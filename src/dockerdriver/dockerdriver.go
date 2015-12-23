@@ -190,8 +190,7 @@ func (dockerdriver *dockerdriver) createEndpoint(w http.ResponseWriter, r *http.
 
 	var interfaceToAttach string
 	interfaceToAttach = ""
-	var ipaddressToAttach string
-	ipaddressToAttach = "127.0.0.2"
+	var ipaddressToAttach string	
 
 	for key, value := range createEndpointRequest.Options {
 		
@@ -206,11 +205,22 @@ func (dockerdriver *dockerdriver) createEndpoint(w http.ResponseWriter, r *http.
 		}
 	}
 
+	
+	// Now with ipam driver, docker will provide an interface 
+	// The values in that interface can be empty (in case of null ipam driver)
+	// or they can contain some pre filled values (if ipam allocates ip addresses)	
 	if createEndpointRequest.Interface != nil {
-		errMessage := "Interface in endpoint creation request is not supported." + createEndpointRequest.Interface.Address
-		fmt.Println (errMessage)
-		setErrorInResponseWriter(w, errMessage)
-		return
+		ipaddressToAttach := createEndpointRequest.Interface.Address
+		message := 
+		fmt.Sprintf(`Interface found in endpoint creation request: 
+					Addr:%s, ID:%v, Ipv6:%s, DstPrefix:%s, GatewayIpv4:%s, MacAddress:%s, SrcName:%s`,
+		 			ipaddressToAttach, createEndpointRequest.Interface.ID, 
+					createEndpointRequest.Interface.AddressIPV6,
+					createEndpointRequest.Interface.DstPrefix, createEndpointRequest.Interface.GatewayIPv4,
+					createEndpointRequest.Interface.MacAddress, createEndpointRequest.Interface.SrcName)
+		fmt.Println (message)
+		//setErrorInResponseWriter(w, errMessage)
+		//return
 	}
 
 	fmt.Printf("Trying to create an endpoint\n\tn/w-id:%s \n\tep-id:%s\n", string(netID), string(endID))
