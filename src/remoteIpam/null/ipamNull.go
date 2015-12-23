@@ -136,7 +136,7 @@ func (ipamNullDriver *ipamNullDriver) requestPool(w http.ResponseWriter, r *http
 	
 	data := make(map[string]string)
 	
-	response := &requestPoolResponseFormat{"", "10.0.0.0/8", data}
+	response := &requestPoolResponseFormat{"", "0.0.0.0/8", data}
 	sendResponse(w, response,
 		"error responding to request pool",
 		"Responded to request pool with empty response")
