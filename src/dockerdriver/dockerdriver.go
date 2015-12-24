@@ -27,257 +27,257 @@ func NewInstance(version string) (DockerDriver, error) {
 	return &dockerdriver{
 		version: version,
 		}, nil
-	}
+}
 
-	func router(w http.ResponseWriter, req *http.Request) {
-		fmt.Println("Handler invoked")
+func router(w http.ResponseWriter, req *http.Request) {
+	fmt.Println("Handler invoked")
 
-		switch req.Method {
-		case "GET":
-			fmt.Println("receiver GET request", req.URL.Path)
-		case "POST":
-			fmt.Println("receiver POST request", req.URL.Path)
-			switch req.URL.Path {
-			case "/Plugin.Activate":
-				fmt.Println("/Plugin.Activate received")
-			}
-		default:
-			fmt.Println("receiver unexpected request", req.Method, "->", req.URL.Path)
+	switch req.Method {
+	case "GET":
+		fmt.Println("receiver GET request", req.URL.Path)
+	case "POST":
+		fmt.Println("receiver POST request", req.URL.Path)
+		switch req.URL.Path {
+		case "/Plugin.Activate":
+			fmt.Println("/Plugin.Activate received")
 		}
+	default:
+		fmt.Println("receiver unexpected request", req.Method, "->", req.URL.Path)
+	}
+}
+
+func (dockerdriver *dockerdriver) StartListening(listener net.Listener) error {
+
+	fmt.Println("Going to listen ...")
+	mux := http.NewServeMux()
+	mux.HandleFunc("/status", dockerdriver.status)
+	mux.HandleFunc("/Plugin.Activate", dockerdriver.activatePlugin)
+	mux.HandleFunc("/NetworkDriver.GetCapabilities", dockerdriver.getCapabilities)
+	mux.HandleFunc("/NetworkDriver.CreateNetwork", dockerdriver.createNetwork)
+	mux.HandleFunc("/NetworkDriver.DeleteNetwork", dockerdriver.deleteNetwork)
+	mux.HandleFunc("/NetworkDriver.CreateEndpoint", dockerdriver.createEndpoint)
+	mux.HandleFunc("/NetworkDriver.Join", dockerdriver.join)
+	mux.HandleFunc("/NetworkDriver.DeleteEndpoint", dockerdriver.deleteEndpoint)
+	mux.HandleFunc("/NetworkDriver.Leave", dockerdriver.leave)
+	mux.HandleFunc("/NetworkDriver.EndpointOperInfo", dockerdriver.endpointOperInfo)
+	fmt.Println("listening ...")
+	return http.Serve(listener, mux)
+}
+
+func (dockerdriver *dockerdriver) status(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, fmt.Sprintln("azure network plugin", dockerdriver.version))
+}
+
+type activationResponse struct {
+	Implements []string
+}
+
+func (dockerdriver *dockerdriver) activatePlugin(w http.ResponseWriter, r *http.Request) {
+	response := &activationResponse{[]string{"NetworkDriver"}}
+	sendResponse(w, response,
+		"error activating plugin",
+		"Plugin activation finished")
+}
+
+func (dockerdriver *dockerdriver) getCapabilities(w http.ResponseWriter, r *http.Request) {
+	capabilities := map[string]string{"Scope": "local"}
+	sendResponse(w, capabilities,
+		"error getting capabilities:",
+		fmt.Sprintf("returned following capabilites %+v", capabilities))
+}
+
+// All request and response formats are well known and are published by libnetwork
+type createNetworkRequestFormat struct {
+	NetworkID string
+	Options   map[string]interface{}
+}
+
+func (dockerdriver *dockerdriver) createNetwork(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("Received a network creation request. Going to check for validity.")
+
+	var createNetworkRequest createNetworkRequestFormat
+
+	decodeReceivedRequest(w, r, &createNetworkRequest,
+		"Error decoding create network request",
+		"Successfully decoded a network creation request")
+
+	netID := createNetworkRequest.NetworkID
+	if dockerdriver.networkExists(netID) {
+		setErrorInResponseWriter(w, "Network with same Id already exists")
+		return
 	}
 
-	func (dockerdriver *dockerdriver) StartListening(listener net.Listener) error {
+	dockerdriver.Lock()
+	if dockerdriver.networkExists(netID) {
+		setErrorInResponseWriter(w, "Network with same Id already exists")
+		return
+	}
+	if(dockerdriver.networks == nil){
+		dockerdriver.networks = make (map[string]*azureNetwork)
+	}
+	dockerdriver.networks[netID] =
+	&azureNetwork{networkId: netID}
+	dockerdriver.Unlock()
 
-		fmt.Println("Going to listen ...")
-		mux := http.NewServeMux()
-		mux.HandleFunc("/status", dockerdriver.status)
-		mux.HandleFunc("/Plugin.Activate", dockerdriver.activatePlugin)
-		mux.HandleFunc("/NetworkDriver.GetCapabilities", dockerdriver.getCapabilities)
-		mux.HandleFunc("/NetworkDriver.CreateNetwork", dockerdriver.createNetwork)
-		mux.HandleFunc("/NetworkDriver.DeleteNetwork", dockerdriver.deleteNetwork)
-		mux.HandleFunc("/NetworkDriver.CreateEndpoint", dockerdriver.createEndpoint)
-		mux.HandleFunc("/NetworkDriver.Join", dockerdriver.join)
-		mux.HandleFunc("/NetworkDriver.DeleteEndpoint", dockerdriver.deleteEndpoint)
-		mux.HandleFunc("/NetworkDriver.Leave", dockerdriver.leave)
-		mux.HandleFunc("/NetworkDriver.EndpointOperInfo", dockerdriver.endpointOperInfo)
-		fmt.Println("listening ...")
-		return http.Serve(listener, mux)
+	// docker do not expect anything in response to a create network call
+	json.NewEncoder(w).Encode(map[string]string{})
+	fmt.Println("Persisted network creation request for network:", netID)
+}
+
+type networkDeleteRequestFormat struct {
+	NetworkID string
+}
+
+func (dockerdriver *dockerdriver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
+	var deleteNetworkRequest networkDeleteRequestFormat
+
+	decodeReceivedRequest(w, r, &deleteNetworkRequest,
+		"Error decoding delete network request",
+		"Successfully decoded a network deletion request")
+
+	deleted := false
+	if(!dockerdriver.networkExists(deleteNetworkRequest.NetworkID)){
+		deleted = true
 	}
 
-	func (dockerdriver *dockerdriver) status(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, fmt.Sprintln("azure network plugin", dockerdriver.version))
-	}
-
-	type activationResponse struct {
-		Implements []string
-	}
-
-	func (dockerdriver *dockerdriver) activatePlugin(w http.ResponseWriter, r *http.Request) {
-		response := &activationResponse{[]string{"NetworkDriver"}}
-		sendResponse(w, response,
-			"error activating plugin",
-			"Plugin activation finished")
-	}
-
-	func (dockerdriver *dockerdriver) getCapabilities(w http.ResponseWriter, r *http.Request) {
-		capabilities := map[string]string{"Scope": "local"}
-		sendResponse(w, capabilities,
-			"error getting capabilities:",
-			fmt.Sprintf("returned following capabilites %+v", capabilities))
-	}
-
-	// All request and response formats are well known and are published by libnetwork
-	type createNetworkRequestFormat struct {
-		NetworkID string
-		Options   map[string]interface{}
-	}
-
-	func (dockerdriver *dockerdriver) createNetwork(w http.ResponseWriter, r *http.Request) {
-
-		fmt.Println("Received a network creation request. Going to check for validity.")
-
-		var createNetworkRequest createNetworkRequestFormat
-
-		decodeReceivedRequest(w, r, &createNetworkRequest,
-			"Error decoding create network request",
-			"Successfully decoded a network creation request")
-
-		netID := createNetworkRequest.NetworkID
-		if dockerdriver.networkExists(netID) {
-			setErrorInResponseWriter(w, "Network with same Id already exists")
-			return
-		}
-
+	if(!deleted){
 		dockerdriver.Lock()
-		if dockerdriver.networkExists(netID) {
-			setErrorInResponseWriter(w, "Network with same Id already exists")
-			return
+		if(dockerdriver.networkExists(deleteNetworkRequest.NetworkID)){
+			delete(dockerdriver.networks, deleteNetworkRequest.NetworkID)
 		}
-		if(dockerdriver.networks == nil){
-			dockerdriver.networks = make (map[string]*azureNetwork)
-		}
-		dockerdriver.networks[netID] =
-		&azureNetwork{networkId: netID}
 		dockerdriver.Unlock()
-
-		// docker do not expect anything in response to a create network call
-		json.NewEncoder(w).Encode(map[string]string{})
-		fmt.Println("Persisted network creation request for network:", netID)
 	}
 
-	type networkDeleteRequestFormat struct {
-		NetworkID string
+	// docker do not expect anything in response to a delete network call
+	json.NewEncoder(w).Encode(map[string]string{})
+	fmt.Printf("Deleted network %s.\n", deleteNetworkRequest.NetworkID)
+}
+
+type azInterface struct{
+	Address string
+	AddressIPV6 string
+	MacAddress string
+	ID         int
+	SrcName    string
+	DstPrefix  string
+	GatewayIPv4 string
+}
+
+type createEndpointRequestFormat struct {
+	NetworkID  string
+	EndpointID string
+	Options    map[string]interface{}
+	Interface  *azInterface
+}
+
+type endpointResponse struct {
+	Interface azInterface
+}
+
+func (dockerdriver *dockerdriver) createEndpoint(w http.ResponseWriter, r *http.Request) {
+	var createEndpointRequest createEndpointRequestFormat
+
+	decodeReceivedRequest(w, r, &createEndpointRequest,
+		"Error decoding create endpoint request",
+		"Successfully decoded the endpoint creation request")
+
+	netID := createEndpointRequest.NetworkID
+	endID := createEndpointRequest.EndpointID
+
+	if(!dockerdriver.networkExists(netID)){
+		setErrorInResponseWriter(w, fmt.Sprintf("Could not find the network on which endpoint is requested: %s", netID))
+		return
 	}
 
-	func (dockerdriver *dockerdriver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
-		var deleteNetworkRequest networkDeleteRequestFormat
+	var interfaceToAttach string
+	interfaceToAttach = ""
+	var ipaddressToAttach string
 
-		decodeReceivedRequest(w, r, &deleteNetworkRequest,
-			"Error decoding delete network request",
-			"Successfully decoded a network deletion request")
+	for key, value := range createEndpointRequest.Options {
 
-		deleted := false
-		if(!dockerdriver.networkExists(deleteNetworkRequest.NetworkID)){
-			deleted = true
+		if key == "eth" {
+			interfaceToAttach = value.(string)
+			fmt.Println("Received request to attach following interface: ", value)
 		}
 
-		if(!deleted){
-			dockerdriver.Lock()
-			if(dockerdriver.networkExists(deleteNetworkRequest.NetworkID)){
-				delete(dockerdriver.networks, deleteNetworkRequest.NetworkID)
-			}
-			dockerdriver.Unlock()
+		if key == "com.docker.network.endpoint.ipaddresstoattach" {
+			ipaddressToAttach = value.(string)
+			fmt.Println("Received request to attach following ipaddress: ", value)
 		}
-
-		// docker do not expect anything in response to a delete network call
-		json.NewEncoder(w).Encode(map[string]string{})
-		fmt.Printf("Deleted network %s.\n", deleteNetworkRequest.NetworkID)
 	}
 
-	type azInterface struct{
-		Address string
-		AddressIPV6 string
-		MacAddress string
-		ID         int
-		SrcName    string
-		DstPrefix  string
-		GatewayIPv4 string
+
+	// Now with ipam driver, docker will provide an interface
+	// The values in that interface can be empty (in case of null ipam driver)
+	// or they can contain some pre filled values (if ipam allocates ip addresses)
+	if createEndpointRequest.Interface != nil {
+		ipaddressToAttach := createEndpointRequest.Interface.Address
+		message :=
+		fmt.Sprintf(`Interface found in endpoint creation request:
+			Addr:%s, ID:%v, Ipv6:%s, DstPrefix:%s, GatewayIpv4:%s, MacAddress:%s, SrcName:%s`,
+			ipaddressToAttach, createEndpointRequest.Interface.ID,
+			createEndpointRequest.Interface.AddressIPV6,
+			createEndpointRequest.Interface.DstPrefix, createEndpointRequest.Interface.GatewayIPv4,
+			createEndpointRequest.Interface.MacAddress, createEndpointRequest.Interface.SrcName)
+		fmt.Println (message)
+		//setErrorInResponseWriter(w, errMessage)
+		//return
 	}
 
-	type createEndpointRequestFormat struct {
-		NetworkID  string
-		EndpointID string
-		Options    map[string]interface{}
-		Interface  *azInterface
+	fmt.Printf("Trying to create an endpoint\n\tn/w-id:%s \n\tep-id:%s\n", string(netID), string(endID))
+
+	// lets lock driver for now.. will optimize later
+	dockerdriver.Lock()
+	if(!dockerdriver.networkExists(netID)){
+		setErrorInResponseWriter(w, fmt.Sprintf("Could not find [networkID:%s]\n", netID))
+		return
+	}
+	if(dockerdriver.endpointExists(netID, endID)){
+		setErrorInResponseWriter(w, fmt.Sprintf("Endpoint already exists [networkID:%s endpointID:%s]\n", netID, endID))
+		return
 	}
 
-	type endpointResponse struct {
-		Interface azInterface
-	}
+	fmt.Printf("Endpoint created successfully " +
+		"\n\tn/w-id:%s \n\tep-id:%s\n", string(netID), string(endID))
 
-	func (dockerdriver *dockerdriver) createEndpoint(w http.ResponseWriter, r *http.Request) {
-		var createEndpointRequest createEndpointRequestFormat
+	rAddress,
+	rAddressIPV6,
+	rMacAddress,
+	rID,
+	rSrcName,
+	rDstPrefix,
+	rGatewayIPv4, ermsg := azure.GetInterfaceToAttach(interfaceToAttach, ipaddressToAttach)
 
-		decodeReceivedRequest(w, r, &createEndpointRequest,
-			"Error decoding create endpoint request",
-			"Successfully decoded the endpoint creation request")
-
-		netID := createEndpointRequest.NetworkID
-		endID := createEndpointRequest.EndpointID
-
-		if(!dockerdriver.networkExists(netID)){
-			setErrorInResponseWriter(w, fmt.Sprintf("Could not find the network on which endpoint is requested: %s", netID))
-			return
-		}
-
-		var interfaceToAttach string
-		interfaceToAttach = ""
-		var ipaddressToAttach string
-
-		for key, value := range createEndpointRequest.Options {
-
-			if key == "eth" {
-				interfaceToAttach = value.(string)
-				fmt.Println("Received request to attach following interface: ", value)
-			}
-
-			if key == "com.docker.network.endpoint.ipaddresstoattach" {
-				ipaddressToAttach = value.(string)
-				fmt.Println("Received request to attach following ipaddress: ", value)
-			}
-		}
-
-
-		// Now with ipam driver, docker will provide an interface
-		// The values in that interface can be empty (in case of null ipam driver)
-		// or they can contain some pre filled values (if ipam allocates ip addresses)
-		if createEndpointRequest.Interface != nil {
-			ipaddressToAttach := createEndpointRequest.Interface.Address
-			message :=
-			fmt.Sprintf(`Interface found in endpoint creation request:
-				Addr:%s, ID:%v, Ipv6:%s, DstPrefix:%s, GatewayIpv4:%s, MacAddress:%s, SrcName:%s`,
-				ipaddressToAttach, createEndpointRequest.Interface.ID,
-				createEndpointRequest.Interface.AddressIPV6,
-				createEndpointRequest.Interface.DstPrefix, createEndpointRequest.Interface.GatewayIPv4,
-				createEndpointRequest.Interface.MacAddress, createEndpointRequest.Interface.SrcName)
-			fmt.Println (message)
-			//setErrorInResponseWriter(w, errMessage)
-			//return
-		}
-
-		fmt.Printf("Trying to create an endpoint\n\tn/w-id:%s \n\tep-id:%s\n", string(netID), string(endID))
-
-		// lets lock driver for now.. will optimize later
-		dockerdriver.Lock()
-		if(!dockerdriver.networkExists(netID)){
-			setErrorInResponseWriter(w, fmt.Sprintf("Could not find [networkID:%s]\n", netID))
-			return
-		}
-		if(dockerdriver.endpointExists(netID, endID)){
-			setErrorInResponseWriter(w, fmt.Sprintf("Endpoint already exists [networkID:%s endpointID:%s]\n", netID, endID))
-			return
-		}
-
-		fmt.Printf("Endpoint created successfully " +
-			"\n\tn/w-id:%s \n\tep-id:%s\n", string(netID), string(endID))
-
-		rAddress,
-		rAddressIPV6,
-		rMacAddress,
-		rID,
-		rSrcName,
-		rDstPrefix,
-		rGatewayIPv4, ermsg := azure.GetInterfaceToAttach(interfaceToAttach, ipaddressToAttach)
-
-		if(ermsg != "" ){
-			setErrorInResponseWriter(w, ermsg)
-			dockerdriver.Unlock()
-			return
-		}
-
-		targetInterface := azureInterface{
-			Address: rAddress,
-			AddressIPV6: rAddressIPV6,
-			MacAddress: rMacAddress,
-			ID: rID,
-			SrcName: rSrcName,
-			DstPrefix: rDstPrefix,
-			GatewayIPv4: rGatewayIPv4,
-		}
-		network := dockerdriver.networks[netID]
-		if(network.endpoints == nil){
-			network.endpoints = make(map[string]*azureEndpoint)
-		}
-		network.endpoints[endID] = &azureEndpoint{endpointID: endID, networkID: netID}
-		network.endpoints[endID].azureInterface = targetInterface
-
+	if(ermsg != "" ){
+		setErrorInResponseWriter(w, ermsg)
 		dockerdriver.Unlock()
+		return
+	}
 
-		/*defer func() {
-		if err != nil {
-		n.Lock()
-		delete(n.endpoints, eid)
-		n.Unlock()
+	targetInterface := azureInterface{
+		Address: rAddress,
+		AddressIPV6: rAddressIPV6,
+		MacAddress: rMacAddress,
+		ID: rID,
+		SrcName: rSrcName,
+		DstPrefix: rDstPrefix,
+		GatewayIPv4: rGatewayIPv4,
+	}
+	network := dockerdriver.networks[netID]
+	if(network.endpoints == nil){
+		network.endpoints = make(map[string]*azureEndpoint)
+	}
+	network.endpoints[endID] = &azureEndpoint{endpointID: endID, networkID: netID}
+	network.endpoints[endID].azureInterface = targetInterface
+
+	dockerdriver.Unlock()
+
+	/*defer func() {
+	if err != nil {
+	n.Lock()
+	delete(n.endpoints, eid)
+	n.Unlock()
 	}
 	}()*/
 
@@ -379,65 +379,65 @@ func (dockerdriver *dockerdriver) deleteEndpoint(w http.ResponseWriter, r *http.
 	if(!dockerdriver.endpointExists(netID, endID)){
 		// idempotent or throw error?
 		fmt.Println("Endpoint not found network: ", netID, " endpointID: ", endID)
-		}else{
-			network := dockerdriver.networks[netID]
-			delete(network.endpoints, endID)
-		}
-		dockerdriver.Unlock()
-		json.NewEncoder(w).Encode(map[string]string{})
-		fmt.Printf("Deleted endpoint %s", endpointDeleteRequest.EndpointID)
+	}else{
+		network := dockerdriver.networks[netID]
+		delete(network.endpoints, endID)
 	}
+	dockerdriver.Unlock()
+	json.NewEncoder(w).Encode(map[string]string{})
+	fmt.Printf("Deleted endpoint %s", endpointDeleteRequest.EndpointID)
+}
 
-	type leaveRequestFormat struct {
-		NetworkID  string
-		EndpointID string
-	}
+type leaveRequestFormat struct {
+	NetworkID  string
+	EndpointID string
+}
 
-	type leaveResponse struct {
-	}
+type leaveResponse struct {
+}
 
-	func (dockerdriver *dockerdriver) leave(w http.ResponseWriter, r *http.Request) {
-		var leaveRequest leaveRequestFormat
+func (dockerdriver *dockerdriver) leave(w http.ResponseWriter, r *http.Request) {
+	var leaveRequest leaveRequestFormat
 
-		decodeReceivedRequest(w, r, &leaveRequest,
-			"Unable to decode leaveRequest",
-			"Successfully decoded leaveRequest")
+	decodeReceivedRequest(w, r, &leaveRequest,
+		"Unable to decode leaveRequest",
+		"Successfully decoded leaveRequest")
 
-		fmt.Printf("Successfully executed leave\n Network: %s\n Endpoint: %s \n",
-			leaveRequest.NetworkID, leaveRequest.EndpointID)
+	fmt.Printf("Successfully executed leave\n Network: %s\n Endpoint: %s \n",
+		leaveRequest.NetworkID, leaveRequest.EndpointID)
 
-		res := &leaveResponse{}
-		sendResponse(w, res,
-			"Failed to send response for leave",
-			"Successfully responded to leave")
-	}
+	res := &leaveResponse{}
+	sendResponse(w, res,
+		"Failed to send response for leave",
+		"Successfully responded to leave")
+}
 
-	type endpointOperInfoRequestFormat struct {
-		NetworkID  string
-		EndpointID string
-	}
+type endpointOperInfoRequestFormat struct {
+	NetworkID  string
+	EndpointID string
+}
 
-	type endpointOperInfoResponseFormat struct {
-		Value map[string]interface{}
-	}
+type endpointOperInfoResponseFormat struct {
+	Value map[string]interface{}
+}
 
-	func (dockerdriver *dockerdriver) endpointOperInfo(w http.ResponseWriter, r *http.Request) {
-		var endpointOperInfoRequest endpointOperInfoRequestFormat
+func (dockerdriver *dockerdriver) endpointOperInfo(w http.ResponseWriter, r *http.Request) {
+	var endpointOperInfoRequest endpointOperInfoRequestFormat
 
-		decodeReceivedRequest(w, r, &endpointOperInfoRequest,
-			"Unable to decode endpointOperationInfoRequest",
-			"Successfully decoded endpointOperationInfoRequest")
+	decodeReceivedRequest(w, r, &endpointOperInfoRequest,
+		"Unable to decode endpointOperationInfoRequest",
+		"Successfully decoded endpointOperationInfoRequest")
 
-		resp := make(map[string]interface{})
-		//resp["com.docker.network.endpoint.macaddress"] = macAddress
-		// resp["MacAddress"] = macAddress
+	resp := make(map[string]interface{})
+	//resp["com.docker.network.endpoint.macaddress"] = macAddress
+	// resp["MacAddress"] = macAddress
 
-		res := &endpointOperInfoResponseFormat{Value: resp}
+	res := &endpointOperInfoResponseFormat{Value: resp}
 
-		sendResponse(w, res,
-			"Failed to send response for endpointOperationInfoRequest",
-			"Successfully responded to endpointOperationInfoRequest")
+	sendResponse(w, res,
+		"Failed to send response for endpointOperationInfoRequest",
+		"Successfully responded to endpointOperationInfoRequest")
 
-		fmt.Println("Successfully responded to endpoint Oper Info request: ",
-			endpointOperInfoRequest.EndpointID)
-	}
+	fmt.Println("Successfully responded to endpoint Oper Info request: ",
+		endpointOperInfoRequest.EndpointID)
+}
