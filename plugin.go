@@ -9,8 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"dockerdriver"
-	ipamNull "remoteIpam/null"
+
+    "github.com/sharmasushant/penguin/network"
+	ipamNull "github.com/sharmasushant/penguin/ipam/null"
 )
 
 var Version string = "V0"
@@ -49,7 +50,7 @@ func initNetworkDriver(){
 	// create a channel that can receive errors from driver
 	// any unhandled error from driver will be sent to this channel
 	errorChan := make(chan error, 1)
-	driver, err := dockerdriver.NewInstance(Version)
+	driver, err := network.NewInstance(Version)
 	go func() {
 		errorChan <- driver.StartListening(driverListener)
 	}()

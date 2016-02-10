@@ -1,7 +1,7 @@
 // Copyright Microsoft Corp.
 // All rights reserved.
 
-package dockerdriver
+package network
 
 import (
 	"encoding/json"

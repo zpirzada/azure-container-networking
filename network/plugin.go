@@ -1,7 +1,7 @@
 // Copyright Microsoft Corp.
 // All rights reserved.
 
-package dockerdriver
+package network
 
 import (
 	"encoding/json"
@@ -10,7 +10,8 @@ import (
 	"net"
 	"net/http"
 	"sync"
-	"core"
+
+    "github.com/sharmasushant/penguin/core"
 )
 
 type dockerdriver struct {
@@ -247,7 +248,7 @@ func (dockerdriver *dockerdriver) createEndpoint(w http.ResponseWriter, r *http.
 	rID,
 	rSrcName,
 	rDstPrefix,
-	rGatewayIPv4, ermsg := azure.GetInterfaceToAttach(interfaceToAttach, ipaddressToAttach)
+	rGatewayIPv4, ermsg := core.GetInterfaceToAttach(interfaceToAttach, ipaddressToAttach)
 
 	if(ermsg != "" ){
 		setErrorInResponseWriter(w, ermsg)

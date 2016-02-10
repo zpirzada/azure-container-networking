@@ -1,7 +1,7 @@
 // Copyright Microsoft Corp.
 // All rights reserved.
 
-package azure
+package core
 
 import (
 	"fmt"
