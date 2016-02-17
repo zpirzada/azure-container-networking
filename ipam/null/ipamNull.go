@@ -11,17 +11,17 @@ import (
 	"sync"
 )
 
-type ipamNullDriver struct {
+type ipamPlugin struct {
 	version string
 	sync.Mutex
 }
 
-type IpamDriver interface {
+type IpamPlugin interface {
 	StartListening(net.Listener) error
 }
 
-func NewInstance(version string) (IpamDriver, error) {
-	return &ipamNullDriver{
+func NewPlugin(version string) (IpamPlugin, error) {
+	return &ipamPlugin {
 		version: version,
 	}, nil
 }
@@ -43,16 +43,16 @@ func router(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (ipamNullDriver *ipamNullDriver) StartListening(listener net.Listener) error {
+func (plugin *ipamPlugin) StartListening(listener net.Listener) error {
 
 	fmt.Println("Null IPAM driver going to listen ...")
 	mux := http.NewServeMux()
-	mux.HandleFunc("/Plugin.Activate", ipamNullDriver.activatePlugin)
-	mux.HandleFunc("/IpamDriver.GetDefaultAddressSpaces", ipamNullDriver.getDefaultAddressSpaces)
-	mux.HandleFunc("/IpamDriver.RequestPool", ipamNullDriver.requestPool)
-	mux.HandleFunc("/IpamDriver.ReleasePool", ipamNullDriver.releasePool)
-	mux.HandleFunc("/IpamDriver.RequestAddress", ipamNullDriver.requestAddress)
-	mux.HandleFunc("/IpamDriver.ReleaseAddress", ipamNullDriver.releaseAddress)
+	mux.HandleFunc("/Plugin.Activate", plugin.activatePlugin)
+	mux.HandleFunc("/IpamDriver.GetDefaultAddressSpaces", plugin.getDefaultAddressSpaces)
+	mux.HandleFunc("/IpamDriver.RequestPool", plugin.requestPool)
+	mux.HandleFunc("/IpamDriver.ReleasePool", plugin.releasePool)
+	mux.HandleFunc("/IpamDriver.RequestAddress", plugin.requestAddress)
+	mux.HandleFunc("/IpamDriver.ReleaseAddress", plugin.releaseAddress)
 	fmt.Println("Null IPAM driver is now listening ...")
 	return http.Serve(listener, mux)
 }
@@ -90,7 +90,7 @@ type activationResponse struct {
 	Implements []string
 }
 
-func (ipamNullDriver *ipamNullDriver) activatePlugin(w http.ResponseWriter, r *http.Request) {
+func (plugin *ipamPlugin) activatePlugin(w http.ResponseWriter, r *http.Request) {
 	response := &activationResponse{[]string{"IpamDriver"}}
 	sendResponse(w, response,
 		"error activating ipam plugin",
@@ -102,7 +102,7 @@ type defaultAddressSpacesResponseFormat struct {
 	GlobalDefaultAddressSpace string
 }
 
-func (ipamNullDriver *ipamNullDriver) getDefaultAddressSpaces(w http.ResponseWriter, r *http.Request) {
+func (plugin *ipamPlugin) getDefaultAddressSpaces(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Get default address space request received")
 
 	response := &defaultAddressSpacesResponseFormat{
@@ -128,7 +128,7 @@ type requestPoolResponseFormat struct {
 	Data	map[string]string
 }
 
-func (ipamNullDriver *ipamNullDriver) requestPool(w http.ResponseWriter, r *http.Request) {
+func (plugin *ipamPlugin) requestPool(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Request pool request received")
 	var requestPoolRequest requestPoolRequestFormat
 
@@ -151,7 +151,7 @@ type releasePoolRequestFormat struct{
 type releasePoolResponseFormat struct{
 }
 
-func (ipamNullDriver *ipamNullDriver) releasePool(w http.ResponseWriter, r *http.Request) {
+func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Release pool request received")
 
 	var releasePoolRequest releasePoolRequestFormat
@@ -179,7 +179,7 @@ type requestAddressResponseFormat struct {
 	Options	map[string]string
 }
 
-func (ipamNullDriver *ipamNullDriver) requestAddress(w http.ResponseWriter, r *http.Request) {
+func (plugin *ipamPlugin) requestAddress(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Received request to reserve an ip address.")
 
@@ -200,7 +200,7 @@ type releaseAddressRequestFormat struct {
 	Address	string
 }
 
-func (ipamNullDriver *ipamNullDriver) releaseAddress(w http.ResponseWriter, r *http.Request) {
+func (plugin *ipamPlugin) releaseAddress(w http.ResponseWriter, r *http.Request) {
 	var releaseAddressRequest releaseAddressRequestFormat
 
 	decodeReceivedRequest(w, r, &releaseAddressRequest,

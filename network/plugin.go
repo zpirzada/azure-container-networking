@@ -14,18 +14,18 @@ import (
     "github.com/sharmasushant/penguin/core"
 )
 
-type dockerdriver struct {
+type netPlugin struct {
 	version string
 	networks map[string]*azureNetwork
 	sync.Mutex
 }
 
-type DockerDriver interface {
+type NetPlugin interface {
 	StartListening(net.Listener) error
 }
 
-func NewInstance(version string) (DockerDriver, error) {
-	return &dockerdriver{
+func NewPlugin(version string) (NetPlugin, error) {
+	return &netPlugin {
 		version: version,
 		}, nil
 }
@@ -47,40 +47,60 @@ func router(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (dockerdriver *dockerdriver) StartListening(listener net.Listener) error {
+func (plugin *netPlugin) StartListening(listener net.Listener) error {
 
 	fmt.Println("Going to listen ...")
 	mux := http.NewServeMux()
-	mux.HandleFunc("/status", dockerdriver.status)
-	mux.HandleFunc("/Plugin.Activate", dockerdriver.activatePlugin)
-	mux.HandleFunc("/NetworkDriver.GetCapabilities", dockerdriver.getCapabilities)
-	mux.HandleFunc("/NetworkDriver.CreateNetwork", dockerdriver.createNetwork)
-	mux.HandleFunc("/NetworkDriver.DeleteNetwork", dockerdriver.deleteNetwork)
-	mux.HandleFunc("/NetworkDriver.CreateEndpoint", dockerdriver.createEndpoint)
-	mux.HandleFunc("/NetworkDriver.Join", dockerdriver.join)
-	mux.HandleFunc("/NetworkDriver.DeleteEndpoint", dockerdriver.deleteEndpoint)
-	mux.HandleFunc("/NetworkDriver.Leave", dockerdriver.leave)
-	mux.HandleFunc("/NetworkDriver.EndpointOperInfo", dockerdriver.endpointOperInfo)
+	mux.HandleFunc("/status", plugin.status)
+	mux.HandleFunc("/Plugin.Activate", plugin.activatePlugin)
+	mux.HandleFunc("/NetworkDriver.GetCapabilities", plugin.getCapabilities)
+	mux.HandleFunc("/NetworkDriver.CreateNetwork", plugin.createNetwork)
+	mux.HandleFunc("/NetworkDriver.DeleteNetwork", plugin.deleteNetwork)
+	mux.HandleFunc("/NetworkDriver.CreateEndpoint", plugin.createEndpoint)
+	mux.HandleFunc("/NetworkDriver.Join", plugin.join)
+	mux.HandleFunc("/NetworkDriver.DeleteEndpoint", plugin.deleteEndpoint)
+	mux.HandleFunc("/NetworkDriver.Leave", plugin.leave)
+	mux.HandleFunc("/NetworkDriver.EndpointOperInfo", plugin.endpointOperInfo)
 	fmt.Println("listening ...")
 	return http.Serve(listener, mux)
 }
 
-func (dockerdriver *dockerdriver) status(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, fmt.Sprintln("azure network plugin", dockerdriver.version))
+func (plugin *netPlugin) networkExists(networkID string) bool {
+	if plugin.networks[networkID] != nil {
+		return true
+	}
+	return false
+}
+
+func (plugin *netPlugin) endpointExists(networkID string, endpointID string) bool {
+	network := plugin.networks[networkID]
+	if network == nil {
+		return false
+	}
+
+	if network.endpoints[endpointID] == nil {
+		return false
+	}
+
+	return true
+}
+
+func (plugin *netPlugin) status(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, fmt.Sprintln("azure network plugin", plugin.version))
 }
 
 type activationResponse struct {
 	Implements []string
 }
 
-func (dockerdriver *dockerdriver) activatePlugin(w http.ResponseWriter, r *http.Request) {
+func (plugin *netPlugin) activatePlugin(w http.ResponseWriter, r *http.Request) {
 	response := &activationResponse{[]string{"NetworkDriver"}}
 	sendResponse(w, response,
 		"error activating plugin",
 		"Plugin activation finished")
 }
 
-func (dockerdriver *dockerdriver) getCapabilities(w http.ResponseWriter, r *http.Request) {
+func (plugin *netPlugin) getCapabilities(w http.ResponseWriter, r *http.Request) {
 	capabilities := map[string]string{"Scope": "local"}
 	sendResponse(w, capabilities,
 		"error getting capabilities:",
@@ -93,7 +113,7 @@ type createNetworkRequestFormat struct {
 	Options   map[string]interface{}
 }
 
-func (dockerdriver *dockerdriver) createNetwork(w http.ResponseWriter, r *http.Request) {
+func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Received a network creation request. Going to check for validity.")
 
@@ -104,22 +124,21 @@ func (dockerdriver *dockerdriver) createNetwork(w http.ResponseWriter, r *http.R
 		"Successfully decoded a network creation request")
 
 	netID := createNetworkRequest.NetworkID
-	if dockerdriver.networkExists(netID) {
+	if plugin.networkExists(netID) {
 		setErrorInResponseWriter(w, "Network with same Id already exists")
 		return
 	}
 
-	dockerdriver.Lock()
-	if dockerdriver.networkExists(netID) {
+	plugin.Lock()
+	if plugin.networkExists(netID) {
 		setErrorInResponseWriter(w, "Network with same Id already exists")
 		return
 	}
-	if(dockerdriver.networks == nil){
-		dockerdriver.networks = make (map[string]*azureNetwork)
+	if plugin.networks == nil {
+		plugin.networks = make (map[string]*azureNetwork)
 	}
-	dockerdriver.networks[netID] =
-	&azureNetwork{networkId: netID}
-	dockerdriver.Unlock()
+	plugin.networks[netID] = &azureNetwork{networkId: netID}
+	plugin.Unlock()
 
 	// docker do not expect anything in response to a create network call
 	json.NewEncoder(w).Encode(map[string]string{})
@@ -130,7 +149,7 @@ type networkDeleteRequestFormat struct {
 	NetworkID string
 }
 
-func (dockerdriver *dockerdriver) deleteNetwork(w http.ResponseWriter, r *http.Request) {
+func (plugin *netPlugin) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	var deleteNetworkRequest networkDeleteRequestFormat
 
 	decodeReceivedRequest(w, r, &deleteNetworkRequest,
@@ -138,16 +157,16 @@ func (dockerdriver *dockerdriver) deleteNetwork(w http.ResponseWriter, r *http.R
 		"Successfully decoded a network deletion request")
 
 	deleted := false
-	if(!dockerdriver.networkExists(deleteNetworkRequest.NetworkID)){
+	if !plugin.networkExists(deleteNetworkRequest.NetworkID) {
 		deleted = true
 	}
 
 	if(!deleted){
-		dockerdriver.Lock()
-		if(dockerdriver.networkExists(deleteNetworkRequest.NetworkID)){
-			delete(dockerdriver.networks, deleteNetworkRequest.NetworkID)
+		plugin.Lock()
+		if plugin.networkExists(deleteNetworkRequest.NetworkID) {
+			delete(plugin.networks, deleteNetworkRequest.NetworkID)
 		}
-		dockerdriver.Unlock()
+		plugin.Unlock()
 	}
 
 	// docker do not expect anything in response to a delete network call
@@ -176,7 +195,7 @@ type endpointResponse struct {
 	Interface azInterface
 }
 
-func (dockerdriver *dockerdriver) createEndpoint(w http.ResponseWriter, r *http.Request) {
+func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) {
 	var createEndpointRequest createEndpointRequestFormat
 
 	decodeReceivedRequest(w, r, &createEndpointRequest,
@@ -186,7 +205,7 @@ func (dockerdriver *dockerdriver) createEndpoint(w http.ResponseWriter, r *http.
 	netID := createEndpointRequest.NetworkID
 	endID := createEndpointRequest.EndpointID
 
-	if(!dockerdriver.networkExists(netID)){
+	if !plugin.networkExists(netID) {
 		setErrorInResponseWriter(w, fmt.Sprintf("Could not find the network on which endpoint is requested: %s", netID))
 		return
 	}
@@ -229,12 +248,12 @@ func (dockerdriver *dockerdriver) createEndpoint(w http.ResponseWriter, r *http.
 	fmt.Printf("Trying to create an endpoint\n\tn/w-id:%s \n\tep-id:%s\n", string(netID), string(endID))
 
 	// lets lock driver for now.. will optimize later
-	dockerdriver.Lock()
-	if(!dockerdriver.networkExists(netID)){
+	plugin.Lock()
+	if !plugin.networkExists(netID) {
 		setErrorInResponseWriter(w, fmt.Sprintf("Could not find [networkID:%s]\n", netID))
 		return
 	}
-	if(dockerdriver.endpointExists(netID, endID)){
+	if plugin.endpointExists(netID, endID) {
 		setErrorInResponseWriter(w, fmt.Sprintf("Endpoint already exists [networkID:%s endpointID:%s]\n", netID, endID))
 		return
 	}
@@ -252,7 +271,7 @@ func (dockerdriver *dockerdriver) createEndpoint(w http.ResponseWriter, r *http.
 
 	if(ermsg != "" ){
 		setErrorInResponseWriter(w, ermsg)
-		dockerdriver.Unlock()
+		plugin.Unlock()
 		return
 	}
 
@@ -265,14 +284,14 @@ func (dockerdriver *dockerdriver) createEndpoint(w http.ResponseWriter, r *http.
 		DstPrefix: rDstPrefix,
 		GatewayIPv4: rGatewayIPv4,
 	}
-	network := dockerdriver.networks[netID]
+	network := plugin.networks[netID]
 	if(network.endpoints == nil){
 		network.endpoints = make(map[string]*azureEndpoint)
 	}
 	network.endpoints[endID] = &azureEndpoint{endpointID: endID, networkID: netID}
 	network.endpoints[endID].azureInterface = targetInterface
 
-	dockerdriver.Unlock()
+	plugin.Unlock()
 
 	/*defer func() {
 	if err != nil {
@@ -324,7 +343,7 @@ type staticRoute struct {
 	NextHop     string
 }
 
-func (dockerdriver *dockerdriver) join(w http.ResponseWriter, r *http.Request) {
+func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 	var joinRequest joinRequestFormat
 	decodeReceivedRequest(w, r, &joinRequest,
 		"Unable to decode join request",
@@ -335,11 +354,11 @@ func (dockerdriver *dockerdriver) join(w http.ResponseWriter, r *http.Request) {
 	sandboxKey := joinRequest.SandboxKey
 	fmt.Println("Received a request to join endpoint: ", endID, " network: ", netID)
 
-	if(!dockerdriver.endpointExists(netID, endID)){
+	if !plugin.endpointExists(netID, endID) {
 		setErrorInResponseWriter(w, "cannot find endpoint for which join is requested")
 		return
 	}
-	endpoint := dockerdriver.networks[netID].endpoints[endID]
+	endpoint := plugin.networks[netID].endpoints[endID]
 	ifname := &interfaceToJoin{
 		SrcName:   endpoint.azureInterface.SrcName,
 		DstPrefix: endpoint.azureInterface.DstPrefix,
@@ -349,9 +368,11 @@ func (dockerdriver *dockerdriver) join(w http.ResponseWriter, r *http.Request) {
 		InterfaceName: *ifname,
 		Gateway: endpoint.azureInterface.GatewayIPv4.String(),
 	}
-	dockerdriver.Lock()
+
+	plugin.Lock()
 	endpoint.sandboxKey = sandboxKey
-	dockerdriver.Unlock()
+	plugin.Unlock()
+
 	sendResponse(w, res,
 		"Failed to send response for endpoint join",
 		"Successfully responded with the interface to Join")
@@ -367,7 +388,7 @@ type endpointDeleteRequestFormat struct {
 	EndpointID string
 }
 
-func (dockerdriver *dockerdriver) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
+func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
 	var endpointDeleteRequest endpointDeleteRequestFormat
 
 	decodeReceivedRequest(w, r, &endpointDeleteRequest,
@@ -376,15 +397,15 @@ func (dockerdriver *dockerdriver) deleteEndpoint(w http.ResponseWriter, r *http.
 
 	netID := endpointDeleteRequest.NetworkID
 	endID := endpointDeleteRequest.EndpointID
-	dockerdriver.Lock()
-	if(!dockerdriver.endpointExists(netID, endID)){
+	plugin.Lock()
+	if !plugin.endpointExists(netID, endID) {
 		// idempotent or throw error?
 		fmt.Println("Endpoint not found network: ", netID, " endpointID: ", endID)
 	}else{
-		network := dockerdriver.networks[netID]
+		network := plugin.networks[netID]
 		delete(network.endpoints, endID)
 	}
-	dockerdriver.Unlock()
+	plugin.Unlock()
 	json.NewEncoder(w).Encode(map[string]string{})
 	fmt.Printf("Deleted endpoint %s", endpointDeleteRequest.EndpointID)
 }
@@ -397,7 +418,7 @@ type leaveRequestFormat struct {
 type leaveResponse struct {
 }
 
-func (dockerdriver *dockerdriver) leave(w http.ResponseWriter, r *http.Request) {
+func (plugin *netPlugin) leave(w http.ResponseWriter, r *http.Request) {
 	var leaveRequest leaveRequestFormat
 
 	decodeReceivedRequest(w, r, &leaveRequest,
@@ -422,7 +443,7 @@ type endpointOperInfoResponseFormat struct {
 	Value map[string]interface{}
 }
 
-func (dockerdriver *dockerdriver) endpointOperInfo(w http.ResponseWriter, r *http.Request) {
+func (plugin *netPlugin) endpointOperInfo(w http.ResponseWriter, r *http.Request) {
 	var endpointOperInfoRequest endpointOperInfoRequestFormat
 
 	decodeReceivedRequest(w, r, &endpointOperInfoRequest,

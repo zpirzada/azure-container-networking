@@ -50,7 +50,7 @@ func initNetworkDriver(){
 	// create a channel that can receive errors from driver
 	// any unhandled error from driver will be sent to this channel
 	errorChan := make(chan error, 1)
-	driver, err := network.NewInstance(Version)
+	driver, err := network.NewPlugin(Version)
 	go func() {
 		errorChan <- driver.StartListening(driverListener)
 	}()
@@ -93,7 +93,7 @@ func initNullIpam(){
 	// create a channel that can receive errors from driver
 	// any unhandled error from driver will be sent to this channel
 	errorChan := make(chan error, 1)
-	driver, err := ipamNull.NewInstance(ipamVersion)
+	driver, err := ipamNull.NewPlugin(ipamVersion)
 	go func() {
 		errorChan <- driver.StartListening(driverListener)
 	}()
