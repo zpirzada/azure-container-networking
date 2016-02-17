@@ -37,14 +37,14 @@ func setErrorInResponseWriter(w http.ResponseWriter, errMessage string){
 	json.NewEncoder(w).Encode(map[string]string{"Err": errMessage,})
 }
 
-func (dockerdriver *dockerdriver) networkExists(networkID string) bool{
+func (dockerdriver *netPlugin) networkExists(networkID string) bool{
 	if dockerdriver.networks[networkID] != nil {
 		return true
 	}
 	return false
 }
 
-func (dockerdriver *dockerdriver) endpointExists(networkID string, endpointID string) bool{
+func (dockerdriver *netPlugin) endpointExists(networkID string, endpointID string) bool{
 	network := dockerdriver.networks[networkID]
 	if network == nil {
 		return false

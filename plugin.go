@@ -5,110 +5,112 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
+    "github.com/sharmasushant/penguin/core"
     "github.com/sharmasushant/penguin/network"
 	ipamNull "github.com/sharmasushant/penguin/ipam/null"
 )
 
-var Version string = "V0"
-var ipamVersion string = "V0"
+// Plugin name
+const pluginName = "penguin"
+
+// Plugins versions
+const networkVersion string = "V0"
+const ipamVersion string = "V0"
+
+// Plugin object
+type Plugin struct {
+    version string
+    listener *core.Listener
+    netPlugin network.NetPlugin
+    ipamPlugin ipamNull.IpamPlugin
+}
 
 func main() {
-	arguments := os.Args
-	if(len(arguments)>1 && os.Args[1] == "startipam"){
-		initNullIpam()
-	}else{
-		initNetworkDriver()
-	}
+    var plugin Plugin
+    var err error
 
-}
+    plugin.version = "1"
 
-func initNetworkDriver(){
-	// create a server on which we will listen for incoming calls from libnetwork
-	os.MkdirAll("/run/docker/plugins", 0660)
-	driverListener, err := net.Listen("unix", "/run/docker/plugins/penguin.sock")
-	if err != nil {
-		fmt.Println("Error setting up driver listener: ", err)
-	}
-	defer driverListener.Close()
+    fmt.Printf("Plugin %s starting...\n", pluginName)
 
-	// For now, driver can shutdown on two conditions
-	//    a. If some unhandled exception happens in the driver
-	//    b. If we receive explicit signal
-	// To receive explicit os signals, create a channel that can receive os signals.
-	osSignalChannel := make(chan os.Signal, 1)
+    // Create the listener.
+    plugin.listener, err = core.NewListener(pluginName)
+    if err != nil {
+        fmt.Printf("Failed to create listener %v", err)
+		return
+    }
 
-	// Relay incoming signals to channel.
-	// If no signals are provided, all incoming signals will be relayed to channel.
-	// Otherwise, just the provided signals will.
-	signal.Notify(osSignalChannel, os.Interrupt, os.Kill, syscall.SIGTERM)
+    // Parse command line arguments.
+    args := os.Args
 
-	// create a channel that can receive errors from driver
-	// any unhandled error from driver will be sent to this channel
-	errorChan := make(chan error, 1)
-	driver, err := network.NewInstance(Version)
-	go func() {
-		errorChan <- driver.StartListening(driverListener)
-	}()
+    for i, arg := range args {
+        if i == 0 {
+            continue
+        }
 
-	fmt.Printf("Penguin is ready..\n")
+        switch arg {
+        case "net":
+            plugin.netPlugin, err = network.NewPlugin(networkVersion)
+            if err != nil {
+                fmt.Printf("Failed to create network plugin %v", err)
+            }
 
-	// select can be used to wait on multiple channels in parallel
-	select {
-	case sig := <-osSignalChannel:
-		fmt.Println("\nCaught signal <" + sig.String() + "> shutting down..")
-	case err := <-errorChan:
-		if err != nil {
-			fmt.Println("\nDriver received an unhandled error.. ", err)
-			driverListener.Close()
-			os.Exit(1)
-		}
-	}
-}
+            err = plugin.netPlugin.Start(plugin.listener)
+            if err != nil {
+                fmt.Printf("Failed to start network plugin %v", err)
+            }
 
-func initNullIpam(){
-	// create a server on which we will listen for incoming calls from libnetwork
-	os.MkdirAll("/run/docker/plugins", 0660)
-	driverListener, err := net.Listen("unix", "/run/docker/plugins/nullipam.sock")
-	if err != nil {
-		fmt.Println("Error setting up null ipam listener socket: ", err)
-	}
-	defer driverListener.Close()
+        case "ipam":
+            plugin.ipamPlugin, err = ipamNull.NewPlugin(ipamVersion)
+            if err != nil {
+                fmt.Printf("Failed to create IPAM plugin %v", err)
+            }
 
-	// For now, driver can shutdown on two conditions
-	//    a. If some unhandled exception happens in the driver
-	//    b. If we receive explicit signal
-	// To receive explicit os signals, create a channel that can receive os signals.
-	osSignalChannel := make(chan os.Signal, 1)
+            err = plugin.ipamPlugin.Start(plugin.listener)
+            if err != nil {
+                fmt.Printf("Failed to start IPAM plugin %v", err)
+                return
+            }
 
-	// Relay incoming signals to channel.
-	// If no signals are provided, all incoming signals will be relayed to channel.
-	// Otherwise, just the provided signals will.
-	signal.Notify(osSignalChannel, os.Interrupt, os.Kill, syscall.SIGTERM)
+        default:
+            fmt.Printf("Unknown argument %s", arg)
+        }
+    }
 
-	// create a channel that can receive errors from driver
-	// any unhandled error from driver will be sent to this channel
-	errorChan := make(chan error, 1)
-	driver, err := ipamNull.NewInstance(ipamVersion)
-	go func() {
-		errorChan <- driver.StartListening(driverListener)
-	}()
+    // Create a channel to receive unhandled errors from the listener.
+    errorChan := make(chan error, 1)
 
-	fmt.Printf("Null IPAM is ready..\n")
+    // Start listener.
+    plugin.listener.Start()
 
-	// select can be used to wait on multiple channels in parallel
-	select {
-	case sig := <-osSignalChannel:
-		fmt.Println("\nCaught signal <" + sig.String() + "> shutting down..")
-	case err := <-errorChan:
-		if err != nil {
-			fmt.Println("\nDriver received an unhandled error.. ", err)
-			driverListener.Close()
-			os.Exit(1)
-		}
-	}
+    // For now, driver can shutdown on two conditions
+    //    a. If some unhandled exceptions happens in the driver
+    //    b. If we receive explicit signal
+    // To receive explicit os signals, create a channel that can receive os signals.
+    osSignalChannel := make(chan os.Signal, 1)
+
+    // Relay incoming signals to channel
+    // If no signals are provided, all incoming signals will be relayed to channel.
+    // Otherwise, just the provided signals will.
+    signal.Notify(osSignalChannel, os.Interrupt, os.Kill, syscall.SIGTERM)
+
+    // select can be used to wait on multiple channels in parallel
+    select {
+    case sig := <- osSignalChannel:
+        fmt.Println("\nCaught signal <" + sig.String() + "> shutting down..")
+    case err := <- errorChan:
+        if err != nil {
+            fmt.Println("\nDriver received an unhandled error.. ", err)
+            os.Exit(1)
+        }
+    }
+
+    // Stop to cleanup listener state.
+    plugin.listener.Stop()
+
+    fmt.Println("Plugin exited.")
 }
