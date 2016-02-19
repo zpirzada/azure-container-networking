@@ -7,27 +7,78 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"sync"
 
     "github.com/sharmasushant/penguin/core"
 )
 
+// Libnetwork network plugin name
+const pluginName = "penguin"
+
+// Libnetwork network plugin endpoint name
+const endpointName = "NetworkDriver"
+
+// NetPlugin object and its interface
 type netPlugin struct {
-	version string
-	networks map[string]*azureNetwork
-	sync.Mutex
+    version string
+    scope string
+    listener *core.Listener
+    networks map[string]*azureNetwork
+    sync.Mutex
 }
 
 type NetPlugin interface {
-	StartListening(net.Listener) error
+    Start(chan error) error
+    Stop()
 }
 
+// Creates a new NetPlugin object.
 func NewPlugin(version string) (NetPlugin, error) {
-	return &netPlugin {
-		version: version,
-		}, nil
+    return &netPlugin {
+        version:    version,
+        scope:      "local",
+        }, nil
+}
+
+// Starts the plugin.
+func (plugin *netPlugin) Start(errChan chan error) error {
+
+    // Create the listener.
+    listener, err := core.NewListener(pluginName)
+    if err != nil {
+        fmt.Printf("Failed to create listener %v", err)
+		return err
+    }
+
+    // Add protocol handlers.
+    listener.AddHandler("Plugin", "Activate", plugin.activatePlugin)
+    listener.AddHandler(endpointName, "GetCapabilities", plugin.getCapabilities)
+	listener.AddHandler(endpointName, "CreateNetwork", plugin.createNetwork)
+	listener.AddHandler(endpointName, "DeleteNetwork", plugin.deleteNetwork)
+	listener.AddHandler(endpointName, "CreateEndpoint", plugin.createEndpoint)
+	listener.AddHandler(endpointName, "DeleteEndpoint", plugin.deleteEndpoint)
+	listener.AddHandler(endpointName, "Join", plugin.join)
+	listener.AddHandler(endpointName, "Leave", plugin.leave)
+	listener.AddHandler(endpointName, "EndpointOperInfo", plugin.endpointOperInfo)
+
+    plugin.listener = listener
+
+	err = listener.Start(errChan)
+	if err != nil {
+		fmt.Printf("Failed to start listener %v", err)
+		return err
+	}
+
+    fmt.Println("Network plugin started.")
+
+    return nil
+}
+
+// Stops the plugin.
+func (plugin *netPlugin) Stop() {
+	plugin.listener.Stop()
+    fmt.Println("Network plugin stopped.")
 }
 
 func router(w http.ResponseWriter, req *http.Request) {
@@ -45,24 +96,6 @@ func router(w http.ResponseWriter, req *http.Request) {
 	default:
 		fmt.Println("receiver unexpected request", req.Method, "->", req.URL.Path)
 	}
-}
-
-func (plugin *netPlugin) StartListening(listener net.Listener) error {
-
-	fmt.Println("Going to listen ...")
-	mux := http.NewServeMux()
-	mux.HandleFunc("/status", plugin.status)
-	mux.HandleFunc("/Plugin.Activate", plugin.activatePlugin)
-	mux.HandleFunc("/NetworkDriver.GetCapabilities", plugin.getCapabilities)
-	mux.HandleFunc("/NetworkDriver.CreateNetwork", plugin.createNetwork)
-	mux.HandleFunc("/NetworkDriver.DeleteNetwork", plugin.deleteNetwork)
-	mux.HandleFunc("/NetworkDriver.CreateEndpoint", plugin.createEndpoint)
-	mux.HandleFunc("/NetworkDriver.Join", plugin.join)
-	mux.HandleFunc("/NetworkDriver.DeleteEndpoint", plugin.deleteEndpoint)
-	mux.HandleFunc("/NetworkDriver.Leave", plugin.leave)
-	mux.HandleFunc("/NetworkDriver.EndpointOperInfo", plugin.endpointOperInfo)
-	fmt.Println("listening ...")
-	return http.Serve(listener, mux)
 }
 
 func (plugin *netPlugin) networkExists(networkID string) bool {

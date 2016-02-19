@@ -6,24 +6,73 @@ package ipamNull
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"sync"
+
+    "github.com/sharmasushant/penguin/core"
 )
 
+// Libnetwork IPAM plugin name
+const pluginName = "nullipam"
+
+// Libnetwork IPAM plugin endpoint name
+const endpointName = "IpamDriver"
+
+// IpamPlugin object and interface
 type ipamPlugin struct {
-	version string
+    version string
+    listener *core.Listener
 	sync.Mutex
 }
 
 type IpamPlugin interface {
-	StartListening(net.Listener) error
+    Start(chan error) error
+    Stop()
 }
 
+// Creates a new IpamPlugin object.
 func NewPlugin(version string) (IpamPlugin, error) {
-	return &ipamPlugin {
-		version: version,
-	}, nil
+    return &ipamPlugin {
+        version: version,
+        }, nil
+}
+
+// Starts the plugin.
+func (plugin *ipamPlugin) Start(errChan chan error) error {
+
+    // Create the listener.
+    listener, err := core.NewListener(pluginName)
+    if err != nil {
+        fmt.Printf("Failed to create listener %v", err)
+		return err
+    }
+
+    // Add protocol handlers.
+    listener.AddHandler("Plugin", "Activate", plugin.activatePlugin)
+    listener.AddHandler(endpointName, "GetCapabilities", plugin.getCapabilities)
+	listener.AddHandler(endpointName, "GetDefaultAddressSpaces", plugin.getDefaultAddressSpaces)
+	listener.AddHandler(endpointName, "RequestPool", plugin.requestPool)
+	listener.AddHandler(endpointName, "ReleasePool", plugin.releasePool)
+	listener.AddHandler(endpointName, "RequestAddress", plugin.requestAddress)
+	listener.AddHandler(endpointName, "ReleaseAddress", plugin.releaseAddress)
+
+    plugin.listener = listener
+
+	err = listener.Start(errChan)
+	if err != nil {
+		fmt.Printf("Failed to start listener %v", err)
+		return err
+	}
+
+    fmt.Println("IPAM plugin started.")
+
+    return nil
+}
+
+// Stops the plugin.
+func (plugin *ipamPlugin) Stop() {
+	plugin.listener.Stop()
+    fmt.Println("IPAM plugin stopped.")
 }
 
 func router(w http.ResponseWriter, req *http.Request) {
@@ -42,21 +91,6 @@ func router(w http.ResponseWriter, req *http.Request) {
 		fmt.Println("receiver unexpected request", req.Method, "->", req.URL.Path)
 	}
 }
-
-func (plugin *ipamPlugin) StartListening(listener net.Listener) error {
-
-	fmt.Println("Null IPAM driver going to listen ...")
-	mux := http.NewServeMux()
-	mux.HandleFunc("/Plugin.Activate", plugin.activatePlugin)
-	mux.HandleFunc("/IpamDriver.GetDefaultAddressSpaces", plugin.getDefaultAddressSpaces)
-	mux.HandleFunc("/IpamDriver.RequestPool", plugin.requestPool)
-	mux.HandleFunc("/IpamDriver.ReleasePool", plugin.releasePool)
-	mux.HandleFunc("/IpamDriver.RequestAddress", plugin.requestAddress)
-	mux.HandleFunc("/IpamDriver.ReleaseAddress", plugin.releaseAddress)
-	fmt.Println("Null IPAM driver is now listening ...")
-	return http.Serve(listener, mux)
-}
-
 
 func sendResponse(w http.ResponseWriter, response interface{}, errMessage string, successMessage string){
 	encoder := json.NewEncoder(w)
@@ -95,6 +129,13 @@ func (plugin *ipamPlugin) activatePlugin(w http.ResponseWriter, r *http.Request)
 	sendResponse(w, response,
 		"error activating ipam plugin",
 		"Ipam plugin activation finished")
+}
+
+func (plugin *ipamPlugin) getCapabilities(w http.ResponseWriter, r *http.Request) {
+	capabilities := map[string]string{"Scope": "local"}
+	sendResponse(w, capabilities,
+		"error getting capabilities:",
+		fmt.Sprintf("returned following capabilites %+v", capabilities))
 }
 
 type defaultAddressSpacesResponseFormat struct {

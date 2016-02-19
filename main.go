@@ -5,7 +5,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,101 +13,102 @@ import (
 	ipamNull "github.com/sharmasushant/penguin/ipam/null"
 )
 
-var Version string = "V0"
-var ipamVersion string = "V0"
+// Plugins versions
+const networkVersion string = "V0"
+const ipamVersion string = "V0"
+
+// Prints description and usage information. 
+func printHelp() {
+    fmt.Println("Usage: penguin [net] [ipam]");
+}
 
 func main() {
-	arguments := os.Args
-	if(len(arguments)>1 && os.Args[1] == "startipam"){
-		initNullIpam()
-	}else{
-		initNetworkDriver()
-	}
+    var netPlugin network.NetPlugin
+    var ipamPlugin ipamNull.IpamPlugin
+    var err error
 
-}
+    // Parse command line arguments.
+    args := os.Args
 
-func initNetworkDriver(){
-	// create a server on which we will listen for incoming calls from libnetwork
-	os.MkdirAll("/run/docker/plugins", 0660)
-	driverListener, err := net.Listen("unix", "/run/docker/plugins/penguin.sock")
-	if err != nil {
-		fmt.Println("Error setting up driver listener: ", err)
-	}
-	defer driverListener.Close()
+    if len(args) == 1 {
+        printHelp()
+        return
+    }
 
-	// For now, driver can shutdown on two conditions
-	//    a. If some unhandled exception happens in the driver
-	//    b. If we receive explicit signal
-	// To receive explicit os signals, create a channel that can receive os signals.
-	osSignalChannel := make(chan os.Signal, 1)
+    for i, arg := range args {
+        if i == 0 {
+            continue
+        }
 
-	// Relay incoming signals to channel.
-	// If no signals are provided, all incoming signals will be relayed to channel.
-	// Otherwise, just the provided signals will.
-	signal.Notify(osSignalChannel, os.Interrupt, os.Kill, syscall.SIGTERM)
+        switch arg {
+        case "net":
+            netPlugin, err = network.NewPlugin(networkVersion)
+            if err != nil {
+                fmt.Printf("Failed to create network plugin %v\n", err)
+                return
+            }
 
-	// create a channel that can receive errors from driver
-	// any unhandled error from driver will be sent to this channel
-	errorChan := make(chan error, 1)
-	driver, err := network.NewPlugin(Version)
-	go func() {
-		errorChan <- driver.StartListening(driverListener)
-	}()
+        case "ipam":
+            ipamPlugin, err = ipamNull.NewPlugin(ipamVersion)
+            if err != nil {
+                fmt.Printf("Failed to create IPAM plugin %v\n", err)
+                return
+            }
 
-	fmt.Printf("Penguin is ready..\n")
+        default:
+            fmt.Printf("Unknown argument: %s\n", arg)
+            printHelp()
+            return
+        }
+    }
 
-	// select can be used to wait on multiple channels in parallel
-	select {
-	case sig := <-osSignalChannel:
-		fmt.Println("\nCaught signal <" + sig.String() + "> shutting down..")
-	case err := <-errorChan:
-		if err != nil {
-			fmt.Println("\nDriver received an unhandled error.. ", err)
-			driverListener.Close()
-			os.Exit(1)
-		}
-	}
-}
+    // Create a channel to receive unhandled errors from the plugins.
+    errorChan := make(chan error, 1)
 
-func initNullIpam(){
-	// create a server on which we will listen for incoming calls from libnetwork
-	os.MkdirAll("/run/docker/plugins", 0660)
-	driverListener, err := net.Listen("unix", "/run/docker/plugins/nullipam.sock")
-	if err != nil {
-		fmt.Println("Error setting up null ipam listener socket: ", err)
-	}
-	defer driverListener.Close()
+    // Start plugins.
+    if netPlugin != nil {
+        err = netPlugin.Start(errorChan)
+        if err != nil {
+            fmt.Printf("Failed to start network plugin %v\n", err)
+            return
+        }
+    }
 
-	// For now, driver can shutdown on two conditions
-	//    a. If some unhandled exception happens in the driver
-	//    b. If we receive explicit signal
-	// To receive explicit os signals, create a channel that can receive os signals.
-	osSignalChannel := make(chan os.Signal, 1)
+    if ipamPlugin != nil {
+        err = ipamPlugin.Start(errorChan)
+        if err != nil {
+            fmt.Printf("Failed to start IPAM plugin %v\n", err)
+            return
+        }
+    }
 
-	// Relay incoming signals to channel.
-	// If no signals are provided, all incoming signals will be relayed to channel.
-	// Otherwise, just the provided signals will.
-	signal.Notify(osSignalChannel, os.Interrupt, os.Kill, syscall.SIGTERM)
+    // For now, driver can shutdown on two conditions
+    //    a. If some unhandled exceptions happens in the driver
+    //    b. If we receive explicit signal
+    // To receive explicit os signals, create a channel that can receive os signals.
+    osSignalChannel := make(chan os.Signal, 1)
 
-	// create a channel that can receive errors from driver
-	// any unhandled error from driver will be sent to this channel
-	errorChan := make(chan error, 1)
-	driver, err := ipamNull.NewPlugin(ipamVersion)
-	go func() {
-		errorChan <- driver.StartListening(driverListener)
-	}()
+    // Relay incoming signals to channel
+    // If no signals are provided, all incoming signals will be relayed to channel.
+    // Otherwise, just the provided signals will.
+    signal.Notify(osSignalChannel, os.Interrupt, os.Kill, syscall.SIGTERM)
 
-	fmt.Printf("Null IPAM is ready..\n")
+    // Wait until receiving a signal.
+    select {
+    case sig := <- osSignalChannel:
+        fmt.Println("\nCaught signal <" + sig.String() + "> shutting down..")
+    case err := <- errorChan:
+        if err != nil {
+            fmt.Println("\nDriver received an unhandled error.. ", err)
+        }
+    }
 
-	// select can be used to wait on multiple channels in parallel
-	select {
-	case sig := <-osSignalChannel:
-		fmt.Println("\nCaught signal <" + sig.String() + "> shutting down..")
-	case err := <-errorChan:
-		if err != nil {
-			fmt.Println("\nDriver received an unhandled error.. ", err)
-			driverListener.Close()
-			os.Exit(1)
-		}
-	}
+    // Cleanup.
+    if netPlugin != nil {
+        netPlugin.Stop()
+    }
+
+    if ipamPlugin != nil {
+        ipamPlugin.Stop()
+    }
 }
