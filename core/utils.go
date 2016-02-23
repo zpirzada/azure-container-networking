@@ -11,23 +11,23 @@ import (
 )
 
 func LogRequest(tag string, requestName string, err error) {
-    if err == nil {
-        log.Printf("%s: Received %s request.", tag, requestName)
+	if err == nil {
+		log.Printf("%s: Received %s request.", tag, requestName)
 	} else {
-        log.Printf("%s: Failed to decode %s request %s.", tag, requestName, err.Error())
+		log.Printf("%s: Failed to decode %s request %s.", tag, requestName, err.Error())
 	}
 }
 
 func LogResponse(tag string, responseName string, response interface{}, err error) {
-    if err == nil {
-        log.Printf("%s: Sent %s response %+v.", tag, responseName, response)
+	if err == nil {
+		log.Printf("%s: Sent %s response %+v.", tag, responseName, response)
 	} else {
-        log.Printf("%s: Failed to encode %s response %+v %s.", tag, responseName, response, err.Error())
+		log.Printf("%s: Failed to encode %s response %+v %s.", tag, responseName, response, err.Error())
 	}
 }
 
 func LogEvent(tag string, event string) {
-    log.Printf("%s: %s", tag, event)
+	log.Printf("%s: %s", tag, event)
 }
 
 func printHostInterfaces() {

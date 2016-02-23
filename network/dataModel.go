@@ -4,31 +4,30 @@
 package network
 
 import (
-	"sync"
 	"net"
+	"sync"
 )
 
-
 type azureNetwork struct {
-	networkId        string
+	networkId string
 	endpoints map[string]*azureEndpoint // key: endpoint id
 	sync.Mutex
 }
 
 type azureEndpoint struct {
-	endpointID string
-	networkID string
+	endpointID     string
+	networkID      string
 	azureInterface azureInterface // lets support only one now
-	sandboxKey string
+	sandboxKey     string
 }
 
 type azureInterface struct {
-	Address    net.IPNet
+	Address     net.IPNet
 	AddressIPV6 net.IPNet
-	MacAddress net.HardwareAddr
-	ID         int
-	SrcName    string
-	DstPrefix  string
+	MacAddress  net.HardwareAddr
+	ID          int
+	SrcName     string
+	DstPrefix   string
 	GatewayIPv4 net.IP
 }
 

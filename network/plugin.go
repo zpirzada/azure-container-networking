@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"sync"
 
-    "github.com/sharmasushant/penguin/core"
+	"github.com/sharmasushant/penguin/core"
 )
 
 // Libnetwork network plugin name
@@ -20,39 +20,39 @@ const endpointName = "NetworkDriver"
 
 // NetPlugin object and its interface
 type netPlugin struct {
-    version string
-    scope string
-    listener *core.Listener
-    networks map[string]*azureNetwork
-    sync.Mutex
+	version  string
+	scope    string
+	listener *core.Listener
+	networks map[string]*azureNetwork
+	sync.Mutex
 }
 
 type NetPlugin interface {
-    Start(chan error) error
-    Stop()
+	Start(chan error) error
+	Stop()
 }
 
 // Creates a new NetPlugin object.
 func NewPlugin(version string) (NetPlugin, error) {
-    return &netPlugin {
-        version:    version,
-        scope:      "local",
-        }, nil
+	return &netPlugin{
+		version: version,
+		scope:   "local",
+	}, nil
 }
 
 // Starts the plugin.
 func (plugin *netPlugin) Start(errChan chan error) error {
 
-    // Create the listener.
-    listener, err := core.NewListener(pluginName)
-    if err != nil {
-        fmt.Printf("Failed to create listener %v", err)
+	// Create the listener.
+	listener, err := core.NewListener(pluginName)
+	if err != nil {
+		fmt.Printf("Failed to create listener %v", err)
 		return err
-    }
+	}
 
-    // Add protocol handlers.
-    listener.AddHandler("Plugin", "Activate", plugin.activatePlugin)
-    listener.AddHandler(endpointName, "GetCapabilities", plugin.getCapabilities)
+	// Add protocol handlers.
+	listener.AddHandler("Plugin", "Activate", plugin.activatePlugin)
+	listener.AddHandler(endpointName, "GetCapabilities", plugin.getCapabilities)
 	listener.AddHandler(endpointName, "CreateNetwork", plugin.createNetwork)
 	listener.AddHandler(endpointName, "DeleteNetwork", plugin.deleteNetwork)
 	listener.AddHandler(endpointName, "CreateEndpoint", plugin.createEndpoint)
@@ -61,7 +61,7 @@ func (plugin *netPlugin) Start(errChan chan error) error {
 	listener.AddHandler(endpointName, "Leave", plugin.leave)
 	listener.AddHandler(endpointName, "EndpointOperInfo", plugin.endpointOperInfo)
 
-    plugin.listener = listener
+	plugin.listener = listener
 
 	err = listener.Start(errChan)
 	if err != nil {
@@ -69,15 +69,15 @@ func (plugin *netPlugin) Start(errChan chan error) error {
 		return err
 	}
 
-    fmt.Println("Network plugin started.")
+	fmt.Println("Network plugin started.")
 
-    return nil
+	return nil
 }
 
 // Stops the plugin.
 func (plugin *netPlugin) Stop() {
 	plugin.listener.Stop()
-    fmt.Println("Network plugin stopped.")
+	fmt.Println("Network plugin stopped.")
 }
 
 func (plugin *netPlugin) networkExists(networkID string) bool {
@@ -109,21 +109,21 @@ type activateResponse struct {
 }
 
 func (plugin *netPlugin) activatePlugin(w http.ResponseWriter, r *http.Request) {
-    core.LogRequest(pluginName, "Activate", nil)
+	core.LogRequest(pluginName, "Activate", nil)
 
 	resp := &activateResponse{[]string{endpointName}}
-    err := plugin.listener.Encode(w, resp)
+	err := plugin.listener.Encode(w, resp)
 
-    core.LogResponse(pluginName, "Activate", resp, err)
+	core.LogResponse(pluginName, "Activate", resp, err)
 }
 
 func (plugin *netPlugin) getCapabilities(w http.ResponseWriter, r *http.Request) {
-    core.LogRequest(pluginName, "GetCapabilities", nil)
+	core.LogRequest(pluginName, "GetCapabilities", nil)
 
 	resp := map[string]string{"Scope": plugin.scope}
-    err := plugin.listener.Encode(w, resp)
+	err := plugin.listener.Encode(w, resp)
 
-    core.LogResponse(pluginName, "GetCapabilities", resp, err)
+	core.LogResponse(pluginName, "GetCapabilities", resp, err)
 }
 
 // All request and response formats are well known and are published by libnetwork
@@ -133,43 +133,43 @@ type createNetworkRequestFormat struct {
 }
 
 func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
-    var req createNetworkRequestFormat
+	var req createNetworkRequestFormat
 
-    err := plugin.listener.Decode(w, r, &req)
+	err := plugin.listener.Decode(w, r, &req)
 
-    core.LogRequest(pluginName, "CreateNetwork", err)
+	core.LogRequest(pluginName, "CreateNetwork", err)
 
-    if err != nil {
-        return
-    }
+	if err != nil {
+		return
+	}
 
-    netID := req.NetworkID
-    if plugin.networkExists(netID) {
-        plugin.listener.SendError(w, "Network with same Id already exists")
-        return
-    }
+	netID := req.NetworkID
+	if plugin.networkExists(netID) {
+		plugin.listener.SendError(w, "Network with same Id already exists")
+		return
+	}
 
-    plugin.Lock()
-    if plugin.networkExists(netID) {
-        plugin.listener.SendError(w, "Network with same Id already exists")
-        plugin.Unlock()
-        return
-    }
+	plugin.Lock()
+	if plugin.networkExists(netID) {
+		plugin.listener.SendError(w, "Network with same Id already exists")
+		plugin.Unlock()
+		return
+	}
 
-    if plugin.networks == nil {
-        plugin.networks = make(map[string]*azureNetwork)
-    }
+	if plugin.networks == nil {
+		plugin.networks = make(map[string]*azureNetwork)
+	}
 
-    plugin.networks[netID] = &azureNetwork{networkId: netID}
-    plugin.Unlock()
+	plugin.networks[netID] = &azureNetwork{networkId: netID}
+	plugin.Unlock()
 
-    // Empty response indicates success.
-    resp := map[string]string{}
-    err = plugin.listener.Encode(w, resp)
+	// Empty response indicates success.
+	resp := map[string]string{}
+	err = plugin.listener.Encode(w, resp)
 
-    core.LogResponse(pluginName, "CreateNetwork", resp, err)
+	core.LogResponse(pluginName, "CreateNetwork", resp, err)
 
-    fmt.Println("Persisted network creation request for network:", netID)
+	fmt.Println("Persisted network creation request for network:", netID)
 }
 
 type networkDeleteRequestFormat struct {
@@ -179,38 +179,38 @@ type networkDeleteRequestFormat struct {
 func (plugin *netPlugin) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	var req networkDeleteRequestFormat
 
-    err := plugin.listener.Decode(w, r, &req)
+	err := plugin.listener.Decode(w, r, &req)
 
-    core.LogRequest(pluginName, "DeleteNetwork", err)
+	core.LogRequest(pluginName, "DeleteNetwork", err)
 
-    if err != nil {
-        return
-    }
+	if err != nil {
+		return
+	}
 
-    if plugin.networkExists(req.NetworkID) {
-        plugin.Lock()
-        if plugin.networkExists(req.NetworkID) {
-            delete(plugin.networks, req.NetworkID)
-        }
-        plugin.Unlock()
-    }
+	if plugin.networkExists(req.NetworkID) {
+		plugin.Lock()
+		if plugin.networkExists(req.NetworkID) {
+			delete(plugin.networks, req.NetworkID)
+		}
+		plugin.Unlock()
+	}
 
-    // Empty response indicates success.
-    resp := map[string]string{}
-    err = plugin.listener.Encode(w, resp)
+	// Empty response indicates success.
+	resp := map[string]string{}
+	err = plugin.listener.Encode(w, resp)
 
-    core.LogResponse(pluginName, "DeleteNetwork", resp, err)
+	core.LogResponse(pluginName, "DeleteNetwork", resp, err)
 
-    fmt.Printf("Deleted network %s.\n", req.NetworkID)
+	fmt.Printf("Deleted network %s.\n", req.NetworkID)
 }
 
-type azInterface struct{
-	Address string
+type azInterface struct {
+	Address     string
 	AddressIPV6 string
-	MacAddress string
-	ID         int
-	SrcName    string
-	DstPrefix  string
+	MacAddress  string
+	ID          int
+	SrcName     string
+	DstPrefix   string
 	GatewayIPv4 string
 }
 
@@ -228,13 +228,13 @@ type endpointResponse struct {
 func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) {
 	var req createEndpointRequestFormat
 
-    err := plugin.listener.Decode(w, r, &req)
+	err := plugin.listener.Decode(w, r, &req)
 
-    core.LogRequest(pluginName, "CreateEndpoint", err)
+	core.LogRequest(pluginName, "CreateEndpoint", err)
 
-    if err != nil {
-        return
-    }
+	if err != nil {
+		return
+	}
 
 	netID := req.NetworkID
 	endID := req.EndpointID
@@ -267,13 +267,13 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 	if req.Interface != nil {
 		ipaddressToAttach := req.Interface.Address
 		message :=
-		fmt.Sprintf(`Interface found in endpoint creation request:
+			fmt.Sprintf(`Interface found in endpoint creation request:
 			Addr:%s, ID:%v, Ipv6:%s, DstPrefix:%s, GatewayIpv4:%s, MacAddress:%s, SrcName:%s`,
-			ipaddressToAttach, req.Interface.ID,
-			req.Interface.AddressIPV6,
-			req.Interface.DstPrefix, req.Interface.GatewayIPv4,
-			req.Interface.MacAddress, req.Interface.SrcName)
-		fmt.Println (message)
+				ipaddressToAttach, req.Interface.ID,
+				req.Interface.AddressIPV6,
+				req.Interface.DstPrefix, req.Interface.GatewayIPv4,
+				req.Interface.MacAddress, req.Interface.SrcName)
+		fmt.Println(message)
 		//plugin.listener.SendError(w, errMessage)
 		//return
 	}
@@ -291,34 +291,34 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	fmt.Printf("Endpoint created successfully " +
+	fmt.Printf("Endpoint created successfully "+
 		"\n\tn/w-id:%s \n\tep-id:%s\n", string(netID), string(endID))
 
 	rAddress,
-	rAddressIPV6,
-	rMacAddress,
-	rID,
-	rSrcName,
-	rDstPrefix,
-	rGatewayIPv4, ermsg := core.GetInterfaceToAttach(interfaceToAttach, ipaddressToAttach)
+		rAddressIPV6,
+		rMacAddress,
+		rID,
+		rSrcName,
+		rDstPrefix,
+		rGatewayIPv4, ermsg := core.GetInterfaceToAttach(interfaceToAttach, ipaddressToAttach)
 
-	if(ermsg != "" ){
+	if ermsg != "" {
 		plugin.listener.SendError(w, ermsg)
 		plugin.Unlock()
 		return
 	}
 
 	targetInterface := azureInterface{
-		Address: rAddress,
+		Address:     rAddress,
 		AddressIPV6: rAddressIPV6,
-		MacAddress: rMacAddress,
-		ID: rID,
-		SrcName: rSrcName,
-		DstPrefix: rDstPrefix,
+		MacAddress:  rMacAddress,
+		ID:          rID,
+		SrcName:     rSrcName,
+		DstPrefix:   rDstPrefix,
 		GatewayIPv4: rGatewayIPv4,
 	}
 	network := plugin.networks[netID]
-	if(network.endpoints == nil){
+	if network.endpoints == nil {
 		network.endpoints = make(map[string]*azureEndpoint)
 	}
 	network.endpoints[endID] = &azureEndpoint{endpointID: endID, networkID: netID}
@@ -337,17 +337,17 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 	/********END**********/
 
 	respIface := &azInterface{
-		Address:    targetInterface.Address.String(),
-		MacAddress: targetInterface.MacAddress.String(),
+		Address:     targetInterface.Address.String(),
+		MacAddress:  targetInterface.MacAddress.String(),
 		GatewayIPv4: targetInterface.GatewayIPv4.String(),
 	}
 	resp := &endpointResponse{
 		Interface: *respIface,
 	}
 
-    err = plugin.listener.Encode(w, resp)
+	err = plugin.listener.Encode(w, resp)
 
-    core.LogResponse(pluginName, "CreateEndpoint", resp, err)
+	core.LogResponse(pluginName, "CreateEndpoint", resp, err)
 
 	fmt.Printf("Created endpoint %s: %+v", endID, resp)
 }
@@ -380,13 +380,13 @@ type staticRoute struct {
 func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 	var req joinRequestFormat
 
-    err := plugin.listener.Decode(w, r, &req)
+	err := plugin.listener.Decode(w, r, &req)
 
-    core.LogRequest(pluginName, "Join", err)
+	core.LogRequest(pluginName, "Join", err)
 
-    if err != nil {
-        return
-    }
+	if err != nil {
+		return
+	}
 
 	endID := req.EndpointID
 	netID := req.NetworkID
@@ -407,16 +407,16 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 
 	resp := &joinResponseFormat{
 		InterfaceName: *ifname,
-		Gateway: endpoint.azureInterface.GatewayIPv4.String(),
+		Gateway:       endpoint.azureInterface.GatewayIPv4.String(),
 	}
 
 	plugin.Lock()
 	endpoint.sandboxKey = sandboxKey
 	plugin.Unlock()
 
-    err = plugin.listener.Encode(w, resp)
+	err = plugin.listener.Encode(w, resp)
 
-    core.LogResponse(pluginName, "Join", resp, err)
+	core.LogResponse(pluginName, "Join", resp, err)
 
 	fmt.Printf("srcname: %s dstPRefix:%s \n", ifname.SrcName, ifname.DstPrefix)
 
@@ -432,13 +432,13 @@ type endpointDeleteRequestFormat struct {
 func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
 	var req endpointDeleteRequestFormat
 
-    err := plugin.listener.Decode(w, r, &req)
+	err := plugin.listener.Decode(w, r, &req)
 
-    core.LogRequest(pluginName, "DeleteEndpoint", err)
+	core.LogRequest(pluginName, "DeleteEndpoint", err)
 
-    if err != nil {
-        return
-    }
+	if err != nil {
+		return
+	}
 
 	netID := req.NetworkID
 	endID := req.EndpointID
@@ -453,11 +453,11 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 	plugin.Unlock()
 
-    // Empty response indicates success.
+	// Empty response indicates success.
 	resp := &map[string]string{}
-    err = plugin.listener.Encode(w, resp)
+	err = plugin.listener.Encode(w, resp)
 
-    core.LogResponse(pluginName, "DeleteEndpoint", resp, err)
+	core.LogResponse(pluginName, "DeleteEndpoint", resp, err)
 
 	fmt.Printf("Deleted endpoint %s", req.EndpointID)
 }
@@ -473,22 +473,22 @@ type leaveResponse struct {
 func (plugin *netPlugin) leave(w http.ResponseWriter, r *http.Request) {
 	var req leaveRequestFormat
 
-    err := plugin.listener.Decode(w, r, &req)
+	err := plugin.listener.Decode(w, r, &req)
 
-    core.LogRequest(pluginName, "Leave", err)
+	core.LogRequest(pluginName, "Leave", err)
 
-    if err != nil {
-        return
-    }
+	if err != nil {
+		return
+	}
 
-    // Empty response indicates success.
+	// Empty response indicates success.
 	resp := &leaveResponse{}
-    err = plugin.listener.Encode(w, resp)
+	err = plugin.listener.Encode(w, resp)
 
-    core.LogResponse(pluginName, "Leave", resp, err)
+	core.LogResponse(pluginName, "Leave", resp, err)
 
-    fmt.Printf("Successfully executed leave\n Network: %s\n Endpoint: %s \n",
-        req.NetworkID, req.EndpointID)
+	fmt.Printf("Successfully executed leave\n Network: %s\n Endpoint: %s \n",
+		req.NetworkID, req.EndpointID)
 }
 
 type endpointOperInfoRequestFormat struct {
@@ -501,24 +501,24 @@ type endpointOperInfoResponseFormat struct {
 }
 
 func (plugin *netPlugin) endpointOperInfo(w http.ResponseWriter, r *http.Request) {
-    var req endpointOperInfoRequestFormat
+	var req endpointOperInfoRequestFormat
 
-    err := plugin.listener.Decode(w, r, &req)
+	err := plugin.listener.Decode(w, r, &req)
 
-    core.LogRequest(pluginName, "EndpointOperInfo", err)
+	core.LogRequest(pluginName, "EndpointOperInfo", err)
 
-    if err != nil {
-        return
-    }
+	if err != nil {
+		return
+	}
 
-    value := make(map[string]interface{})
+	value := make(map[string]interface{})
 	//value["com.docker.network.endpoint.macaddress"] = macAddress
 	//value["MacAddress"] = macAddress
 
 	resp := &endpointOperInfoResponseFormat{Value: value}
-    err = plugin.listener.Encode(w, resp)
+	err = plugin.listener.Encode(w, resp)
 
-    core.LogResponse(pluginName, "EndpointOperInfo", resp, err)
+	core.LogResponse(pluginName, "EndpointOperInfo", resp, err)
 
-    fmt.Println("Successfully responded to endpoint Oper Info request: ", req.EndpointID)
+	fmt.Println("Successfully responded to endpoint Oper Info request: ", req.EndpointID)
 }
