@@ -4,7 +4,6 @@
 package ipamNull
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -75,67 +74,26 @@ func (plugin *ipamPlugin) Stop() {
     fmt.Println("IPAM plugin stopped.")
 }
 
-func router(w http.ResponseWriter, req *http.Request) {
-	fmt.Println("Handler invoked")
-
-	switch req.Method {
-	case "GET":
-		fmt.Println("receiver GET request", req.URL.Path)
-	case "POST":
-		fmt.Println("receiver POST request", req.URL.Path)
-		switch req.URL.Path {
-		case "/Plugin.Activate":
-			fmt.Println("/Plugin.Activate received")
-		}
-	default:
-		fmt.Println("receiver unexpected request", req.Method, "->", req.URL.Path)
-	}
-}
-
-func sendResponse(w http.ResponseWriter, response interface{}, errMessage string, successMessage string){
-	encoder := json.NewEncoder(w)
-	err := encoder.Encode(response)
-	if err != nil {
-		http.Error(w, "encode error", http.StatusInternalServerError)
-		fmt.Println("errMessage:", err)
-		return
-	}
-	fmt.Println(successMessage)
-}
-
-func decodeReceivedRequest(w http.ResponseWriter, r *http.Request, request interface{}, errMessage string, successMessage string){
-
-	err := json.NewDecoder(r.Body).Decode(request)
-	if err != nil {
-		errorMessage := errMessage + err.Error()
-		fmt.Println(errorMessage)
-		http.Error(w, errorMessage, http.StatusBadRequest)
-		return
-	}
-	fmt.Println(fmt.Sprintf("%s: %+v", successMessage, request))
-}
-
-func setErrorInResponseWriter(w http.ResponseWriter, errMessage string){
-	fmt.Println(errMessage)
-	json.NewEncoder(w).Encode(map[string]string{"Err": errMessage,})
-}
-
-type activationResponse struct {
+type activateResponse struct {
 	Implements []string
 }
 
 func (plugin *ipamPlugin) activatePlugin(w http.ResponseWriter, r *http.Request) {
-	response := &activationResponse{[]string{"IpamDriver"}}
-	sendResponse(w, response,
-		"error activating ipam plugin",
-		"Ipam plugin activation finished")
+    core.LogRequest(pluginName, "Activate", nil)
+
+	resp := &activateResponse{[]string{endpointName}}
+    err := plugin.listener.Encode(w, resp)
+
+    core.LogResponse(pluginName, "Activate", resp, err)
 }
 
 func (plugin *ipamPlugin) getCapabilities(w http.ResponseWriter, r *http.Request) {
-	capabilities := map[string]string{"Scope": "local"}
-	sendResponse(w, capabilities,
-		"error getting capabilities:",
-		fmt.Sprintf("returned following capabilites %+v", capabilities))
+    core.LogRequest(pluginName, "GetCapabilities", nil)
+
+	resp := map[string]string{"Scope": "local"}
+    err := plugin.listener.Encode(w, resp)
+
+    core.LogResponse(pluginName, "GetCapabilities", resp, err)
 }
 
 type defaultAddressSpacesResponseFormat struct {
@@ -144,15 +102,16 @@ type defaultAddressSpacesResponseFormat struct {
 }
 
 func (plugin *ipamPlugin) getDefaultAddressSpaces(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Get default address space request received")
+    core.LogRequest(pluginName, "GetDefaultAddressSpaces", nil)
 
-	response := &defaultAddressSpacesResponseFormat{
-		LocalDefaultAddressSpace: "",
-		GlobalDefaultAddressSpace: "",
-	}
-	sendResponse(w, response,
-		"error getDefaultAddressSpaces",
-		"successfully returned empty default address spaces")
+	resp := &defaultAddressSpacesResponseFormat {
+        LocalDefaultAddressSpace: "",
+        GlobalDefaultAddressSpace: "",
+        }
+
+    err := plugin.listener.Encode(w, resp)
+
+    core.LogResponse(pluginName, "GetDefaultAddressSpaces", resp, err)
 }
 
 type requestPoolRequestFormat struct {
@@ -170,19 +129,20 @@ type requestPoolResponseFormat struct {
 }
 
 func (plugin *ipamPlugin) requestPool(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Request pool request received")
-	var requestPoolRequest requestPoolRequestFormat
+    var req requestPoolRequestFormat
 
-	decodeReceivedRequest(w, r, &requestPoolRequest,
-		"Error decoding request pool request",
-		"Successfully decoded a request pool request")
+    err := plugin.listener.Decode(w, r, &req)
 
-	data := make(map[string]string)
+    core.LogRequest(pluginName, "RequestPool", err)
 
-	response := &requestPoolResponseFormat{"", "0.0.0.0/8", data}
-	sendResponse(w, response,
-		"error responding to request pool",
-		"Responded to request pool with empty response")
+    if err == nil {
+        data := make(map[string]string)
+        resp := &requestPoolResponseFormat{"", "0.0.0.0/8", data}
+
+        err = plugin.listener.Encode(w, resp)
+
+        core.LogResponse(pluginName, "RequestPool", resp, err)
+	}
 }
 
 type releasePoolRequestFormat struct{
@@ -193,19 +153,19 @@ type releasePoolResponseFormat struct{
 }
 
 func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Release pool request received")
+	var req releasePoolRequestFormat
 
-	var releasePoolRequest releasePoolRequestFormat
+    err := plugin.listener.Decode(w, r, &req)
 
-	decodeReceivedRequest(w, r, &releasePoolRequest,
-		"Error decoding release pool request",
-		"Successfully decoded a release pool request")
+    core.LogRequest(pluginName, "ReleasePool", err)
 
-	response := &releasePoolRequestFormat{}
+    if err == nil {
+        resp := &releasePoolRequestFormat{}
 
-	sendResponse(w, response,
-		"error responding to relase pool request capabilities:",
-		fmt.Sprintf("successfully responded to release pool request for poolId: %+v", releasePoolRequest.PoolID))
+        err = plugin.listener.Encode(w, resp)
+
+        core.LogResponse(pluginName, "ReleasePool", resp, err)
+	}
 }
 
 type requestAddressRequestFormat struct {
@@ -221,19 +181,19 @@ type requestAddressResponseFormat struct {
 }
 
 func (plugin *ipamPlugin) requestAddress(w http.ResponseWriter, r *http.Request) {
+	var req requestAddressRequestFormat
 
-	fmt.Println("Received request to reserve an ip address.")
+    err := plugin.listener.Decode(w, r, &req)
 
-	var requestAddressRequest requestAddressRequestFormat
+    core.LogRequest(pluginName, "RequestAddress", err)
 
-	decodeReceivedRequest(w, r, &requestAddressRequest,
-		"Error decoding request for reserving ip address",
-		"Successfully decoded request for reserving ip address")
+    if err == nil {
+        resp := &requestAddressResponseFormat{"", "", make(map[string]string)}
 
-	response := &requestPoolResponseFormat{"", "", make(map[string]string)}
-	sendResponse(w, response,
-		"error responding to ip addess reservation request",
-		"successfully responded to ip address reservation request")
+        err = plugin.listener.Encode(w, resp)
+
+        core.LogResponse(pluginName, "RequestAddress", resp, err)
+	}
 }
 
 type releaseAddressRequestFormat struct {
@@ -242,13 +202,17 @@ type releaseAddressRequestFormat struct {
 }
 
 func (plugin *ipamPlugin) releaseAddress(w http.ResponseWriter, r *http.Request) {
-	var releaseAddressRequest releaseAddressRequestFormat
+	var req releaseAddressRequestFormat
 
-	decodeReceivedRequest(w, r, &releaseAddressRequest,
-		"Error decoding release Address request",
-		"Successfully decoded release address request")
+    err := plugin.listener.Decode(w, r, &req)
 
-	// docker do not expect anything in response to release Address call
-	json.NewEncoder(w).Encode(map[string]string{})
-	fmt.Printf("Release address %s.\n", releaseAddressRequest.Address)
+    core.LogRequest(pluginName, "ReleaseAddress", err)
+
+    if err == nil {
+        resp := map[string]string{}
+
+        err = plugin.listener.Encode(w, resp)
+
+        core.LogResponse(pluginName, "ReleaseAddress", resp, err)
+    }
 }

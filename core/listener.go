@@ -76,7 +76,8 @@ func (listener *Listener) AddHandler(endpoint string, method string, handler fun
 func (listener *Listener) Decode(w http.ResponseWriter, r *http.Request, request interface{}) error {
 	err := json.NewDecoder(r.Body).Decode(request)
 	if err != nil {
-        http.Error(w, "Unable to decode JSON payload: " + err.Error(), http.StatusBadRequest)
+        http.Error(w, "Failed to decode request: " + err.Error(), http.StatusBadRequest)
+        log.Println("Listener: Failed to decode request: " + err.Error())
 	}
 	return err
 }
@@ -85,7 +86,13 @@ func (listener *Listener) Decode(w http.ResponseWriter, r *http.Request, request
 func (listener *Listener) Encode(w http.ResponseWriter, response interface{}) error {
     err := json.NewEncoder(w).Encode(response)
     if err != nil {
-        http.Error(w, "Unable to encode JSON payload: " + err.Error(), http.StatusInternalServerError)
+        http.Error(w, "Failed to encode response: " + err.Error(), http.StatusInternalServerError)
+        log.Println("Listener: Failed to encode response: " + err.Error())
     }
 	return err
+}
+
+// Sends an error response.
+func (listener *Listener) SendError(w http.ResponseWriter, errMessage string) {
+	json.NewEncoder(w).Encode(map[string]string{"Err": errMessage,})
 }
