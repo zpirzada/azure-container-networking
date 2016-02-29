@@ -21,11 +21,12 @@ const endpointName = "IpamDriver"
 type ipamPlugin struct {
 	version  string
 	listener *core.Listener
+	logger   *core.Logger
 	sync.Mutex
 }
 
 type IpamPlugin interface {
-	Start(chan error) error
+	Start(chan error, *core.Logger) error
 	Stop()
 }
 
@@ -37,7 +38,7 @@ func NewPlugin(version string) (IpamPlugin, error) {
 }
 
 // Starts the plugin.
-func (plugin *ipamPlugin) Start(errChan chan error) error {
+func (plugin *ipamPlugin) Start(errChan chan error, logger *core.Logger) error {
 
 	// Create the listener.
 	listener, err := core.NewListener(pluginName)
@@ -63,7 +64,8 @@ func (plugin *ipamPlugin) Start(errChan chan error) error {
 		return err
 	}
 
-	fmt.Println("IPAM plugin started.")
+	plugin.logger = logger
+	logger.LogEvent(pluginName, "Plugin started.")
 
 	return nil
 }
@@ -71,7 +73,7 @@ func (plugin *ipamPlugin) Start(errChan chan error) error {
 // Stops the plugin.
 func (plugin *ipamPlugin) Stop() {
 	plugin.listener.Stop()
-	fmt.Println("IPAM plugin stopped.")
+	plugin.logger.LogEvent(pluginName, "Plugin stopped.")
 }
 
 type activateResponse struct {
@@ -79,21 +81,21 @@ type activateResponse struct {
 }
 
 func (plugin *ipamPlugin) activatePlugin(w http.ResponseWriter, r *http.Request) {
-	core.LogRequest(pluginName, "Activate", nil)
+	plugin.logger.LogRequest(pluginName, "Activate", nil)
 
 	resp := &activateResponse{[]string{endpointName}}
 	err := plugin.listener.Encode(w, resp)
 
-	core.LogResponse(pluginName, "Activate", resp, err)
+	plugin.logger.LogResponse(pluginName, "Activate", resp, err)
 }
 
 func (plugin *ipamPlugin) getCapabilities(w http.ResponseWriter, r *http.Request) {
-	core.LogRequest(pluginName, "GetCapabilities", nil)
+	plugin.logger.LogRequest(pluginName, "GetCapabilities", nil)
 
 	resp := map[string]string{"Scope": "local"}
 	err := plugin.listener.Encode(w, resp)
 
-	core.LogResponse(pluginName, "GetCapabilities", resp, err)
+	plugin.logger.LogResponse(pluginName, "GetCapabilities", resp, err)
 }
 
 type defaultAddressSpacesResponseFormat struct {
@@ -102,7 +104,7 @@ type defaultAddressSpacesResponseFormat struct {
 }
 
 func (plugin *ipamPlugin) getDefaultAddressSpaces(w http.ResponseWriter, r *http.Request) {
-	core.LogRequest(pluginName, "GetDefaultAddressSpaces", nil)
+	plugin.logger.LogRequest(pluginName, "GetDefaultAddressSpaces", nil)
 
 	resp := &defaultAddressSpacesResponseFormat{
 		LocalDefaultAddressSpace:  "",
@@ -111,7 +113,7 @@ func (plugin *ipamPlugin) getDefaultAddressSpaces(w http.ResponseWriter, r *http
 
 	err := plugin.listener.Encode(w, resp)
 
-	core.LogResponse(pluginName, "GetDefaultAddressSpaces", resp, err)
+	plugin.logger.LogResponse(pluginName, "GetDefaultAddressSpaces", resp, err)
 }
 
 type requestPoolRequestFormat struct {
@@ -133,7 +135,7 @@ func (plugin *ipamPlugin) requestPool(w http.ResponseWriter, r *http.Request) {
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	core.LogRequest(pluginName, "RequestPool", err)
+	plugin.logger.LogRequest(pluginName, "RequestPool", err)
 
 	if err == nil {
 		data := make(map[string]string)
@@ -141,7 +143,7 @@ func (plugin *ipamPlugin) requestPool(w http.ResponseWriter, r *http.Request) {
 
 		err = plugin.listener.Encode(w, resp)
 
-		core.LogResponse(pluginName, "RequestPool", resp, err)
+		plugin.logger.LogResponse(pluginName, "RequestPool", resp, err)
 	}
 }
 
@@ -157,14 +159,14 @@ func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	core.LogRequest(pluginName, "ReleasePool", err)
+	plugin.logger.LogRequest(pluginName, "ReleasePool", err)
 
 	if err == nil {
 		resp := &releasePoolRequestFormat{}
 
 		err = plugin.listener.Encode(w, resp)
 
-		core.LogResponse(pluginName, "ReleasePool", resp, err)
+		plugin.logger.LogResponse(pluginName, "ReleasePool", resp, err)
 	}
 }
 
@@ -185,14 +187,14 @@ func (plugin *ipamPlugin) requestAddress(w http.ResponseWriter, r *http.Request)
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	core.LogRequest(pluginName, "RequestAddress", err)
+	plugin.logger.LogRequest(pluginName, "RequestAddress", err)
 
 	if err == nil {
 		resp := &requestAddressResponseFormat{"", "", make(map[string]string)}
 
 		err = plugin.listener.Encode(w, resp)
 
-		core.LogResponse(pluginName, "RequestAddress", resp, err)
+		plugin.logger.LogResponse(pluginName, "RequestAddress", resp, err)
 	}
 }
 
@@ -206,13 +208,13 @@ func (plugin *ipamPlugin) releaseAddress(w http.ResponseWriter, r *http.Request)
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	core.LogRequest(pluginName, "ReleaseAddress", err)
+	plugin.logger.LogRequest(pluginName, "ReleaseAddress", err)
 
 	if err == nil {
 		resp := map[string]string{}
 
 		err = plugin.listener.Encode(w, resp)
 
-		core.LogResponse(pluginName, "ReleaseAddress", resp, err)
+		plugin.logger.LogResponse(pluginName, "ReleaseAddress", resp, err)
 	}
 }
