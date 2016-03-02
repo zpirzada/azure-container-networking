@@ -1,7 +1,7 @@
 // Copyright Microsoft Corp.
 // All rights reserved.
 
-package ipamNull
+package ipam
 
 import (
 	"net/http"

@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	ipamNull "github.com/sharmasushant/penguin/ipam/null"
+	"github.com/sharmasushant/penguin/ipam"
 	"github.com/sharmasushant/penguin/log"
 	"github.com/sharmasushant/penguin/network"
 )
@@ -25,7 +25,7 @@ func printHelp() {
 
 func main() {
 	var netPlugin network.NetPlugin
-	var ipamPlugin ipamNull.IpamPlugin
+	var ipamPlugin ipam.IpamPlugin
 	var err error
 
 	// Set defaults.
@@ -53,7 +53,7 @@ func main() {
 			}
 
 		case "ipam":
-			ipamPlugin, err = ipamNull.NewPlugin(ipamVersion)
+			ipamPlugin, err = ipam.NewPlugin(ipamVersion)
 			if err != nil {
 				fmt.Printf("Failed to create IPAM plugin %v\n", err)
 				return
