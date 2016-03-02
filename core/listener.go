@@ -6,11 +6,12 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
 	"path"
+
+	"github.com/sharmasushant/penguin/log"
 )
 
 // Libnetwork plugin path
@@ -42,7 +43,7 @@ func (listener *Listener) Start(errChan chan error) error {
 
 	listener.l, err = net.Listen("unix", listener.socketName)
 	if err != nil {
-		log.Fatalf("Listener: Failed to listen on %s %v", listener.socketName, err)
+		log.Printf("Listener: Failed to listen on %s %v", listener.socketName, err)
 	}
 
 	log.Printf("Listener: Started listening on %s.", listener.socketName)
@@ -77,7 +78,7 @@ func (listener *Listener) Decode(w http.ResponseWriter, r *http.Request, request
 	err := json.NewDecoder(r.Body).Decode(request)
 	if err != nil {
 		http.Error(w, "Failed to decode request: "+err.Error(), http.StatusBadRequest)
-		log.Println("Listener: Failed to decode request: " + err.Error())
+		log.Printf("Listener: Failed to decode request: %v\n", err.Error())
 	}
 	return err
 }
@@ -87,7 +88,7 @@ func (listener *Listener) Encode(w http.ResponseWriter, response interface{}) er
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
 		http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
-		log.Println("Listener: Failed to encode response: " + err.Error())
+		log.Printf("Listener: Failed to encode response: %v\n", err.Error())
 	}
 	return err
 }

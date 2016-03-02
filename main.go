@@ -9,8 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/sharmasushant/penguin/core"
 	ipamNull "github.com/sharmasushant/penguin/ipam/null"
+	"github.com/sharmasushant/penguin/log"
 	"github.com/sharmasushant/penguin/network"
 )
 
@@ -26,11 +26,10 @@ func printHelp() {
 func main() {
 	var netPlugin network.NetPlugin
 	var ipamPlugin ipamNull.IpamPlugin
-	var logger *core.Logger
 	var err error
 
 	// Set defaults.
-	logTarget := core.LOG_STDERR
+	logTarget := log.TargetStderr
 
 	// Parse command line arguments.
 	args := os.Args
@@ -61,7 +60,7 @@ func main() {
 			}
 
 		case "--log-target=syslog":
-			logTarget = core.LOG_SYSLOG
+			logTarget = log.TargetSyslog
 
 		default:
 			fmt.Printf("Unknown argument: %s\n", arg)
@@ -74,9 +73,9 @@ func main() {
 	errorChan := make(chan error, 1)
 
 	// Create logging provider.
-	logger, err = core.NewLogger(logTarget)
+	err = log.SetTarget(logTarget)
 	if err != nil {
-		fmt.Printf("Failed to start logger: %v\n", err)
+		fmt.Printf("Failed to configure logging: %v\n", err)
 		return
 	}
 
@@ -90,7 +89,7 @@ func main() {
 	}
 
 	if ipamPlugin != nil {
-		err = ipamPlugin.Start(errorChan, logger)
+		err = ipamPlugin.Start(errorChan)
 		if err != nil {
 			fmt.Printf("Failed to start IPAM plugin %v\n", err)
 			return
