@@ -43,7 +43,8 @@ func (listener *Listener) Start(errChan chan error) error {
 
 	listener.l, err = net.Listen("unix", listener.socketName)
 	if err != nil {
-		log.Printf("Listener: Failed to listen on %s %v", listener.socketName, err)
+		log.Printf("Listener: Failed to listen %+v", err)
+        return err
 	}
 
 	log.Printf("Listener: Started listening on %s.", listener.socketName)
@@ -65,6 +66,11 @@ func (listener *Listener) Stop() {
 	os.Remove(listener.socketName)
 
 	log.Printf("Listener: Stopped listening on %s", listener.socketName)
+}
+
+// Returns the HTTP mux for the listener.
+func (listener *Listener) GetMux() *http.ServeMux {
+	return listener.mux
 }
 
 // Registers a protocol handler.
