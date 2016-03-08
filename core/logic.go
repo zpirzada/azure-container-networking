@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os/exec"
 	"strconv"
 	"strings"
 
@@ -225,7 +224,7 @@ func GetTargetInterface(interfaceNameToAttach string, ipAddressToAttach string) 
 
 	fmt.Println("Going to set ", name2, " as up.")
 	command := fmt.Sprintf("ip link set %s up", name2)
-	err = executeShellCommand(command)
+	err = ExecuteShellCommand(command)
 	if err != nil {
 		return net.IPNet{}, net.IPNet{}, nil, -1, "", "", net.IP{}, err.Error()
 	}
@@ -271,7 +270,7 @@ func FreeSlaves() error {
 
 		fmt.Println("Going to if down the interface so that mac address can be fixed")
 		command := fmt.Sprintf("ip link set %s down", ifaceName)
-		err = executeShellCommand(command)
+		err = ExecuteShellCommand(command)
 		if err != nil {
 			return err
 		}
@@ -279,14 +278,14 @@ func FreeSlaves() error {
 		macAddress := ifaceDetails.rnmAllocatedMacAddress
 		fmt.Println("Going to revert hardware address of " + ifaceName + " to " + macAddress.String())
 		command = fmt.Sprintf("ip link set %s address %s", ifaceName, macAddress)
-		err = executeShellCommand(command)
+		err = ExecuteShellCommand(command)
 		if err != nil {
 			return err
 		}
 
 		fmt.Println("Going to revert hardware address")
 		command = fmt.Sprintf("ip link set %s up", ifaceName)
-		err = executeShellCommand(command)
+		err = ExecuteShellCommand(command)
 		if err != nil {
 			return err
 		}
@@ -476,7 +475,7 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 
 	fmt.Println("Going to iff up the bridge " + bridge)
 	command := fmt.Sprintf("ip link set %s up", bridge)
-	err = executeShellCommand(command)
+	err = ExecuteShellCommand(command)
 	if err != nil {
 		return err
 	}
@@ -495,7 +494,7 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 
 	fmt.Println("Going to iff down " + iface.Name)
 	command = fmt.Sprintf("ip link set %s down", iface.Name)
-	err = executeShellCommand(command)
+	err = ExecuteShellCommand(command)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err
@@ -525,7 +524,7 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 
 	fmt.Println("Going to set " + newMac.String() + " on " + iface.Name)
 	command = fmt.Sprintf("ip link set %s address %s", iface.Name, newMac.String())
-	err = executeShellCommand(command)
+	err = ExecuteShellCommand(command)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err
@@ -533,7 +532,7 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 
 	fmt.Println("Going to iff up the link " + iface.Name)
 	command = fmt.Sprintf("ip link set %s up", iface.Name)
-	err = executeShellCommand(command)
+	err = ExecuteShellCommand(command)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err
@@ -547,15 +546,6 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 	}
 	mapEnslavedInterfaces[iface.Name] = slave
 	return nil
-}
-
-func executeShellCommand(command string) error {
-	cmd := exec.Command("sh", "-c", command)
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	return cmd.Wait()
 }
 
 // From Go playground: http://play.golang.org/p/1eND0es4Nf

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os/exec"
 )
 
 func printHostInterfaces() {
@@ -42,4 +43,15 @@ func router(w http.ResponseWriter, req *http.Request) {
 	default:
 		fmt.Println("receiver unexpected request", req.Method, "->", req.URL.Path)
 	}
+}
+
+// ExecuteShellCommand executes a shell command
+func ExecuteShellCommand(command string) error {
+	fmt.Println("going to execute: " + command)
+	cmd := exec.Command("sh", "-c", command)
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	return cmd.Wait()
 }

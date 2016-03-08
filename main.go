@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/sharmasushant/penguin/core"
 	"github.com/sharmasushant/penguin/ipam"
 	"github.com/sharmasushant/penguin/log"
 	"github.com/sharmasushant/penguin/network"
@@ -39,6 +40,7 @@ func main() {
 		return
 	}
 
+	handleDependencies()
 	for i, arg := range args {
 		if i == 0 {
 			continue
@@ -125,4 +127,12 @@ func main() {
 	if ipamPlugin != nil {
 		ipamPlugin.Stop()
 	}
+}
+
+func handleDependencies() {
+	installEbtables()
+}
+
+func installEbtables() {
+	core.ExecuteShellCommand("apt-get install ebtables")
 }
