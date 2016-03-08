@@ -20,6 +20,7 @@ const endpointName = "NetworkDriver"
 
 // NetPlugin object and its interface
 type netPlugin struct {
+	name     string
 	version  string
 	scope    string
 	listener *core.Listener
@@ -36,6 +37,7 @@ type NetPlugin interface {
 // NewPlugin creates a new NetPlugin object.
 func NewPlugin(version string) (NetPlugin, error) {
 	return &netPlugin{
+		name:    pluginName,
 		version: version,
 		scope:   "local",
 	}, nil
@@ -45,7 +47,7 @@ func NewPlugin(version string) (NetPlugin, error) {
 func (plugin *netPlugin) Start(errChan chan error) error {
 
 	// Create the listener.
-	listener, err := core.NewListener(pluginName)
+	listener, err := core.NewListener(plugin.name)
 	if err != nil {
 		log.Printf("Failed to create listener %v", err)
 		return err
@@ -70,7 +72,7 @@ func (plugin *netPlugin) Start(errChan chan error) error {
 		return err
 	}
 
-	log.Printf("%s: Plugin started.", pluginName)
+	log.Printf("%s: Plugin started.", plugin.name)
 
 	return nil
 }
@@ -79,7 +81,7 @@ func (plugin *netPlugin) Start(errChan chan error) error {
 func (plugin *netPlugin) Stop() {
 	plugin.listener.Stop()
 	core.FreeSlaves()
-	log.Printf("%s: Plugin stopped.\n", pluginName)
+	log.Printf("%s: Plugin stopped.\n", plugin.name)
 }
 
 func (plugin *netPlugin) networkExists(networkID string) bool {
@@ -107,21 +109,21 @@ type activateResponse struct {
 }
 
 func (plugin *netPlugin) activatePlugin(w http.ResponseWriter, r *http.Request) {
-	log.Request(pluginName, "Activate", nil, nil)
+	log.Request(plugin.name, "Activate", nil, nil)
 
 	resp := &activateResponse{[]string{endpointName}}
 	err := plugin.listener.Encode(w, resp)
 
-	log.Response(pluginName, "Activate", resp, err)
+	log.Response(plugin.name, "Activate", resp, err)
 }
 
 func (plugin *netPlugin) getCapabilities(w http.ResponseWriter, r *http.Request) {
-	log.Request(pluginName, "GetCapabilities", nil, nil)
+	log.Request(plugin.name, "GetCapabilities", nil, nil)
 
 	resp := map[string]string{"Scope": plugin.scope}
 	err := plugin.listener.Encode(w, resp)
 
-	log.Response(pluginName, "GetCapabilities", resp, err)
+	log.Response(plugin.name, "GetCapabilities", resp, err)
 }
 
 // All request and response formats are well known and are published by libnetwork
@@ -135,7 +137,7 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(pluginName, "CreateNetwork", req, err)
+	log.Request(plugin.name, "CreateNetwork", req, err)
 
 	if err != nil {
 		return
@@ -165,7 +167,7 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]string{}
 	err = plugin.listener.Encode(w, resp)
 
-	log.Response(pluginName, "CreateNetwork", resp, err)
+	log.Response(plugin.name, "CreateNetwork", resp, err)
 }
 
 type networkDeleteRequestFormat struct {
@@ -177,7 +179,7 @@ func (plugin *netPlugin) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(pluginName, "DeleteNetwork", req, err)
+	log.Request(plugin.name, "DeleteNetwork", req, err)
 
 	if err != nil {
 		return
@@ -195,7 +197,7 @@ func (plugin *netPlugin) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]string{}
 	err = plugin.listener.Encode(w, resp)
 
-	log.Response(pluginName, "DeleteNetwork", resp, err)
+	log.Response(plugin.name, "DeleteNetwork", resp, err)
 }
 
 type azInterface struct {
@@ -224,7 +226,7 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(pluginName, "CreateEndpoint", req, err)
+	log.Request(plugin.name, "CreateEndpoint", req, err)
 
 	if err != nil {
 		return
@@ -340,7 +342,7 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 
 	err = plugin.listener.Encode(w, resp)
 
-	log.Response(pluginName, "CreateEndpoint", resp, err)
+	log.Response(plugin.name, "CreateEndpoint", resp, err)
 }
 
 type joinRequestFormat struct {
@@ -373,7 +375,7 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(pluginName, "Join", req, err)
+	log.Request(plugin.name, "Join", req, err)
 
 	if err != nil {
 		return
@@ -407,7 +409,7 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 
 	err = plugin.listener.Encode(w, resp)
 
-	log.Response(pluginName, "Join", resp, err)
+	log.Response(plugin.name, "Join", resp, err)
 
 	fmt.Printf("srcname: %s dstPRefix:%s \n", ifname.SrcName, ifname.DstPrefix)
 
@@ -425,7 +427,7 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(pluginName, "DeleteEndpoint", req, err)
+	log.Request(plugin.name, "DeleteEndpoint", req, err)
 
 	if err != nil {
 		return
@@ -454,7 +456,7 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 	resp := &map[string]string{}
 	err = plugin.listener.Encode(w, resp)
 
-	log.Response(pluginName, "DeleteEndpoint", resp, err)
+	log.Response(plugin.name, "DeleteEndpoint", resp, err)
 }
 
 type leaveRequestFormat struct {
@@ -470,7 +472,7 @@ func (plugin *netPlugin) leave(w http.ResponseWriter, r *http.Request) {
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(pluginName, "Leave", req, err)
+	log.Request(plugin.name, "Leave", req, err)
 
 	if err != nil {
 		return
@@ -480,7 +482,7 @@ func (plugin *netPlugin) leave(w http.ResponseWriter, r *http.Request) {
 	resp := &leaveResponse{}
 	err = plugin.listener.Encode(w, resp)
 
-	log.Response(pluginName, "Leave", resp, err)
+	log.Response(plugin.name, "Leave", resp, err)
 }
 
 type endpointOperInfoRequestFormat struct {
@@ -497,7 +499,7 @@ func (plugin *netPlugin) endpointOperInfo(w http.ResponseWriter, r *http.Request
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(pluginName, "EndpointOperInfo", req, err)
+	log.Request(plugin.name, "EndpointOperInfo", req, err)
 
 	if err != nil {
 		return
@@ -510,5 +512,5 @@ func (plugin *netPlugin) endpointOperInfo(w http.ResponseWriter, r *http.Request
 	resp := &endpointOperInfoResponseFormat{Value: value}
 	err = plugin.listener.Encode(w, resp)
 
-	log.Response(pluginName, "EndpointOperInfo", resp, err)
+	log.Response(plugin.name, "EndpointOperInfo", resp, err)
 }
