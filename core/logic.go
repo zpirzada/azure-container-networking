@@ -418,7 +418,7 @@ func getInterfaceWithMultipleConfiguredCAs(ipAddressToAttach string) (*net.Inter
 				if !isCaAlreadyAssigned(caName, caDetails) {
 					ipAddress := caDetails.ip.String()
 					fmt.Println("going to compare " + ipAddress + " with " + ipAddressToAttach)
-					if ipAddress == ipAddressToAttach {
+					if ipAddress == ipAddressToAttach || ipAddressToAttach == "" {
 						iface, err := net.InterfaceByName(ifaceName)
 						if err == nil {
 							selectedInterface = *iface
