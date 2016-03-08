@@ -27,12 +27,13 @@ type netPlugin struct {
 	sync.Mutex
 }
 
+// NetPlugin is a network plugin
 type NetPlugin interface {
 	Start(chan error) error
 	Stop()
 }
 
-// Creates a new NetPlugin object.
+// NewPlugin creates a new NetPlugin object.
 func NewPlugin(version string) (NetPlugin, error) {
 	return &netPlugin{
 		version: version,
@@ -77,6 +78,7 @@ func (plugin *netPlugin) Start(errChan chan error) error {
 // Stops the plugin.
 func (plugin *netPlugin) Stop() {
 	plugin.listener.Stop()
+	core.FreeSlaves()
 	log.Printf("%s: Plugin stopped.\n", pluginName)
 }
 
@@ -259,8 +261,8 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 	if req.Interface != nil {
 		ipaddressToAttach := req.Interface.Address
 		log.Printf(
-			"Interface found in endpoint creation request: " +
-			"Addr:%s, ID:%v, Ipv6:%s, DstPrefix:%s, GatewayIpv4:%s, MacAddress:%s, SrcName:%s",
+			"Interface found in endpoint creation request: "+
+				"Addr:%s, ID:%v, Ipv6:%s, DstPrefix:%s, GatewayIpv4:%s, MacAddress:%s, SrcName:%s",
 			ipaddressToAttach, req.Interface.ID,
 			req.Interface.AddressIPV6,
 			req.Interface.DstPrefix, req.Interface.GatewayIPv4,
@@ -291,7 +293,7 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 		rID,
 		rSrcName,
 		rDstPrefix,
-		rGatewayIPv4, ermsg := core.GetInterfaceToAttach(interfaceToAttach, ipaddressToAttach)
+		rGatewayIPv4, ermsg := core.GetTargetInterface(interfaceToAttach, ipaddressToAttach)
 
 	if ermsg != "" {
 		plugin.listener.SendError(w, ermsg)
@@ -433,14 +435,20 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 	endID := req.EndpointID
 
 	plugin.Lock()
+	defer plugin.Unlock()
 	if !plugin.endpointExists(netID, endID) {
 		// idempotent or throw error?
 		fmt.Println("Endpoint not found network: ", netID, " endpointID: ", endID)
 	} else {
 		network := plugin.networks[netID]
+		ep := network.endpoints[endID]
+		iface := ep.azureInterface
+		err = core.CleanupAfterContainerDeletion(iface.SrcName, iface.MacAddress)
+		if err != nil {
+			log.Printf(" %s DeleteEndpoint cleanup failure %s", pluginName, err.Error())
+		}
 		delete(network.endpoints, endID)
 	}
-	plugin.Unlock()
 
 	// Empty response indicates success.
 	resp := &map[string]string{}
