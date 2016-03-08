@@ -5,8 +5,10 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/sharmasushant/penguin/core"
@@ -134,5 +136,12 @@ func handleDependencies() {
 }
 
 func installEbtables() {
-	core.ExecuteShellCommand("apt-get install ebtables")
+	contents, err := ioutil.ReadFile("/proc/version")
+	if err == nil {
+		value := string(contents)
+		if strings.Contains(value, "ubuntu") || strings.Contains(value, "Ubuntu") {
+			fmt.Print("Detected ubuntu " + value)
+			core.ExecuteShellCommand("apt-get install ebtables")
+		}
+	} // else unsupported distro
 }
