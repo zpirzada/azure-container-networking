@@ -374,7 +374,8 @@ func getInterfaceWithMultipleConfiguredCAs(ipAddressToAttach string) (*net.Inter
 			// temporary hack until we have metadata server
 			!strings.Contains(hostInterface.Name, "veth") &&
 			!strings.Contains(hostInterface.Name, "vth") &&
-			!strings.Contains(hostInterface.Name, "eth0")
+			!strings.Contains(hostInterface.Name, "eth0") &&
+			!strings.Contains(hostInterface.Name, "docker")
 
 		if ipAddressToAttach == "" {
 			if canBeSelected {
