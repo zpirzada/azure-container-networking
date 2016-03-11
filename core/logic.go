@@ -54,6 +54,8 @@ var mapEnslavedInterfaces map[string]enslavedInterface
 
 var vethPairCollection map[int]vethPair
 
+var vethPrefix = "azveth"
+
 // GetInterfaceToAttach is a function that contains the logic to create/select
 // the interface that will be attached to the container
 // It is deprecated now
@@ -153,7 +155,7 @@ func GetInterfaceToAttach(interfaceNameToAttach string, ipAddressToAttach string
 func CleanupAfterContainerDeletion(ifaceName string, macAddress net.HardwareAddr) error {
 	// ifaceName should be of the form veth followed by an even number
 	fmt.Println("Going to cleanup for " + ifaceName + " -- " + macAddress.String())
-	seq := strings.SplitAfter(ifaceName, "veth")
+	seq := strings.SplitAfter(ifaceName, vethPrefix)
 	val, err := strconv.ParseUint(seq[1], 10, 32)
 	if err != nil {
 		return err
@@ -204,8 +206,8 @@ func GetTargetInterface(interfaceNameToAttach string, ipAddressToAttach string) 
 		return net.IPNet{}, net.IPNet{}, nil, -1, "", "", net.IP{}, err.Error()
 	}
 
-	name1 := fmt.Sprintf("veth%d", pair.peer1)
-	name2 := fmt.Sprintf("veth%d", pair.peer2)
+	name1 := fmt.Sprintf("%s%d", vethPrefix, pair.peer1)
+	name2 := fmt.Sprintf("%s%d", vethPrefix, pair.peer2)
 	fmt.Println("Received veth pair names as ", name1, "-", name2, ". Now creating these.")
 	err = netlink.CreateVethPair(name1, name2)
 	if err != nil {
