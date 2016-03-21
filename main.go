@@ -11,10 +11,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/azure/aqua/core"
-	"github.com/azure/aqua/ipam"
-	"github.com/azure/aqua/log"
-	"github.com/azure/aqua/network"
+	"github.com/Azure/Aqua/core"
+	"github.com/Azure/Aqua/ipam"
+	"github.com/Azure/Aqua/log"
+	"github.com/Azure/Aqua/network"
 )
 
 // Binary version
@@ -45,6 +45,8 @@ func main() {
 		return
 	}
 
+	handleDependencies()
+
 	for i, arg := range args {
 		if i == 0 {
 			continue
@@ -74,8 +76,6 @@ func main() {
 			return
 		}
 	}
-
-	handleDependencies()
 
 	// Create a channel to receive unhandled errors from the plugins.
 	errorChan := make(chan error, 1)

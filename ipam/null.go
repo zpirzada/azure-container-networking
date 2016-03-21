@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/azure/aqua/core"
-	"github.com/azure/aqua/log"
+	"github.com/Azure/Aqua/core"
+	"github.com/Azure/Aqua/log"
 )
 
 // Libnetwork IPAM plugin endpoint name

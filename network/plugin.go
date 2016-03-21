@@ -8,9 +8,12 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/azure/aqua/core"
-	"github.com/azure/aqua/log"
+	"github.com/Azure/Aqua/core"
+	"github.com/Azure/Aqua/log"
 )
+
+// Libnetwork network plugin name
+const pluginName = "aqua"
 
 // Libnetwork network plugin endpoint name
 const endpointName = "NetworkDriver"

@@ -29,16 +29,16 @@ const (
 
 // Log prefix
 const logPrefix = ""
-const syslogTag = "PENGUIN"
+const syslogTag = "AQUA"
 
 // Logger object
 type Logger struct {
-    l     *log.Logger
+	l     *log.Logger
 	level int
 }
 
 // Creates a new Logger with default settings.
-func NewLogger() (*Logger) {
+func NewLogger() *Logger {
 	var logger Logger
 
 	logger.l = log.New(os.Stderr, logPrefix, log.LstdFlags)
@@ -61,7 +61,7 @@ func (logger *Logger) SetTarget(target int) error {
 		err = fmt.Errorf("Invalid log target %d", target)
 	}
 
-    if err == nil {
+	if err == nil {
 		logger.l.SetOutput(out)
 	}
 

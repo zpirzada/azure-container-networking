@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/azure/aqua/netfilter"
-	"github.com/azure/aqua/netlink"
+	"github.com/Azure/Aqua/netfilter"
+	"github.com/Azure/Aqua/netlink"
 )
 
 type interfaceDetails struct {
@@ -191,7 +191,7 @@ func GetTargetInterface(interfaceNameToAttach string, ipAddressToAttach string) 
 		return net.IPNet{}, net.IPNet{}, nil, -1, "", "", net.IP{}, errmsg
 	}
 
-	err := enslaveInterfaceIfRequired(targetNic, "penguin")
+	err := enslaveInterfaceIfRequired(targetNic, "aqua")
 	if err != nil {
 		return net.IPNet{}, net.IPNet{}, nil, -1, "", "", net.IP{}, err.Error()
 	}
@@ -232,8 +232,8 @@ func GetTargetInterface(interfaceNameToAttach string, ipAddressToAttach string) 
 	}
 	fmt.Println("successfully ifupped ", name2, ".")
 
-	fmt.Println("Going to add ", name2, " to penguin.")
-	err = netlink.AddInterfaceToBridge(name2, "penguin")
+	fmt.Println("Going to add ", name2, " to aqua.")
+	err = netlink.AddInterfaceToBridge(name2, "aqua")
 	if err != nil {
 		fmt.Println(err.Error())
 		return net.IPNet{}, net.IPNet{}, nil, -1, "", "", net.IP{}, err.Error()

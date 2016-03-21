@@ -42,7 +42,7 @@ func TestMain(m *testing.M) {
 }
 
 //
-// Libnetwork remote API compliance tests 
+// Libnetwork remote API compliance tests
 // github.com/docker/libnetwork/drivers/remote/api
 //
 
