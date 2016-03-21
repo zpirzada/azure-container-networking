@@ -17,9 +17,12 @@ import (
 	"github.com/azure/aqua/network"
 )
 
-// Plugins versions
-const networkVersion string = "V0"
-const ipamVersion string = "V0"
+// Binary version
+const version = "v0.1"
+
+// Libnetwork plugin names
+const netPluginName = "aqua"
+const ipamPluginName = "nullipam"
 
 // Prints description and usage information.
 func printHelp() {
@@ -42,7 +45,6 @@ func main() {
 		return
 	}
 
-	handleDependencies()
 	for i, arg := range args {
 		if i == 0 {
 			continue
@@ -50,14 +52,14 @@ func main() {
 
 		switch arg {
 		case "net":
-			netPlugin, err = network.NewPlugin(networkVersion)
+			netPlugin, err = network.NewPlugin(netPluginName, version)
 			if err != nil {
 				fmt.Printf("Failed to create network plugin %v\n", err)
 				return
 			}
 
 		case "ipam":
-			ipamPlugin, err = ipam.NewPlugin(ipamVersion)
+			ipamPlugin, err = ipam.NewPlugin(ipamPluginName, version)
 			if err != nil {
 				fmt.Printf("Failed to create IPAM plugin %v\n", err)
 				return
@@ -72,6 +74,8 @@ func main() {
 			return
 		}
 	}
+
+	handleDependencies()
 
 	// Create a channel to receive unhandled errors from the plugins.
 	errorChan := make(chan error, 1)
@@ -100,24 +104,21 @@ func main() {
 		}
 	}
 
-	// For now, driver can shutdown on two conditions
-	//    a. If some unhandled exceptions happens in the driver
-	//    b. If we receive explicit signal
-	// To receive explicit os signals, create a channel that can receive os signals.
+	// Shutdown on two conditions:
+	//    a. Unhandled exceptions in plugins
+	//    b. Explicit OS signal
 	osSignalChannel := make(chan os.Signal, 1)
 
-	// Relay incoming signals to channel
-	// If no signals are provided, all incoming signals will be relayed to channel.
-	// Otherwise, just the provided signals will.
+	// Relay these incoming signals to OS signal channel.
 	signal.Notify(osSignalChannel, os.Interrupt, os.Kill, syscall.SIGTERM)
 
 	// Wait until receiving a signal.
 	select {
 	case sig := <-osSignalChannel:
-		fmt.Println("\nCaught signal <" + sig.String() + "> shutting down..")
+		fmt.Printf("\nCaught signal <" + sig.String() + "> shutting down...\n")
 	case err := <-errorChan:
 		if err != nil {
-			fmt.Println("\nDriver received an unhandled error.. ", err)
+			fmt.Printf("\nReceived unhandled error %v, shutting down...\n", err)
 		}
 	}
 

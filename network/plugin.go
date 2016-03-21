@@ -12,9 +12,6 @@ import (
 	"github.com/azure/aqua/log"
 )
 
-// Libnetwork network plugin name
-const pluginName = "aqua"
-
 // Libnetwork network plugin endpoint name
 const endpointName = "NetworkDriver"
 
@@ -28,16 +25,17 @@ type netPlugin struct {
 	sync.Mutex
 }
 
-// NetPlugin is a network plugin
 type NetPlugin interface {
 	Start(chan error) error
 	Stop()
+
+	GetListener() *core.Listener
 }
 
-// NewPlugin creates a new NetPlugin object.
-func NewPlugin(version string) (NetPlugin, error) {
+// Creates a new NetPlugin object.
+func NewPlugin(name string, version string) (NetPlugin, error) {
 	return &netPlugin{
-		name:    pluginName,
+		name:    name,
 		version: version,
 		scope:   "local",
 	}, nil
@@ -45,9 +43,13 @@ func NewPlugin(version string) (NetPlugin, error) {
 
 // Starts the plugin.
 func (plugin *netPlugin) Start(errChan chan error) error {
+	var socketName string
+	if plugin.name != "test" {
+		socketName = plugin.name
+	}
 
 	// Create the listener.
-	listener, err := core.NewListener(plugin.name)
+	listener, err := core.NewListener(socketName)
 	if err != nil {
 		log.Printf("Failed to create listener %v", err)
 		return err
@@ -82,6 +84,11 @@ func (plugin *netPlugin) Stop() {
 	plugin.listener.Stop()
 	core.FreeSlaves()
 	log.Printf("%s: Plugin stopped.\n", plugin.name)
+}
+
+// Returns the listener for the plugin.
+func (plugin *netPlugin) GetListener() *core.Listener {
+	return plugin.listener
 }
 
 func (plugin *netPlugin) networkExists(networkID string) bool {
@@ -447,7 +454,7 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 		iface := ep.azureInterface
 		err = core.CleanupAfterContainerDeletion(iface.SrcName, iface.MacAddress)
 		if err != nil {
-			log.Printf(" %s DeleteEndpoint cleanup failure %s", pluginName, err.Error())
+			log.Printf("%s: DeleteEndpoint cleanup failure %s", plugin.name, err.Error())
 		}
 		delete(network.endpoints, endID)
 	}

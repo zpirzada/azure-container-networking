@@ -11,9 +11,6 @@ import (
 	"github.com/azure/aqua/log"
 )
 
-// Libnetwork IPAM plugin name
-const pluginName = "nullipam"
-
 // Libnetwork IPAM plugin endpoint name
 const endpointName = "IpamDriver"
 
@@ -32,9 +29,9 @@ type IpamPlugin interface {
 }
 
 // Creates a new IpamPlugin object.
-func NewPlugin(version string) (IpamPlugin, error) {
+func NewPlugin(name string, version string) (IpamPlugin, error) {
 	return &ipamPlugin{
-		name:    pluginName,
+		name:    name,
 		version: version,
 		scope:   "local",
 	}, nil

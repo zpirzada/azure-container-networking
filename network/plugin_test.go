@@ -9,23 +9,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
-
-	"github.com/azure/aqua/core"
-	//"github.com/docker/libnetwork/drivers/remote/api"
 )
 
 var plugin NetPlugin
 var mux *http.ServeMux
 
 func TestMain(m *testing.M) {
-	// Create the listener.
-	listener, err := core.NewListener("test")
-	if err != nil {
-		fmt.Printf("Failed to create listener %v", err)
-		return
-	}
-
-	mux = listener.GetMux()
+	var err error
 
 	// Create the plugin.
 	plugin, err = NewPlugin("test", "")
@@ -34,11 +24,13 @@ func TestMain(m *testing.M) {
 		return
 	}
 
-	err = plugin.Start(listener)
+	err = plugin.Start(nil)
 	if err != nil {
 		fmt.Printf("Failed to start network plugin %v\n", err)
 		return
 	}
+
+	mux = plugin.GetListener().GetMux()
 
 	// Run tests.
 	exitCode := m.Run()
@@ -48,6 +40,11 @@ func TestMain(m *testing.M) {
 
 	os.Exit(exitCode)
 }
+
+//
+// Libnetwork remote API compliance tests 
+// github.com/docker/libnetwork/drivers/remote/api
+//
 
 func TestActivate(t *testing.T) {
 	fmt.Println("Test: Activate")

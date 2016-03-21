@@ -25,10 +25,13 @@ type Listener struct {
 }
 
 // Creates a new Listener.
-func NewListener(name string) (*Listener, error) {
+func NewListener(socketName string) (*Listener, error) {
 	var listener Listener
 
-	listener.socketName = path.Join(pluginPath, name) + ".sock"
+	if socketName != "" {
+		listener.socketName = path.Join(pluginPath, socketName) + ".sock"
+	}
+
 	listener.mux = http.NewServeMux()
 
 	return &listener, nil
@@ -37,6 +40,11 @@ func NewListener(name string) (*Listener, error) {
 // Starts listening for requests from libnetwork and routes them to the corresponding plugin.
 func (listener *Listener) Start(errChan chan error) error {
 	var err error
+
+	// Succeed early if no socket was requested.
+	if listener.socketName == "" {
+		return nil
+	}
 
 	// Create a socket.
 	os.MkdirAll(pluginPath, 0660)
@@ -49,6 +57,7 @@ func (listener *Listener) Start(errChan chan error) error {
 
 	log.Printf("Listener: Started listening on %s.", listener.socketName)
 
+	// Launch goroutine for servicing requests.
 	go func() {
 		errChan <- http.Serve(listener.l, listener.mux)
 	}()
@@ -58,6 +67,11 @@ func (listener *Listener) Start(errChan chan error) error {
 
 // Stops listening for requests from libnetwork.
 func (listener *Listener) Stop() {
+
+	// Succeed early if no socket was requested.
+	if listener.socketName == "" {
+		return
+	}
 
 	// Stop servicing requests.
 	listener.l.Close()
