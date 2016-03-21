@@ -11,10 +11,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/sharmasushant/penguin/core"
-	"github.com/sharmasushant/penguin/ipam"
-	"github.com/sharmasushant/penguin/log"
-	"github.com/sharmasushant/penguin/network"
+	"github.com/azure/aqua/core"
+	"github.com/azure/aqua/ipam"
+	"github.com/azure/aqua/log"
+	"github.com/azure/aqua/network"
 )
 
 // Plugins versions
@@ -23,7 +23,7 @@ const ipamVersion string = "V0"
 
 // Prints description and usage information.
 func printHelp() {
-	fmt.Println("Usage: penguin [net] [ipam]")
+	fmt.Println("Usage: aqua [net] [ipam]")
 }
 
 func main() {

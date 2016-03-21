@@ -10,7 +10,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sharmasushant/penguin/core"
+	"github.com/azure/aqua/core"
 	//"github.com/docker/libnetwork/drivers/remote/api"
 )
 

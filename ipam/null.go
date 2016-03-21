@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/sharmasushant/penguin/core"
-	"github.com/sharmasushant/penguin/log"
+	"github.com/azure/aqua/core"
+	"github.com/azure/aqua/log"
 )
 
 // Libnetwork IPAM plugin name

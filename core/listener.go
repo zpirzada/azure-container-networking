@@ -11,7 +11,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/sharmasushant/penguin/log"
+	"github.com/azure/aqua/log"
 )
 
 // Libnetwork plugin path

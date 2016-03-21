@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sharmasushant/penguin/netfilter"
-	"github.com/sharmasushant/penguin/netlink"
+	"github.com/azure/aqua/netfilter"
+	"github.com/azure/aqua/netlink"
 )
 
 type interfaceDetails struct {
@@ -470,7 +470,7 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 
 	_, err := net.InterfaceByName(bridge)
 	if err != nil {
-		// penguin does not exist
+		// bridge does not exist
 		if err := netlink.CreateBridge(bridge); err != nil {
 			return err
 		}
