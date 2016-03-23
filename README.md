@@ -1,6 +1,6 @@
 # Overview
 Aqua sets up networking for containers running in Azure VMs.
-The current implementation doies the following<br>
+The current implementation does the following<br>
 1. Implements the interface published by docker's libnetwork.
 
 # Usage
@@ -17,4 +17,6 @@ Once the above network is created, you can have container join the above network
 docker run --net=azure -it ubuntu:latest /bin/bash
 
 #Requirements
-Aqua relies on the fact that the interfaces in the VM are provisioned with multiple ip-addresses (called CAs in azure). In the current version of Aqua, multiple ip-addresses need to be manually configured on the interface. These ip-addresses need to be provisioned via Azure ARM APIs before they can be used inside VMs.
+Aqua currently relies on the fact that the interfaces in the VM are provisioned with multiple ip-addresses (called CAs in azure). In the current version of Aqua, multiple ip-addresses need to be manually configured on the interface. These ip-addresses need to be provisioned via Azure ARM APIs before they can be used inside VMs.
+
+For help, send an email to 
