@@ -95,3 +95,8 @@ func (logger *Logger) Response(tag string, responseName string, response interfa
 func (logger *Logger) Printf(format string, args ...interface{}) {
 	logger.l.Printf(format, args)
 }
+
+// Logs a string.
+func (logger *Logger) Println(s string) {
+	logger.l.Println(s)
+}
