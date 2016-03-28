@@ -95,7 +95,14 @@ func (listener *Listener) AddHandler(endpoint string, method string, handler fun
 
 // Decodes JSON payload.
 func (listener *Listener) Decode(w http.ResponseWriter, r *http.Request, request interface{}) error {
-	err := json.NewDecoder(r.Body).Decode(request)
+	var err error
+
+	if r.Body == nil {
+		err = fmt.Errorf("Request body is empty")
+	} else {
+		err = json.NewDecoder(r.Body).Decode(request)
+	}
+
 	if err != nil {
 		http.Error(w, "Failed to decode request: "+err.Error(), http.StatusBadRequest)
 		log.Printf("Listener: Failed to decode request: %v\n", err.Error())
