@@ -12,11 +12,8 @@ import (
 	"github.com/Azure/Aqua/log"
 )
 
-// Libnetwork network plugin name
-const pluginName = "aqua"
-
-// Libnetwork network plugin endpoint name
-const endpointName = "NetworkDriver"
+// Libnetwork network plugin endpoint type
+const endpointType = "NetworkDriver"
 
 // NetPlugin object and its interface
 type netPlugin struct {
@@ -31,7 +28,6 @@ type netPlugin struct {
 type NetPlugin interface {
 	Start(chan error) error
 	Stop()
-
 	GetListener() *core.Listener
 }
 
@@ -60,14 +56,14 @@ func (plugin *netPlugin) Start(errChan chan error) error {
 
 	// Add protocol handlers.
 	listener.AddHandler("Plugin", "Activate", plugin.activatePlugin)
-	listener.AddHandler(endpointName, "GetCapabilities", plugin.getCapabilities)
-	listener.AddHandler(endpointName, "CreateNetwork", plugin.createNetwork)
-	listener.AddHandler(endpointName, "DeleteNetwork", plugin.deleteNetwork)
-	listener.AddHandler(endpointName, "CreateEndpoint", plugin.createEndpoint)
-	listener.AddHandler(endpointName, "DeleteEndpoint", plugin.deleteEndpoint)
-	listener.AddHandler(endpointName, "Join", plugin.join)
-	listener.AddHandler(endpointName, "Leave", plugin.leave)
-	listener.AddHandler(endpointName, "EndpointOperInfo", plugin.endpointOperInfo)
+	listener.AddHandler(endpointType, "GetCapabilities", plugin.getCapabilities)
+	listener.AddHandler(endpointType, "CreateNetwork", plugin.createNetwork)
+	listener.AddHandler(endpointType, "DeleteNetwork", plugin.deleteNetwork)
+	listener.AddHandler(endpointType, "CreateEndpoint", plugin.createEndpoint)
+	listener.AddHandler(endpointType, "DeleteEndpoint", plugin.deleteEndpoint)
+	listener.AddHandler(endpointType, "Join", plugin.join)
+	listener.AddHandler(endpointType, "Leave", plugin.leave)
+	listener.AddHandler(endpointType, "EndpointOperInfo", plugin.endpointOperInfo)
 
 	plugin.listener = listener
 
@@ -121,7 +117,7 @@ type activateResponse struct {
 func (plugin *netPlugin) activatePlugin(w http.ResponseWriter, r *http.Request) {
 	log.Request(plugin.name, "Activate", nil, nil)
 
-	resp := &activateResponse{[]string{endpointName}}
+	resp := &activateResponse{[]string{endpointType}}
 	err := plugin.listener.Encode(w, resp)
 
 	log.Response(plugin.name, "Activate", resp, err)
