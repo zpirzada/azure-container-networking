@@ -11,8 +11,8 @@ import (
 	"github.com/Azure/Aqua/log"
 )
 
-// Libnetwork IPAM plugin endpoint name
-const endpointName = "IpamDriver"
+// Libnetwork IPAM plugin endpoint type
+const endpointType = "IpamDriver"
 
 // IpamPlugin object and interface
 type ipamPlugin struct {
@@ -26,6 +26,7 @@ type ipamPlugin struct {
 type IpamPlugin interface {
 	Start(chan error) error
 	Stop()
+	GetListener() *core.Listener
 }
 
 // Creates a new IpamPlugin object.
@@ -39,9 +40,13 @@ func NewPlugin(name string, version string) (IpamPlugin, error) {
 
 // Starts the plugin.
 func (plugin *ipamPlugin) Start(errChan chan error) error {
+	var socketName string
+	if plugin.name != "test" {
+		socketName = plugin.name
+	}
 
 	// Create the listener.
-	listener, err := core.NewListener(plugin.name)
+	listener, err := core.NewListener(socketName)
 	if err != nil {
 		log.Printf("Failed to create listener %v", err)
 		return err
@@ -49,12 +54,12 @@ func (plugin *ipamPlugin) Start(errChan chan error) error {
 
 	// Add protocol handlers.
 	listener.AddHandler("Plugin", "Activate", plugin.activatePlugin)
-	listener.AddHandler(endpointName, "GetCapabilities", plugin.getCapabilities)
-	listener.AddHandler(endpointName, "GetDefaultAddressSpaces", plugin.getDefaultAddressSpaces)
-	listener.AddHandler(endpointName, "RequestPool", plugin.requestPool)
-	listener.AddHandler(endpointName, "ReleasePool", plugin.releasePool)
-	listener.AddHandler(endpointName, "RequestAddress", plugin.requestAddress)
-	listener.AddHandler(endpointName, "ReleaseAddress", plugin.releaseAddress)
+	listener.AddHandler(endpointType, "GetCapabilities", plugin.getCapabilities)
+	listener.AddHandler(endpointType, "GetDefaultAddressSpaces", plugin.getDefaultAddressSpaces)
+	listener.AddHandler(endpointType, "RequestPool", plugin.requestPool)
+	listener.AddHandler(endpointType, "ReleasePool", plugin.releasePool)
+	listener.AddHandler(endpointType, "RequestAddress", plugin.requestAddress)
+	listener.AddHandler(endpointType, "ReleaseAddress", plugin.releaseAddress)
 
 	plugin.listener = listener
 
@@ -75,6 +80,11 @@ func (plugin *ipamPlugin) Stop() {
 	log.Printf("%s: Plugin stopped.\n", plugin.name)
 }
 
+// Returns the listener for the plugin.
+func (plugin *ipamPlugin) GetListener() *core.Listener {
+	return plugin.listener
+}
+
 type activateResponse struct {
 	Implements []string
 }
@@ -82,7 +92,7 @@ type activateResponse struct {
 func (plugin *ipamPlugin) activatePlugin(w http.ResponseWriter, r *http.Request) {
 	log.Request(plugin.name, "Activate", nil, nil)
 
-	resp := &activateResponse{[]string{endpointName}}
+	resp := &activateResponse{[]string{endpointType}}
 	err := plugin.listener.Encode(w, resp)
 
 	log.Response(plugin.name, "Activate", resp, err)
