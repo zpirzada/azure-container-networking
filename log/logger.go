@@ -93,7 +93,7 @@ func (logger *Logger) Response(tag string, responseName string, response interfa
 
 // Logs a formatted string.
 func (logger *Logger) Printf(format string, args ...interface{}) {
-	logger.l.Printf(format, args)
+	logger.l.Printf(format, args...)
 }
 
 // Logs a string.

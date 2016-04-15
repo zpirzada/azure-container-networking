@@ -28,7 +28,7 @@ func Response(tag string, responseName string, response interface{}, err error) 
 }
 
 func Printf(format string, args ...interface{}) {
-	stdLog.Printf(format, args)
+	stdLog.Printf(format, args...)
 }
 
 func Println(s string) {
