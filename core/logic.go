@@ -225,8 +225,7 @@ func GetTargetInterface(interfaceNameToAttach string, ipAddressToAttach string) 
 	fmt.Println("Updating veth pair state")
 
 	fmt.Println("Going to set ", name2, " as up.")
-	command := fmt.Sprintf("ip link set %s up", name2)
-	err = ExecuteShellCommand(command)
+	err = netlink.SetLinkState(name2, true)
 	if err != nil {
 		return net.IPNet{}, net.IPNet{}, nil, -1, "", "", net.IP{}, err.Error()
 	}
@@ -271,23 +270,20 @@ func FreeSlaves() error {
 		err := netlink.SetLinkMaster(ifaceName, "")
 
 		fmt.Println("Going to if down the interface so that mac address can be fixed")
-		command := fmt.Sprintf("ip link set %s down", ifaceName)
-		err = ExecuteShellCommand(command)
+		err = netlink.SetLinkState(ifaceName, false)
 		if err != nil {
 			return err
 		}
 
 		macAddress := ifaceDetails.rnmAllocatedMacAddress
 		fmt.Println("Going to revert hardware address of " + ifaceName + " to " + macAddress.String())
-		command = fmt.Sprintf("ip link set %s address %s", ifaceName, macAddress)
-		err = ExecuteShellCommand(command)
+		err = netlink.SetLinkAddress(ifaceName, macAddress)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println("Going to revert hardware address")
-		command = fmt.Sprintf("ip link set %s up", ifaceName)
-		err = ExecuteShellCommand(command)
+		fmt.Println("Going to if up")
+		err = netlink.SetLinkState(ifaceName, true)
 		if err != nil {
 			return err
 		}
@@ -477,8 +473,7 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 	}
 
 	fmt.Println("Going to iff up the bridge " + bridge)
-	command := fmt.Sprintf("ip link set %s up", bridge)
-	err = ExecuteShellCommand(command)
+	err = netlink.SetLinkState(bridge, true)
 	if err != nil {
 		return err
 	}
@@ -496,8 +491,7 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 	}
 
 	fmt.Println("Going to iff down " + iface.Name)
-	command = fmt.Sprintf("ip link set %s down", iface.Name)
-	err = ExecuteShellCommand(command)
+	err = netlink.SetLinkState(iface.Name, false)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err
@@ -526,16 +520,14 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 	}
 
 	fmt.Println("Going to set " + newMac.String() + " on " + iface.Name)
-	command = fmt.Sprintf("ip link set %s address %s", iface.Name, newMac.String())
-	err = ExecuteShellCommand(command)
+	err = netlink.SetLinkAddress(iface.Name, newMac)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err
 	}
 
 	fmt.Println("Going to iff up the link " + iface.Name)
-	command = fmt.Sprintf("ip link set %s up", iface.Name)
-	err = ExecuteShellCommand(command)
+	err = netlink.SetLinkState(iface.Name, true)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err

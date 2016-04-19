@@ -83,6 +83,37 @@ func DeleteLink(name string) error {
 	return s.sendAndComplete(req)
 }
 
+// Sets the operational state of a network interface.
+func SetLinkState(name string, up bool) error {
+	s, err := getSocket()
+	if err != nil {
+		return err
+	}
+
+	iface, err := net.InterfaceByName(name)
+	if err != nil {
+		return err
+	}
+
+	req := newRequest(unix.RTM_NEWLINK, unix.NLM_F_ACK)
+
+	ifInfo := newIfInfoMsg()
+	ifInfo.Type = unix.RTM_SETLINK
+	ifInfo.Index = int32(iface.Index)
+
+	if up {
+		ifInfo.Flags = unix.IFF_UP
+		ifInfo.Change = unix.IFF_UP
+	} else {
+		ifInfo.Flags = 0 & ^unix.IFF_UP
+		ifInfo.Change = DEFAULT_CHANGE
+	}
+
+	req.addPayload(ifInfo)
+
+	return s.sendAndComplete(req)
+}
+
 // Sets the master (upper) device of a network interface.
 func SetLinkMaster(name string, master string) error {
 	s, err := getSocket()
@@ -115,6 +146,32 @@ func SetLinkMaster(name string, master string) error {
 
 	attrMaster := newAttributeUint32(unix.IFLA_MASTER, masterIndex)
 	req.addPayload(attrMaster)
+
+	return s.sendAndComplete(req)
+}
+
+// Sets the link layer hardware address of a network interface.
+func SetLinkAddress(ifName string, hwAddress net.HardwareAddr) error {
+	s, err := getSocket()
+	if err != nil {
+		return err
+	}
+
+	iface, err := net.InterfaceByName(ifName)
+	if err != nil {
+		return err
+	}
+
+	req := newRequest(unix.RTM_SETLINK, unix.NLM_F_ACK)
+
+	ifInfo := newIfInfoMsg()
+	ifInfo.Type = unix.RTM_SETLINK
+	ifInfo.Index = int32(iface.Index)
+	ifInfo.Flags = unix.NLM_F_REQUEST
+	ifInfo.Change = DEFAULT_CHANGE
+	req.addPayload(ifInfo)
+
+	req.addPayload(newAttribute(unix.IFLA_ADDRESS, hwAddress))
 
 	return s.sendAndComplete(req)
 }
