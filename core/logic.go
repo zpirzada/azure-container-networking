@@ -169,7 +169,7 @@ func CleanupAfterContainerDeletion(ifaceName string, macAddress net.HardwareAddr
 		return errors.New("received null veth pair for cleanup")
 	}
 
-	netlink.DeleteNetworkLink(ifaceName)
+	netlink.DeleteLink(ifaceName)
 	err = ebtables.RemoveDnatBasedOnIPV4Address(targetVeth.ip.String(), macAddress.String())
 	if err != nil {
 		fmt.Println(err.Error())
@@ -177,7 +177,7 @@ func CleanupAfterContainerDeletion(ifaceName string, macAddress net.HardwareAddr
 	}
 	a := targetVeth.ip
 	fmt.Println("going to add " + a.String() + "-- to " + targetVeth.ifaceNameCaWasTakenFrom)
-	netlink.AddLinkIPAddress(targetVeth.ifaceNameCaWasTakenFrom, *(targetVeth.ip), targetVeth.ipNet)
+	netlink.AddIpAddress(targetVeth.ifaceNameCaWasTakenFrom, *(targetVeth.ip), targetVeth.ipNet)
 	delete(vethPairCollection, int(val))
 	return nil
 }
@@ -209,14 +209,14 @@ func GetTargetInterface(interfaceNameToAttach string, ipAddressToAttach string) 
 	name1 := fmt.Sprintf("%s%d", vethPrefix, pair.peer1)
 	name2 := fmt.Sprintf("%s%d", vethPrefix, pair.peer2)
 	fmt.Println("Received veth pair names as ", name1, "-", name2, ". Now creating these.")
-	err = netlink.CreateVethPair(name1, name2)
+	err = netlink.AddVethPair(name1, name2)
 	if err != nil {
 		return net.IPNet{}, net.IPNet{}, nil, -1, "", "", net.IP{}, err.Error()
 	}
 	fmt.Println("Successfully generated veth pair.")
 
 	fmt.Println("Going to add ip address ", *ip, ipNet, " to ", name1)
-	err = netlink.AddLinkIPAddress(name1, *ip, ipNet)
+	err = netlink.AddIpAddress(name1, *ip, ipNet)
 	if err != nil {
 		return net.IPNet{}, net.IPNet{}, nil, -1, "", "", net.IP{}, err.Error()
 	}
@@ -225,15 +225,14 @@ func GetTargetInterface(interfaceNameToAttach string, ipAddressToAttach string) 
 	fmt.Println("Updating veth pair state")
 
 	fmt.Println("Going to set ", name2, " as up.")
-	command := fmt.Sprintf("ip link set %s up", name2)
-	err = ExecuteShellCommand(command)
+	err = netlink.SetLinkState(name2, true)
 	if err != nil {
 		return net.IPNet{}, net.IPNet{}, nil, -1, "", "", net.IP{}, err.Error()
 	}
 	fmt.Println("successfully ifupped ", name2, ".")
 
 	fmt.Println("Going to add ", name2, " to aqua.")
-	err = netlink.AddInterfaceToBridge(name2, "aqua")
+	err = netlink.SetLinkMaster(name2, "aqua")
 	if err != nil {
 		fmt.Println(err.Error())
 		return net.IPNet{}, net.IPNet{}, nil, -1, "", "", net.IP{}, err.Error()
@@ -268,26 +267,23 @@ func GetTargetInterface(interfaceNameToAttach string, ipAddressToAttach string) 
 func FreeSlaves() error {
 	for ifaceName, ifaceDetails := range mapEnslavedInterfaces {
 		fmt.Println("Going to remove " + ifaceName + " from bridge")
-		err := netlink.RemoveInterfaceFromBridge(ifaceName)
+		err := netlink.SetLinkMaster(ifaceName, "")
 
 		fmt.Println("Going to if down the interface so that mac address can be fixed")
-		command := fmt.Sprintf("ip link set %s down", ifaceName)
-		err = ExecuteShellCommand(command)
+		err = netlink.SetLinkState(ifaceName, false)
 		if err != nil {
 			return err
 		}
 
 		macAddress := ifaceDetails.rnmAllocatedMacAddress
 		fmt.Println("Going to revert hardware address of " + ifaceName + " to " + macAddress.String())
-		command = fmt.Sprintf("ip link set %s address %s", ifaceName, macAddress)
-		err = ExecuteShellCommand(command)
+		err = netlink.SetLinkAddress(ifaceName, macAddress)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println("Going to revert hardware address")
-		command = fmt.Sprintf("ip link set %s up", ifaceName)
-		err = ExecuteShellCommand(command)
+		fmt.Println("Going to if up")
+		err = netlink.SetLinkState(ifaceName, true)
 		if err != nil {
 			return err
 		}
@@ -302,7 +298,7 @@ func FreeSlaves() error {
 
 		fmt.Println("Going to add ip addresses back to interface " + ifaceName)
 		for _, caDetails := range ifaceDetails.provisionedCas {
-			netlink.AddLinkIPAddress(ifaceName, *(caDetails.ip), caDetails.ipNet)
+			netlink.AddIpAddress(ifaceName, *(caDetails.ip), caDetails.ipNet)
 		}
 	}
 
@@ -471,14 +467,13 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 	_, err := net.InterfaceByName(bridge)
 	if err != nil {
 		// bridge does not exist
-		if err := netlink.CreateBridge(bridge); err != nil {
+		if err := netlink.AddLink(bridge, "bridge"); err != nil {
 			return err
 		}
 	}
 
 	fmt.Println("Going to iff up the bridge " + bridge)
-	command := fmt.Sprintf("ip link set %s up", bridge)
-	err = ExecuteShellCommand(command)
+	err = netlink.SetLinkState(bridge, true)
 	if err != nil {
 		return err
 	}
@@ -496,8 +491,7 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 	}
 
 	fmt.Println("Going to iff down " + iface.Name)
-	command = fmt.Sprintf("ip link set %s down", iface.Name)
-	err = ExecuteShellCommand(command)
+	err = netlink.SetLinkState(iface.Name, false)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err
@@ -526,23 +520,21 @@ func enslaveInterfaceIfRequired(iface *net.Interface, bridge string) error {
 	}
 
 	fmt.Println("Going to set " + newMac.String() + " on " + iface.Name)
-	command = fmt.Sprintf("ip link set %s address %s", iface.Name, newMac.String())
-	err = ExecuteShellCommand(command)
+	err = netlink.SetLinkAddress(iface.Name, newMac)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err
 	}
 
 	fmt.Println("Going to iff up the link " + iface.Name)
-	command = fmt.Sprintf("ip link set %s up", iface.Name)
-	err = ExecuteShellCommand(command)
+	err = netlink.SetLinkState(iface.Name, true)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err
 	}
 
 	fmt.Println("Going to add link " + iface.Name + " to " + bridge)
-	err = netlink.AddInterfaceToBridge(iface.Name, bridge)
+	err = netlink.SetLinkMaster(iface.Name, bridge)
 	if err != nil {
 		fmt.Println(err.Error())
 		return err
@@ -593,7 +585,7 @@ func getAvailableCaAndRemoveFromHostInterface(iface *net.Interface, ipAddressToA
 			return nil, nil, errors.New(erMsg)
 		}
 
-		netlink.RemoveLinkIPAddress(iface.Name, *targetCa.ip, targetCa.ipNet)
+		netlink.DeleteIpAddress(iface.Name, *targetCa.ip, targetCa.ipNet)
 		return targetCa.ip, targetCa.ipNet, nil
 	}
 
@@ -602,7 +594,7 @@ func getAvailableCaAndRemoveFromHostInterface(iface *net.Interface, ipAddressToA
 	for caName, caDetails := range ensalvedIface.provisionedCas {
 		if !isCaAlreadyAssigned(caName, caDetails) {
 			fmt.Println("Found an unused CA " + caName)
-			netlink.RemoveLinkIPAddress(iface.Name, *caDetails.ip, caDetails.ipNet)
+			netlink.DeleteIpAddress(iface.Name, *caDetails.ip, caDetails.ipNet)
 			return caDetails.ip, caDetails.ipNet, nil
 		}
 	}

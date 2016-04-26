@@ -284,10 +284,12 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 	// lets lock driver for now.. will optimize later
 	plugin.Lock()
 	if !plugin.networkExists(netID) {
+		plugin.Unlock()
 		plugin.listener.SendError(w, fmt.Sprintf("Could not find [networkID:%s]\n", netID))
 		return
 	}
 	if plugin.endpointExists(netID, endID) {
+		plugin.Unlock()
 		plugin.listener.SendError(w, fmt.Sprintf("Endpoint already exists [networkID:%s endpointID:%s]\n", netID, endID))
 		return
 	}
@@ -304,8 +306,8 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 		rGatewayIPv4, ermsg := core.GetTargetInterface(interfaceToAttach, ipaddressToAttach)
 
 	if ermsg != "" {
-		plugin.listener.SendError(w, ermsg)
 		plugin.Unlock()
+		plugin.listener.SendError(w, ermsg)
 		return
 	}
 
