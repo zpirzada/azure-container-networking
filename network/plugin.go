@@ -28,7 +28,6 @@ type netPlugin struct {
 type NetPlugin interface {
 	Start(chan error) error
 	Stop()
-	GetListener() *core.Listener
 }
 
 // Creates a new NetPlugin object.
@@ -83,11 +82,6 @@ func (plugin *netPlugin) Stop() {
 	plugin.listener.Stop()
 	core.FreeSlaves()
 	log.Printf("%s: Plugin stopped.\n", plugin.name)
-}
-
-// Returns the listener for the plugin.
-func (plugin *netPlugin) GetListener() *core.Listener {
-	return plugin.listener
 }
 
 func (plugin *netPlugin) networkExists(networkID string) bool {

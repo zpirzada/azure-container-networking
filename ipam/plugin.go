@@ -26,7 +26,6 @@ type ipamPlugin struct {
 type IpamPlugin interface {
 	Start(chan error) error
 	Stop()
-	GetListener() *core.Listener
 }
 
 // Creates a new IpamPlugin object.
@@ -78,11 +77,6 @@ func (plugin *ipamPlugin) Start(errChan chan error) error {
 func (plugin *ipamPlugin) Stop() {
 	plugin.listener.Stop()
 	log.Printf("%s: Plugin stopped.\n", plugin.name)
-}
-
-// Returns the listener for the plugin.
-func (plugin *ipamPlugin) GetListener() *core.Listener {
-	return plugin.listener
 }
 
 type activateResponse struct {
