@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Get the internal http mux as test hook.
-	mux = plugin.(*ipamPlugin).listener.GetMux()
+	mux = plugin.(*ipamPlugin).Listener.GetMux()
 
 	// Run tests.
 	exitCode := m.Run()
