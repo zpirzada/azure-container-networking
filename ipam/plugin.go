@@ -11,9 +11,6 @@ import (
 	"github.com/Azure/Aqua/log"
 )
 
-// Libnetwork IPAM plugin endpoint type
-const endpointType = "IpamDriver"
-
 // IpamPlugin object and interface
 type ipamPlugin struct {
 	common.Plugin
@@ -66,27 +63,23 @@ func (plugin *ipamPlugin) Stop() {
 }
 
 //
-// Libnetwork remote IPAM plugin APIs
+// Libnetwork remote IPAM API implementation
+// https://github.com/docker/libnetwork/blob/master/docs/ipam.md
 //
 
 func (plugin *ipamPlugin) getCapabilities(w http.ResponseWriter, r *http.Request) {
 	log.Request(plugin.Name, "GetCapabilities", nil, nil)
 
-	resp := map[string]string{"Scope": plugin.Scope}
+	resp := &getCapabilitiesResponse{}
 	err := plugin.Listener.Encode(w, resp)
 
 	log.Response(plugin.Name, "GetCapabilities", resp, err)
 }
 
-type defaultAddressSpacesResponseFormat struct {
-	LocalDefaultAddressSpace  string
-	GlobalDefaultAddressSpace string
-}
-
 func (plugin *ipamPlugin) getDefaultAddressSpaces(w http.ResponseWriter, r *http.Request) {
 	log.Request(plugin.Name, "GetDefaultAddressSpaces", nil, nil)
 
-	resp := &defaultAddressSpacesResponseFormat{
+	resp := &getDefaultAddressSpacesResponse{
 		LocalDefaultAddressSpace:  "",
 		GlobalDefaultAddressSpace: "",
 	}
@@ -96,22 +89,8 @@ func (plugin *ipamPlugin) getDefaultAddressSpaces(w http.ResponseWriter, r *http
 	log.Response(plugin.Name, "GetDefaultAddressSpaces", resp, err)
 }
 
-type requestPoolRequestFormat struct {
-	AddressSpace string
-	Pool         string
-	SubPool      string
-	Options      map[string]string
-	V6           bool
-}
-
-type requestPoolResponseFormat struct {
-	PoolID string
-	Pool   string
-	Data   map[string]string
-}
-
 func (plugin *ipamPlugin) requestPool(w http.ResponseWriter, r *http.Request) {
-	var req requestPoolRequestFormat
+	var req requestPoolRequest
 
 	err := plugin.Listener.Decode(w, r, &req)
 
@@ -119,7 +98,7 @@ func (plugin *ipamPlugin) requestPool(w http.ResponseWriter, r *http.Request) {
 
 	if err == nil {
 		data := make(map[string]string)
-		resp := &requestPoolResponseFormat{"", "0.0.0.0/8", data}
+		resp := &requestPoolResponse{"", "0.0.0.0/8", data}
 
 		err = plugin.Listener.Encode(w, resp)
 
@@ -127,22 +106,15 @@ func (plugin *ipamPlugin) requestPool(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type releasePoolRequestFormat struct {
-	PoolID string
-}
-
-type releasePoolResponseFormat struct {
-}
-
 func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
-	var req releasePoolRequestFormat
+	var req releasePoolRequest
 
 	err := plugin.Listener.Decode(w, r, &req)
-
+	
 	log.Request(plugin.Name, "ReleasePool", req, err)
-
+	
 	if err == nil {
-		resp := &releasePoolRequestFormat{}
+		resp := &releasePoolResponse{}
 
 		err = plugin.Listener.Encode(w, resp)
 
@@ -150,27 +122,15 @@ func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type requestAddressRequestFormat struct {
-	PoolID  string
-	Address string
-	Options map[string]string
-}
-
-type requestAddressResponseFormat struct {
-	PoolID  string
-	Address string
-	Options map[string]string
-}
-
 func (plugin *ipamPlugin) requestAddress(w http.ResponseWriter, r *http.Request) {
-	var req requestAddressRequestFormat
+	var req requestAddressRequest
 
 	err := plugin.Listener.Decode(w, r, &req)
 
 	log.Request(plugin.Name, "RequestAddress", req, err)
 
 	if err == nil {
-		resp := &requestAddressResponseFormat{"", "", make(map[string]string)}
+		resp := &requestAddressResponse{"", make(map[string]string)}
 
 		err = plugin.Listener.Encode(w, resp)
 
@@ -178,20 +138,15 @@ func (plugin *ipamPlugin) requestAddress(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-type releaseAddressRequestFormat struct {
-	PoolID  string
-	Address string
-}
-
 func (plugin *ipamPlugin) releaseAddress(w http.ResponseWriter, r *http.Request) {
-	var req releaseAddressRequestFormat
+	var req releaseAddressRequest
 
 	err := plugin.Listener.Decode(w, r, &req)
 
 	log.Request(plugin.Name, "ReleaseAddress", req, err)
 
 	if err == nil {
-		resp := map[string]string{}
+		resp := &releaseAddressResponse{}
 
 		err = plugin.Listener.Encode(w, resp)
 
