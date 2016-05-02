@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/Azure/Aqua/core"
+	"github.com/Azure/Aqua/common"
 	"github.com/Azure/Aqua/log"
 )
 
@@ -20,7 +21,7 @@ type netPlugin struct {
 	name     string
 	version  string
 	scope    string
-	listener *core.Listener
+	listener *common.Listener
 	networks map[string]*azureNetwork
 	sync.Mutex
 }
@@ -47,7 +48,7 @@ func (plugin *netPlugin) Start(errChan chan error) error {
 	}
 
 	// Create the listener.
-	listener, err := core.NewListener(socketName)
+	listener, err := common.NewListener(socketName)
 	if err != nil {
 		log.Printf("Failed to create listener %v", err)
 		return err
