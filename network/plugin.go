@@ -52,15 +52,15 @@ func (plugin *netPlugin) Start(errChan chan error) error {
 	}
 
 	// Add protocol handlers.
-	listener.AddHandler("Plugin", "Activate", plugin.activatePlugin)
-	listener.AddHandler(endpointType, "GetCapabilities", plugin.getCapabilities)
-	listener.AddHandler(endpointType, "CreateNetwork", plugin.createNetwork)
-	listener.AddHandler(endpointType, "DeleteNetwork", plugin.deleteNetwork)
-	listener.AddHandler(endpointType, "CreateEndpoint", plugin.createEndpoint)
-	listener.AddHandler(endpointType, "DeleteEndpoint", plugin.deleteEndpoint)
-	listener.AddHandler(endpointType, "Join", plugin.join)
-	listener.AddHandler(endpointType, "Leave", plugin.leave)
-	listener.AddHandler(endpointType, "EndpointOperInfo", plugin.endpointOperInfo)
+	listener.AddHandler("/Plugin.Activate", plugin.activatePlugin)
+	listener.AddHandler(getCapabilitiesPath, plugin.getCapabilities)
+	listener.AddHandler(createNetworkPath, plugin.createNetwork)
+	listener.AddHandler(deleteNetworkPath, plugin.deleteNetwork)
+	listener.AddHandler(createEndpointPath, plugin.createEndpoint)
+	listener.AddHandler(deleteEndpointPath, plugin.deleteEndpoint)
+	listener.AddHandler(joinPath, plugin.join)
+	listener.AddHandler(leavePath, plugin.leave)
+	listener.AddHandler(endpointOperInfoPath, plugin.endpointOperInfo)
 
 	plugin.listener = listener
 
