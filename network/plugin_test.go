@@ -94,7 +94,7 @@ func TestGetCapabilities(t *testing.T) {
 
 	var resp remoteApi.GetCapabilityResponse
 
-	req, err := http.NewRequest(http.MethodGet, "/NetworkDriver.GetCapabilities", nil)
+	req, err := http.NewRequest(http.MethodGet, getCapabilitiesPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,12 +117,12 @@ func TestCreateNetwork(t *testing.T) {
 	var resp remoteApi.CreateNetworkResponse
 
 	info := &remoteApi.CreateNetworkRequest{
-		NetworkID:  "N1",
+		NetworkID: "N1",
 	}
 
 	json.NewEncoder(&body).Encode(info)
 
-	req, err := http.NewRequest(http.MethodGet, "/NetworkDriver.CreateNetwork", &body)
+	req, err := http.NewRequest(http.MethodGet, createNetworkPath, &body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,12 +145,12 @@ func TestDeleteNetwork(t *testing.T) {
 	var resp remoteApi.DeleteNetworkResponse
 
 	info := &remoteApi.DeleteNetworkRequest{
-		NetworkID:  "N1",
+		NetworkID: "N1",
 	}
 
 	json.NewEncoder(&body).Encode(info)
 
-	req, err := http.NewRequest(http.MethodGet, "/NetworkDriver.DeleteNetwork", &body)
+	req, err := http.NewRequest(http.MethodGet, deleteNetworkPath, &body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestEndpointOperInfo(t *testing.T) {
 
 	json.NewEncoder(&body).Encode(info)
 
-	req, err := http.NewRequest(http.MethodGet, "/NetworkDriver.EndpointOperInfo", &body)
+	req, err := http.NewRequest(http.MethodGet, endpointOperInfoPath, &body)
 	if err != nil {
 		t.Fatal(err)
 	}

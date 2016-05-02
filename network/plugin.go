@@ -8,13 +8,10 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/Azure/Aqua/core"
 	"github.com/Azure/Aqua/common"
+	"github.com/Azure/Aqua/core"
 	"github.com/Azure/Aqua/log"
 )
-
-// Libnetwork network plugin endpoint type
-const endpointType = "NetworkDriver"
 
 // NetPlugin object and its interface
 type netPlugin struct {
