@@ -63,12 +63,12 @@ func (plugin *Plugin) Uninitialize() {
 func (plugin *Plugin) activate(w http.ResponseWriter, r *http.Request) {
 	var req activateRequest
 
-	log.Request(plugin.Name, "Activate", req, nil)
+	log.Request(plugin.Name, &req, nil)
 
-	resp := &activateResponse{[]string{plugin.EndpointType}}
-	err := plugin.Listener.Encode(w, resp)
+	resp := activateResponse{[]string{plugin.EndpointType}}
+	err := plugin.Listener.Encode(w, &resp)
 
-	log.Response(plugin.Name, "Activate", resp, err)
+	log.Response(plugin.Name, &resp, err)
 }
 
 // Sends and logs an error response.
@@ -76,5 +76,5 @@ func (plugin *Plugin) SendErrorResponse(w http.ResponseWriter, errMsg string) {
 	resp := errorResponse{errMsg}
 	err := plugin.Listener.Encode(w, &resp)
 
-	log.Response(plugin.Name, "", resp, err)
+	log.Response(plugin.Name, &resp, err)
 }

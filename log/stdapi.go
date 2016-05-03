@@ -19,12 +19,12 @@ func SetLevel(level int) {
 	stdLog.SetLevel(level)
 }
 
-func Request(tag string, requestName string, request interface{}, err error) {
-	stdLog.Request(tag, requestName, request, err)
+func Request(tag string, request interface{}, err error) {
+	stdLog.Request(tag, request, err)
 }
 
-func Response(tag string, responseName string, response interface{}, err error) {
-	stdLog.Response(tag, responseName, response, err)
+func Response(tag string, response interface{}, err error) {
+	stdLog.Response(tag, response, err)
 }
 
 func Printf(format string, args ...interface{}) {

@@ -107,21 +107,23 @@ type activateResponse struct {
 }
 
 func (plugin *netPlugin) activatePlugin(w http.ResponseWriter, r *http.Request) {
-	log.Request(plugin.name, "Activate", nil, nil)
+	log.Request(plugin.name, nil, nil)
 
-	resp := &activateResponse{[]string{endpointType}}
-	err := plugin.listener.Encode(w, resp)
+	resp := activateResponse{[]string{endpointType}}
+	err := plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, "Activate", resp, err)
+	log.Response(plugin.name, &resp, err)
 }
 
 func (plugin *netPlugin) getCapabilities(w http.ResponseWriter, r *http.Request) {
-	log.Request(plugin.name, "GetCapabilities", nil, nil)
+	var req getCapabilitiesRequest
 
-	resp := map[string]string{"Scope": plugin.scope}
-	err := plugin.listener.Encode(w, resp)
+	log.Request(plugin.name, &req, nil)
 
-	log.Response(plugin.name, "GetCapabilities", resp, err)
+	resp := getCapabilitiesResponse{Scope: plugin.scope}
+	err := plugin.listener.Encode(w, &resp)
+
+	log.Response(plugin.name, &resp, err)
 }
 
 // All request and response formats are well known and are published by libnetwork
@@ -135,7 +137,7 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(plugin.name, "CreateNetwork", req, err)
+	log.Request(plugin.name, &req, err)
 
 	if err != nil {
 		return
@@ -163,9 +165,9 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 
 	// Empty response indicates success.
 	resp := map[string]string{}
-	err = plugin.listener.Encode(w, resp)
+	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, "CreateNetwork", resp, err)
+	log.Response(plugin.name, &resp, err)
 }
 
 type networkDeleteRequestFormat struct {
@@ -177,7 +179,7 @@ func (plugin *netPlugin) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(plugin.name, "DeleteNetwork", req, err)
+	log.Request(plugin.name, &req, err)
 
 	if err != nil {
 		return
@@ -193,9 +195,9 @@ func (plugin *netPlugin) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 
 	// Empty response indicates success.
 	resp := map[string]string{}
-	err = plugin.listener.Encode(w, resp)
+	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, "DeleteNetwork", resp, err)
+	log.Response(plugin.name, &resp, err)
 }
 
 type azInterface struct {
@@ -224,7 +226,7 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(plugin.name, "CreateEndpoint", req, err)
+	log.Request(plugin.name, &req, err)
 
 	if err != nil {
 		return
@@ -336,13 +338,13 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 		MacAddress:  targetInterface.MacAddress.String(),
 		GatewayIPv4: targetInterface.GatewayIPv4.String(),
 	}
-	resp := &endpointResponse{
+	resp := endpointResponse{
 		Interface: *respIface,
 	}
 
-	err = plugin.listener.Encode(w, resp)
+	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, "CreateEndpoint", resp, err)
+	log.Response(plugin.name, &resp, err)
 }
 
 type joinRequestFormat struct {
@@ -375,7 +377,7 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(plugin.name, "Join", req, err)
+	log.Request(plugin.name, &req, err)
 
 	if err != nil {
 		return
@@ -398,7 +400,7 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 		DstPrefix: endpoint.azureInterface.DstPrefix,
 	}
 
-	resp := &joinResponseFormat{
+	resp := joinResponseFormat{
 		InterfaceName: *ifname,
 		Gateway:       endpoint.azureInterface.GatewayIPv4.String(),
 	}
@@ -407,9 +409,9 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 	endpoint.sandboxKey = sandboxKey
 	plugin.Unlock()
 
-	err = plugin.listener.Encode(w, resp)
+	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, "Join", resp, err)
+	log.Response(plugin.name, &resp, err)
 
 	fmt.Printf("srcname: %s dstPRefix:%s \n", ifname.SrcName, ifname.DstPrefix)
 
@@ -427,7 +429,7 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(plugin.name, "DeleteEndpoint", req, err)
+	log.Request(plugin.name, &req, err)
 
 	if err != nil {
 		return
@@ -453,10 +455,10 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Empty response indicates success.
-	resp := &map[string]string{}
-	err = plugin.listener.Encode(w, resp)
+	resp := map[string]string{}
+	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, "DeleteEndpoint", resp, err)
+	log.Response(plugin.name, &resp, err)
 }
 
 type leaveRequestFormat struct {
@@ -472,17 +474,17 @@ func (plugin *netPlugin) leave(w http.ResponseWriter, r *http.Request) {
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(plugin.name, "Leave", req, err)
+	log.Request(plugin.name, &req, err)
 
 	if err != nil {
 		return
 	}
 
 	// Empty response indicates success.
-	resp := &leaveResponse{}
-	err = plugin.listener.Encode(w, resp)
+	resp := leaveResponse{}
+	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, "Leave", resp, err)
+	log.Response(plugin.name, &resp, err)
 }
 
 type endpointOperInfoRequestFormat struct {
@@ -499,7 +501,7 @@ func (plugin *netPlugin) endpointOperInfo(w http.ResponseWriter, r *http.Request
 
 	err := plugin.listener.Decode(w, r, &req)
 
-	log.Request(plugin.name, "EndpointOperInfo", req, err)
+	log.Request(plugin.name, &req, err)
 
 	if err != nil {
 		return
@@ -509,8 +511,8 @@ func (plugin *netPlugin) endpointOperInfo(w http.ResponseWriter, r *http.Request
 	//value["com.docker.network.endpoint.macaddress"] = macAddress
 	//value["MacAddress"] = macAddress
 
-	resp := &endpointOperInfoResponseFormat{Value: value}
-	err = plugin.listener.Encode(w, resp)
+	resp := endpointOperInfoResponseFormat{Value: value}
+	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, "EndpointOperInfo", resp, err)
+	log.Response(plugin.name, &resp, err)
 }
