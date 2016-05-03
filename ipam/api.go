@@ -8,17 +8,25 @@ const (
 	endpointType = "IpamDriver"
 
 	// Libnetwork IPAM plugin remote API paths
-	capabilitiesPath   = "/IpamDriver.GetCapabilities"
-	addressSpacesPath  = "/IpamDriver.GetDefaultAddressSpaces"
-	requestPoolPath    = "/IpamDriver.RequestPool"
-	releasePoolPath    = "/IpamDriver.ReleasePool"
-	requestAddressPath = "/IpamDriver.RequestAddress"
-	releaseAddressPath = "/IpamDriver.ReleaseAddress"
+	getCapabilitiesPath  = "/IpamDriver.GetCapabilities"
+	getAddressSpacesPath = "/IpamDriver.GetDefaultAddressSpaces"
+	requestPoolPath      = "/IpamDriver.RequestPool"
+	releasePoolPath      = "/IpamDriver.ReleasePool"
+	requestAddressPath   = "/IpamDriver.RequestAddress"
+	releaseAddressPath   = "/IpamDriver.ReleaseAddress"
 )
+
+// Request sent by libnetwork when querying plugin capabilities.
+type getCapabilitiesRequest struct {
+}
 
 // Response sent by plugin when registering its capabilities with libnetwork.
 type getCapabilitiesResponse struct {
 	RequiresMACAddress bool
+}
+
+// Request sent by libnetwork when querying the default address space names.
+type getDefaultAddressSpacesRequest struct {
 }
 
 // Response sent by plugin when returning the default address space names.

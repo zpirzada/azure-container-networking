@@ -88,9 +88,8 @@ func (listener *Listener) GetMux() *http.ServeMux {
 }
 
 // Registers a protocol handler.
-func (listener *Listener) AddHandler(endpoint string, method string, handler func(http.ResponseWriter, *http.Request)) {
-	url := fmt.Sprintf("/%s.%s", endpoint, method)
-	listener.mux.HandleFunc(url, handler)
+func (listener *Listener) AddHandler(path string, handler func(http.ResponseWriter, *http.Request)) {
+	listener.mux.HandleFunc(path, handler)
 }
 
 // Decodes JSON payload.

@@ -38,18 +38,18 @@ func NewPlugin(name string, version string) (IpamPlugin, error) {
 func (plugin *ipamPlugin) Start(errChan chan error) error {
 	err := plugin.Initialize(errChan)
 	if err != nil {
-		log.Printf("%s: Failed to start: %v", err)
+		log.Printf("%s: Failed to start: %v", plugin.Name, err)
 		return err
 	}
 
 	// Add protocol handlers.
 	listener := plugin.Listener
-	listener.AddHandler(endpointType, "GetCapabilities", plugin.getCapabilities)
-	listener.AddHandler(endpointType, "GetDefaultAddressSpaces", plugin.getDefaultAddressSpaces)
-	listener.AddHandler(endpointType, "RequestPool", plugin.requestPool)
-	listener.AddHandler(endpointType, "ReleasePool", plugin.releasePool)
-	listener.AddHandler(endpointType, "RequestAddress", plugin.requestAddress)
-	listener.AddHandler(endpointType, "ReleaseAddress", plugin.releaseAddress)
+	listener.AddHandler(getCapabilitiesPath, plugin.getCapabilities)
+	listener.AddHandler(getAddressSpacesPath, plugin.getDefaultAddressSpaces)
+	listener.AddHandler(requestPoolPath, plugin.requestPool)
+	listener.AddHandler(releasePoolPath, plugin.releasePool)
+	listener.AddHandler(requestAddressPath, plugin.requestAddress)
+	listener.AddHandler(releaseAddressPath, plugin.releaseAddress)
 
 	log.Printf("%s: Plugin started.", plugin.Name)
 

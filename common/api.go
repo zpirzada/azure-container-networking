@@ -17,6 +17,10 @@ type errorResponse struct {
 	Err string
 }
 
+// Request sent by libnetwork for activation.
+type activateRequest struct {
+}
+
 // Response sent by plugin for activation.
 type activateResponse struct {
 	Implements []string

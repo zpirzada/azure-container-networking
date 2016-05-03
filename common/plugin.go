@@ -42,7 +42,7 @@ func (plugin *Plugin) Initialize(errChan chan error) error {
 	}
 
 	// Add generic protocol handlers.
-	listener.AddHandler("Plugin", "Activate", plugin.activatePlugin)
+	listener.AddHandler(activatePath, plugin.activate)
 
 	plugin.Listener = listener
 	err = listener.Start(errChan)
@@ -59,8 +59,11 @@ func (plugin *Plugin) Uninitialize() {
 // Libnetwork remote plugin API
 //
 
-func (plugin *Plugin) activatePlugin(w http.ResponseWriter, r *http.Request) {
-	log.Request(plugin.Name, "Activate", nil, nil)
+// Handles Activate requests.
+func (plugin *Plugin) activate(w http.ResponseWriter, r *http.Request) {
+	var req activateRequest
+
+	log.Request(plugin.Name, "Activate", req, nil)
 
 	resp := &activateResponse{[]string{plugin.EndpointType}}
 	err := plugin.Listener.Encode(w, resp)
