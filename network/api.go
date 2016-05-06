@@ -17,3 +17,12 @@ const (
 	leavePath            = "/NetworkDriver.Leave"
 	endpointOperInfoPath = "/NetworkDriver.EndpointOperInfo"
 )
+
+// Request sent by libnetwork when querying plugin capabilities.
+type getCapabilitiesRequest struct {
+}
+
+// Response sent by plugin when registering its capabilities with libnetwork.
+type getCapabilitiesResponse struct {
+	Scope string
+}
