@@ -13,18 +13,18 @@ import (
 type Plugin struct {
 	Name         string
 	Version      string
-	Scope        string
 	EndpointType string
+	Options      map[string]string
 	Listener     *Listener
 }
 
 // Creates a new Plugin object.
-func NewPlugin(name, version, scope, endpointType string) (*Plugin, error) {
+func NewPlugin(name, version, endpointType string) (*Plugin, error) {
 	return &Plugin{
 		Name:         name,
 		Version:      version,
-		Scope:        scope,
 		EndpointType: endpointType,
+		Options:      make(map[string]string),
 	}, nil
 }
 
@@ -53,6 +53,16 @@ func (plugin *Plugin) Initialize(errChan chan error) error {
 // Uninitializes the plugin.
 func (plugin *Plugin) Uninitialize() {
 	plugin.Listener.Stop()
+}
+
+// Sets the option value for the given key.
+func (plugin *Plugin) SetOption(key, value string) {
+	plugin.Options[key] = value
+}
+
+// Gets the option value for the given key.
+func (plugin *Plugin) GetOption(key string) string {
+	return plugin.Options[key]
 }
 
 //

@@ -13,24 +13,27 @@ import (
 
 // IpamPlugin object and interface
 type ipamPlugin struct {
-	common.Plugin
+	*common.Plugin
 	sync.Mutex
 }
 
 type IpamPlugin interface {
 	Start(chan error) error
 	Stop()
+
+	SetOption(string, string)
 }
 
 // Creates a new IpamPlugin object.
 func NewPlugin(name string, version string) (IpamPlugin, error) {
+	// Setup base plugin.
+	plugin, err := common.NewPlugin(name, version, endpointType)
+	if err != nil {
+		return nil, err
+	}
+
 	return &ipamPlugin{
-		Plugin: common.Plugin{
-			Name:         name,
-			Version:      version,
-			Scope:        "local",
-			EndpointType: endpointType,
-		},
+		Plugin: plugin,
 	}, nil
 }
 
@@ -116,13 +119,13 @@ func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
 	var req releasePoolRequest
 
 	err := plugin.Listener.Decode(w, r, &req)
-	
+
 	log.Request(plugin.Name, &req, err)
 
 	if err != nil {
 		return
 	}
-	
+
 	resp := releasePoolResponse{}
 
 	err = plugin.Listener.Encode(w, &resp)
