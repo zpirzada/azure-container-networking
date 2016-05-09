@@ -82,8 +82,8 @@ func (plugin *Plugin) activate(w http.ResponseWriter, r *http.Request) {
 }
 
 // Sends and logs an error response.
-func (plugin *Plugin) SendErrorResponse(w http.ResponseWriter, errMsg string) {
-	resp := errorResponse{errMsg}
+func (plugin *Plugin) SendErrorResponse(w http.ResponseWriter, errMsg error) {
+	resp := errorResponse{errMsg.Error()}
 	err := plugin.Listener.Encode(w, &resp)
 
 	log.Response(plugin.Name, &resp, err)
