@@ -38,42 +38,57 @@ func main() {
 	logTarget := log.TargetStderr
 
 	// Parse command line arguments.
-	args := os.Args
+	args := os.Args[1:]
 
-	if len(args) == 1 {
+	if len(args) == 0 {
 		printHelp()
 		return
 	}
 
 	handleDependencies()
 
-	for i, arg := range args {
-		if i == 0 {
-			continue
-		}
+	for _, arg := range args {
+		if !strings.HasPrefix(arg, "--") {
+			// Process commands.
+			switch arg {
+			case "net":
+				netPlugin, err = network.NewPlugin(netPluginName, version)
+				if err != nil {
+					fmt.Printf("Failed to create network plugin %v\n", err)
+					return
+				}
 
-		switch arg {
-		case "net":
-			netPlugin, err = network.NewPlugin(netPluginName, version)
-			if err != nil {
-				fmt.Printf("Failed to create network plugin %v\n", err)
+			case "ipam":
+				ipamPlugin, err = ipam.NewPlugin(ipamPluginName, version)
+				if err != nil {
+					fmt.Printf("Failed to create IPAM plugin %v\n", err)
+					return
+				}
+
+			default:
+				fmt.Printf("Invalid command: %s\n", arg)
+				printHelp()
 				return
 			}
+		} else {
+			// Process options of format "--obj-option=value".
+			obj := strings.SplitN(arg[2:], "-", 2)
+			opt := strings.SplitN(obj[1], "=", 2)
 
-		case "ipam":
-			ipamPlugin, err = ipam.NewPlugin(ipamPluginName, version)
-			if err != nil {
-				fmt.Printf("Failed to create IPAM plugin %v\n", err)
+			switch obj[0] {
+			case "ipam":
+				ipamPlugin.SetOption(opt[0], opt[1])
+
+			case "log":
+				if opt[0] == "target" && opt[1] == "syslog" {
+					logTarget = log.TargetSyslog
+				}
+
+			default:
+				fmt.Printf("Invalid option: %v\n", arg)
+				printHelp()
 				return
 			}
-
-		case "--log-target=syslog":
-			logTarget = log.TargetSyslog
-
-		default:
-			fmt.Printf("Unknown argument: %s\n", arg)
-			printHelp()
-			return
 		}
 	}
 
