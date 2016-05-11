@@ -31,16 +31,16 @@ type getCapabilitiesResponse struct {
 type createNetworkRequest struct {
 	NetworkID string
 	Options   map[string]interface{}
-	IPv4Data  *IpamData
-	IPv6Data  *IpamData
+	IPv4Data  []ipamData
+	IPv6Data  []ipamData
 }
 
 // IPAMData represents the per-network IP operational information.
-type IpamData struct {
+type ipamData struct {
 	AddressSpace string
-	Pool         *net.IPNet
-	Gateway      *net.IPNet
-	AuxAddresses map[string]*net.IPNet
+	Pool         string
+	Gateway      string
+	AuxAddresses map[string]string
 }
 
 // Response sent by plugin when a network is created.
