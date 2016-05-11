@@ -30,7 +30,7 @@ func (plugin *ipamPlugin) startSource() error {
 		plugin.source, err = newMasSource(configSink(plugin))
 
 	case "null":
-		plugin.source = nil
+		plugin.source, err = newNullSource(configSink(plugin))
 
 	default:
 		return errInvalidConfiguration
