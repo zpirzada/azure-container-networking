@@ -20,8 +20,7 @@ const (
 
 // NetPlugin object and its interface
 type netPlugin struct {
-	name     string
-	version  string
+	*common.Plugin
 	scope    string
 	listener *common.Listener
 	networks map[string]*azureNetwork
@@ -35,9 +34,14 @@ type NetPlugin interface {
 
 // Creates a new NetPlugin object.
 func NewPlugin(name string, version string) (NetPlugin, error) {
+	// Setup base plugin.
+	plugin, err := common.NewPlugin(name, version, endpointType)
+	if err != nil {
+		return nil, err
+	}
+
 	return &netPlugin{
-		name:     name,
-		version:  version,
+		Plugin:   plugin,
 		scope:    scope,
 		networks: make(map[string]*azureNetwork),
 	}, nil
@@ -45,20 +49,14 @@ func NewPlugin(name string, version string) (NetPlugin, error) {
 
 // Starts the plugin.
 func (plugin *netPlugin) Start(errChan chan error) error {
-	var socketName string
-	if plugin.name != "test" {
-		socketName = plugin.name
-	}
-
-	// Create the listener.
-	listener, err := common.NewListener(socketName)
+	err := plugin.Initialize(errChan)
 	if err != nil {
-		log.Printf("Failed to create listener %v", err)
+		log.Printf("%s: Failed to start: %v", plugin.Name, err)
 		return err
 	}
 
 	// Add protocol handlers.
-	listener.AddHandler("/Plugin.Activate", plugin.activatePlugin)
+	listener := plugin.Listener
 	listener.AddHandler(getCapabilitiesPath, plugin.getCapabilities)
 	listener.AddHandler(createNetworkPath, plugin.createNetwork)
 	listener.AddHandler(deleteNetworkPath, plugin.deleteNetwork)
@@ -68,24 +66,16 @@ func (plugin *netPlugin) Start(errChan chan error) error {
 	listener.AddHandler(leavePath, plugin.leave)
 	listener.AddHandler(endpointOperInfoPath, plugin.endpointOperInfo)
 
-	plugin.listener = listener
-
-	err = listener.Start(errChan)
-	if err != nil {
-		log.Printf("Failed to start listener %v", err)
-		return err
-	}
-
-	log.Printf("%s: Plugin started.", plugin.name)
+	log.Printf("%s: Plugin started.", plugin.Name)
 
 	return nil
 }
 
 // Stops the plugin.
 func (plugin *netPlugin) Stop() {
-	plugin.listener.Stop()
+	plugin.Uninitialize()
 	core.FreeSlaves()
-	log.Printf("%s: Plugin stopped.\n", plugin.name)
+	log.Printf("%s: Plugin stopped.\n", plugin.Name)
 }
 
 func (plugin *netPlugin) networkExists(networkID string) bool {
@@ -108,29 +98,16 @@ func (plugin *netPlugin) endpointExists(networkID string, endpointID string) boo
 	return true
 }
 
-type activateResponse struct {
-	Implements []string
-}
-
-func (plugin *netPlugin) activatePlugin(w http.ResponseWriter, r *http.Request) {
-	log.Request(plugin.name, nil, nil)
-
-	resp := activateResponse{[]string{endpointType}}
-	err := plugin.listener.Encode(w, &resp)
-
-	log.Response(plugin.name, &resp, err)
-}
-
 // Handles GetCapabilities requests.
 func (plugin *netPlugin) getCapabilities(w http.ResponseWriter, r *http.Request) {
 	var req getCapabilitiesRequest
 
-	log.Request(plugin.name, &req, nil)
+	log.Request(plugin.Name, &req, nil)
 
 	resp := getCapabilitiesResponse{Scope: plugin.scope}
 	err := plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, &resp, err)
+	log.Response(plugin.Name, &resp, err)
 }
 
 // Handles CreateNetwork requests.
@@ -139,7 +116,7 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 
 	// Decode request.
 	err := plugin.listener.Decode(w, r, &req)
-	log.Request(plugin.name, &req, err)
+	log.Request(plugin.Name, &req, err)
 	if err != nil {
 		return
 	}
@@ -158,7 +135,7 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 	resp := createNetworkResponse{}
 	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, &resp, err)
+	log.Response(plugin.Name, &resp, err)
 }
 
 // Handles DeleteNetwork requests.
@@ -167,7 +144,7 @@ func (plugin *netPlugin) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 
 	// Decode request.
 	err := plugin.listener.Decode(w, r, &req)
-	log.Request(plugin.name, &req, err)
+	log.Request(plugin.Name, &req, err)
 	if err != nil {
 		return
 	}
@@ -182,7 +159,7 @@ func (plugin *netPlugin) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	resp := deleteNetworkResponse{}
 	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, &resp, err)
+	log.Response(plugin.Name, &resp, err)
 }
 
 // Handles CreateEndpoint requests.
@@ -191,7 +168,7 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 
 	// Decode request.
 	err := plugin.listener.Decode(w, r, &req)
-	log.Request(plugin.name, &req, err)
+	log.Request(plugin.Name, &req, err)
 	if err != nil {
 		return
 	}
@@ -277,7 +254,7 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 
 	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, &resp, err)
+	log.Response(plugin.Name, &resp, err)
 }
 
 // Handles Join requests.
@@ -286,7 +263,7 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 
 	// Decode request.
 	err := plugin.listener.Decode(w, r, &req)
-	log.Request(plugin.name, &req, err)
+	log.Request(plugin.Name, &req, err)
 	if err != nil {
 		return
 	}
@@ -319,7 +296,7 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 
 	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, &resp, err)
+	log.Response(plugin.Name, &resp, err)
 }
 
 // Handles DeleteEndpoint requests.
@@ -328,7 +305,7 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 
 	// Decode request.
 	err := plugin.listener.Decode(w, r, &req)
-	log.Request(plugin.name, &req, err)
+	log.Request(plugin.Name, &req, err)
 	if err != nil {
 		return
 	}
@@ -347,7 +324,7 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 		iface := ep.azureInterface
 		err = core.CleanupAfterContainerDeletion(iface.SrcName, iface.MacAddress)
 		if err != nil {
-			log.Printf("%s: DeleteEndpoint cleanup failure %s", plugin.name, err.Error())
+			log.Printf("%s: DeleteEndpoint cleanup failure %s", plugin.Name, err.Error())
 		}
 		delete(network.endpoints, endID)
 	}
@@ -356,7 +333,7 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 	resp := deleteEndpointResponse{}
 	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, &resp, err)
+	log.Response(plugin.Name, &resp, err)
 }
 
 // Handles Leave requests.
@@ -365,7 +342,7 @@ func (plugin *netPlugin) leave(w http.ResponseWriter, r *http.Request) {
 
 	// Decode request.
 	err := plugin.listener.Decode(w, r, &req)
-	log.Request(plugin.name, &req, err)
+	log.Request(plugin.Name, &req, err)
 	if err != nil {
 		return
 	}
@@ -374,7 +351,7 @@ func (plugin *netPlugin) leave(w http.ResponseWriter, r *http.Request) {
 	resp := leaveResponse{}
 	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, &resp, err)
+	log.Response(plugin.Name, &resp, err)
 }
 
 // Handles EndpointOperInfo requests.
@@ -383,7 +360,7 @@ func (plugin *netPlugin) endpointOperInfo(w http.ResponseWriter, r *http.Request
 
 	// Decode request.
 	err := plugin.listener.Decode(w, r, &req)
-	log.Request(plugin.name, &req, err)
+	log.Request(plugin.Name, &req, err)
 	if err != nil {
 		return
 	}
@@ -396,5 +373,5 @@ func (plugin *netPlugin) endpointOperInfo(w http.ResponseWriter, r *http.Request
 	resp := endpointOperInfoResponse{Value: value}
 	err = plugin.listener.Encode(w, &resp)
 
-	log.Response(plugin.name, &resp, err)
+	log.Response(plugin.Name, &resp, err)
 }
