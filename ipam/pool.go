@@ -322,7 +322,13 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 
 	ar.inUse = true
 
-	return ar.addr.String(), nil
+	// Return address in CIDR notation.
+	addr := net.IPNet{
+		IP:   ar.addr,
+		Mask: ap.subnet.Mask,
+	}
+
+	return addr.String(), nil
 }
 
 // Releases a previously requested address back to its address pool.

@@ -36,7 +36,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Get the internal http mux as test hook.
-	mux = plugin.(*netPlugin).listener.GetMux()
+	mux = plugin.(*netPlugin).Listener.GetMux()
 
 	// Run tests.
 	exitCode := m.Run()

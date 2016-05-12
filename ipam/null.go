@@ -35,6 +35,12 @@ func (s *nullSource) stop() {
 // Refreshes configuration.
 func (s *nullSource) refresh() error {
 
+	// Initialize once.
+	if s.initialized == true {
+		return nil
+	}
+	s.initialized = true
+
 	// Configure the local default address space.
 	local, err := newAddressSpace(localDefaultAddressSpaceId, localScope)
 	if err != nil {
