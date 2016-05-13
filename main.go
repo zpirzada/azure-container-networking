@@ -21,8 +21,8 @@ import (
 const version = "v0.1"
 
 // Libnetwork plugin names
-const netPluginName = "aqua"
-const ipamPluginName = "nullipam"
+const netPluginName = "aquanet"
+const ipamPluginName = "aquaipam"
 
 // Prints description and usage information.
 func printHelp() {

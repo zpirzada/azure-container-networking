@@ -4,9 +4,10 @@
 package ipam
 
 import (
-	//"bytes"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +16,12 @@ import (
 
 var plugin IpamPlugin
 var mux *http.ServeMux
+
+var local *addressSpace
+var global *addressSpace
+
+var poolId1 string
+var address1 string
 
 // Wraps the test run with plugin setup and teardown.
 func TestMain(m *testing.M) {
@@ -26,6 +33,8 @@ func TestMain(m *testing.M) {
 		fmt.Printf("Failed to create IPAM plugin %v\n", err)
 		return
 	}
+
+	plugin.SetOption("source", "")
 
 	err = plugin.Start(nil)
 	if err != nil {
@@ -94,7 +103,7 @@ func TestGetCapabilities(t *testing.T) {
 		RequiresMACAddress bool
 	}
 
-	req, err := http.NewRequest(http.MethodGet, "/IpamDriver.GetCapabilities", nil)
+	req, err := http.NewRequest(http.MethodGet, getCapabilitiesPath, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,5 +115,190 @@ func TestGetCapabilities(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("GetCapabilities response is invalid %+v", resp)
+	}
+}
+
+// Tests address space management functionality.
+func TestAddAddressSpace(t *testing.T) {
+	fmt.Println("Test: AddAddressSpace")
+
+	var err error
+
+	// Configure the local default address space.
+	local, err = newAddressSpace(localDefaultAddressSpaceId, localScope)
+	if err != nil {
+		t.Errorf("newAddressSpace failed %+v", err)
+		return
+	}
+
+	addr1 := net.IPv4(192, 168, 1, 1)
+	addr2 := net.IPv4(192, 168, 1, 2)
+	subnet := net.IPNet{
+		IP:   net.IPv4(192, 168, 1, 0),
+		Mask: net.IPv4Mask(255, 255, 255, 0),
+	}
+	ap, err := local.newAddressPool(&subnet)
+	ap.newAddressRecord(&addr1)
+	ap.newAddressRecord(&addr2)
+
+	addr1 = net.IPv4(192, 168, 2, 1)
+	subnet = net.IPNet{
+		IP:   net.IPv4(192, 168, 2, 0),
+		Mask: net.IPv4Mask(255, 255, 255, 0),
+	}
+	ap, err = local.newAddressPool(&subnet)
+	ap.newAddressRecord(&addr1)
+
+	plugin.setAddressSpace(local)
+
+	// Configure the global default address space.
+	global, err = newAddressSpace(globalDefaultAddressSpaceId, globalScope)
+	if err != nil {
+		t.Errorf("newAddressSpace failed %+v", err)
+		return
+	}
+
+	plugin.setAddressSpace(global)
+}
+
+// Tests IpamDriver.GetDefaultAddressSpaces functionality.
+func TestGetDefaultAddressSpaces(t *testing.T) {
+	fmt.Println("Test: GetDefaultAddressSpaces")
+
+	var resp getDefaultAddressSpacesResponse
+
+	req, err := http.NewRequest(http.MethodGet, getAddressSpacesPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil ||
+		resp.LocalDefaultAddressSpace != localDefaultAddressSpaceId ||
+		resp.GlobalDefaultAddressSpace != globalDefaultAddressSpaceId {
+		t.Errorf("GetDefaultAddressSpaces response is invalid %+v", resp)
+	}
+}
+
+// Tests IpamDriver.RequestPool functionality.
+func TestRequestPool(t *testing.T) {
+	fmt.Println("Test: RequestPool")
+
+	var body bytes.Buffer
+	var resp requestPoolResponse
+
+	payload := &requestPoolRequest{
+		AddressSpace: localDefaultAddressSpaceId,
+	}
+
+	json.NewEncoder(&body).Encode(payload)
+
+	req, err := http.NewRequest(http.MethodGet, requestPoolPath, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil {
+		t.Errorf("RequestPool response is invalid %+v", resp)
+	}
+
+	poolId1 = resp.PoolID
+}
+
+// Tests IpamDriver.RequestAddress functionality.
+func TestRequestAddress(t *testing.T) {
+	fmt.Println("Test: RequestAddress")
+
+	var body bytes.Buffer
+	var resp requestAddressResponse
+
+	payload := &requestAddressRequest{
+		PoolID:  poolId1,
+		Address: "",
+		Options: nil,
+	}
+
+	json.NewEncoder(&body).Encode(payload)
+
+	req, err := http.NewRequest(http.MethodGet, requestAddressPath, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil {
+		t.Errorf("RequestAddress response is invalid %+v", resp)
+	}
+
+	address1 = resp.Address
+}
+
+// Tests IpamDriver.ReleaseAddress functionality.
+func TestReleaseAddress(t *testing.T) {
+	fmt.Println("Test: ReleaseAddress")
+
+	var body bytes.Buffer
+	var resp releaseAddressResponse
+
+	payload := &releaseAddressRequest{
+		PoolID:  poolId1,
+		Address: address1,
+	}
+
+	json.NewEncoder(&body).Encode(payload)
+
+	req, err := http.NewRequest(http.MethodGet, releaseAddressPath, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil {
+		t.Errorf("ReleaseAddress response is invalid %+v", resp)
+	}
+}
+
+// Tests IpamDriver.ReleasePool functionality.
+func TestReleasePool(t *testing.T) {
+	fmt.Println("Test: ReleasePool")
+
+	var body bytes.Buffer
+	var resp releasePoolResponse
+
+	payload := &releasePoolRequest{
+		PoolID: poolId1,
+	}
+
+	json.NewEncoder(&body).Encode(payload)
+
+	req, err := http.NewRequest(http.MethodGet, releasePoolPath, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil {
+		t.Errorf("ReleasePool response is invalid %+v", resp)
 	}
 }
