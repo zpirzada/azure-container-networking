@@ -6,6 +6,8 @@ package ebtables
 import (
 	"fmt"
 	"os/exec"
+
+	"github.com/Azure/Aqua/log"
 )
 
 // SetupSnatForOutgoingPackets sets up snat
@@ -69,7 +71,7 @@ func RemoveDnatBasedOnIPV4Address(ipv4Address string, macAddress string) error {
 }
 
 func executeShellCommand(command string) error {
-	fmt.Println("going to execute: " + command)
+	log.Printf("[ebtables] %s", command)
 	cmd := exec.Command("sh", "-c", command)
 	err := cmd.Start()
 	if err != nil {
