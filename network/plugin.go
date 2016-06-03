@@ -4,12 +4,10 @@
 package network
 
 import (
-	"fmt"
 	"net/http"
 	"sync"
 
 	"github.com/Azure/Aqua/common"
-	"github.com/Azure/Aqua/core"
 	"github.com/Azure/Aqua/log"
 )
 
@@ -23,7 +21,7 @@ type netPlugin struct {
 	*common.Plugin
 	scope    string
 	listener *common.Listener
-	networks map[string]*azureNetwork
+	nm       *networkManager
 	sync.Mutex
 }
 
@@ -40,10 +38,16 @@ func NewPlugin(name string, version string) (NetPlugin, error) {
 		return nil, err
 	}
 
+	// Setup network manager.
+	nm, err := newNetworkManager()
+	if err != nil {
+		return nil, err
+	}
+
 	return &netPlugin{
-		Plugin:   plugin,
-		scope:    scope,
-		networks: make(map[string]*azureNetwork),
+		Plugin: plugin,
+		scope:  scope,
+		nm:     nm,
 	}, nil
 }
 
@@ -74,29 +78,13 @@ func (plugin *netPlugin) Start(errChan chan error) error {
 // Stops the plugin.
 func (plugin *netPlugin) Stop() {
 	plugin.Uninitialize()
-	core.FreeSlaves()
 	log.Printf("%s: Plugin stopped.\n", plugin.Name)
 }
 
-func (plugin *netPlugin) networkExists(networkID string) bool {
-	if plugin.networks[networkID] != nil {
-		return true
-	}
-	return false
-}
-
-func (plugin *netPlugin) endpointExists(networkID string, endpointID string) bool {
-	network := plugin.networks[networkID]
-	if network == nil {
-		return false
-	}
-
-	if network.endpoints[endpointID] == nil {
-		return false
-	}
-
-	return true
-}
+//
+// Libnetwork remote network API implementation
+// https://github.com/docker/libnetwork/blob/master/docs/remote.md
+//
 
 // Handles GetCapabilities requests.
 func (plugin *netPlugin) getCapabilities(w http.ResponseWriter, r *http.Request) {
@@ -121,15 +109,15 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Process request.
 	plugin.Lock()
-	if plugin.networkExists(req.NetworkID) {
-		plugin.listener.SendError(w, "Network with same Id already exists")
-		plugin.Unlock()
+	defer plugin.Unlock()
+
+	_, err = plugin.nm.newNetwork(req.NetworkID, req.Options, req.IPv4Data, req.IPv6Data)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
 		return
 	}
-
-	plugin.networks[req.NetworkID] = &azureNetwork{networkId: req.NetworkID}
-	plugin.Unlock()
 
 	// Encode response.
 	resp := createNetworkResponse{}
@@ -149,11 +137,15 @@ func (plugin *netPlugin) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Process request.
 	plugin.Lock()
-	if plugin.networkExists(req.NetworkID) {
-		delete(plugin.networks, req.NetworkID)
+	defer plugin.Unlock()
+
+	err = plugin.nm.deleteNetwork(req.NetworkID)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
 	}
-	plugin.Unlock()
 
 	// Encode response.
 	resp := deleteNetworkResponse{}
@@ -173,83 +165,30 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	netID := req.NetworkID
-	endID := req.EndpointID
-
-	var interfaceToAttach string
-	var ipaddressToAttach string
-
-	for key, value := range req.Options {
-		if key == "eth" {
-			interfaceToAttach = value.(string)
-			log.Printf("Received request to attach following interface: %s", value)
-		}
-
-		if key == "com.docker.network.endpoint.ipaddresstoattach" {
-			ipaddressToAttach = value.(string)
-			log.Printf("Received request to attach following ipaddress: %s", value)
-		}
-	}
-
-	// The values in that interface can be empty (in case of null ipam driver)
-	// or they can contain some pre filled values (if ipam allocates ip addresses)
+	// Process request.
+	var ipv4Address string
 	if req.Interface != nil {
-		ipaddressToAttach = req.Interface.Address
+		ipv4Address = req.Interface.Address
 	}
 
 	plugin.Lock()
+	defer plugin.Unlock()
 
-	if !plugin.networkExists(netID) {
-		plugin.Unlock()
-		plugin.listener.SendError(w, fmt.Sprintf("Could not find [networkID:%s]\n", netID))
-		return
-	}
-	if plugin.endpointExists(netID, endID) {
-		plugin.Unlock()
-		plugin.listener.SendError(w, fmt.Sprintf("Endpoint already exists [networkID:%s endpointID:%s]\n", netID, endID))
+	nw, err := plugin.nm.getNetwork(req.NetworkID)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
 		return
 	}
 
-	rAddress,
-		rAddressIPV6,
-		rMacAddress,
-		rID,
-		rSrcName,
-		rDstPrefix,
-		rGatewayIPv4, ermsg := core.GetTargetInterface(interfaceToAttach, ipaddressToAttach)
-
-	if ermsg != "" {
-		plugin.Unlock()
-		plugin.listener.SendError(w, ermsg)
+	_, err = nw.newEndpoint(req.EndpointID, ipv4Address)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
 		return
 	}
-
-	targetInterface := azureInterface{
-		Address:     rAddress,
-		AddressIPV6: rAddressIPV6,
-		MacAddress:  rMacAddress,
-		ID:          rID,
-		SrcName:     rSrcName,
-		DstPrefix:   rDstPrefix,
-		GatewayIPv4: rGatewayIPv4,
-	}
-	network := plugin.networks[netID]
-	if network.endpoints == nil {
-		network.endpoints = make(map[string]*azureEndpoint)
-	}
-	network.endpoints[endID] = &azureEndpoint{endpointID: endID, networkID: netID}
-	network.endpoints[endID].azureInterface = targetInterface
-
-	plugin.Unlock()
 
 	// Encode response.
-	epInterface := endpointInterface{
-		Address:     targetInterface.Address.String(),
-		MacAddress:  targetInterface.MacAddress.String(),
-		GatewayIPv4: targetInterface.GatewayIPv4.String(),
-	}
 	resp := createEndpointResponse{
-		Interface: &epInterface,
+		Interface: nil,
 	}
 
 	err = plugin.listener.Encode(w, &resp)
@@ -268,30 +207,31 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	endID := req.EndpointID
-	netID := req.NetworkID
-	sandboxKey := req.SandboxKey
+	// Process request.
+	plugin.Lock()
+	defer plugin.Unlock()
 
-	if !plugin.endpointExists(netID, endID) {
-		plugin.listener.SendError(w, "cannot find endpoint for which join is requested")
+	ep, err := plugin.nm.getEndpoint(req.NetworkID, req.EndpointID)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
 		return
 	}
 
-	endpoint := plugin.networks[netID].endpoints[endID]
-
-	plugin.Lock()
-	endpoint.sandboxKey = sandboxKey
-	plugin.Unlock()
+	err = ep.join(req.SandboxKey, req.Options)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
+	}
 
 	// Encode response.
 	ifname := interfaceName{
-		SrcName:   endpoint.azureInterface.SrcName,
-		DstPrefix: endpoint.azureInterface.DstPrefix,
+		SrcName:   ep.SrcName,
+		DstPrefix: ep.DstPrefix,
 	}
 
 	resp := joinResponse{
 		InterfaceName: ifname,
-		Gateway:       endpoint.azureInterface.GatewayIPv4.String(),
+		Gateway:       ep.GatewayIPv4.String(),
 	}
 
 	err = plugin.listener.Encode(w, &resp)
@@ -310,23 +250,20 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	netID := req.NetworkID
-	endID := req.EndpointID
-
+	// Process request.
 	plugin.Lock()
 	defer plugin.Unlock()
-	if !plugin.endpointExists(netID, endID) {
-		// idempotent or throw error?
-		fmt.Println("Endpoint not found network: ", netID, " endpointID: ", endID)
-	} else {
-		network := plugin.networks[netID]
-		ep := network.endpoints[endID]
-		iface := ep.azureInterface
-		err = core.CleanupAfterContainerDeletion(iface.SrcName, iface.MacAddress)
-		if err != nil {
-			log.Printf("%s: DeleteEndpoint cleanup failure %s", plugin.Name, err.Error())
-		}
-		delete(network.endpoints, endID)
+
+	nw, err := plugin.nm.getNetwork(req.NetworkID)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
+	}
+
+	err = nw.deleteEndpoint(req.EndpointID)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
 	}
 
 	// Encode response.
@@ -344,6 +281,22 @@ func (plugin *netPlugin) leave(w http.ResponseWriter, r *http.Request) {
 	err := plugin.listener.Decode(w, r, &req)
 	log.Request(plugin.Name, &req, err)
 	if err != nil {
+		return
+	}
+
+	// Process request.
+	plugin.Lock()
+	defer plugin.Unlock()
+
+	ep, err := plugin.nm.getEndpoint(req.NetworkID, req.EndpointID)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
+	}
+
+	err = ep.leave()
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
 		return
 	}
 
