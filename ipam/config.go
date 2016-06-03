@@ -25,6 +25,7 @@ func (plugin *ipamPlugin) startSource() error {
 	switch plugin.GetOption("source") {
 
 	case "azure", "":
+		plugin.source, err = newAzureSource(configSink(plugin))
 
 	case "mas":
 		plugin.source, err = newMasSource(configSink(plugin))
