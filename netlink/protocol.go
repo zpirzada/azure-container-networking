@@ -5,6 +5,7 @@ package netlink
 
 import (
 	"encoding/binary"
+	"net"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -44,6 +45,7 @@ func initEncoder() {
 // Generic netlink message
 type message struct {
 	unix.NlMsghdr
+	data    []byte
 	payload []serializable
 }
 
@@ -62,7 +64,7 @@ func newMessage(msgType int, flags int) *message {
 
 // Creates a new netlink request message.
 func newRequest(msgType int, flags int) *message {
-	return newMessage(msgType, flags | unix.NLM_F_REQUEST)
+	return newMessage(msgType, flags|unix.NLM_F_REQUEST)
 }
 
 // Appends protocol specific payload to a netlink message.
@@ -100,6 +102,23 @@ func (msg *message) serialize() []byte {
 	return b
 }
 
+// Get attributes.
+func (msg *message) getAttributes(body serializable) []*attribute {
+	var attrs []*attribute
+
+	s := msg.payload[1:]
+	for _, v := range s {
+		attr, ok := v.(*attribute)
+		if !ok {
+			continue
+		}
+
+		attrs = append(attrs, attr)
+	}
+
+	return attrs
+}
+
 //
 // Netlink message attribute
 //
@@ -129,7 +148,7 @@ func newAttributeString(attrType int, value string) *attribute {
 
 // Creates a new attribute with a null-terminated string value.
 func newAttributeStringZ(attrType int, value string) *attribute {
-	return newAttribute(attrType, []byte(value + "\000"))
+	return newAttribute(attrType, []byte(value+"\000"))
 }
 
 // Creates a new attribute with a uint32 value.
@@ -137,6 +156,16 @@ func newAttributeUint32(attrType int, value uint32) *attribute {
 	buf := make([]byte, 4)
 	encoder.PutUint32(buf, value)
 	return newAttribute(attrType, buf)
+}
+
+// Creates a new attribute with a net.IP value.
+func newAttributeIpAddress(attrType int, value net.IP) *attribute {
+	addr := value.To4()
+	if addr != nil {
+		return newAttribute(attrType, addr)
+	} else {
+		return newAttribute(attrType, value.To16())
+	}
 }
 
 // Adds a nested attribute to an attribute.
@@ -251,4 +280,50 @@ func (ifAddr *ifAddrMsg) serialize() []byte {
 // Returns the length of an interface address message.
 func (ifAddr *ifAddrMsg) length() int {
 	return unix.SizeofIfAddrmsg
+}
+
+//
+// Network route service module
+//
+
+// Route message
+type rtMsg struct {
+	unix.RtMsg
+}
+
+// Creates a new route message.
+func newRtMsg(family int) *rtMsg {
+	return &rtMsg{
+		RtMsg: unix.RtMsg{
+			Family:   uint8(family),
+			Protocol: unix.RTPROT_STATIC,
+			Scope:    unix.RT_SCOPE_UNIVERSE,
+			Type:     unix.RTN_UNICAST,
+		},
+	}
+}
+
+// Deserializes a route message.
+func deserializeRtMsg(b []byte) *rtMsg {
+	return (*rtMsg)(unsafe.Pointer(&b[0:unix.SizeofRtMsg][0]))
+}
+
+// Serializes a route message.
+func (rt *rtMsg) serialize() []byte {
+	b := make([]byte, rt.length())
+	b[0] = rt.Family
+	b[1] = rt.Dst_len
+	b[2] = rt.Src_len
+	b[3] = rt.Tos
+	b[4] = rt.Table
+	b[5] = rt.Protocol
+	b[6] = rt.Scope
+	b[7] = rt.Type
+	encoder.PutUint32(b[8:12], rt.Flags)
+	return b
+}
+
+// Returns the length of a route message.
+func (rt *rtMsg) length() int {
+	return unix.SizeofRtMsg
 }
