@@ -22,14 +22,14 @@ func Echo(text string) error {
 		return err
 	}
 
-	req := newRequest(unix.NLMSG_NOOP, unix.NLM_F_ECHO | unix.NLM_F_ACK)
+	req := newRequest(unix.NLMSG_NOOP, unix.NLM_F_ECHO|unix.NLM_F_ACK)
 	if req == nil {
 		return unix.ENOMEM
-	} 
+	}
 
 	req.addPayload(newAttributeString(0, text))
 
-	return s.sendAndComplete(req)
+	return s.sendAndWaitForAck(req)
 }
 
 // Adds a new network link of a specified type.
@@ -43,7 +43,7 @@ func AddLink(name string, linkType string) error {
 		return err
 	}
 
-	req := newRequest(unix.RTM_NEWLINK, unix.NLM_F_CREATE | unix.NLM_F_EXCL | unix.NLM_F_ACK)
+	req := newRequest(unix.RTM_NEWLINK, unix.NLM_F_CREATE|unix.NLM_F_EXCL|unix.NLM_F_ACK)
 
 	ifInfo := newIfInfoMsg()
 	req.addPayload(ifInfo)
@@ -55,7 +55,7 @@ func AddLink(name string, linkType string) error {
 	attrIfName := newAttributeStringZ(unix.IFLA_IFNAME, name)
 	req.addPayload(attrIfName)
 
-	return s.sendAndComplete(req)
+	return s.sendAndWaitForAck(req)
 }
 
 // Deletes a network link.
@@ -80,7 +80,7 @@ func DeleteLink(name string) error {
 	ifInfo.Index = int32(iface.Index)
 	req.addPayload(ifInfo)
 
-	return s.sendAndComplete(req)
+	return s.sendAndWaitForAck(req)
 }
 
 // Sets the operational state of a network interface.
@@ -111,7 +111,7 @@ func SetLinkState(name string, up bool) error {
 
 	req.addPayload(ifInfo)
 
-	return s.sendAndComplete(req)
+	return s.sendAndWaitForAck(req)
 }
 
 // Sets the master (upper) device of a network interface.
@@ -147,7 +147,7 @@ func SetLinkMaster(name string, master string) error {
 	attrMaster := newAttributeUint32(unix.IFLA_MASTER, masterIndex)
 	req.addPayload(attrMaster)
 
-	return s.sendAndComplete(req)
+	return s.sendAndWaitForAck(req)
 }
 
 // Sets the link layer hardware address of a network interface.
@@ -173,7 +173,7 @@ func SetLinkAddress(ifName string, hwAddress net.HardwareAddr) error {
 
 	req.addPayload(newAttribute(unix.IFLA_ADDRESS, hwAddress))
 
-	return s.sendAndComplete(req)
+	return s.sendAndWaitForAck(req)
 }
 
 // Adds a new veth pair.
@@ -183,7 +183,7 @@ func AddVethPair(name1 string, name2 string) error {
 		return err
 	}
 
-	req := newRequest(unix.RTM_NEWLINK, unix.NLM_F_CREATE | unix.NLM_F_EXCL | unix.NLM_F_ACK)
+	req := newRequest(unix.RTM_NEWLINK, unix.NLM_F_CREATE|unix.NLM_F_EXCL|unix.NLM_F_ACK)
 
 	ifInfo := newIfInfoMsg()
 	req.addPayload(ifInfo)
@@ -205,7 +205,7 @@ func AddVethPair(name1 string, name2 string) error {
 
 	req.addPayload(attrLinkInfo)
 
-	return s.sendAndComplete(req)
+	return s.sendAndWaitForAck(req)
 }
 
 // Returns the address family of an IP address.
@@ -222,7 +222,7 @@ func getIpAddressFamily(ip net.IP) int {
 // Sends an IP address set request.
 func setIpAddress(ifName string, ipAddress net.IP, ipNet *net.IPNet, add bool) error {
 	var msgType, flags int
-	
+
 	s, err := getSocket()
 	if err != nil {
 		return err
@@ -261,7 +261,7 @@ func setIpAddress(ifName string, ipAddress net.IP, ipNet *net.IPNet, add bool) e
 	req.addPayload(newAttribute(unix.IFA_LOCAL, ipAddrValue))
 	req.addPayload(newAttribute(unix.IFA_ADDRESS, ipAddrValue))
 
-	return s.sendAndComplete(req)
+	return s.sendAndWaitForAck(req)
 }
 
 // Adds an IP address to an interface.
@@ -272,4 +272,214 @@ func AddIpAddress(ifName string, ipAddress net.IP, ipNet *net.IPNet) error {
 // Deletes an IP address from an interface.
 func DeleteIpAddress(ifName string, ipAddress net.IP, ipNet *net.IPNet) error {
 	return setIpAddress(ifName, ipAddress, ipNet, false)
+}
+
+// Route represents a netlink route.
+type Route struct {
+	Family     int
+	Dst        *net.IPNet
+	Src        net.IP
+	Gw         net.IP
+	Tos        int
+	Table      int
+	Protocol   int
+	Scope      int
+	Type       int
+	Flags      int
+	Priority   int
+	LinkIndex  int
+	ILinkIndex int
+}
+
+// Decodes a netlink message into a Route struct.
+func deserializeRoute(msg *message) (*Route, error) {
+	// Parse route message.
+	rtmsg := deserializeRtMsg(msg.data)
+	attrs := msg.getAttributes(rtmsg)
+
+	// Initialize a new route object.
+	route := Route{
+		Family:   int(rtmsg.Family),
+		Tos:      int(rtmsg.Tos),
+		Table:    int(rtmsg.Table),
+		Protocol: int(rtmsg.Protocol),
+		Scope:    int(rtmsg.Scope),
+		Type:     int(rtmsg.Type),
+		Flags:    int(rtmsg.Flags),
+	}
+
+	// Populate route attributes.
+	for _, attr := range attrs {
+		switch attr.Type {
+		case unix.RTA_DST:
+			route.Dst = &net.IPNet{
+				IP:   attr.value,
+				Mask: net.CIDRMask(int(rtmsg.Dst_len), 8*len(attr.value)),
+			}
+		case unix.RTA_PREFSRC:
+			route.Src = net.IP(attr.value)
+		case unix.RTA_GATEWAY:
+			route.Gw = net.IP(attr.value)
+		case unix.RTA_TABLE:
+			route.Table = int(encoder.Uint32(attr.value[0:4]))
+		case unix.RTA_PRIORITY:
+			route.Priority = int(encoder.Uint32(attr.value[0:4]))
+		case unix.RTA_OIF:
+			route.LinkIndex = int(encoder.Uint32(attr.value[0:4]))
+		case unix.RTA_IIF:
+			route.ILinkIndex = int(encoder.Uint32(attr.value[0:4]))
+		}
+	}
+
+	return &route, nil
+}
+
+// Returns a list of IP routes matching the given filter.
+func GetIpRouteList(filter *Route) ([]*Route, error) {
+	s, err := getSocket()
+	if err != nil {
+		return nil, err
+	}
+
+	req := newRequest(unix.RTM_GETROUTE, unix.NLM_F_DUMP)
+
+	ifInfo := newIfInfoMsg()
+	ifInfo.Family = uint8(filter.Family)
+	req.addPayload(ifInfo)
+
+	msgs, err := s.sendAndWaitForResponse(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var routes []*Route
+
+	// For each route in the list...
+	for _, msg := range msgs {
+		route, err := deserializeRoute(msg)
+		if err != nil {
+			return nil, err
+		}
+
+		// Ignore cloned routes.
+		if route.Flags&unix.RTM_F_CLONED != 0 {
+			continue
+		}
+
+		// Filter by table.
+		if (filter.Table == 0 && route.Table != unix.RT_TABLE_MAIN) ||
+			(filter.Table != 0 && filter.Table != route.Table) {
+			continue
+		}
+
+		// Filter by protocol.
+		if filter.Protocol != 0 && filter.Protocol != route.Protocol {
+			continue
+		}
+
+		// Filter by destination prefix.
+		if filter.Dst != nil {
+			fMaskOnes, fMaskBits := filter.Dst.Mask.Size()
+
+			if route.Dst == nil {
+				if fMaskOnes != 0 {
+					continue
+				}
+			} else {
+				rMaskOnes, rMaskBits := route.Dst.Mask.Size()
+
+				if !filter.Dst.IP.Equal(route.Dst.IP) ||
+					fMaskOnes != rMaskOnes || fMaskBits != rMaskBits {
+					continue
+				}
+			}
+		}
+
+		// Filter by link index.
+		if filter.LinkIndex != 0 && filter.LinkIndex != route.LinkIndex {
+			continue
+		}
+
+		routes = append(routes, route)
+	}
+
+	return routes, nil
+}
+
+// Sends an IP route set request.
+func setIpRoute(route *Route, add bool) error {
+	var msgType, flags int
+
+	s, err := getSocket()
+	if err != nil {
+		return err
+	}
+
+	if add {
+		msgType = unix.RTM_NEWROUTE
+		flags = unix.NLM_F_CREATE | unix.NLM_F_EXCL | unix.NLM_F_ACK
+	} else {
+		msgType = unix.RTM_DELROUTE
+		flags = unix.NLM_F_EXCL | unix.NLM_F_ACK
+	}
+
+	req := newRequest(msgType, flags)
+
+	msg := newRtMsg(route.Family)
+	msg.Tos = uint8(route.Tos)
+	msg.Table = uint8(route.Table)
+
+	if route.Protocol != 0 {
+		msg.Protocol = uint8(route.Protocol)
+	}
+
+	if route.Scope != 0 {
+		msg.Scope = uint8(route.Scope)
+	}
+
+	if route.Type != 0 {
+		msg.Type = uint8(route.Type)
+	}
+
+	msg.Flags = uint32(route.Flags)
+
+	req.addPayload(msg)
+
+	if route.Dst != nil {
+		prefixLength, _ := route.Dst.Mask.Size()
+		msg.Dst_len = uint8(prefixLength)
+		req.addPayload(newAttributeIpAddress(unix.RTA_DST, route.Dst.IP))
+	}
+
+	if route.Src != nil {
+		req.addPayload(newAttributeIpAddress(unix.RTA_PREFSRC, route.Src))
+	}
+
+	if route.Gw != nil {
+		req.addPayload(newAttributeIpAddress(unix.RTA_GATEWAY, route.Gw))
+	}
+
+	if route.Priority != 0 {
+		req.addPayload(newAttributeUint32(unix.RTA_PRIORITY, uint32(route.Priority)))
+	}
+
+	if route.LinkIndex != 0 {
+		req.addPayload(newAttributeUint32(unix.RTA_OIF, uint32(route.LinkIndex)))
+	}
+
+	if route.ILinkIndex != 0 {
+		req.addPayload(newAttributeUint32(unix.RTA_IIF, uint32(route.ILinkIndex)))
+	}
+
+	return s.sendAndWaitForAck(req)
+}
+
+// Adds an IP route to the route table.
+func AddIpRoute(route *Route) error {
+	return setIpRoute(route, true)
+}
+
+// Deletes an IP route from the route table.
+func DeleteIpRoute(route *Route) error {
+	return setIpRoute(route, false)
 }

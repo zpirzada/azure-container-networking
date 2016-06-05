@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"golang.org/x/sys/unix"
 	"github.com/Azure/Aqua/log"
+	"golang.org/x/sys/unix"
 )
 
 // Represents a netlink socket.
@@ -72,17 +72,23 @@ func (s *socket) send(msg *message) error {
 	return err
 }
 
-// Sends a netlink message and blocks until its completion.
-func (s *socket) sendAndComplete(msg *message) error {
+// Sends a netlink message and blocks until its response is received.
+func (s *socket) sendAndWaitForResponse(msg *message) ([]*message, error) {
 	s.Lock()
 	defer s.Unlock()
 
 	err := s.send(msg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return s.waitForAck(msg)
+	return s.receiveResponse(msg)
+}
+
+// Sends a netlink message and blocks until its ack is received.
+func (s *socket) sendAndWaitForAck(msg *message) error {
+	_, err := s.sendAndWaitForResponse(msg)
+	return err
 }
 
 // Receives a netlink message.
@@ -102,34 +108,92 @@ func (s *socket) receive() ([]syscall.NetlinkMessage, error) {
 	return syscall.ParseNetlinkMessage(buffer)
 }
 
-// Waits for the acknowledgement for the given sent message.
-func (s *socket) waitForAck(sent *message) error {
+// Receives the response for the given sent message and returns the parsed message.
+func (s *socket) receiveResponse(sent *message) ([]*message, error) {
+	var messages []*message
+	var multi, done bool
+
 	for {
-		received, err := s.receive()
+		// Receive all pending messages.
+		nlMsgs, err := s.receive()
 		if err != nil {
 			log.Printf("[netlink] Receive err=%v\n", err)
-			return err
+			return messages, err
 		}
 
-		for _, msg := range received {
+		// Process received messages.
+		for _, nlMsg := range nlMsgs {
+			// Convert to message object.
+			msg := message{
+				NlMsghdr: unix.NlMsghdr{
+					Len:   nlMsg.Header.Len,
+					Type:  nlMsg.Header.Type,
+					Flags: nlMsg.Header.Flags,
+					Seq:   nlMsg.Header.Seq,
+					Pid:   nlMsg.Header.Pid,
+				},
+				data: nlMsg.Data,
+			}
+
+			// Ignore if the message is not in response to the sent message.
+			if msg.Seq != sent.Seq || msg.Pid != sent.Pid {
+				log.Printf("[netlink] Ignoring unexpected message %+v\n", msg)
+				continue
+			}
+
+			// Return if this is an ack or an error message.
 			// An acknowledgement is an error message with error code set to
 			// zero, followed by the original request message header.
-			if msg.Header.Type == unix.NLMSG_ERROR &&
-			   msg.Header.Seq == sent.Seq &&
-			   msg.Header.Pid == sent.Pid {
-
-				errCode := int32(encoder.Uint32(msg.Data[0:4]))
-				if errCode != 0 {
-					// Request failed.
+			if msg.Type == unix.NLMSG_ERROR {
+				errCode := int32(encoder.Uint32(msg.data[0:4]))
+				if errCode == 0 {
+					log.Printf("[netlink] Received %+v, ack\n", msg)
+				} else {
 					err = syscall.Errno(-errCode)
+					log.Printf("[netlink] Received %+v, err=%v\n", msg, err)
 				}
-
-				log.Printf("[netlink] Received %+v, err=%v\n", msg, err)
-
-				return err
-			} else {
-				log.Printf("[netlink] Ignoring unexpected message %+v\n", msg)
+				return nil, err
 			}
+
+			// Log response message.
+			log.Printf("[netlink] Received %+v\n", msg)
+
+			// Parse body.
+			msg.payload = append(msg.payload, nil)
+
+			// Parse attributes.
+			// Ignore failures as not all messages have attributes.
+			nlAttrs, _ := syscall.ParseNetlinkRouteAttr(&nlMsg)
+
+			// Convert to attribute objects.
+			for _, nlAttr := range nlAttrs {
+				attr := attribute{
+					NlAttr: unix.NlAttr{
+						Len:  nlAttr.Attr.Len,
+						Type: nlAttr.Attr.Type,
+					},
+					value: nlAttr.Value,
+				}
+				msg.payload = append(msg.payload, &attr)
+			}
+
+			multi = ((msg.Flags & unix.NLM_F_MULTI) != 0)
+			done = (msg.Type == unix.NLMSG_DONE)
+
+			// Exit if message completes a multipart response.
+			if multi && done {
+				break
+			}
+
+			messages = append(messages, &msg)
+		}
+
+		// Exit if response is a single message,
+		// or a completed multipart message.
+		if !multi || done {
+			break
 		}
 	}
+
+	return messages, nil
 }
