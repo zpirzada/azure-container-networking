@@ -71,7 +71,7 @@ func RemoveDnatBasedOnIPV4Address(ipv4Address string, macAddress string) error {
 }
 
 func executeShellCommand(command string) error {
-	log.Printf("[ebtables] %s", command)
+	log.Debugf("[ebtables] %s", command)
 	cmd := exec.Command("sh", "-c", command)
 	err := cmd.Start()
 	if err != nil {

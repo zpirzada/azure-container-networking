@@ -31,6 +31,6 @@ func Printf(format string, args ...interface{}) {
 	stdLog.Printf(format, args...)
 }
 
-func Println(s string) {
-	stdLog.Println(s)
+func Debugf(format string, args ...interface{}) {
+	stdLog.Debugf(format, args...)
 }

@@ -36,7 +36,7 @@ func getSocket() (*socket, error) {
 // Creates a new netlink socket object.
 func newSocket() (*socket, error) {
 	fd, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW, unix.NETLINK_ROUTE)
-	defer log.Printf("[netlink] Socket created, err=%v\n", err)
+	defer log.Debugf("[netlink] Socket created, err=%v\n", err)
 	if err != nil {
 		return nil, err
 	}
@@ -61,14 +61,14 @@ func newSocket() (*socket, error) {
 // Closes the socket.
 func (s *socket) close() {
 	err := unix.Close(s.fd)
-	log.Printf("[netlink] Socket closed, err=%v\n", err)
+	log.Debugf("[netlink] Socket closed, err=%v\n", err)
 }
 
 // Sends a netlink message.
 func (s *socket) send(msg *message) error {
 	msg.Seq = atomic.AddUint32(&s.seq, 1)
 	err := unix.Sendto(s.fd, msg.serialize(), 0, &s.sa)
-	log.Printf("[netlink] Sent %+v, err=%v\n", *msg, err)
+	log.Debugf("[netlink] Sent %+v, err=%v\n", *msg, err)
 	return err
 }
 
@@ -147,7 +147,7 @@ func (s *socket) receiveResponse(sent *message) ([]*message, error) {
 			if msg.Type == unix.NLMSG_ERROR {
 				errCode := int32(encoder.Uint32(msg.data[0:4]))
 				if errCode == 0 {
-					log.Printf("[netlink] Received %+v, ack\n", msg)
+					log.Debugf("[netlink] Received %+v, ack\n", msg)
 				} else {
 					err = syscall.Errno(-errCode)
 					log.Printf("[netlink] Received %+v, err=%v\n", msg, err)
@@ -156,7 +156,7 @@ func (s *socket) receiveResponse(sent *message) ([]*message, error) {
 			}
 
 			// Log response message.
-			log.Printf("[netlink] Received %+v\n", msg)
+			log.Debugf("[netlink] Received %+v\n", msg)
 
 			// Parse body.
 			msg.payload = append(msg.payload, nil)
