@@ -335,7 +335,7 @@ func deserializeRoute(msg *message) (*Route, error) {
 }
 
 // Returns a list of IP routes matching the given filter.
-func GetIpRouteList(filter *Route) ([]*Route, error) {
+func GetIpRoute(filter *Route) ([]*Route, error) {
 	s, err := getSocket()
 	if err != nil {
 		return nil, err

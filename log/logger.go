@@ -76,27 +76,31 @@ func (logger *Logger) SetLevel(level int) {
 // Logs a structured request.
 func (logger *Logger) Request(tag string, request interface{}, err error) {
 	if err == nil {
-		logger.l.Printf("%s: Received %T %+v.", tag, request, request)
+		logger.Printf("%s: Received %T %+v.", tag, request, request)
 	} else {
-		logger.l.Printf("%s: Failed to decode %T %+v %s.", tag, request, request, err.Error())
+		logger.Printf("%s: Failed to decode %T %+v %s.", tag, request, request, err.Error())
 	}
 }
 
 // Logs a structured response.
 func (logger *Logger) Response(tag string, response interface{}, err error) {
 	if err == nil {
-		logger.l.Printf("%s: Sent %T %+v.", tag, response, response)
+		logger.Printf("%s: Sent %T %+v.", tag, response, response)
 	} else {
-		logger.l.Printf("%s: Failed to encode %T %+v %s.", tag, response, response, err.Error())
+		logger.Printf("%s: Failed to encode %T %+v %s.", tag, response, response, err.Error())
 	}
 }
 
-// Logs a formatted string.
+// Logs a formatted string at info level.
 func (logger *Logger) Printf(format string, args ...interface{}) {
-	logger.l.Printf(format, args...)
+	if logger.level >= LevelInfo {
+		logger.l.Printf(format, args...)
+	}
 }
 
-// Logs a string.
-func (logger *Logger) Println(s string) {
-	logger.l.Println(s)
+// Logs a formatted string at debug level.
+func (logger *Logger) Debugf(format string, args ...interface{}) {
+	if logger.level >= LevelDebug {
+		logger.l.Printf(format, args...)
+	}
 }

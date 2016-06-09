@@ -167,7 +167,7 @@ func (nw *network) getEndpoint(endpointId string) (*endpoint, error) {
 //
 
 // Joins an endpoint to a sandbox.
-func (ep *endpoint) join(sandboxKey string, options map[string] interface{}) error {
+func (ep *endpoint) join(sandboxKey string, options map[string]interface{}) error {
 	if ep.sandboxKey != "" {
 		return errEndpointInUse
 	}
