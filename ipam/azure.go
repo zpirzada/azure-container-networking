@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -105,11 +106,19 @@ func (s *azureSource) refresh() error {
 
 	// For each interface...
 	for _, i := range doc.Interface {
-		// Find the interface with the matching MacAddress.
 		ifName := ""
+		priority := 0
+
+		// Find the interface with the matching MacAddress.
 		for _, iface := range interfaces {
-			if iface.HardwareAddr.String() == i.MacAddress {
+			macAddr := strings.Replace(iface.HardwareAddr.String(), ":", "", -1)
+			if macAddr == i.MacAddress {
 				ifName = iface.Name
+
+				// Prioritize secondary interfaces.
+				if !i.IsPrimary {
+					priority = 1
+				}
 				break
 			}
 		}
@@ -126,13 +135,18 @@ func (s *azureSource) refresh() error {
 				return err
 			}
 
-			ap, err := local.newAddressPool(ifName, subnet)
+			ap, err := local.newAddressPool(ifName, priority, subnet)
 			if err != nil && err != errAddressExists {
 				return err
 			}
 
 			// For each address in the subnet...
 			for _, a := range s.IPAddress {
+				// Primary addresses are reserved for the host.
+				if a.IsPrimary {
+					continue
+				}
+
 				address := net.ParseIP(a.Address)
 
 				_, err = ap.newAddressRecord(&address)

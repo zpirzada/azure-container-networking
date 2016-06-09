@@ -44,6 +44,7 @@ type addressPool struct {
 	subnet    net.IPNet
 	addresses map[string]*addressRecord
 	v6        bool
+	priority  int
 	epoch     int
 	ref       int
 }
@@ -173,7 +174,7 @@ func (as *addressSpace) merge(newas *addressSpace) {
 }
 
 // Creates a new addressPool object.
-func (as *addressSpace) newAddressPool(ifName string, subnet *net.IPNet) (*addressPool, error) {
+func (as *addressSpace) newAddressPool(ifName string, priority int, subnet *net.IPNet) (*addressPool, error) {
 	id := newAddressPoolId(as.id, subnet.String(), "")
 
 	as.Lock()
@@ -184,13 +185,16 @@ func (as *addressSpace) newAddressPool(ifName string, subnet *net.IPNet) (*addre
 		return pool, errAddressPoolExists
 	}
 
+	v6 := (len(subnet.IP) > net.IPv4len)
+
 	pool = &addressPool{
 		id:        id,
 		as:        as,
 		ifName:    ifName,
 		subnet:    *subnet,
 		addresses: make(map[string]*addressRecord),
-		v6:        subnet.IP.To16() != nil,
+		v6:        v6,
+		priority:  priority,
 		epoch:     as.epoch,
 	}
 
@@ -227,9 +231,18 @@ func (as *addressSpace) requestPool(pool string, subPool string, options map[str
 		}
 	} else {
 		// Return any available address pool.
-		for _, ap = range as.pools {
-			if ap.v6 == v6 {
-				break
+		highestPriority := -1
+
+		for _, pool := range as.pools {
+			// Pick a pool from the same address family.
+			if pool.v6 != v6 {
+				continue
+			}
+
+			// Pick the pool with the highest priority.
+			if pool.priority > highestPriority {
+				highestPriority = pool.priority
+				ap = pool
 			}
 		}
 
