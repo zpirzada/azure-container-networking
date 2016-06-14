@@ -108,10 +108,12 @@ func (s *azureSource) refresh() error {
 	for _, i := range doc.Interface {
 		ifName := ""
 		priority := 0
+		i.MacAddress = strings.ToLower(i.MacAddress)
 
 		// Find the interface with the matching MacAddress.
 		for _, iface := range interfaces {
 			macAddr := strings.Replace(iface.HardwareAddr.String(), ":", "", -1)
+			macAddr = strings.ToLower(macAddr)
 			if macAddr == i.MacAddress {
 				ifName = iface.Name
 
