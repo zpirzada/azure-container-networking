@@ -8,6 +8,8 @@ import (
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/Azure/Aqua/core"
 )
 
 const (
@@ -199,6 +201,8 @@ func (as *addressSpace) newAddressPool(ifName string, priority int, subnet *net.
 	}
 
 	as.pools[id.String()] = pool
+
+	core.NewExternalInterface(ifName, subnet.String())
 
 	return pool, nil
 }

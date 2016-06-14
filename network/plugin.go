@@ -231,7 +231,8 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 
 	resp := joinResponse{
 		InterfaceName: ifname,
-		Gateway:       ep.GatewayIPv4.String(),
+		Gateway:       ep.IPv4Gateway.String(),
+		GatewayIPv6:   ep.IPv6Gateway.String(),
 	}
 
 	err = plugin.listener.Encode(w, &resp)
