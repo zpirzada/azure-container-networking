@@ -19,4 +19,5 @@ docker run --net=azure -it ubuntu:latest /bin/bash
 #Requirements
 Aqua currently relies on the fact that the interfaces in the VM are provisioned with multiple ip-addresses (called CAs in azure). In the current version of Aqua, multiple ip-addresses need to be manually configured on the interface. These ip-addresses need to be provisioned via Azure ARM APIs before they can be used inside VMs.
 
-For help, send an email to 
+#Code of Conduct
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
