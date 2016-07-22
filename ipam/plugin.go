@@ -219,6 +219,8 @@ func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	plugin.refreshSource()
+
 	// Process request.
 	as, _, err := plugin.parsePoolId(req.PoolID)
 	if err != nil {
@@ -285,6 +287,8 @@ func (plugin *ipamPlugin) releaseAddress(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		return
 	}
+
+	plugin.refreshSource()
 
 	// Process request.
 	_, ap, err := plugin.parsePoolId(req.PoolID)
