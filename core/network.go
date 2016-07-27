@@ -65,6 +65,10 @@ var state struct {
 
 // Initializes core network module.
 func init() {
+	// Log platform information to help with debugging.
+	logPlatformInfo()
+	logNetworkInterfaces()
+
 	state.externalInterfaces = make(map[string]*externalInterface)
 }
 

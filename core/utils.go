@@ -4,50 +4,40 @@
 package core
 
 import (
-	"fmt"
+	"io/ioutil"
 	"net"
-	"net/http"
 	"os/exec"
+
+	"github.com/Azure/Aqua/log"
 )
 
-func printHostInterfaces() {
-	hostInterfaces, err := net.Interfaces()
-	if err != nil {
-		fmt.Println("Azure Driver: Got error while retrieving interfaces")
+// LogPlatformInfo logs platform version information.
+func logPlatformInfo() {
+	info, err := ioutil.ReadFile("/proc/version")
+	if err == nil {
+		log.Printf("[core] Running on %v", string(info))
 	} else {
-		fmt.Println("Azure Driver: Found following Interfaces in default name space")
-		for _, hostInterface := range hostInterfaces {
-
-			addresses, ok := hostInterface.Addrs()
-			if ok == nil && len(addresses) > 0 {
-				fmt.Println("\t", hostInterface.Name, hostInterface.Index, hostInterface.Flags, hostInterface.HardwareAddr, hostInterface.Flags, hostInterface.MTU, addresses[0].String())
-			} else {
-				fmt.Println("\t", hostInterface.Name, hostInterface.Index, hostInterface.Flags, hostInterface.HardwareAddr, hostInterface.Flags, hostInterface.MTU)
-			}
-		}
+		log.Printf("[core] Failed to detect platform, err:%v", err)
 	}
 }
 
-func router(w http.ResponseWriter, req *http.Request) {
-	fmt.Println("Handler invoked")
+// LogNetworkInterfaces logs the host's network interfaces in the default namespace.
+func logNetworkInterfaces() {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		log.Printf("[core] Failed to query network interfaces, err:%v", err)
+		return
+	}
 
-	switch req.Method {
-	case "GET":
-		fmt.Println("receiver GET request", req.URL.Path)
-	case "POST":
-		fmt.Println("receiver POST request", req.URL.Path)
-		switch req.URL.Path {
-		case "/Plugin.Activate":
-			fmt.Println("/Plugin.Activate received")
-		}
-	default:
-		fmt.Println("receiver unexpected request", req.Method, "->", req.URL.Path)
+	for _, iface := range interfaces {
+		addrs, _ := iface.Addrs()
+		log.Printf("[core] Network interface: %+v with IP addresses: %+v", iface, addrs);
 	}
 }
 
-// ExecuteShellCommand executes a shell command
+// ExecuteShellCommand executes a shell command.
 func ExecuteShellCommand(command string) error {
-	fmt.Println("going to execute: " + command)
+	log.Debugf("[core] %s", command)
 	cmd := exec.Command("sh", "-c", command)
 	err := cmd.Start()
 	if err != nil {

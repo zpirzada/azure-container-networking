@@ -61,8 +61,6 @@ var vethPrefix = "azveth"
 // It is deprecated now
 func GetInterfaceToAttach(interfaceNameToAttach string, ipAddressToAttach string) (net.IPNet, net.IPNet, net.HardwareAddr, int, string, string, net.IP, string) {
 
-	printHostInterfaces()
-
 	fmt.Println("Request came for", ipAddressToAttach)
 	var selectedInterface net.Interface
 	selected := false
