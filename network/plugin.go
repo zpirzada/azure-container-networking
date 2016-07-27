@@ -196,6 +196,40 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 	log.Response(plugin.Name, &resp, err)
 }
 
+// Handles DeleteEndpoint requests.
+func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
+	var req deleteEndpointRequest
+
+	// Decode request.
+	err := plugin.listener.Decode(w, r, &req)
+	log.Request(plugin.Name, &req, err)
+	if err != nil {
+		return
+	}
+
+	// Process request.
+	plugin.Lock()
+	defer plugin.Unlock()
+
+	nw, err := plugin.nm.getNetwork(req.NetworkID)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
+	}
+
+	err = nw.deleteEndpoint(req.EndpointID)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
+	}
+
+	// Encode response.
+	resp := deleteEndpointResponse{}
+	err = plugin.listener.Encode(w, &resp)
+
+	log.Response(plugin.Name, &resp, err)
+}
+
 // Handles Join requests.
 func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 	var req joinRequest
@@ -235,40 +269,6 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 		GatewayIPv6:   ep.IPv6Gateway.String(),
 	}
 
-	err = plugin.listener.Encode(w, &resp)
-
-	log.Response(plugin.Name, &resp, err)
-}
-
-// Handles DeleteEndpoint requests.
-func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
-	var req deleteEndpointRequest
-
-	// Decode request.
-	err := plugin.listener.Decode(w, r, &req)
-	log.Request(plugin.Name, &req, err)
-	if err != nil {
-		return
-	}
-
-	// Process request.
-	plugin.Lock()
-	defer plugin.Unlock()
-
-	nw, err := plugin.nm.getNetwork(req.NetworkID)
-	if err != nil {
-		plugin.SendErrorResponse(w, err)
-		return
-	}
-
-	err = nw.deleteEndpoint(req.EndpointID)
-	if err != nil {
-		plugin.SendErrorResponse(w, err)
-		return
-	}
-
-	// Encode response.
-	resp := deleteEndpointResponse{}
 	err = plugin.listener.Encode(w, &resp)
 
 	log.Response(plugin.Name, &resp, err)
