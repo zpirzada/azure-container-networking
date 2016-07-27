@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Azure/Aqua/netfilter"
+	"github.com/Azure/Aqua/ebtables"
 	"github.com/Azure/Aqua/netlink"
 )
 
