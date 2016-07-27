@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/Aqua/ebtables"
 	"github.com/Azure/Aqua/log"
-	"github.com/Azure/Aqua/netfilter"
 	"github.com/Azure/Aqua/netlink"
 	"golang.org/x/sys/unix"
 )
