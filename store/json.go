@@ -94,7 +94,12 @@ func (kvs *jsonFileStore) flush() error {
 		return err
 	}
 
-	err = json.NewEncoder(file).Encode(&kvs.data)
+	buf, err := json.MarshalIndent(&kvs.data, "", "\t")
+	if err != nil {
+		return err
+	}
+
+	_, err = file.Write(buf)
 	if err != nil {
 		return err
 	}

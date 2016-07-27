@@ -5,6 +5,7 @@ package store
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -91,10 +92,15 @@ func TestKeyValuePairsArePersistedToJSONFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read from file %v", err)
 	}
-	actualPair = string(data[:n-1])
 
 	file.Close()
-	defer os.Remove(testFileName)
+	os.Remove(testFileName)
+
+	// Remove indentation to normalize the JSON encoding.
+	actualPair = string(data[:n])
+	actualPair = strings.Replace(actualPair, " ", "", -1)
+	actualPair = strings.Replace(actualPair, "\t", "", -1)
+	actualPair = strings.Replace(actualPair, "\n", "", -1)
 
 	// Fail if the contents do not match expected JSON encoding.
 	if actualPair != expectedPair {
