@@ -5,10 +5,31 @@ package ebtables
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os/exec"
+	"strings"
 
 	"github.com/Azure/Aqua/log"
 )
+
+// Init initializes the ebtables module.
+func init() {
+	installEbtables()
+}
+
+// InstallEbtables installs the ebtables package.
+func installEbtables() {
+	version, _ := ioutil.ReadFile("/proc/version")
+	os := strings.ToLower(string(version))
+
+	if strings.Contains(os, "ubuntu") {
+		executeShellCommand("apt-get install ebtables")
+	} else if strings.Contains(os, "redhat") {
+		executeShellCommand("yum install ebtables")
+	} else {
+		log.Printf("Unable to detect OS platform. Please make sure the ebtables package is installed.")
+	}
+}
 
 // SetupSnatForOutgoingPackets sets up snat
 func SetupSnatForOutgoingPackets(interfaceName string, snatAddress string) error {

@@ -5,13 +5,11 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
-	"github.com/Azure/Aqua/core"
 	"github.com/Azure/Aqua/ipam"
 	"github.com/Azure/Aqua/log"
 	"github.com/Azure/Aqua/network"
@@ -44,8 +42,6 @@ func main() {
 		printHelp()
 		return
 	}
-
-	handleDependencies()
 
 	for _, arg := range args {
 		if !strings.HasPrefix(arg, "--") {
@@ -145,19 +141,4 @@ func main() {
 	if ipamPlugin != nil {
 		ipamPlugin.Stop()
 	}
-}
-
-func handleDependencies() {
-	installEbtables()
-}
-
-func installEbtables() {
-	contents, err := ioutil.ReadFile("/proc/version")
-	if err == nil {
-		value := string(contents)
-		if strings.Contains(value, "ubuntu") || strings.Contains(value, "Ubuntu") {
-			fmt.Print("Detected ubuntu " + value)
-			core.ExecuteShellCommand("apt-get install ebtables")
-		}
-	} // else unsupported distro
 }
