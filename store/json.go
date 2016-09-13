@@ -60,7 +60,12 @@ func (kvs *jsonFileStore) Read(key string, value interface{}) error {
 	kvs.Lock()
 	defer kvs.Unlock()
 
-	return json.Unmarshal(*kvs.data[key], value)
+	raw := kvs.data[key]
+	if raw == nil {
+		return ErrKeyNotFound
+	}
+
+	return json.Unmarshal(*raw, value)
 }
 
 // Write saves the given key value pair to persistent store.
