@@ -25,7 +25,7 @@ type netPlugin struct {
 }
 
 type NetPlugin interface {
-	Start(chan error) error
+	Start(*common.PluginConfig) error
 	Stop()
 }
 
@@ -51,11 +51,11 @@ func NewPlugin(name string, version string) (NetPlugin, error) {
 }
 
 // Starts the plugin.
-func (plugin *netPlugin) Start(errChan chan error) error {
+func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 	// Initialize base plugin.
-	err := plugin.Initialize(errChan)
+	err := plugin.Initialize(config)
 	if err != nil {
-		log.Printf("%s: Failed to start: %v", plugin.Name, err)
+		log.Printf("%s: Failed to initialize base plugin: %v", plugin.Name, err)
 		return err
 	}
 
