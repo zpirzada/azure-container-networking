@@ -10,9 +10,11 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/Azure/Aqua/common"
 	"github.com/Azure/Aqua/ipam"
 	"github.com/Azure/Aqua/log"
 	"github.com/Azure/Aqua/network"
+	"github.com/Azure/Aqua/store"
 )
 
 // Binary version
@@ -30,6 +32,7 @@ func printHelp() {
 func main() {
 	var netPlugin network.NetPlugin
 	var ipamPlugin ipam.IpamPlugin
+	var config common.PluginConfig
 	var err error
 
 	// Set defaults.
@@ -89,7 +92,14 @@ func main() {
 	}
 
 	// Create a channel to receive unhandled errors from the plugins.
-	errorChan := make(chan error, 1)
+	config.ErrChan = make(chan error, 1)
+
+	// Create the key value store.
+	config.Store, err = store.NewJsonFileStore("")
+	if err != nil {
+		fmt.Printf("Failed to create store: %v\n", err)
+		return
+	}
 
 	// Create logging provider.
 	err = log.SetTarget(logTarget)
@@ -100,7 +110,7 @@ func main() {
 
 	// Start plugins.
 	if netPlugin != nil {
-		err = netPlugin.Start(errorChan)
+		err = netPlugin.Start(&config)
 		if err != nil {
 			fmt.Printf("Failed to start network plugin %v\n", err)
 			return
@@ -108,7 +118,7 @@ func main() {
 	}
 
 	if ipamPlugin != nil {
-		err = ipamPlugin.Start(errorChan)
+		err = ipamPlugin.Start(&config)
 		if err != nil {
 			fmt.Printf("Failed to start IPAM plugin %v\n", err)
 			return
@@ -127,7 +137,7 @@ func main() {
 	select {
 	case sig := <-osSignalChannel:
 		fmt.Printf("\nCaught signal <" + sig.String() + "> shutting down...\n")
-	case err := <-errorChan:
+	case err := <-config.ErrChan:
 		if err != nil {
 			fmt.Printf("\nReceived unhandled error %v, shutting down...\n", err)
 		}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/Azure/Aqua/log"
+	"github.com/Azure/Aqua/store"
 )
 
 // Plugin object and interface
@@ -15,7 +16,14 @@ type Plugin struct {
 	Version      string
 	EndpointType string
 	Options      map[string]string
+	Store        store.KeyValueStore
 	Listener     *Listener
+}
+
+// Plugin common configuration.
+type PluginConfig struct {
+	ErrChan   chan error
+	Store     store.KeyValueStore
 }
 
 // Creates a new Plugin object.
@@ -29,7 +37,7 @@ func NewPlugin(name, version, endpointType string) (*Plugin, error) {
 }
 
 // Initializes the plugin and starts the listener.
-func (plugin *Plugin) Initialize(errChan chan error) error {
+func (plugin *Plugin) Initialize(config *PluginConfig) error {
 	var socketName string
 	if plugin.Name != "test" {
 		socketName = plugin.Name
@@ -44,8 +52,12 @@ func (plugin *Plugin) Initialize(errChan chan error) error {
 	// Add generic protocol handlers.
 	listener.AddHandler(activatePath, plugin.activate)
 
+	// Initialize plugin properties.
 	plugin.Listener = listener
-	err = listener.Start(errChan)
+	plugin.Store = config.Store
+
+	// Start the listener.
+	err = listener.Start(config.ErrChan)
 
 	return err
 }

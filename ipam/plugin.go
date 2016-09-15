@@ -25,7 +25,7 @@ type ipamPlugin struct {
 }
 
 type IpamPlugin interface {
-	Start(chan error) error
+	Start(*common.PluginConfig) error
 	Stop()
 
 	SetOption(string, string)
@@ -48,10 +48,11 @@ func NewPlugin(name string, version string) (IpamPlugin, error) {
 }
 
 // Starts the plugin.
-func (plugin *ipamPlugin) Start(errChan chan error) error {
-	err := plugin.Initialize(errChan)
+func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
+	// Initialize base plugin.
+	err := plugin.Initialize(config)
 	if err != nil {
-		log.Printf("%s: Failed to start: %v", plugin.Name, err)
+		log.Printf("%s: Failed to initialize base plugin: %v", plugin.Name, err)
 		return err
 	}
 
