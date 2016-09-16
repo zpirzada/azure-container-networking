@@ -5,7 +5,6 @@ package ipam
 
 import (
 	"net/http"
-	"sync"
 
 	"github.com/Azure/Aqua/common"
 	"github.com/Azure/Aqua/log"
@@ -19,9 +18,7 @@ const (
 // IpamPlugin object and interface
 type ipamPlugin struct {
 	*common.Plugin
-	addrSpaces map[string]*addressSpace
-	source     configSource
-	sync.Mutex
+	am *addressManager
 }
 
 type IpamPlugin interface {
@@ -29,8 +26,6 @@ type IpamPlugin interface {
 	Stop()
 
 	SetOption(string, string)
-
-	setAddressSpace(*addressSpace) error
 }
 
 // Creates a new IpamPlugin object.
@@ -41,9 +36,15 @@ func NewPlugin(name string, version string) (IpamPlugin, error) {
 		return nil, err
 	}
 
+	// Setup address manager.
+	am, err := newAddressManager()
+	if err != nil {
+		return nil, err
+	}
+
 	return &ipamPlugin{
-		Plugin:     plugin,
-		addrSpaces: make(map[string]*addressSpace),
+		Plugin: plugin,
+		am:     am,
 	}, nil
 }
 
@@ -56,6 +57,13 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 		return err
 	}
 
+	// Initialize address manager.
+	err = plugin.am.Initialize(config, plugin.GetOption("source"))
+	if err != nil {
+		log.Printf("%s: Failed to initialize address manager: %v", plugin.Name, err)
+		return err
+	}
+
 	// Add protocol handlers.
 	listener := plugin.Listener
 	listener.AddHandler(getCapabilitiesPath, plugin.getCapabilities)
@@ -65,13 +73,6 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 	listener.AddHandler(requestAddressPath, plugin.requestAddress)
 	listener.AddHandler(releaseAddressPath, plugin.releaseAddress)
 
-	// Start configuration source.
-	err = plugin.startSource()
-	if err != nil {
-		log.Printf("%s: Failed to start: %v", plugin.Name, err)
-		return err
-	}
-
 	log.Printf("%s: Plugin started.", plugin.Name)
 
 	return nil
@@ -79,51 +80,9 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 
 // Stops the plugin.
 func (plugin *ipamPlugin) Stop() {
-	plugin.stopSource()
+	plugin.am.Uninitialize()
 	plugin.Uninitialize()
 	log.Printf("%s: Plugin stopped.\n", plugin.Name)
-}
-
-// Sets a new address space for the plugin to serve to clients.
-func (plugin *ipamPlugin) setAddressSpace(as *addressSpace) error {
-	plugin.Lock()
-
-	as1, ok := plugin.addrSpaces[as.id]
-	if !ok {
-		plugin.addrSpaces[as.id] = as
-		plugin.Unlock()
-	} else {
-		plugin.Unlock()
-		as1.merge(as)
-	}
-
-	return nil
-}
-
-// Parses the given pool ID string and returns the address space and pool objects.
-func (plugin *ipamPlugin) parsePoolId(poolId string) (*addressSpace, *addressPool, error) {
-	apId, err := newAddressPoolIdFromString(poolId)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	plugin.Lock()
-	as := plugin.addrSpaces[apId.asId]
-	plugin.Unlock()
-
-	if as == nil {
-		return nil, nil, errInvalidAddressSpace
-	}
-
-	var ap *addressPool
-	if apId.subnet != "" {
-		ap, err = as.getAddressPool(poolId)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-
-	return as, ap, nil
 }
 
 //
@@ -153,21 +112,10 @@ func (plugin *ipamPlugin) getDefaultAddressSpaces(w http.ResponseWriter, r *http
 
 	log.Request(plugin.Name, &req, nil)
 
-	plugin.refreshSource()
+	localId, globalId := plugin.am.GetDefaultAddressSpaces()
 
-	plugin.Lock()
-
-	local := plugin.addrSpaces[localDefaultAddressSpaceId]
-	if local != nil {
-		resp.LocalDefaultAddressSpace = local.id
-	}
-
-	global := plugin.addrSpaces[globalDefaultAddressSpaceId]
-	if global != nil {
-		resp.GlobalDefaultAddressSpace = global.id
-	}
-
-	plugin.Unlock()
+	resp.LocalDefaultAddressSpace = localId
+	resp.GlobalDefaultAddressSpace = globalId
 
 	err := plugin.Listener.Encode(w, &resp)
 
@@ -185,16 +133,8 @@ func (plugin *ipamPlugin) requestPool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	plugin.refreshSource()
-
 	// Process request.
-	as, _, err := plugin.parsePoolId(req.AddressSpace)
-	if err != nil {
-		plugin.SendErrorResponse(w, err)
-		return
-	}
-
-	poolId, err := as.requestPool(req.Pool, req.SubPool, req.Options, req.V6)
+	poolId, subnet, err := plugin.am.RequestPool(req.AddressSpace, req.Pool, req.SubPool, req.Options, req.V6)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -202,7 +142,8 @@ func (plugin *ipamPlugin) requestPool(w http.ResponseWriter, r *http.Request) {
 
 	// Encode response.
 	data := make(map[string]string)
-	resp := requestPoolResponse{PoolID: poolId.String(), Pool: poolId.subnet, Data: data}
+	poolId = newAddressPoolId(req.AddressSpace, poolId, "").String()
+	resp := requestPoolResponse{PoolID: poolId, Pool: subnet, Data: data}
 
 	err = plugin.Listener.Encode(w, &resp)
 
@@ -220,16 +161,14 @@ func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	plugin.refreshSource()
-
 	// Process request.
-	as, _, err := plugin.parsePoolId(req.PoolID)
+	poolId, err := newAddressPoolIdFromString(req.PoolID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
 	}
 
-	err = as.releasePool(req.PoolID)
+	err = plugin.am.ReleasePool(poolId.asId, poolId.subnet)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -254,16 +193,14 @@ func (plugin *ipamPlugin) requestAddress(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	plugin.refreshSource()
-
 	// Process request.
-	_, ap, err := plugin.parsePoolId(req.PoolID)
+	poolId, err := newAddressPoolIdFromString(req.PoolID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
 	}
 
-	addr, err := ap.requestAddress(req.Address, req.Options)
+	addr, err := plugin.am.RequestAddress(poolId.asId, poolId.subnet, req.Address, req.Options)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -289,16 +226,14 @@ func (plugin *ipamPlugin) releaseAddress(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	plugin.refreshSource()
-
 	// Process request.
-	_, ap, err := plugin.parsePoolId(req.PoolID)
+	poolId, err := newAddressPoolIdFromString(req.PoolID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
 	}
 
-	err = ap.releaseAddress(req.Address)
+	err = plugin.am.ReleaseAddress(poolId.asId, poolId.subnet, req.Address)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return

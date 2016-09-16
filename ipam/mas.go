@@ -21,7 +21,7 @@ const (
 // Microsoft Azure Stack IPAM configuration source.
 type masSource struct {
 	name          string
-	sink          configSink
+	sink          addressConfigSink
 	lastRefresh   time.Time
 	minPollPeriod time.Duration
 }
@@ -39,21 +39,22 @@ type jsonObject struct {
 }
 
 // Creates the MAS source.
-func newMasSource(sink configSink) (*masSource, error) {
+func newMasSource() (*masSource, error) {
 	return &masSource{
 		name:          "MAS",
-		sink:          sink,
 		minPollPeriod: masDefaultMinPollPeriod,
 	}, nil
 }
 
 // Starts the MAS source.
-func (s *masSource) start() error {
+func (s *masSource) start(sink addressConfigSink) error {
+	s.sink = sink
 	return nil
 }
 
 // Stops the MAS source.
 func (s *masSource) stop() {
+	s.sink = nil
 	return
 }
 
@@ -67,7 +68,7 @@ func (s *masSource) refresh() error {
 	s.lastRefresh = time.Now()
 
 	// Configure the local default address space.
-	local, err := newAddressSpace(localDefaultAddressSpaceId, localScope)
+	local, err := s.sink.newAddressSpace(localDefaultAddressSpaceId, localScope)
 	if err != nil {
 		return err
 	}

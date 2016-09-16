@@ -22,7 +22,7 @@ const (
 // Microsoft Azure IPAM configuration source.
 type azureSource struct {
 	name          string
-	sink          configSink
+	sink          addressConfigSink
 	lastRefresh   time.Time
 	minPollPeriod time.Duration
 }
@@ -49,21 +49,22 @@ type xmlDocument struct {
 }
 
 // Creates the Azure source.
-func newAzureSource(sink configSink) (*azureSource, error) {
+func newAzureSource() (*azureSource, error) {
 	return &azureSource{
 		name:          "Azure",
-		sink:          sink,
 		minPollPeriod: azureDefaultMinPollPeriod,
 	}, nil
 }
 
 // Starts the Azure source.
-func (s *azureSource) start() error {
+func (s *azureSource) start(sink addressConfigSink) error {
+	s.sink = sink
 	return nil
 }
 
 // Stops the Azure source.
 func (s *azureSource) stop() {
+	s.sink = nil
 	return
 }
 
@@ -83,7 +84,7 @@ func (s *azureSource) refresh() error {
 	}
 
 	// Configure the local default address space.
-	local, err := newAddressSpace(localDefaultAddressSpaceId, localScope)
+	local, err := s.sink.newAddressSpace(localDefaultAddressSpaceId, localScope)
 	if err != nil {
 		return err
 	}
