@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"sync"
 
 	"github.com/Azure/Aqua/core"
 )
@@ -31,30 +30,30 @@ type addressPoolId struct {
 
 // Represents a set of non-overlapping address pools.
 type addressSpace struct {
-	id    string
-	scope string
-	pools map[string]*addressPool
+	am    *addressManager
+	Id    string
+	Scope string
+	Pools map[string]*addressPool
 	epoch int
-	sync.Mutex
 }
 
 // Represents a subnet and the set of addresses in it.
 type addressPool struct {
-	id        *addressPoolId
 	as        *addressSpace
-	ifName    string
-	subnet    net.IPNet
-	addresses map[string]*addressRecord
-	v6        bool
-	priority  int
+	Id        string
+	IfName    string
+	Subnet    net.IPNet
+	Addresses map[string]*addressRecord
+	IsIPv6    bool
+	Priority  int
 	epoch     int
 	ref       int
 }
 
 // Represents an IP address in a pool.
 type addressRecord struct {
-	addr  net.IP
-	inUse bool
+	Addr  net.IP
+	InUse bool
 	epoch int
 }
 
@@ -105,47 +104,69 @@ func (pid *addressPoolId) String() string {
 //
 
 // Creates a new addressSpace object.
-func newAddressSpace(id string, scope string) (*addressSpace, error) {
+func (am *addressManager) newAddressSpace(id string, scope string) (*addressSpace, error) {
 	if scope != localScope && scope != globalScope {
 		return nil, errInvalidScope
 	}
 
 	return &addressSpace{
-		id:    id,
-		scope: scope,
-		pools: make(map[string]*addressPool),
+		am:    am,
+		Id:    id,
+		Scope: scope,
+		Pools: make(map[string]*addressPool),
 	}, nil
+}
+
+// Returns the address space with the given ID.
+func (am *addressManager) getAddressSpace(id string) (*addressSpace, error) {
+	as := am.AddrSpaces[id]
+	if as == nil {
+		return nil, errInvalidAddressSpace
+	}
+
+	return as, nil
+}
+
+// Sets a new or updates an existing address space.
+func (am *addressManager) setAddressSpace(as *addressSpace) error {
+	as1, ok := am.AddrSpaces[as.Id]
+	if !ok {
+		am.AddrSpaces[as.Id] = as
+	} else {
+		as1.merge(as)
+	}
+
+	am.save()
+
+	return nil
 }
 
 // Merges a new address space to an existing one.
 func (as *addressSpace) merge(newas *addressSpace) {
-	as.Lock()
-	defer as.Unlock()
-
 	// The new epoch after the merge.
 	as.epoch++
 
 	// Add new pools and addresses.
-	for pk, pv := range newas.pools {
-		ap := as.pools[pk]
+	for pk, pv := range newas.Pools {
+		ap := as.Pools[pk]
 
 		if ap == nil {
 			// This is a new address pool.
 			// Merge it to the existing address space.
-			as.pools[pk] = pv
-			delete(newas.pools, pk)
+			as.Pools[pk] = pv
+			delete(newas.Pools, pk)
 			pv.epoch = as.epoch
 		} else {
 			// This pool already exists.
 			// Compare address records one by one.
-			for ak, av := range pv.addresses {
-				ar := ap.addresses[ak]
+			for ak, av := range pv.Addresses {
+				ar := ap.Addresses[ak]
 
 				if ar == nil {
 					// This is a new address record.
 					// Merge it to the existing address pool.
-					ap.addresses[ak] = av
-					delete(ap.addresses, ak)
+					ap.Addresses[ak] = av
+					delete(ap.Addresses, ak)
 					av.epoch = as.epoch
 				} else {
 					// This address record already exists.
@@ -158,16 +179,16 @@ func (as *addressSpace) merge(newas *addressSpace) {
 	}
 
 	// Cleanup stale pools and addresses from the old epoch.
-	for pk, pv := range as.pools {
+	for pk, pv := range as.Pools {
 		if pv.epoch < as.epoch {
-			for ak, av := range pv.addresses {
-				if !av.inUse {
-					delete(pv.addresses, ak)
+			for ak, av := range pv.Addresses {
+				if !av.InUse {
+					delete(pv.Addresses, ak)
 				}
 			}
 
 			if pv.ref == 0 {
-				delete(as.pools, pk)
+				delete(as.Pools, pk)
 			}
 		}
 	}
@@ -177,12 +198,9 @@ func (as *addressSpace) merge(newas *addressSpace) {
 
 // Creates a new addressPool object.
 func (as *addressSpace) newAddressPool(ifName string, priority int, subnet *net.IPNet) (*addressPool, error) {
-	id := newAddressPoolId(as.id, subnet.String(), "")
+	id := subnet.String()
 
-	as.Lock()
-	defer as.Unlock()
-
-	pool, ok := as.pools[id.String()]
+	pool, ok := as.Pools[id]
 	if ok {
 		return pool, errAddressPoolExists
 	}
@@ -190,17 +208,17 @@ func (as *addressSpace) newAddressPool(ifName string, priority int, subnet *net.
 	v6 := (len(subnet.IP) > net.IPv4len)
 
 	pool = &addressPool{
-		id:        id,
 		as:        as,
-		ifName:    ifName,
-		subnet:    *subnet,
-		addresses: make(map[string]*addressRecord),
-		v6:        v6,
-		priority:  priority,
+		Id:        id,
+		IfName:    ifName,
+		Subnet:    *subnet,
+		Addresses: make(map[string]*addressRecord),
+		IsIPv6:    v6,
+		Priority:  priority,
 		epoch:     as.epoch,
 	}
 
-	as.pools[id.String()] = pool
+	as.Pools[id] = pool
 
 	core.NewExternalInterface(ifName, subnet.String())
 
@@ -209,10 +227,7 @@ func (as *addressSpace) newAddressPool(ifName string, priority int, subnet *net.
 
 // Returns the address pool with the given pool ID.
 func (as *addressSpace) getAddressPool(poolId string) (*addressPool, error) {
-	as.Lock()
-	defer as.Unlock()
-
-	ap := as.pools[poolId]
+	ap := as.Pools[poolId]
 	if ap == nil {
 		return nil, errInvalidPoolId
 	}
@@ -221,15 +236,12 @@ func (as *addressSpace) getAddressPool(poolId string) (*addressPool, error) {
 }
 
 // Requests a new address pool from the address space.
-func (as *addressSpace) requestPool(pool string, subPool string, options map[string]string, v6 bool) (*addressPoolId, error) {
+func (as *addressSpace) requestPool(poolId string, subPoolId string, options map[string]string, v6 bool) (*addressPool, error) {
 	var ap *addressPool
 
-	as.Lock()
-	defer as.Unlock()
-
-	if pool != "" {
+	if poolId != "" {
 		// Return the specific address pool requested.
-		ap = as.pools[pool]
+		ap = as.Pools[poolId]
 		if ap == nil {
 			return nil, errAddressPoolNotFound
 		}
@@ -237,15 +249,15 @@ func (as *addressSpace) requestPool(pool string, subPool string, options map[str
 		// Return any available address pool.
 		highestPriority := -1
 
-		for _, pool := range as.pools {
+		for _, pool := range as.Pools {
 			// Pick a pool from the same address family.
-			if pool.v6 != v6 {
+			if pool.IsIPv6 != v6 {
 				continue
 			}
 
 			// Pick the pool with the highest priority.
-			if pool.priority > highestPriority {
-				highestPriority = pool.priority
+			if pool.Priority > highestPriority {
+				highestPriority = pool.Priority
 				ap = pool
 			}
 		}
@@ -257,15 +269,12 @@ func (as *addressSpace) requestPool(pool string, subPool string, options map[str
 
 	ap.ref++
 
-	return ap.id, nil
+	return ap, nil
 }
 
 // Releases a previously requested address pool back to its address space.
 func (as *addressSpace) releasePool(poolId string) error {
-	as.Lock()
-	defer as.Unlock()
-
-	ap, ok := as.pools[poolId]
+	ap, ok := as.Pools[poolId]
 	if !ok {
 		return errAddressPoolNotFound
 	}
@@ -274,7 +283,7 @@ func (as *addressSpace) releasePool(poolId string) error {
 
 	// Delete address pool if it is no longer available.
 	if ap.ref == 0 && ap.epoch < as.epoch {
-		delete(as.pools, poolId)
+		delete(as.Pools, poolId)
 	}
 
 	return nil
@@ -288,24 +297,21 @@ func (as *addressSpace) releasePool(poolId string) error {
 func (ap *addressPool) newAddressRecord(addr *net.IP) (*addressRecord, error) {
 	id := addr.String()
 
-	if !ap.subnet.Contains(*addr) {
+	if !ap.Subnet.Contains(*addr) {
 		return nil, errInvalidAddress
 	}
 
-	ap.as.Lock()
-	defer ap.as.Unlock()
-
-	ar, ok := ap.addresses[id]
+	ar, ok := ap.Addresses[id]
 	if ok {
 		return ar, errAddressExists
 	}
 
 	ar = &addressRecord{
-		addr:  *addr,
+		Addr:  *addr,
 		epoch: ap.epoch,
 	}
 
-	ap.addresses[id] = ar
+	ap.Addresses[id] = ar
 
 	return ar, nil
 }
@@ -314,22 +320,19 @@ func (ap *addressPool) newAddressRecord(addr *net.IP) (*addressRecord, error) {
 func (ap *addressPool) requestAddress(address string, options map[string]string) (string, error) {
 	var ar *addressRecord
 
-	ap.as.Lock()
-	defer ap.as.Unlock()
-
 	if address != "" {
 		// Return the specific address requested.
-		ar = ap.addresses[address]
+		ar = ap.Addresses[address]
 		if ar == nil {
 			return "", errAddressNotFound
 		}
-		if ar.inUse {
+		if ar.InUse {
 			return "", errAddressInUse
 		}
 	} else {
 		// Return any available address.
-		for _, ar = range ap.addresses {
-			if !ar.inUse {
+		for _, ar = range ap.Addresses {
+			if !ar.InUse {
 				break
 			}
 		}
@@ -339,12 +342,12 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 		}
 	}
 
-	ar.inUse = true
+	ar.InUse = true
 
 	// Return address in CIDR notation.
 	addr := net.IPNet{
-		IP:   ar.addr,
-		Mask: ap.subnet.Mask,
+		IP:   ar.Addr,
+		Mask: ap.Subnet.Mask,
 	}
 
 	return addr.String(), nil
@@ -352,22 +355,19 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 
 // Releases a previously requested address back to its address pool.
 func (ap *addressPool) releaseAddress(address string) error {
-	ap.as.Lock()
-	defer ap.as.Unlock()
-
-	ar := ap.addresses[address]
+	ar := ap.Addresses[address]
 	if ar == nil {
 		return errAddressNotFound
 	}
-	if !ar.inUse {
+	if !ar.InUse {
 		return errAddressNotInUse
 	}
 
-	ar.inUse = false
+	ar.InUse = false
 
 	// Delete address record if it is no longer available.
 	if ar.epoch < ap.as.epoch {
-		delete(ap.addresses, address)
+		delete(ap.Addresses, address)
 	}
 
 	return nil

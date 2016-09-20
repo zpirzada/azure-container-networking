@@ -10,25 +10,26 @@ import (
 // Null IPAM configuration source.
 type nullSource struct {
 	name        string
-	sink        configSink
+	sink        addressConfigSink
 	initialized bool
 }
 
 // Creates the null source.
-func newNullSource(sink configSink) (*nullSource, error) {
+func newNullSource() (*nullSource, error) {
 	return &nullSource{
 		name: "Null",
-		sink: sink,
 	}, nil
 }
 
 // Starts the null source.
-func (s *nullSource) start() error {
+func (s *nullSource) start(sink addressConfigSink) error {
+	s.sink = sink
 	return nil
 }
 
 // Stops the null source.
 func (s *nullSource) stop() {
+	s.sink = nil
 	return
 }
 
@@ -42,7 +43,7 @@ func (s *nullSource) refresh() error {
 	s.initialized = true
 
 	// Configure the local default address space.
-	local, err := newAddressSpace(localDefaultAddressSpaceId, localScope)
+	local, err := s.sink.newAddressSpace(localDefaultAddressSpaceId, localScope)
 	if err != nil {
 		return err
 	}
