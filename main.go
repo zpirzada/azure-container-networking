@@ -38,31 +38,32 @@ func main() {
 	// Set defaults.
 	logTarget := log.TargetStderr
 
-	// Parse command line arguments.
-	args := os.Args[1:]
+	// Log platform information.
+	common.LogPlatformInfo()
+	common.LogNetworkInterfaces()
 
-	if len(args) == 0 {
-		printHelp()
+	// Create network plugin.
+	netPlugin, err = network.NewPlugin(netPluginName, version)
+	if err != nil {
+		fmt.Printf("Failed to create network plugin %v\n", err)
 		return
 	}
+	config.NetApi = netPlugin
+
+	// Create IPAM plugin.
+	ipamPlugin, err = ipam.NewPlugin(ipamPluginName, version)
+	if err != nil {
+		fmt.Printf("Failed to create IPAM plugin %v\n", err)
+		return
+	}
+
+	// Parse command line arguments.
+	args := os.Args[1:]
 
 	for _, arg := range args {
 		if !strings.HasPrefix(arg, "--") {
 			// Process commands.
 			switch arg {
-			case "net":
-				netPlugin, err = network.NewPlugin(netPluginName, version)
-				if err != nil {
-					fmt.Printf("Failed to create network plugin %v\n", err)
-					return
-				}
-
-			case "ipam":
-				ipamPlugin, err = ipam.NewPlugin(ipamPluginName, version)
-				if err != nil {
-					fmt.Printf("Failed to create IPAM plugin %v\n", err)
-					return
-				}
 
 			default:
 				fmt.Printf("Invalid command: %s\n", arg)

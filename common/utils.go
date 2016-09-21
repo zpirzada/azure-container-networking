@@ -1,7 +1,7 @@
 // Copyright Microsoft Corp.
 // All rights reserved.
 
-package core
+package common
 
 import (
 	"io/ioutil"
@@ -12,32 +12,32 @@ import (
 )
 
 // LogPlatformInfo logs platform version information.
-func logPlatformInfo() {
+func LogPlatformInfo() {
 	info, err := ioutil.ReadFile("/proc/version")
 	if err == nil {
-		log.Printf("[core] Running on %v", string(info))
+		log.Printf("Running on %v", string(info))
 	} else {
-		log.Printf("[core] Failed to detect platform, err:%v", err)
+		log.Printf("Failed to detect platform, err:%v", err)
 	}
 }
 
 // LogNetworkInterfaces logs the host's network interfaces in the default namespace.
-func logNetworkInterfaces() {
+func LogNetworkInterfaces() {
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		log.Printf("[core] Failed to query network interfaces, err:%v", err)
+		log.Printf("Failed to query network interfaces, err:%v", err)
 		return
 	}
 
 	for _, iface := range interfaces {
 		addrs, _ := iface.Addrs()
-		log.Printf("[core] Network interface: %+v with IP addresses: %+v", iface, addrs);
+		log.Printf("Network interface: %+v with IP addresses: %+v", iface, addrs)
 	}
 }
 
 // ExecuteShellCommand executes a shell command.
 func ExecuteShellCommand(command string) error {
-	log.Debugf("[core] %s", command)
+	log.Debugf("[shell] %s", command)
 	cmd := exec.Command("sh", "-c", command)
 	err := cmd.Start()
 	if err != nil {
