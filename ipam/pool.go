@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-
-	"github.com/Azure/Aqua/core"
 )
 
 const (
@@ -30,7 +28,6 @@ type addressPoolId struct {
 
 // Represents a set of non-overlapping address pools.
 type addressSpace struct {
-	am    *addressManager
 	Id    string
 	Scope string
 	Pools map[string]*addressPool
@@ -110,7 +107,6 @@ func (am *addressManager) newAddressSpace(id string, scope string) (*addressSpac
 	}
 
 	return &addressSpace{
-		am:    am,
 		Id:    id,
 		Scope: scope,
 		Pools: make(map[string]*addressPool),
@@ -134,6 +130,11 @@ func (am *addressManager) setAddressSpace(as *addressSpace) error {
 		am.AddrSpaces[as.Id] = as
 	} else {
 		as1.merge(as)
+	}
+
+	// Notify NetPlugin of external interfaces.
+	for _, ap := range as.Pools {
+		am.netApi.AddExternalInterface(ap.IfName, ap.Subnet.String())
 	}
 
 	am.save()
@@ -219,8 +220,6 @@ func (as *addressSpace) newAddressPool(ifName string, priority int, subnet *net.
 	}
 
 	as.Pools[id] = pool
-
-	core.NewExternalInterface(ifName, subnet.String())
 
 	return pool, nil
 }

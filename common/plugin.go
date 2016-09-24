@@ -22,8 +22,9 @@ type Plugin struct {
 
 // Plugin common configuration.
 type PluginConfig struct {
-	ErrChan   chan error
-	Store     store.KeyValueStore
+	NetApi  interface{}
+	ErrChan chan error
+	Store   store.KeyValueStore
 }
 
 // Creates a new Plugin object.

@@ -5,7 +5,6 @@ package network
 
 import (
 	"net/http"
-	"sync"
 
 	"github.com/Azure/Aqua/common"
 	"github.com/Azure/Aqua/log"
@@ -21,12 +20,15 @@ type netPlugin struct {
 	*common.Plugin
 	scope string
 	nm    *networkManager
-	sync.Mutex
 }
 
 type NetPlugin interface {
 	Start(*common.PluginConfig) error
 	Stop()
+}
+
+type NetApi interface {
+	AddExternalInterface(ifName string, subnet string) error
 }
 
 // Creates a new NetPlugin object.
@@ -55,7 +57,14 @@ func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 	// Initialize base plugin.
 	err := plugin.Initialize(config)
 	if err != nil {
-		log.Printf("%s: Failed to initialize base plugin: %v", plugin.Name, err)
+		log.Printf("[net] Failed to initialize base plugin, err:%v.", err)
+		return err
+	}
+
+	// Initialize network manager.
+	err = plugin.nm.Initialize(config)
+	if err != nil {
+		log.Printf("[net] Failed to initialize network manager, err:%v.", err)
 		return err
 	}
 
@@ -70,15 +79,24 @@ func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 	listener.AddHandler(leavePath, plugin.leave)
 	listener.AddHandler(endpointOperInfoPath, plugin.endpointOperInfo)
 
-	log.Printf("%s: Plugin started.", plugin.Name)
+	log.Printf("[net] Plugin started.")
 
 	return nil
 }
 
 // Stops the plugin.
 func (plugin *netPlugin) Stop() {
+	plugin.nm.Uninitialize()
 	plugin.Uninitialize()
-	log.Printf("%s: Plugin stopped.\n", plugin.Name)
+	log.Printf("[net] Plugin stopped.")
+}
+
+//
+// NetPlugin internal API
+//
+
+func (plugin *netPlugin) AddExternalInterface(ifName string, subnet string) error {
+	return plugin.nm.AddExternalInterface(ifName, subnet)
 }
 
 //
@@ -110,10 +128,7 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Process request.
-	plugin.Lock()
-	defer plugin.Unlock()
-
-	_, err = plugin.nm.newNetwork(req.NetworkID, req.Options, req.IPv4Data, req.IPv6Data)
+	err = plugin.nm.CreateNetwork(req.NetworkID, req.Options, req.IPv4Data, req.IPv6Data)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -138,10 +153,7 @@ func (plugin *netPlugin) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Process request.
-	plugin.Lock()
-	defer plugin.Unlock()
-
-	err = plugin.nm.deleteNetwork(req.NetworkID)
+	err = plugin.nm.DeleteNetwork(req.NetworkID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -171,16 +183,7 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 		ipv4Address = req.Interface.Address
 	}
 
-	plugin.Lock()
-	defer plugin.Unlock()
-
-	nw, err := plugin.nm.getNetwork(req.NetworkID)
-	if err != nil {
-		plugin.SendErrorResponse(w, err)
-		return
-	}
-
-	_, err = nw.newEndpoint(req.EndpointID, ipv4Address)
+	err = plugin.nm.CreateEndpoint(req.NetworkID, req.EndpointID, ipv4Address)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -208,16 +211,7 @@ func (plugin *netPlugin) deleteEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Process request.
-	plugin.Lock()
-	defer plugin.Unlock()
-
-	nw, err := plugin.nm.getNetwork(req.NetworkID)
-	if err != nil {
-		plugin.SendErrorResponse(w, err)
-		return
-	}
-
-	err = nw.deleteEndpoint(req.EndpointID)
+	err = plugin.nm.DeleteEndpoint(req.NetworkID, req.EndpointID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -242,16 +236,7 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Process request.
-	plugin.Lock()
-	defer plugin.Unlock()
-
-	ep, err := plugin.nm.getEndpoint(req.NetworkID, req.EndpointID)
-	if err != nil {
-		plugin.SendErrorResponse(w, err)
-		return
-	}
-
-	err = ep.join(req.SandboxKey, req.Options)
+	ep, err := plugin.nm.AttachEndpoint(req.NetworkID, req.EndpointID, req.SandboxKey)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -286,16 +271,7 @@ func (plugin *netPlugin) leave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Process request.
-	plugin.Lock()
-	defer plugin.Unlock()
-
-	ep, err := plugin.nm.getEndpoint(req.NetworkID, req.EndpointID)
-	if err != nil {
-		plugin.SendErrorResponse(w, err)
-		return
-	}
-
-	err = ep.leave()
+	err = plugin.nm.DetachEndpoint(req.NetworkID, req.EndpointID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return

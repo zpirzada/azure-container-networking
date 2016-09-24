@@ -8,6 +8,7 @@ import (
 
 	"github.com/Azure/Aqua/common"
 	"github.com/Azure/Aqua/log"
+	"github.com/Azure/Aqua/network"
 	"github.com/Azure/Aqua/store"
 )
 
@@ -21,6 +22,7 @@ type addressManager struct {
 	AddrSpaces map[string]*addressSpace `json:"AddressSpaces"`
 	store      store.KeyValueStore
 	source     addressConfigSource
+	netApi     network.NetApi
 	sync.Mutex
 }
 
@@ -49,6 +51,7 @@ func newAddressManager() (*addressManager, error) {
 // Initialize configures address manager.
 func (am *addressManager) Initialize(config *common.PluginConfig, sourceType string) error {
 	am.store = config.Store
+	am.netApi = config.NetApi.(network.NetApi)
 
 	// Restore persisted state.
 	err := am.restore()
@@ -82,7 +85,6 @@ func (am *addressManager) restore() error {
 
 	// Populate pointers.
 	for _, as := range am.AddrSpaces {
-		as.am = am
 		for _, ap := range as.Pools {
 			ap.as = as
 		}
@@ -146,6 +148,12 @@ func (am *addressManager) refreshSource() {
 		}
 	}
 }
+
+//
+// AddressManager API
+//
+// Provides atomic stateful wrappers around core IPAM functionality.
+//
 
 // GetDefaultAddressSpaces returns the default local and global address space IDs.
 func (am *addressManager) GetDefaultAddressSpaces() (string, string) {
