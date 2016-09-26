@@ -10,8 +10,11 @@ import (
 	"github.com/Azure/Aqua/log"
 )
 
-// Plugin capabilities.
 const (
+	// Plugin name.
+	name = "ipam"
+
+	// Plugin capabilities.
 	requiresMACAddress = false
 )
 
@@ -29,9 +32,9 @@ type IpamPlugin interface {
 }
 
 // Creates a new IpamPlugin object.
-func NewPlugin(name string, version string) (IpamPlugin, error) {
+func NewPlugin(config *common.PluginConfig) (IpamPlugin, error) {
 	// Setup base plugin.
-	plugin, err := common.NewPlugin(name, version, endpointType)
+	plugin, err := common.NewPlugin(name, config.Version, endpointType)
 	if err != nil {
 		return nil, err
 	}
@@ -53,14 +56,14 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 	// Initialize base plugin.
 	err := plugin.Initialize(config)
 	if err != nil {
-		log.Printf("%s: Failed to initialize base plugin: %v", plugin.Name, err)
+		log.Printf("[ipam] Failed to initialize base plugin, err:%v.", err)
 		return err
 	}
 
 	// Initialize address manager.
 	err = plugin.am.Initialize(config, plugin.GetOption("source"))
 	if err != nil {
-		log.Printf("%s: Failed to initialize address manager: %v", plugin.Name, err)
+		log.Printf("[ipam] Failed to initialize address manager, err:%v.", err)
 		return err
 	}
 
@@ -73,7 +76,7 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 	listener.AddHandler(requestAddressPath, plugin.requestAddress)
 	listener.AddHandler(releaseAddressPath, plugin.releaseAddress)
 
-	log.Printf("%s: Plugin started.", plugin.Name)
+	log.Printf("[ipam] Plugin started.")
 
 	return nil
 }
@@ -82,7 +85,7 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 func (plugin *ipamPlugin) Stop() {
 	plugin.am.Uninitialize()
 	plugin.Uninitialize()
-	log.Printf("%s: Plugin stopped.\n", plugin.Name)
+	log.Printf("[ipam] Plugin stopped.")
 }
 
 //

@@ -22,6 +22,8 @@ type Plugin struct {
 
 // Plugin common configuration.
 type PluginConfig struct {
+	Name    string
+	Version string
 	NetApi  interface{}
 	ErrChan chan error
 	Store   store.KeyValueStore
@@ -41,7 +43,7 @@ func NewPlugin(name, version, endpointType string) (*Plugin, error) {
 func (plugin *Plugin) Initialize(config *PluginConfig) error {
 	var socketName string
 	if plugin.Name != "test" {
-		socketName = plugin.Name
+		socketName = config.Name + plugin.Name
 	}
 
 	// Create the listener.

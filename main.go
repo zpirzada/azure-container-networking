@@ -17,12 +17,13 @@ import (
 	"github.com/Azure/Aqua/store"
 )
 
-// Binary version
-const version = "v0.1"
+const (
+	// Plugin name.
+	name = "azure"
 
-// Libnetwork plugin names
-const netPluginName = "aquanet"
-const ipamPluginName = "aquaipam"
+	// Plugin version.
+	version = "v0.4"
+)
 
 // Prints description and usage information.
 func printHelp() {
@@ -38,20 +39,19 @@ func main() {
 	// Set defaults.
 	logTarget := log.TargetStderr
 
-	// Log platform information.
-	common.LogPlatformInfo()
-	common.LogNetworkInterfaces()
+	// Initialize plugin common configuration.
+	config.Name = name
+	config.Version = version
 
 	// Create network plugin.
-	netPlugin, err = network.NewPlugin(netPluginName, version)
+	netPlugin, err = network.NewPlugin(&config)
 	if err != nil {
 		fmt.Printf("Failed to create network plugin %v\n", err)
 		return
 	}
-	config.NetApi = netPlugin
 
 	// Create IPAM plugin.
-	ipamPlugin, err = ipam.NewPlugin(ipamPluginName, version)
+	ipamPlugin, err = ipam.NewPlugin(&config)
 	if err != nil {
 		fmt.Printf("Failed to create IPAM plugin %v\n", err)
 		return
@@ -108,6 +108,10 @@ func main() {
 		fmt.Printf("Failed to configure logging: %v\n", err)
 		return
 	}
+
+	// Log platform information.
+	common.LogPlatformInfo()
+	common.LogNetworkInterfaces()
 
 	// Start plugins.
 	if netPlugin != nil {
