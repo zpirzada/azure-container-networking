@@ -29,6 +29,8 @@ var (
 	errInvalidConfiguration    = fmt.Errorf("Invalid configuration")
 	errAddressPoolExists       = fmt.Errorf("Address pool already exists")
 	errAddressPoolNotFound     = fmt.Errorf("Address pool not found")
+	errAddressPoolInUse        = fmt.Errorf("Address pool already in use")
+	errAddressPoolNotInUse     = fmt.Errorf("Address pool not in use")
 	errNoAvailableAddressPools = fmt.Errorf("No available address pools")
 	errAddressExists           = fmt.Errorf("Address already exists")
 	errAddressNotFound         = fmt.Errorf("Address not found")

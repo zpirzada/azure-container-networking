@@ -43,8 +43,8 @@ type addressPool struct {
 	Addresses map[string]*addressRecord
 	IsIPv6    bool
 	Priority  int
+	InUse     bool
 	epoch     int
-	ref       int
 }
 
 // Represents an IP address in a pool.
@@ -180,6 +180,7 @@ func (as *addressSpace) merge(newas *addressSpace) {
 	}
 
 	// Cleanup stale pools and addresses from the old epoch.
+	// Those currently in use will be deleted after they are released.
 	for pk, pv := range as.Pools {
 		if pv.epoch < as.epoch {
 			for ak, av := range pv.Addresses {
@@ -188,7 +189,7 @@ func (as *addressSpace) merge(newas *addressSpace) {
 				}
 			}
 
-			if pv.ref == 0 {
+			if !pv.InUse {
 				delete(as.Pools, pk)
 			}
 		}
@@ -244,11 +245,21 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 		if ap == nil {
 			return nil, errAddressPoolNotFound
 		}
+
+		// Fail if requested pool is already in use.
+		if ap.InUse {
+			return nil, errAddressPoolInUse
+		}
 	} else {
 		// Return any available address pool.
 		highestPriority := -1
 
 		for _, pool := range as.Pools {
+			// Skip if pool is already in use.
+			if pool.InUse {
+				continue
+			}
+
 			// Pick a pool from the same address family.
 			if pool.IsIPv6 != v6 {
 				continue
@@ -266,7 +277,7 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 		}
 	}
 
-	ap.ref++
+	ap.InUse = true
 
 	return ap, nil
 }
@@ -278,10 +289,14 @@ func (as *addressSpace) releasePool(poolId string) error {
 		return errAddressPoolNotFound
 	}
 
-	ap.ref--
+	if !ap.InUse {
+		return errAddressPoolNotInUse
+	}
+
+	ap.InUse = false
 
 	// Delete address pool if it is no longer available.
-	if ap.ref == 0 && ap.epoch < as.epoch {
+	if ap.epoch < as.epoch {
 		delete(as.Pools, poolId)
 	}
 
