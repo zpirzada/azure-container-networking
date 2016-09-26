@@ -25,10 +25,7 @@ type ipamPlugin struct {
 }
 
 type IpamPlugin interface {
-	Start(*common.PluginConfig) error
-	Stop()
-
-	SetOption(string, string)
+	common.PluginApi
 }
 
 // Creates a new IpamPlugin object.

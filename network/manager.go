@@ -23,6 +23,11 @@ type networkManager struct {
 	sync.Mutex
 }
 
+// NetworkManager API.
+type NetApi interface {
+	AddExternalInterface(ifName string, subnet string) error
+}
+
 // Creates a new network manager.
 func newNetworkManager() (*networkManager, error) {
 	nm := &networkManager{

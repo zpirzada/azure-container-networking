@@ -26,12 +26,7 @@ type netPlugin struct {
 }
 
 type NetPlugin interface {
-	Start(*common.PluginConfig) error
-	Stop()
-}
-
-type NetApi interface {
-	AddExternalInterface(ifName string, subnet string) error
+	common.PluginApi
 }
 
 // Creates a new NetPlugin object.
@@ -94,14 +89,6 @@ func (plugin *netPlugin) Stop() {
 	plugin.nm.Uninitialize()
 	plugin.Uninitialize()
 	log.Printf("[net] Plugin stopped.")
-}
-
-//
-// NetPlugin internal API
-//
-
-func (plugin *netPlugin) AddExternalInterface(ifName string, subnet string) error {
-	return plugin.nm.AddExternalInterface(ifName, subnet)
 }
 
 //

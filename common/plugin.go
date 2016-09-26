@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/Aqua/store"
 )
 
-// Plugin object and interface
+// Plugin base object.
 type Plugin struct {
 	Name         string
 	Version      string
@@ -18,6 +18,13 @@ type Plugin struct {
 	Options      map[string]string
 	Store        store.KeyValueStore
 	Listener     *Listener
+}
+
+// Plugin base interface.
+type PluginApi interface {
+	Start(*PluginConfig) error
+	Stop()
+	SetOption(string, string)
 }
 
 // Plugin common configuration.
