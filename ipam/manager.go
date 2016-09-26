@@ -51,7 +51,7 @@ func newAddressManager() (*addressManager, error) {
 // Initialize configures address manager.
 func (am *addressManager) Initialize(config *common.PluginConfig, sourceType string) error {
 	am.store = config.Store
-	am.netApi = config.NetApi.(network.NetApi)
+	am.netApi, _ = config.NetApi.(network.NetApi)
 
 	// Restore persisted state.
 	err := am.restore()
@@ -72,6 +72,11 @@ func (am *addressManager) Uninitialize() {
 
 // Restore reads address manager state from persistent store.
 func (am *addressManager) restore() error {
+	// Skip if a store is not provided.
+	if am.store == nil {
+		return nil
+	}
+
 	// Read any persisted state.
 	err := am.store.Read(storeKey, am)
 	if err != nil {
@@ -97,6 +102,11 @@ func (am *addressManager) restore() error {
 
 // Save writes address manager state to persistent store.
 func (am *addressManager) save() error {
+	// Skip if a store is not provided.
+	if am.store == nil {
+		return nil
+	}
+
 	err := am.store.Write(storeKey, am)
 	if err == nil {
 		log.Printf("[ipam] Save succeeded.\n")
