@@ -133,8 +133,10 @@ func (am *addressManager) setAddressSpace(as *addressSpace) error {
 	}
 
 	// Notify NetPlugin of external interfaces.
-	for _, ap := range as.Pools {
-		am.netApi.AddExternalInterface(ap.IfName, ap.Subnet.String())
+	if am.netApi != nil {
+		for _, ap := range as.Pools {
+			am.netApi.AddExternalInterface(ap.IfName, ap.Subnet.String())
+		}
 	}
 
 	am.save()
@@ -207,7 +209,7 @@ func (as *addressSpace) newAddressPool(ifName string, priority int, subnet *net.
 		return pool, errAddressPoolExists
 	}
 
-	v6 := (len(subnet.IP) > net.IPv4len)
+	v6 := (subnet.IP.To4() == nil)
 
 	pool = &addressPool{
 		as:        as,
