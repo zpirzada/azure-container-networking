@@ -14,8 +14,9 @@ const (
 	// Plugin name.
 	name = "ipam"
 
-	// Plugin capabilities.
-	requiresMACAddress = false
+	// Libnetwork IPAM plugin capabilities.
+	requiresMACAddress    = false
+	requiresRequestReplay = false
 )
 
 // IpamPlugin object and interface
@@ -97,7 +98,8 @@ func (plugin *ipamPlugin) getCapabilities(w http.ResponseWriter, r *http.Request
 	log.Request(plugin.Name, &req, nil)
 
 	resp := getCapabilitiesResponse{
-		RequiresMACAddress: requiresMACAddress,
+		RequiresMACAddress:    requiresMACAddress,
+		RequiresRequestReplay: requiresRequestReplay,
 	}
 
 	err := plugin.Listener.Encode(w, &resp)

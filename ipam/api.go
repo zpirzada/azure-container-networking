@@ -45,7 +45,8 @@ type getCapabilitiesRequest struct {
 
 // Response sent by plugin when registering its capabilities with libnetwork.
 type getCapabilitiesResponse struct {
-	RequiresMACAddress bool
+	RequiresMACAddress    bool
+	RequiresRequestReplay bool
 }
 
 // Request sent by libnetwork when querying the default address space names.
