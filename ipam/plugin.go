@@ -10,9 +10,13 @@ import (
 	"github.com/Azure/Aqua/log"
 )
 
-// Plugin capabilities.
 const (
-	requiresMACAddress = false
+	// Plugin name.
+	name = "ipam"
+
+	// Libnetwork IPAM plugin capabilities.
+	requiresMACAddress    = false
+	requiresRequestReplay = false
 )
 
 // IpamPlugin object and interface
@@ -22,16 +26,13 @@ type ipamPlugin struct {
 }
 
 type IpamPlugin interface {
-	Start(*common.PluginConfig) error
-	Stop()
-
-	SetOption(string, string)
+	common.PluginApi
 }
 
 // Creates a new IpamPlugin object.
-func NewPlugin(name string, version string) (IpamPlugin, error) {
+func NewPlugin(config *common.PluginConfig) (IpamPlugin, error) {
 	// Setup base plugin.
-	plugin, err := common.NewPlugin(name, version, endpointType)
+	plugin, err := common.NewPlugin(name, config.Version, endpointType)
 	if err != nil {
 		return nil, err
 	}
@@ -53,14 +54,14 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 	// Initialize base plugin.
 	err := plugin.Initialize(config)
 	if err != nil {
-		log.Printf("%s: Failed to initialize base plugin: %v", plugin.Name, err)
+		log.Printf("[ipam] Failed to initialize base plugin, err:%v.", err)
 		return err
 	}
 
 	// Initialize address manager.
 	err = plugin.am.Initialize(config, plugin.GetOption("source"))
 	if err != nil {
-		log.Printf("%s: Failed to initialize address manager: %v", plugin.Name, err)
+		log.Printf("[ipam] Failed to initialize address manager, err:%v.", err)
 		return err
 	}
 
@@ -73,7 +74,7 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 	listener.AddHandler(requestAddressPath, plugin.requestAddress)
 	listener.AddHandler(releaseAddressPath, plugin.releaseAddress)
 
-	log.Printf("%s: Plugin started.", plugin.Name)
+	log.Printf("[ipam] Plugin started.")
 
 	return nil
 }
@@ -82,7 +83,7 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 func (plugin *ipamPlugin) Stop() {
 	plugin.am.Uninitialize()
 	plugin.Uninitialize()
-	log.Printf("%s: Plugin stopped.\n", plugin.Name)
+	log.Printf("[ipam] Plugin stopped.")
 }
 
 //
@@ -97,7 +98,8 @@ func (plugin *ipamPlugin) getCapabilities(w http.ResponseWriter, r *http.Request
 	log.Request(plugin.Name, &req, nil)
 
 	resp := getCapabilitiesResponse{
-		RequiresMACAddress: requiresMACAddress,
+		RequiresMACAddress:    requiresMACAddress,
+		RequiresRequestReplay: requiresRequestReplay,
 	}
 
 	err := plugin.Listener.Encode(w, &resp)

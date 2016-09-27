@@ -7,32 +7,57 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
+	"github.com/Azure/Aqua/common"
+	"github.com/Azure/Aqua/netlink"
+	driverApi "github.com/docker/libnetwork/driverapi"
 	remoteApi "github.com/docker/libnetwork/drivers/remote/api"
 )
 
 var plugin NetPlugin
 var mux *http.ServeMux
 
+var anyInterface = "test0"
+var anySubnet = "192.168.1.0/24"
+
 // Wraps the test run with plugin setup and teardown.
 func TestMain(m *testing.M) {
+	var config common.PluginConfig
 	var err error
 
 	// Create the plugin.
-	plugin, err = NewPlugin("test", "")
+	plugin, err = NewPlugin(&config)
 	if err != nil {
 		fmt.Printf("Failed to create network plugin %v\n", err)
-		return
+		os.Exit(1)
 	}
 
-	err = plugin.Start(nil)
+	// Configure test mode.
+	plugin.(*netPlugin).Name = "test"
+
+	// Start the plugin.
+	err = plugin.Start(&config)
 	if err != nil {
 		fmt.Printf("Failed to start network plugin %v\n", err)
-		return
+		os.Exit(2)
+	}
+
+	// Create a dummy test network interface.
+	err = netlink.AddLink(anyInterface, "dummy")
+	if err != nil {
+		fmt.Printf("Failed to create test network interface, err:%v.\n", err)
+		os.Exit(3)
+	}
+
+	err = plugin.(*netPlugin).nm.AddExternalInterface(anyInterface, anySubnet)
+	if err != nil {
+		fmt.Printf("Failed to add test network interface, err:%v.\n", err)
+		os.Exit(4)
 	}
 
 	// Get the internal http mux as test hook.
@@ -42,6 +67,7 @@ func TestMain(m *testing.M) {
 	exitCode := m.Run()
 
 	// Cleanup.
+	netlink.DeleteLink(anyInterface)
 	plugin.Stop()
 
 	os.Exit(exitCode)
@@ -116,8 +142,15 @@ func TestCreateNetwork(t *testing.T) {
 	var body bytes.Buffer
 	var resp remoteApi.CreateNetworkResponse
 
+	_, pool, _ := net.ParseCIDR(anySubnet)
+
 	info := &remoteApi.CreateNetworkRequest{
 		NetworkID: "N1",
+		IPv4Data: []driverApi.IPAMData{
+			{
+				Pool: pool,
+			},
+		},
 	}
 
 	json.NewEncoder(&body).Encode(info)

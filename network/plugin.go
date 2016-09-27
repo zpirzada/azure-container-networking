@@ -10,8 +10,11 @@ import (
 	"github.com/Azure/Aqua/log"
 )
 
-// Plugin capabilities.
 const (
+	// Plugin name.
+	name = "net"
+
+	// Plugin capabilities.
 	scope = "local"
 )
 
@@ -23,18 +26,13 @@ type netPlugin struct {
 }
 
 type NetPlugin interface {
-	Start(*common.PluginConfig) error
-	Stop()
-}
-
-type NetApi interface {
-	AddExternalInterface(ifName string, subnet string) error
+	common.PluginApi
 }
 
 // Creates a new NetPlugin object.
-func NewPlugin(name string, version string) (NetPlugin, error) {
+func NewPlugin(config *common.PluginConfig) (NetPlugin, error) {
 	// Setup base plugin.
-	plugin, err := common.NewPlugin(name, version, endpointType)
+	plugin, err := common.NewPlugin(name, config.Version, endpointType)
 	if err != nil {
 		return nil, err
 	}
@@ -44,6 +42,8 @@ func NewPlugin(name string, version string) (NetPlugin, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	config.NetApi = nm
 
 	return &netPlugin{
 		Plugin: plugin,
@@ -89,14 +89,6 @@ func (plugin *netPlugin) Stop() {
 	plugin.nm.Uninitialize()
 	plugin.Uninitialize()
 	log.Printf("[net] Plugin stopped.")
-}
-
-//
-// NetPlugin internal API
-//
-
-func (plugin *netPlugin) AddExternalInterface(ifName string, subnet string) error {
-	return plugin.nm.AddExternalInterface(ifName, subnet)
 }
 
 //

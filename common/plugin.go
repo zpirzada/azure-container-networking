@@ -10,7 +10,7 @@ import (
 	"github.com/Azure/Aqua/store"
 )
 
-// Plugin object and interface
+// Plugin base object.
 type Plugin struct {
 	Name         string
 	Version      string
@@ -20,8 +20,17 @@ type Plugin struct {
 	Listener     *Listener
 }
 
+// Plugin base interface.
+type PluginApi interface {
+	Start(*PluginConfig) error
+	Stop()
+	SetOption(string, string)
+}
+
 // Plugin common configuration.
 type PluginConfig struct {
+	Name    string
+	Version string
 	NetApi  interface{}
 	ErrChan chan error
 	Store   store.KeyValueStore
@@ -41,7 +50,7 @@ func NewPlugin(name, version, endpointType string) (*Plugin, error) {
 func (plugin *Plugin) Initialize(config *PluginConfig) error {
 	var socketName string
 	if plugin.Name != "test" {
-		socketName = plugin.Name
+		socketName = config.Name + plugin.Name
 	}
 
 	// Create the listener.

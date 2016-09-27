@@ -23,6 +23,11 @@ type networkManager struct {
 	sync.Mutex
 }
 
+// NetworkManager API.
+type NetApi interface {
+	AddExternalInterface(ifName string, subnet string) error
+}
+
 // Creates a new network manager.
 func newNetworkManager() (*networkManager, error) {
 	nm := &networkManager{
@@ -47,6 +52,11 @@ func (nm *networkManager) Uninitialize() {
 
 // Restore reads network manager state from persistent store.
 func (nm *networkManager) restore() error {
+	// Skip if a store is not provided.
+	if nm.store == nil {
+		return nil
+	}
+
 	// Read any persisted state.
 	err := nm.store.Read(storeKey, nm)
 	if err != nil {
@@ -73,6 +83,11 @@ func (nm *networkManager) restore() error {
 
 // Save writes network manager state to persistent store.
 func (nm *networkManager) save() error {
+	// Skip if a store is not provided.
+	if nm.store == nil {
+		return nil
+	}
+
 	err := nm.store.Write(storeKey, nm)
 	if err == nil {
 		log.Printf("[net] Save succeeded.\n")
