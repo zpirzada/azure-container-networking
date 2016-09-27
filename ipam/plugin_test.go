@@ -12,10 +12,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+
+	"github.com/Azure/Aqua/common"
 )
 
 var plugin IpamPlugin
 var mux *http.ServeMux
+var sink addressConfigSink
 
 var local *addressSpace
 var global *addressSpace
@@ -25,18 +28,22 @@ var address1 string
 
 // Wraps the test run with plugin setup and teardown.
 func TestMain(m *testing.M) {
+	var config common.PluginConfig
 	var err error
 
 	// Create the plugin.
-	plugin, err = NewPlugin("test", "")
+	plugin, err = NewPlugin(&config)
 	if err != nil {
 		fmt.Printf("Failed to create IPAM plugin %v\n", err)
 		return
 	}
 
-	plugin.SetOption("source", "")
+	// Configure test mode and null config source.
+	plugin.(*ipamPlugin).Name = "test"
+	plugin.SetOption("source", "null")
 
-	err = plugin.Start(nil)
+	// Start the plugin.
+	err = plugin.Start(&config)
 	if err != nil {
 		fmt.Printf("Failed to start IPAM plugin %v\n", err)
 		return
@@ -44,6 +51,10 @@ func TestMain(m *testing.M) {
 
 	// Get the internal http mux as test hook.
 	mux = plugin.(*ipamPlugin).Listener.GetMux()
+
+	// Get the internal config sink interface.
+	sink = plugin.(*ipamPlugin).am
+	plugin.(*ipamPlugin).am.source.refresh()
 
 	// Run tests.
 	exitCode := m.Run()
@@ -122,10 +133,12 @@ func TestGetCapabilities(t *testing.T) {
 func TestAddAddressSpace(t *testing.T) {
 	fmt.Println("Test: AddAddressSpace")
 
+	var anyInterface = "any"
+	var anyPriority = 42
 	var err error
 
 	// Configure the local default address space.
-	local, err = newAddressSpace(localDefaultAddressSpaceId, localScope)
+	local, err = sink.newAddressSpace(localDefaultAddressSpaceId, localScope)
 	if err != nil {
 		t.Errorf("newAddressSpace failed %+v", err)
 		return
@@ -137,7 +150,7 @@ func TestAddAddressSpace(t *testing.T) {
 		IP:   net.IPv4(192, 168, 1, 0),
 		Mask: net.IPv4Mask(255, 255, 255, 0),
 	}
-	ap, err := local.newAddressPool(&subnet)
+	ap, err := local.newAddressPool(anyInterface, anyPriority, &subnet)
 	ap.newAddressRecord(&addr1)
 	ap.newAddressRecord(&addr2)
 
@@ -146,19 +159,19 @@ func TestAddAddressSpace(t *testing.T) {
 		IP:   net.IPv4(192, 168, 2, 0),
 		Mask: net.IPv4Mask(255, 255, 255, 0),
 	}
-	ap, err = local.newAddressPool(&subnet)
+	ap, err = local.newAddressPool(anyInterface, anyPriority, &subnet)
 	ap.newAddressRecord(&addr1)
 
-	plugin.setAddressSpace(local)
+	sink.setAddressSpace(local)
 
 	// Configure the global default address space.
-	global, err = newAddressSpace(globalDefaultAddressSpaceId, globalScope)
+	global, err = sink.newAddressSpace(globalDefaultAddressSpaceId, globalScope)
 	if err != nil {
 		t.Errorf("newAddressSpace failed %+v", err)
 		return
 	}
 
-	plugin.setAddressSpace(global)
+	sink.setAddressSpace(global)
 }
 
 // Tests IpamDriver.GetDefaultAddressSpaces functionality.
@@ -243,7 +256,8 @@ func TestRequestAddress(t *testing.T) {
 		t.Errorf("RequestAddress response is invalid %+v", resp)
 	}
 
-	address1 = resp.Address
+	address, _, _ := net.ParseCIDR(resp.Address)
+	address1 = address.String()
 }
 
 // Tests IpamDriver.ReleaseAddress functionality.
