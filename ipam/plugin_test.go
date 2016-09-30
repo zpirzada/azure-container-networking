@@ -38,9 +38,8 @@ func TestMain(m *testing.M) {
 		return
 	}
 
-	// Configure test mode and null config source.
+	// Configure test mode.
 	plugin.(*ipamPlugin).Name = "test"
-	plugin.SetOption("source", "null")
 
 	// Start the plugin.
 	err = plugin.Start(&config)
@@ -54,7 +53,6 @@ func TestMain(m *testing.M) {
 
 	// Get the internal config sink interface.
 	sink = plugin.(*ipamPlugin).am
-	plugin.(*ipamPlugin).am.source.refresh()
 
 	// Run tests.
 	exitCode := m.Run()

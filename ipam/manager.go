@@ -49,7 +49,7 @@ func newAddressManager() (*addressManager, error) {
 }
 
 // Initialize configures address manager.
-func (am *addressManager) Initialize(config *common.PluginConfig, sourceType string) error {
+func (am *addressManager) Initialize(config *common.PluginConfig, environment string) error {
 	am.store = config.Store
 	am.netApi, _ = config.NetApi.(network.NetApi)
 
@@ -60,7 +60,7 @@ func (am *addressManager) Initialize(config *common.PluginConfig, sourceType str
 	}
 
 	// Start source.
-	err = am.startSource(sourceType)
+	err = am.startSource(environment)
 
 	return err
 }
@@ -117,18 +117,21 @@ func (am *addressManager) save() error {
 }
 
 // Starts configuration source.
-func (am *addressManager) startSource(sourceType string) error {
+func (am *addressManager) startSource(environment string) error {
 	var err error
 
-	switch sourceType {
-	case "azure", "":
+	switch environment {
+	case common.OptEnvironmentAzure:
 		am.source, err = newAzureSource()
 
-	case "mas":
+	case common.OptEnvironmentMAS:
 		am.source, err = newMasSource()
 
 	case "null":
 		am.source, err = newNullSource()
+
+	case "":
+		am.source = nil
 
 	default:
 		return errInvalidConfiguration

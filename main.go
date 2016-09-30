@@ -22,12 +22,19 @@ const (
 	name = "azure"
 
 	// Plugin version.
-	version = "v0.4"
+	version = "0.4"
 )
 
 // Prints description and usage information.
 func printHelp() {
-	fmt.Println("Usage: aqua [net] [ipam]")
+	fmt.Printf("Azure container networking plugin\n")
+	fmt.Printf("Version %v\n\n", version)
+	fmt.Printf("Usage: aqua [OPTIONS]\n\n")
+	fmt.Printf("Options:\n")
+	fmt.Printf("  -e, --environment={azure|mas}         Set the operating environment.\n")
+	fmt.Printf("  -l, --log-level={info|debug}          Set the logging level.\n")
+	fmt.Printf("  -t, --log-target={syslog|stderr}      Set the logging target.\n")
+	fmt.Printf("  -?, --help                            Print usage and version information.\n\n")
 }
 
 func main() {
@@ -37,6 +44,8 @@ func main() {
 	var err error
 
 	// Set defaults.
+	environment := common.OptEnvironmentAzure
+	logLevel := log.LevelInfo
 	logTarget := log.TargetStderr
 
 	// Initialize plugin common configuration.
@@ -61,7 +70,7 @@ func main() {
 	args := os.Args[1:]
 
 	for _, arg := range args {
-		if !strings.HasPrefix(arg, "--") {
+		if !strings.HasPrefix(arg, "-") {
 			// Process commands.
 			switch arg {
 
@@ -71,22 +80,45 @@ func main() {
 				return
 			}
 		} else {
-			// Process options of format "--obj-option=value".
-			obj := strings.SplitN(arg[2:], "-", 2)
-			opt := strings.SplitN(obj[1], "=", 2)
+			// Process options of format "--key=value".
+			arg = strings.TrimLeft(arg, "-")
+			opt := strings.SplitN(arg, "=", 2)
+			if len(opt) == 1 {
+				opt = append(opt, "")
+			}
 
-			switch obj[0] {
-			case "ipam":
-				ipamPlugin.SetOption(opt[0], opt[1])
+			switch opt[0] {
+			case common.OptEnvironmentKey, common.OptEnvironmentKeyShort:
+				environment = opt[1]
 
-			case "log":
-				if opt[0] == "target" && opt[1] == "syslog" {
-					logTarget = log.TargetSyslog
+			case common.OptLogLevelKey, common.OptLogLevelKeyShort:
+				switch opt[1] {
+				case common.OptLogLevelInfo:
+					logLevel = log.LevelInfo
+				case common.OptLogLevelDebug:
+					logLevel = log.LevelDebug
+				default:
+					fmt.Printf("Invalid option: %v\nSee --help.\n", arg)
+					return
 				}
 
-			default:
-				fmt.Printf("Invalid option: %v\n", arg)
+			case common.OptLogTargetKey, common.OptLogTargetKeyShort:
+				switch opt[1] {
+				case common.OptLogTargetStderr:
+					logTarget = log.TargetStderr
+				case common.OptLogTargetSyslog:
+					logTarget = log.TargetSyslog
+				default:
+					fmt.Printf("Invalid option: %v\nSee --help.\n", arg)
+					return
+				}
+
+			case common.OptHelpKey, common.OptHelpKeyShort:
 				printHelp()
+				return
+
+			default:
+				fmt.Printf("Invalid option: %v\nSee --help.\n", arg)
 				return
 			}
 		}
@@ -103,6 +135,7 @@ func main() {
 	}
 
 	// Create logging provider.
+	log.SetLevel(logLevel)
 	err = log.SetTarget(logTarget)
 	if err != nil {
 		fmt.Printf("Failed to configure logging: %v\n", err)
@@ -112,6 +145,9 @@ func main() {
 	// Log platform information.
 	common.LogPlatformInfo()
 	common.LogNetworkInterfaces()
+
+	// Set plugin options.
+	ipamPlugin.SetOption(common.OptEnvironmentKey, environment)
 
 	// Start plugins.
 	if netPlugin != nil {
