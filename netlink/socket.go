@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/Azure/Aqua/log"
+	"github.com/Azure/azure-container-networking/log"
 	"golang.org/x/sys/unix"
 )
 

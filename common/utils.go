@@ -8,7 +8,7 @@ import (
 	"net"
 	"os/exec"
 
-	"github.com/Azure/Aqua/log"
+	"github.com/Azure/azure-container-networking/log"
 )
 
 // LogPlatformInfo logs platform version information.

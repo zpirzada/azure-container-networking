@@ -6,8 +6,8 @@ package common
 import (
 	"net/http"
 
-	"github.com/Azure/Aqua/log"
-	"github.com/Azure/Aqua/store"
+	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/store"
 )
 
 // Plugin base object.

@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/Azure/Aqua/log"
+	"github.com/Azure/azure-container-networking/log"
 )
 
 // Init initializes the ebtables module.

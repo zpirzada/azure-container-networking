@@ -13,8 +13,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Azure/Aqua/common"
-	"github.com/Azure/Aqua/netlink"
+	"github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/netlink"
 	driverApi "github.com/docker/libnetwork/driverapi"
 	remoteApi "github.com/docker/libnetwork/drivers/remote/api"
 )
