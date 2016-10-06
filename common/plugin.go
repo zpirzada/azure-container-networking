@@ -32,6 +32,7 @@ type PluginConfig struct {
 	Name    string
 	Version string
 	NetApi  interface{}
+	IpamApi interface{}
 	ErrChan chan error
 	Store   store.KeyValueStore
 }
