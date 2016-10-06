@@ -6,8 +6,8 @@ package ipam
 import (
 	"net/http"
 
-	"github.com/Azure/Aqua/common"
-	"github.com/Azure/Aqua/log"
+	"github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/log"
 )
 
 const (

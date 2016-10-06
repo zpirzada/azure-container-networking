@@ -6,10 +6,10 @@ package ipam
 import (
 	"sync"
 
-	"github.com/Azure/Aqua/common"
-	"github.com/Azure/Aqua/log"
-	"github.com/Azure/Aqua/network"
-	"github.com/Azure/Aqua/store"
+	"github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/network"
+	"github.com/Azure/azure-container-networking/store"
 )
 
 const (

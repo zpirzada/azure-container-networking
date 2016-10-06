@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/Azure/Aqua/ebtables"
-	"github.com/Azure/Aqua/log"
-	"github.com/Azure/Aqua/netlink"
+	"github.com/Azure/azure-container-networking/ebtables"
+	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/netlink"
 	"golang.org/x/sys/unix"
 )
 

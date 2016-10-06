@@ -13,7 +13,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Azure/Aqua/common"
+	"github.com/Azure/azure-container-networking/common"
 )
 
 var plugin IpamPlugin
