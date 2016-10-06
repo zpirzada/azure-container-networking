@@ -20,10 +20,10 @@ import (
 const (
 	// Plugin name.
 	name = "azure"
-
-	// Plugin version.
-	version = "0.4"
 )
+
+// Version is populated by make during build.
+var version string
 
 // Prints description and usage information.
 func printHelp() {
