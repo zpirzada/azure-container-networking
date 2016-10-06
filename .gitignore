@@ -1,6 +1,7 @@
 # Binaries
-Aqua
+azure-cnm-plugin
+azure-cni-plugin
 
 # Artifacts
-aqua.json
+azure-*.json
 ipam-*.xml
