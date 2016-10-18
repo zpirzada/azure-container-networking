@@ -59,10 +59,11 @@ var args = common.ArgumentList{
 		Shorthand:    "t",
 		Description:  "Set the logging target",
 		Type:         "int",
-		DefaultValue: "stderr",
+		DefaultValue: "logfile",
 		ValueMap: map[string]interface{}{
-			"syslog": log.TargetSyslog,
-			"stderr": log.TargetStderr,
+			"syslog":  log.TargetSyslog,
+			"stderr":  log.TargetStderr,
+			"logfile": log.TargetLogfile,
 		},
 	},
 	{
