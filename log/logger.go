@@ -24,12 +24,16 @@ const (
 const (
 	TargetStderr = iota
 	TargetSyslog
-	TargetFile
+	TargetLogfile
 )
+
+// Log path and file
+const logFile = "/var/log/azure-container-networking.log"
+const logFilePerm = os.FileMode(0664)
 
 // Log prefix
 const logPrefix = ""
-const syslogTag = "AQUA"
+const syslogTag = "AzureContainerNet"
 
 // Logger object
 type Logger struct {
@@ -57,6 +61,8 @@ func (logger *Logger) SetTarget(target int) error {
 		out = os.Stderr
 	case TargetSyslog:
 		out, err = syslog.New(log.LstdFlags, syslogTag)
+	case TargetLogfile:
+		out, err = os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, logFilePerm)
 	default:
 		err = fmt.Errorf("Invalid log target %d", target)
 	}
