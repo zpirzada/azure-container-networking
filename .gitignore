@@ -1,4 +1,5 @@
 # Binaries
+out/*
 azure-cnm-plugin
 azure-cni-plugin
 

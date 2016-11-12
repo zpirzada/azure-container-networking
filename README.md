@@ -1,13 +1,36 @@
 ## Overview
-Aqua is a libnetwork plugin for containers running on Microsoft Azure. It enables containers to take advantage of Microsoft Azure SDN capabilities.
+This repository contains plugins and tools for container networking in Azure:
+* A [libnetwork (CNM) plugin](https://github.com/docker/libnetwork/blob/master/docs/remote.md) for Docker containers on Microsoft Azure. The plugin connects containers to Azure's [VNET](link), to take advantage of SDN capabilities.
+* A [CNI plugin](https://github.com/containernetworking/cni/blob/master/SPEC.md) for Kubernetes and Mesos on Azure.
 
-Note this plugin is still in development and will change based on feedback.
+We welcome your feedback!
 
 ## Setup
-Download the latest stable release from Docker plugin store.
+Download the latest official stable release from Docker plugin store.
 ```bash
-$ docker plugin pull azure/aqua
+$ docker plugin pull azure/azure-cnm-plugin
 ```
+
+## Build
+If you want the very latest version, you can also build plugins directly from this repo.
+
+Clone the azure-container-networking repo:
+```bash
+$ git clone https://github/com/Azure/azure-container-networking
+$ cd azure-container-networking
+```
+
+Build the plugin for your environment. For Docker:
+```bash
+$ make azure-cnm-plugin
+```
+
+For Kubernetes and Mesos:
+```bash
+$ make azure-cni-plugin
+```
+
+The plugin is placed in the azure-container-networking/out directory.
 
 ## Supported Environments
 [Microsoft Azure](https://azure.microsoft.com)<br>
@@ -15,7 +38,7 @@ $ docker plugin pull azure/aqua
 
 ## Usage
 ```bash
-Usage: aqua [OPTIONS]
+Usage: azure-cnm-plugin [OPTIONS]
 
 Options:
   -e, --environment={azure|mas}         Set the operating environment.
