@@ -12,9 +12,13 @@ type KeyValueStore interface {
 	Read(key string, value interface{}) error
 	Write(key string, value interface{}) error
 	Flush() error
+	Lock() error
+	Unlock() error
 }
 
 var (
 	// Errors returned by KeyValueStore methods.
-	ErrKeyNotFound = fmt.Errorf("Key not found")
+	ErrKeyNotFound    = fmt.Errorf("Key not found")
+	ErrStoreLocked    = fmt.Errorf("Store is locked")
+	ErrStoreNotLocked = fmt.Errorf("Store is not locked")
 )
