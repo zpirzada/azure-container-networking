@@ -83,6 +83,33 @@ func DeleteLink(name string) error {
 	return s.sendAndWaitForAck(req)
 }
 
+// Sets the name of a network interface.
+func SetLinkName(name string, newName string) error {
+	s, err := getSocket()
+	if err != nil {
+		return err
+	}
+
+	iface, err := net.InterfaceByName(name)
+	if err != nil {
+		return err
+	}
+
+	req := newRequest(unix.RTM_SETLINK, unix.NLM_F_ACK)
+
+	ifInfo := newIfInfoMsg()
+	ifInfo.Type = unix.RTM_SETLINK
+	ifInfo.Index = int32(iface.Index)
+	ifInfo.Flags = unix.NLM_F_REQUEST
+	ifInfo.Change = DEFAULT_CHANGE
+	req.addPayload(ifInfo)
+
+	attrName := newAttributeString(unix.IFLA_IFNAME, newName)
+	req.addPayload(attrName)
+
+	return s.sendAndWaitForAck(req)
+}
+
 // Sets the operational state of a network interface.
 func SetLinkState(name string, up bool) error {
 	s, err := getSocket()
@@ -146,6 +173,33 @@ func SetLinkMaster(name string, master string) error {
 
 	attrMaster := newAttributeUint32(unix.IFLA_MASTER, masterIndex)
 	req.addPayload(attrMaster)
+
+	return s.sendAndWaitForAck(req)
+}
+
+// Sets the network namespace of a network interface.
+func SetLinkNetNs(name string, fd uintptr) error {
+	s, err := getSocket()
+	if err != nil {
+		return err
+	}
+
+	iface, err := net.InterfaceByName(name)
+	if err != nil {
+		return err
+	}
+
+	req := newRequest(unix.RTM_SETLINK, unix.NLM_F_ACK)
+
+	ifInfo := newIfInfoMsg()
+	ifInfo.Type = unix.RTM_SETLINK
+	ifInfo.Index = int32(iface.Index)
+	ifInfo.Flags = unix.NLM_F_REQUEST
+	ifInfo.Change = DEFAULT_CHANGE
+	req.addPayload(ifInfo)
+
+	attrNetNs := newAttributeUint32(IFLA_NET_NS_FD, uint32(fd))
+	req.addPayload(attrNetNs)
 
 	return s.sendAndWaitForAck(req)
 }
