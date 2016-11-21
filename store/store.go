@@ -12,7 +12,7 @@ type KeyValueStore interface {
 	Read(key string, value interface{}) error
 	Write(key string, value interface{}) error
 	Flush() error
-	Lock() error
+	Lock(block bool) error
 	Unlock() error
 }
 

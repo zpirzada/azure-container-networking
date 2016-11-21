@@ -160,7 +160,7 @@ func TestLockingStoreGivesExclusiveAccess(t *testing.T) {
 	}
 
 	// Lock for exclusive access.
-	err = kvs.Lock()
+	err = kvs.Lock(false)
 	if err != nil {
 		t.Errorf("Failed to lock store: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestLockingStoreGivesExclusiveAccess(t *testing.T) {
 
 	// Try locking the second store.
 	// This should fail because the first store has exclusive access.
-	err = kvs2.Lock()
+	err = kvs2.Lock(false)
 	if err == nil {
 		t.Errorf("Locking an already-locked store succeeded: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestLockingStoreGivesExclusiveAccess(t *testing.T) {
 
 	// Try locking the second store again.
 	// This should succeed because the first store revoked exclusive access.
-	err = kvs2.Lock()
+	err = kvs2.Lock(false)
 	if err != nil {
 		t.Errorf("Failed to re-lock an unlocked store: %v", err)
 	}
