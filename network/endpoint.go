@@ -44,8 +44,11 @@ type EndpointInfo struct {
 // NewEndpoint creates a new endpoint in the network.
 func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	var containerIf *net.Interface
+	var ns *Namespace
 	var ep *endpoint
 	var err error
+
+	log.Printf("[net] Creating endpoint %v in network %v.", epInfo.Id, nw.Id)
 
 	if nw.Endpoints[epInfo.Id] != nil {
 		return nil, errEndpointExists
@@ -58,8 +61,6 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 		return nil, err
 	}
 
-	log.Printf("[net] Creating endpoint %v in network %v.", epInfo.Id, nw.Id)
-
 	// Create a veth pair.
 	hostIfName := fmt.Sprintf("%s%s", hostInterfacePrefix, epInfo.Id[:7])
 	contIfName := fmt.Sprintf("%s%s-2", hostInterfacePrefix, epInfo.Id[:7])
@@ -67,6 +68,7 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	log.Printf("[net] Creating veth pair %v %v.", hostIfName, contIfName)
 	err = netlink.AddVethPair(contIfName, hostIfName)
 	if err != nil {
+		log.Printf("[net] Failed to create veth pair, err:%v.", err)
 		return nil, err
 	}
 
@@ -105,6 +107,31 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 		goto cleanup
 	}
 
+	// If a network namespace for the container interface is specified...
+	if epInfo.NetNsPath != "" {
+		// Open the network namespace.
+		log.Printf("[net] Opening netns %v.", epInfo.NetNsPath)
+		ns, err = OpenNamespace(epInfo.NetNsPath)
+		if err != nil {
+			goto cleanup
+		}
+		defer ns.Close()
+
+		// Move the container interface to container's network namespace.
+		log.Printf("[net] Setting link %v netns %v.", contIfName, epInfo.NetNsPath)
+		err = netlink.SetLinkNetNs(contIfName, ns.GetFd())
+		if err != nil {
+			goto cleanup
+		}
+
+		// Enter the container network namespace.
+		log.Printf("[net] Entering netns %v.", epInfo.NetNsPath)
+		err = ns.Enter()
+		if err != nil {
+			goto cleanup
+		}
+	}
+
 	// If a name for the container interface is specified...
 	if epInfo.IfName != "" {
 		// Interface needs to be down before renaming.
@@ -135,6 +162,16 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	err = netlink.AddIpAddress(contIfName, ipAddr, ipNet)
 	if err != nil {
 		goto cleanup
+	}
+
+	// If inside the container network namespace...
+	if ns != nil {
+		// Return to host network namespace.
+		log.Printf("[net] Exiting netns %v.", epInfo.NetNsPath)
+		err = ns.Exit()
+		if err != nil {
+			goto cleanup
+		}
 	}
 
 	// Create the endpoint object.
