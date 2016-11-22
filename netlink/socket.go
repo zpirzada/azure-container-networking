@@ -24,20 +24,35 @@ type socket struct {
 
 // Default netlink socket.
 var s *socket
-var once sync.Once
+var m sync.Mutex
 
 // Returns a reference to the default netlink socket.
 func getSocket() (*socket, error) {
 	var err error
-	once.Do(func() { s, err = newSocket() })
+
+	m.Lock()
+	defer m.Unlock()
+
+	if s == nil {
+		s, err = newSocket()
+	}
+
 	return s, err
+}
+
+// ResetSocket deletes the default netlink socket.
+func ResetSocket() {
+	m.Lock()
+	defer m.Unlock()
+
+	s = nil
 }
 
 // Creates a new netlink socket object.
 func newSocket() (*socket, error) {
 	fd, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW, unix.NETLINK_ROUTE)
-	defer log.Debugf("[netlink] Socket created, err=%v\n", err)
 	if err != nil {
+		log.Debugf("[netlink] Failed to create socket, err=%v\n", err)
 		return nil, err
 	}
 
@@ -52,9 +67,11 @@ func newSocket() (*socket, error) {
 	err = unix.Bind(fd, &s.sa)
 	if err != nil {
 		unix.Close(fd)
+		log.Debugf("[netlink] Failed to bind socket, err=%v\n", err)
 		return nil, err
 	}
 
+	log.Debugf("[netlink] Socket created.\n")
 	return s, nil
 }
 

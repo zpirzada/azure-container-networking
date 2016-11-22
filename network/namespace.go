@@ -8,6 +8,8 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/Azure/azure-container-networking/netlink"
+
 	"golang.org/x/sys/unix"
 )
 
@@ -81,6 +83,9 @@ func (ns *Namespace) Enter() error {
 		return err
 	}
 
+	// Recycle the netlink socket for the new network namespace.
+	netlink.ResetSocket()
+
 	return nil
 }
 
@@ -95,6 +100,9 @@ func (ns *Namespace) Exit() error {
 	ns.prevNs = nil
 
 	runtime.UnlockOSThread()
+
+	// Recycle the netlink socket for the new network namespace.
+	netlink.ResetSocket()
 
 	return nil
 }
