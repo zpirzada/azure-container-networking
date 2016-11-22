@@ -21,9 +21,9 @@ const (
 
 // Represents the key to an address pool.
 type addressPoolId struct {
-	asId        string
-	subnet      string
-	childSubnet string
+	AsId        string
+	Subnet      string
+	ChildSubnet string
 }
 
 // Represents a set of non-overlapping address pools.
@@ -59,16 +59,16 @@ type addressRecord struct {
 //
 
 // Creates a new address pool ID object.
-func newAddressPoolId(asId string, subnet string, childSubnet string) *addressPoolId {
+func NewAddressPoolId(asId string, subnet string, childSubnet string) *addressPoolId {
 	return &addressPoolId{
-		asId:        asId,
-		subnet:      subnet,
-		childSubnet: childSubnet,
+		AsId:        asId,
+		Subnet:      subnet,
+		ChildSubnet: childSubnet,
 	}
 }
 
 // Creates a new pool ID from a string representation.
-func newAddressPoolIdFromString(s string) (*addressPoolId, error) {
+func NewAddressPoolIdFromString(s string) (*addressPoolId, error) {
 	var pid addressPoolId
 
 	p := strings.Split(s, "|")
@@ -76,12 +76,12 @@ func newAddressPoolIdFromString(s string) (*addressPoolId, error) {
 		return nil, errInvalidPoolId
 	}
 
-	pid.asId = p[0]
+	pid.AsId = p[0]
 	if len(p) >= 2 {
-		pid.subnet = p[1]
+		pid.Subnet = p[1]
 	}
 	if len(p) == 3 {
-		pid.childSubnet = p[2]
+		pid.ChildSubnet = p[2]
 	}
 
 	return &pid, nil
@@ -89,9 +89,9 @@ func newAddressPoolIdFromString(s string) (*addressPoolId, error) {
 
 // Returns the string representation of a pool ID.
 func (pid *addressPoolId) String() string {
-	s := fmt.Sprintf("%s|%s", pid.asId, pid.subnet)
-	if pid.childSubnet != "" {
-		s = fmt.Sprintf("%s|%s", s, pid.childSubnet)
+	s := fmt.Sprintf("%s|%s", pid.AsId, pid.Subnet)
+	if pid.ChildSubnet != "" {
+		s = fmt.Sprintf("%s|%s", s, pid.ChildSubnet)
 	}
 	return s
 }
