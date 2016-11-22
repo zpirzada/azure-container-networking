@@ -9,6 +9,10 @@ SOURCEFILES = \
 	$(wildcard network/*.go) \
 	$(wildcard store/*.go)
 
+CNIDIR = cni
+
+CNMDIR = cnm
+
 OUTPUTDIR = out
 
 VERSION ?= $(shell git describe --tags --always --dirty)
@@ -26,11 +30,11 @@ clean:
 
 # Build the Azure CNM plugin.
 $(OUTPUTDIR)/azure-cnm-plugin: $(SOURCEFILES)
-	go build -v -o $(OUTPUTDIR)/azure-cnm-plugin -ldflags "-X main.version=$(VERSION) -s -w" cnm/cnm.go
+	go build -v -o $(OUTPUTDIR)/azure-cnm-plugin -ldflags "-X main.version=$(VERSION) -s -w" $(CNMDIR)/*.go
 
 # Build the Azure CNI plugin.
 $(OUTPUTDIR)/azure-cni-plugin: $(SOURCEFILES)
-	go build -v -o $(OUTPUTDIR)/azure-cni-plugin -ldflags "-X main.version=$(VERSION) -s -w" cni/cni.go
+	go build -v -o $(OUTPUTDIR)/azure-cni-plugin -ldflags "-X main.version=$(VERSION) -s -w" $(CNIDIR)/*.go
 
 install:
 	go install github.com/Azure/azure-container-networking/cnm
