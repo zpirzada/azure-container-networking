@@ -56,29 +56,33 @@ func (nw *network) newEndpoint(endpointId string, ipAddress string) (*endpoint, 
 	hostIfName := fmt.Sprintf("%s%s", hostInterfacePrefix, endpointId[:7])
 	contIfName := fmt.Sprintf("%s%s-2", hostInterfacePrefix, endpointId[:7])
 
+	log.Printf("[net] Creating veth pair %v %v.", hostIfName, contIfName)
 	err = netlink.AddVethPair(contIfName, hostIfName)
 	if err != nil {
-		log.Printf("[net] Failed to create veth pair, err:%v.", err)
 		return nil, err
 	}
 
-	// Assign IP address to container network interface.
-	err = netlink.AddIpAddress(contIfName, ipAddr, ipNet)
-	if err != nil {
-		goto cleanup
-	}
+	//
+	// Host network interface setup.
+	//
 
 	// Host interface up.
+	log.Printf("[net] Setting link %v state up.", hostIfName)
 	err = netlink.SetLinkState(hostIfName, true)
 	if err != nil {
 		goto cleanup
 	}
 
 	// Connect host interface to the bridge.
+	log.Printf("[net] Setting link %v master %v.", hostIfName, nw.extIf.BridgeName)
 	err = netlink.SetLinkMaster(hostIfName, nw.extIf.BridgeName)
 	if err != nil {
 		goto cleanup
 	}
+
+	//
+	// Container network interface setup.
+	//
 
 	// Query container network interface info.
 	containerIf, err = net.InterfaceByName(contIfName)
@@ -87,7 +91,15 @@ func (nw *network) newEndpoint(endpointId string, ipAddress string) (*endpoint, 
 	}
 
 	// Setup MAC address translation rules for container interface.
+	log.Printf("[net] Setting up MAC address translation rules for endpoint %v.", contIfName)
 	err = ebtables.SetupDnatBasedOnIPV4Address(ipAddr.String(), containerIf.HardwareAddr.String())
+	if err != nil {
+		goto cleanup
+	}
+
+	// Assign IP address to container network interface.
+	log.Printf("[net] Adding IP address %v to link %v.", ipAddr, contIfName)
+	err = netlink.AddIpAddress(contIfName, ipAddr, ipNet)
 	if err != nil {
 		goto cleanup
 	}
@@ -111,6 +123,8 @@ func (nw *network) newEndpoint(endpointId string, ipAddress string) (*endpoint, 
 	return ep, nil
 
 cleanup:
+	log.Printf("[net] Creating endpoint %v failed, err:%v.", contIfName, err)
+
 	// Roll back the changes for the endpoint.
 	netlink.DeleteLink(contIfName)
 

@@ -15,7 +15,7 @@ import (
 
 const (
 	// Prefix for bridge names.
-	bridgePrefix = "aqua"
+	bridgePrefix = "azure"
 )
 
 // ExternalInterface represents a host network interface that bridges containers to external networks.
@@ -104,10 +104,13 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface) err
 		return err
 	}
 
-	// Create the bridge.
 	bridgeName := fmt.Sprintf("%s%d", bridgePrefix, hostIf.Index)
+
+	// Check if the bridge already exists.
 	bridge, err := net.InterfaceByName(bridgeName)
 	if err != nil {
+		// Create the bridge.
+		log.Printf("[net] Creating bridge %v.", bridgeName)
 		err = netlink.AddLink(bridgeName, "bridge")
 		if err != nil {
 			return err
@@ -117,6 +120,9 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface) err
 		if err != nil {
 			goto cleanup
 		}
+	} else {
+		// Use the existing bridge.
+		log.Printf("[net] Found existing bridge %v.", bridgeName)
 	}
 
 	// Query the default routes on the external interface.
@@ -154,6 +160,7 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface) err
 	}
 
 	// Setup MAC address translation rules for external interface.
+	log.Printf("[net] Setting up MAC address translation rules for %v.", hostIf.Name)
 	err = ebtables.SetupSnatForOutgoingPackets(hostIf.Name, hostIf.HardwareAddr.String())
 	if err != nil {
 		goto cleanup
@@ -165,24 +172,28 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface) err
 	}
 
 	// External interface down.
+	log.Printf("[net] Setting link %v state down.", hostIf.Name)
 	err = netlink.SetLinkState(hostIf.Name, false)
 	if err != nil {
 		goto cleanup
 	}
 
 	// Connect the external interface to the bridge.
+	log.Printf("[net] Setting link %v master %v.", hostIf.Name, bridgeName)
 	err = netlink.SetLinkMaster(hostIf.Name, bridgeName)
 	if err != nil {
 		goto cleanup
 	}
 
 	// External interface up.
+	log.Printf("[net] Setting link %v state up.", hostIf.Name)
 	err = netlink.SetLinkState(hostIf.Name, true)
 	if err != nil {
 		goto cleanup
 	}
 
 	// Bridge up.
+	log.Printf("[net] Setting link %v state up.", bridgeName)
 	err = netlink.SetLinkState(bridgeName, true)
 	if err != nil {
 		goto cleanup
@@ -199,15 +210,13 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface) err
 		}
 
 		route.LinkIndex = bridge.Index
+		log.Printf("[net] Adding IP route %+v.", route)
 		err = netlink.AddIpRoute(route)
 		route.LinkIndex = hostIf.Index
 
 		if err != nil {
-			log.Printf("[net] Failed to add route %+v, err:%v.", route, err)
 			goto cleanup
 		}
-
-		log.Printf("[net] Added IP route %+v.", route)
 	}
 
 	extIf.BridgeName = bridgeName
@@ -217,6 +226,8 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface) err
 	return nil
 
 cleanup:
+	log.Printf("[net] Connecting interface %v failed, err:%v.", extIf.Name, err)
+
 	// Roll back the changes for the network.
 	ebtables.CleanupDnatForArpReplies(extIf.Name)
 	ebtables.CleanupSnatForOutgoingPackets(extIf.Name, extIf.MacAddress.String())
