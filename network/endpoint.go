@@ -33,28 +33,36 @@ type endpoint struct {
 	IPv6Gateway net.IP
 }
 
+// EndpointInfo contains read-only information about an endpoint.
+type EndpointInfo struct {
+	Id          string
+	IfName      string
+	IPv4Address string
+	NetNsPath   string
+}
+
 // NewEndpoint creates a new endpoint in the network.
-func (nw *network) newEndpoint(endpointId string, ipAddress string) (*endpoint, error) {
+func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	var containerIf *net.Interface
 	var ep *endpoint
 	var err error
 
-	if nw.Endpoints[endpointId] != nil {
+	if nw.Endpoints[epInfo.Id] != nil {
 		return nil, errEndpointExists
 	}
 
 	// Parse IP address.
-	ipAddr, ipNet, err := net.ParseCIDR(ipAddress)
+	ipAddr, ipNet, err := net.ParseCIDR(epInfo.IPv4Address)
 	ipNet.IP = ipAddr
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("[net] Creating endpoint %v in network %v.", endpointId, nw.Id)
+	log.Printf("[net] Creating endpoint %v in network %v.", epInfo.Id, nw.Id)
 
 	// Create a veth pair.
-	hostIfName := fmt.Sprintf("%s%s", hostInterfacePrefix, endpointId[:7])
-	contIfName := fmt.Sprintf("%s%s-2", hostInterfacePrefix, endpointId[:7])
+	hostIfName := fmt.Sprintf("%s%s", hostInterfacePrefix, epInfo.Id[:7])
+	contIfName := fmt.Sprintf("%s%s-2", hostInterfacePrefix, epInfo.Id[:7])
 
 	log.Printf("[net] Creating veth pair %v %v.", hostIfName, contIfName)
 	err = netlink.AddVethPair(contIfName, hostIfName)
@@ -97,6 +105,31 @@ func (nw *network) newEndpoint(endpointId string, ipAddress string) (*endpoint, 
 		goto cleanup
 	}
 
+	// If a name for the container interface is specified...
+	if epInfo.IfName != "" {
+		// Interface needs to be down before renaming.
+		log.Printf("[net] Setting link %v state down.", contIfName)
+		err = netlink.SetLinkState(contIfName, false)
+		if err != nil {
+			goto cleanup
+		}
+
+		// Rename the container interface.
+		log.Printf("[net] Setting link %v name %v.", contIfName, epInfo.IfName)
+		err = netlink.SetLinkName(contIfName, epInfo.IfName)
+		if err != nil {
+			goto cleanup
+		}
+		contIfName = epInfo.IfName
+
+		// Bring the interface back up.
+		log.Printf("[net] Setting link %v state up.", contIfName)
+		err = netlink.SetLinkState(contIfName, true)
+		if err != nil {
+			goto cleanup
+		}
+	}
+
 	// Assign IP address to container network interface.
 	log.Printf("[net] Adding IP address %v to link %v.", ipAddr, contIfName)
 	err = netlink.AddIpAddress(contIfName, ipAddr, ipNet)
@@ -106,7 +139,7 @@ func (nw *network) newEndpoint(endpointId string, ipAddress string) (*endpoint, 
 
 	// Create the endpoint object.
 	ep = &endpoint{
-		Id:          endpointId,
+		Id:          epInfo.Id,
 		SrcName:     contIfName,
 		DstPrefix:   containerInterfacePrefix,
 		MacAddress:  containerIf.HardwareAddr,
@@ -116,7 +149,7 @@ func (nw *network) newEndpoint(endpointId string, ipAddress string) (*endpoint, 
 		IPv6Gateway: nw.extIf.IPv6Gateway,
 	}
 
-	nw.Endpoints[endpointId] = ep
+	nw.Endpoints[epInfo.Id] = ep
 
 	log.Printf("[net] Created endpoint %+v.", ep)
 

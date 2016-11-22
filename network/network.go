@@ -38,6 +38,14 @@ type network struct {
 	extIf     *externalInterface
 }
 
+// NetworkInfo contains read-only information about a container network.
+type NetworkInfo struct {
+	Id         string
+	Subnets    []string
+	BridgeName string
+	Options    map[string]interface{}
+}
+
 type options map[string]interface{}
 
 // NewExternalInterface adds a host interface to the list of available external interfaces.
@@ -93,7 +101,7 @@ func (nm *networkManager) findExternalInterfaceBySubnet(subnet string) *external
 }
 
 // ConnectExternalInterface connects the given host interface to a bridge.
-func (nm *networkManager) connectExternalInterface(extIf *externalInterface) error {
+func (nm *networkManager) connectExternalInterface(extIf *externalInterface, bridgeName string) error {
 	var addrs []net.Addr
 
 	log.Printf("[net] Connecting interface %v.", extIf.Name)
@@ -104,7 +112,10 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface) err
 		return err
 	}
 
-	bridgeName := fmt.Sprintf("%s%d", bridgePrefix, hostIf.Index)
+	// If a bridge name is not specified, generate one based on the external interface index.
+	if bridgeName == "" {
+		bridgeName = fmt.Sprintf("%s%d", bridgePrefix, hostIf.Index)
+	}
 
 	// Check if the bridge already exists.
 	bridge, err := net.InterfaceByName(bridgeName)
@@ -287,32 +298,23 @@ func (nm *networkManager) disconnectExternalInterface(extIf *externalInterface) 
 }
 
 // NewNetwork creates a new container network.
-func (nm *networkManager) newNetwork(networkId string, options map[string]interface{}, ipv4Data, ipv6Data []ipamData) (*network, error) {
-	// Assume single pool per address family.
-	var ipv4Pool, ipv6Pool string
-	if len(ipv4Data) > 0 {
-		ipv4Pool = ipv4Data[0].Pool
-	}
+func (nm *networkManager) newNetwork(nwInfo *NetworkInfo) (*network, error) {
 
-	if len(ipv6Data) > 0 {
-		ipv6Pool = ipv6Data[0].Pool
-	}
-
-	log.Printf("[net] Creating network %v for subnet %v %v.", networkId, ipv4Pool, ipv6Pool)
+	log.Printf("[net] Creating network %+v.", nwInfo)
 
 	// Find the external interface for this subnet.
-	extIf := nm.findExternalInterfaceBySubnet(ipv4Pool)
+	extIf := nm.findExternalInterfaceBySubnet(nwInfo.Subnets[0])
 	if extIf == nil {
 		return nil, fmt.Errorf("Pool not found")
 	}
 
-	if extIf.Networks[networkId] != nil {
+	if extIf.Networks[nwInfo.Id] != nil {
 		return nil, errNetworkExists
 	}
 
 	// Connect the external interface if not already connected.
 	if extIf.BridgeName == "" {
-		err := nm.connectExternalInterface(extIf)
+		err := nm.connectExternalInterface(extIf, nwInfo.BridgeName)
 		if err != nil {
 			return nil, err
 		}
@@ -320,14 +322,14 @@ func (nm *networkManager) newNetwork(networkId string, options map[string]interf
 
 	// Create the network object.
 	nw := &network{
-		Id:        networkId,
+		Id:        nwInfo.Id,
 		Endpoints: make(map[string]*endpoint),
 		extIf:     extIf,
 	}
 
-	extIf.Networks[networkId] = nw
+	extIf.Networks[nwInfo.Id] = nw
 
-	log.Printf("[net] Created network %v on interface %v.", networkId, extIf.Name)
+	log.Printf("[net] Created network %v on interface %v.", nwInfo.Id, extIf.Name)
 
 	return nw, nil
 }

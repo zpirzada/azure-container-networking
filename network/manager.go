@@ -24,12 +24,25 @@ type networkManager struct {
 }
 
 // NetworkManager API.
-type NetApi interface {
+type NetworkManager interface {
+	Initialize(config *common.PluginConfig) error
+	Uninitialize()
+
 	AddExternalInterface(ifName string, subnet string) error
+
+	CreateNetwork(nwInfo *NetworkInfo) error
+	DeleteNetwork(networkId string) error
+	GetNetworkInfo(networkId string) (*NetworkInfo, error)
+
+	CreateEndpoint(networkId string, epInfo *EndpointInfo) error
+	DeleteEndpoint(networkId string, endpointId string) error
+	GetEndpointInfo(networkId string, endpointId string) (*EndpointInfo, error)
+	AttachEndpoint(networkId string, endpointId string, sandboxKey string) (*endpoint, error)
+	DetachEndpoint(networkId string, endpointId string) error
 }
 
 // Creates a new network manager.
-func newNetworkManager() (*networkManager, error) {
+func NewNetworkManager() (NetworkManager, error) {
 	nm := &networkManager{
 		ExternalInterfaces: make(map[string]*externalInterface),
 	}
@@ -122,11 +135,11 @@ func (nm *networkManager) AddExternalInterface(ifName string, subnet string) err
 }
 
 // CreateNetwork creates a new container network.
-func (nm *networkManager) CreateNetwork(networkId string, options map[string]interface{}, ipv4Data, ipv6Data []ipamData) error {
+func (nm *networkManager) CreateNetwork(nwInfo *NetworkInfo) error {
 	nm.Lock()
 	defer nm.Unlock()
 
-	_, err := nm.newNetwork(networkId, options, ipv4Data, ipv6Data)
+	_, err := nm.newNetwork(nwInfo)
 	if err != nil {
 		return err
 	}
@@ -157,8 +170,26 @@ func (nm *networkManager) DeleteNetwork(networkId string) error {
 	return nil
 }
 
+// GetNetworkInfo returns information about the given network.
+func (nm *networkManager) GetNetworkInfo(networkId string) (*NetworkInfo, error) {
+	nm.Lock()
+	defer nm.Unlock()
+
+	nw, err := nm.getNetwork(networkId)
+	if err != nil {
+		return nil, err
+	}
+
+	nwInfo := &NetworkInfo{
+		Id:      networkId,
+		Subnets: []string{nw.extIf.Subnets[0]},
+	}
+
+	return nwInfo, nil
+}
+
 // CreateEndpoint creates a new container endpoint.
-func (nm *networkManager) CreateEndpoint(networkId string, endpointId string, ipAddress string) error {
+func (nm *networkManager) CreateEndpoint(networkId string, epInfo *EndpointInfo) error {
 	nm.Lock()
 	defer nm.Unlock()
 
@@ -167,7 +198,7 @@ func (nm *networkManager) CreateEndpoint(networkId string, endpointId string, ip
 		return err
 	}
 
-	_, err = nw.newEndpoint(endpointId, ipAddress)
+	_, err = nw.newEndpoint(epInfo)
 	if err != nil {
 		return err
 	}
@@ -201,6 +232,29 @@ func (nm *networkManager) DeleteEndpoint(networkId string, endpointId string) er
 	}
 
 	return nil
+}
+
+// GetEndpointInfo returns information about the given endpoint.
+func (nm *networkManager) GetEndpointInfo(networkId string, endpointId string) (*EndpointInfo, error) {
+	nm.Lock()
+	defer nm.Unlock()
+
+	nw, err := nm.getNetwork(networkId)
+	if err != nil {
+		return nil, err
+	}
+
+	ep, err := nw.getEndpoint(endpointId)
+	if err != nil {
+		return nil, err
+	}
+
+	epInfo := &EndpointInfo{
+		Id:          endpointId,
+		IPv4Address: ep.IPv4Address.String(),
+	}
+
+	return epInfo, nil
 }
 
 // AttachEndpoint attaches an endpoint to a sandbox.
