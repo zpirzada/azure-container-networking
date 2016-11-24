@@ -22,7 +22,7 @@ const (
 type netPlugin struct {
 	*common.Plugin
 	scope string
-	nm    *networkManager
+	nm    NetworkManager
 }
 
 type NetPlugin interface {
@@ -38,7 +38,7 @@ func NewPlugin(config *common.PluginConfig) (NetPlugin, error) {
 	}
 
 	// Setup network manager.
-	nm, err := newNetworkManager()
+	nm, err := NewNetworkManager()
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,21 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Process request.
-	err = plugin.nm.CreateNetwork(req.NetworkID, req.Options, req.IPv4Data, req.IPv6Data)
+	nwInfo := NetworkInfo{
+		Id:      req.NetworkID,
+		Options: req.Options,
+	}
+
+	// Assume single pool per address family.
+	if len(req.IPv4Data) > 0 {
+		nwInfo.Subnets = append(nwInfo.Subnets, req.IPv4Data[0].Pool)
+	}
+
+	if len(req.IPv6Data) > 0 {
+		nwInfo.Subnets = append(nwInfo.Subnets, req.IPv6Data[0].Pool)
+	}
+
+	err = plugin.nm.CreateNetwork(&nwInfo)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -175,7 +189,12 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 		ipv4Address = req.Interface.Address
 	}
 
-	err = plugin.nm.CreateEndpoint(req.NetworkID, req.EndpointID, ipv4Address)
+	epInfo := EndpointInfo{
+		Id:          req.EndpointID,
+		IPv4Address: ipv4Address,
+	}
+
+	err = plugin.nm.CreateEndpoint(req.NetworkID, &epInfo)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return

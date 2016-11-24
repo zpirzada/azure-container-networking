@@ -33,52 +33,66 @@ type endpoint struct {
 	IPv6Gateway net.IP
 }
 
+// EndpointInfo contains read-only information about an endpoint.
+type EndpointInfo struct {
+	Id          string
+	IfName      string
+	IPv4Address string
+	NetNsPath   string
+}
+
 // NewEndpoint creates a new endpoint in the network.
-func (nw *network) newEndpoint(endpointId string, ipAddress string) (*endpoint, error) {
+func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	var containerIf *net.Interface
+	var ns *Namespace
 	var ep *endpoint
 	var err error
 
-	if nw.Endpoints[endpointId] != nil {
+	log.Printf("[net] Creating endpoint %v in network %v.", epInfo.Id, nw.Id)
+
+	if nw.Endpoints[epInfo.Id] != nil {
 		return nil, errEndpointExists
 	}
 
 	// Parse IP address.
-	ipAddr, ipNet, err := net.ParseCIDR(ipAddress)
+	ipAddr, ipNet, err := net.ParseCIDR(epInfo.IPv4Address)
 	ipNet.IP = ipAddr
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("[net] Creating endpoint %v in network %v.", endpointId, nw.Id)
-
 	// Create a veth pair.
-	hostIfName := fmt.Sprintf("%s%s", hostInterfacePrefix, endpointId[:7])
-	contIfName := fmt.Sprintf("%s%s-2", hostInterfacePrefix, endpointId[:7])
+	hostIfName := fmt.Sprintf("%s%s", hostInterfacePrefix, epInfo.Id[:7])
+	contIfName := fmt.Sprintf("%s%s-2", hostInterfacePrefix, epInfo.Id[:7])
 
+	log.Printf("[net] Creating veth pair %v %v.", hostIfName, contIfName)
 	err = netlink.AddVethPair(contIfName, hostIfName)
 	if err != nil {
 		log.Printf("[net] Failed to create veth pair, err:%v.", err)
 		return nil, err
 	}
 
-	// Assign IP address to container network interface.
-	err = netlink.AddIpAddress(contIfName, ipAddr, ipNet)
-	if err != nil {
-		goto cleanup
-	}
+	//
+	// Host network interface setup.
+	//
 
 	// Host interface up.
+	log.Printf("[net] Setting link %v state up.", hostIfName)
 	err = netlink.SetLinkState(hostIfName, true)
 	if err != nil {
 		goto cleanup
 	}
 
 	// Connect host interface to the bridge.
+	log.Printf("[net] Setting link %v master %v.", hostIfName, nw.extIf.BridgeName)
 	err = netlink.SetLinkMaster(hostIfName, nw.extIf.BridgeName)
 	if err != nil {
 		goto cleanup
 	}
+
+	//
+	// Container network interface setup.
+	//
 
 	// Query container network interface info.
 	containerIf, err = net.InterfaceByName(contIfName)
@@ -87,14 +101,82 @@ func (nw *network) newEndpoint(endpointId string, ipAddress string) (*endpoint, 
 	}
 
 	// Setup MAC address translation rules for container interface.
+	log.Printf("[net] Setting up MAC address translation rules for endpoint %v.", contIfName)
 	err = ebtables.SetupDnatBasedOnIPV4Address(ipAddr.String(), containerIf.HardwareAddr.String())
 	if err != nil {
 		goto cleanup
 	}
 
+	// If a network namespace for the container interface is specified...
+	if epInfo.NetNsPath != "" {
+		// Open the network namespace.
+		log.Printf("[net] Opening netns %v.", epInfo.NetNsPath)
+		ns, err = OpenNamespace(epInfo.NetNsPath)
+		if err != nil {
+			goto cleanup
+		}
+		defer ns.Close()
+
+		// Move the container interface to container's network namespace.
+		log.Printf("[net] Setting link %v netns %v.", contIfName, epInfo.NetNsPath)
+		err = netlink.SetLinkNetNs(contIfName, ns.GetFd())
+		if err != nil {
+			goto cleanup
+		}
+
+		// Enter the container network namespace.
+		log.Printf("[net] Entering netns %v.", epInfo.NetNsPath)
+		err = ns.Enter()
+		if err != nil {
+			goto cleanup
+		}
+	}
+
+	// If a name for the container interface is specified...
+	if epInfo.IfName != "" {
+		// Interface needs to be down before renaming.
+		log.Printf("[net] Setting link %v state down.", contIfName)
+		err = netlink.SetLinkState(contIfName, false)
+		if err != nil {
+			goto cleanup
+		}
+
+		// Rename the container interface.
+		log.Printf("[net] Setting link %v name %v.", contIfName, epInfo.IfName)
+		err = netlink.SetLinkName(contIfName, epInfo.IfName)
+		if err != nil {
+			goto cleanup
+		}
+		contIfName = epInfo.IfName
+
+		// Bring the interface back up.
+		log.Printf("[net] Setting link %v state up.", contIfName)
+		err = netlink.SetLinkState(contIfName, true)
+		if err != nil {
+			goto cleanup
+		}
+	}
+
+	// Assign IP address to container network interface.
+	log.Printf("[net] Adding IP address %v to link %v.", ipAddr, contIfName)
+	err = netlink.AddIpAddress(contIfName, ipAddr, ipNet)
+	if err != nil {
+		goto cleanup
+	}
+
+	// If inside the container network namespace...
+	if ns != nil {
+		// Return to host network namespace.
+		log.Printf("[net] Exiting netns %v.", epInfo.NetNsPath)
+		err = ns.Exit()
+		if err != nil {
+			goto cleanup
+		}
+	}
+
 	// Create the endpoint object.
 	ep = &endpoint{
-		Id:          endpointId,
+		Id:          epInfo.Id,
 		SrcName:     contIfName,
 		DstPrefix:   containerInterfacePrefix,
 		MacAddress:  containerIf.HardwareAddr,
@@ -104,13 +186,15 @@ func (nw *network) newEndpoint(endpointId string, ipAddress string) (*endpoint, 
 		IPv6Gateway: nw.extIf.IPv6Gateway,
 	}
 
-	nw.Endpoints[endpointId] = ep
+	nw.Endpoints[epInfo.Id] = ep
 
 	log.Printf("[net] Created endpoint %+v.", ep)
 
 	return ep, nil
 
 cleanup:
+	log.Printf("[net] Creating endpoint %v failed, err:%v.", contIfName, err)
+
 	// Roll back the changes for the endpoint.
 	netlink.DeleteLink(contIfName)
 

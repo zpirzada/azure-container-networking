@@ -22,7 +22,7 @@ const (
 // IpamPlugin object and interface
 type ipamPlugin struct {
 	*common.Plugin
-	am *addressManager
+	am AddressManager
 }
 
 type IpamPlugin interface {
@@ -38,10 +38,12 @@ func NewPlugin(config *common.PluginConfig) (IpamPlugin, error) {
 	}
 
 	// Setup address manager.
-	am, err := newAddressManager()
+	am, err := NewAddressManager()
 	if err != nil {
 		return nil, err
 	}
+
+	config.IpamApi = am
 
 	return &ipamPlugin{
 		Plugin: plugin,
@@ -145,7 +147,7 @@ func (plugin *ipamPlugin) requestPool(w http.ResponseWriter, r *http.Request) {
 
 	// Encode response.
 	data := make(map[string]string)
-	poolId = newAddressPoolId(req.AddressSpace, poolId, "").String()
+	poolId = NewAddressPoolId(req.AddressSpace, poolId, "").String()
 	resp := requestPoolResponse{PoolID: poolId, Pool: subnet, Data: data}
 
 	err = plugin.Listener.Encode(w, &resp)
@@ -165,13 +167,13 @@ func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Process request.
-	poolId, err := newAddressPoolIdFromString(req.PoolID)
+	poolId, err := NewAddressPoolIdFromString(req.PoolID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
 	}
 
-	err = plugin.am.ReleasePool(poolId.asId, poolId.subnet)
+	err = plugin.am.ReleasePool(poolId.AsId, poolId.Subnet)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -197,13 +199,13 @@ func (plugin *ipamPlugin) requestAddress(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Process request.
-	poolId, err := newAddressPoolIdFromString(req.PoolID)
+	poolId, err := NewAddressPoolIdFromString(req.PoolID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
 	}
 
-	addr, err := plugin.am.RequestAddress(poolId.asId, poolId.subnet, req.Address, req.Options)
+	addr, err := plugin.am.RequestAddress(poolId.AsId, poolId.Subnet, req.Address, req.Options)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -230,13 +232,13 @@ func (plugin *ipamPlugin) releaseAddress(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Process request.
-	poolId, err := newAddressPoolIdFromString(req.PoolID)
+	poolId, err := NewAddressPoolIdFromString(req.PoolID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
 	}
 
-	err = plugin.am.ReleaseAddress(poolId.asId, poolId.subnet, req.Address)
+	err = plugin.am.ReleaseAddress(poolId.AsId, poolId.Subnet, req.Address)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return

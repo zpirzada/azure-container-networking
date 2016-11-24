@@ -148,3 +148,61 @@ func TestKeyValuePairsAreWrittenAndReadCorrectly(t *testing.T) {
 	// Cleanup.
 	os.Remove(testFileName)
 }
+
+// Tests that locking a store gives the caller exclusive access.
+func TestLockingStoreGivesExclusiveAccess(t *testing.T) {
+	var anyValue = testType1{"test", 42}
+
+	// Create the store.
+	kvs, err := NewJsonFileStore(testFileName)
+	if err != nil {
+		t.Fatalf("Failed to create first store: %v", err)
+	}
+
+	// Lock for exclusive access.
+	err = kvs.Lock(false)
+	if err != nil {
+		t.Errorf("Failed to lock store: %v", err)
+	}
+
+	// Write a key value pair.
+	err = kvs.Write(testKey1, &anyValue)
+	if err != nil {
+		t.Fatalf("Failed to write to store: %v", err)
+	}
+
+	// Create a second store pointing to the same file.
+	kvs2, err := NewJsonFileStore(testFileName)
+	if err != nil {
+		t.Fatalf("Failed to create second store: %v", err)
+	}
+
+	// Try locking the second store.
+	// This should fail because the first store has exclusive access.
+	err = kvs2.Lock(false)
+	if err == nil {
+		t.Errorf("Locking an already-locked store succeeded: %v", err)
+	}
+
+	// Unlock the first store.
+	err = kvs.Unlock()
+	if err != nil {
+		t.Errorf("Failed to unlock first store: %v", err)
+	}
+
+	// Try locking the second store again.
+	// This should succeed because the first store revoked exclusive access.
+	err = kvs2.Lock(false)
+	if err != nil {
+		t.Errorf("Failed to re-lock an unlocked store: %v", err)
+	}
+
+	// Unlock the second store.
+	err = kvs2.Unlock()
+	if err != nil {
+		t.Errorf("Failed to unlock second store: %v", err)
+	}
+
+	// Cleanup.
+	os.Remove(testFileName)
+}

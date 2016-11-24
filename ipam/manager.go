@@ -22,8 +22,20 @@ type addressManager struct {
 	AddrSpaces map[string]*addressSpace `json:"AddressSpaces"`
 	store      store.KeyValueStore
 	source     addressConfigSource
-	netApi     network.NetApi
+	netApi     network.NetworkManager
 	sync.Mutex
+}
+
+// AddressManager API.
+type AddressManager interface {
+	Initialize(config *common.PluginConfig, environment string) error
+	Uninitialize()
+
+	GetDefaultAddressSpaces() (string, string)
+	RequestPool(asId, poolId, subPoolId string, options map[string]string, v6 bool) (string, string, error)
+	ReleasePool(asId, poolId string) error
+	RequestAddress(asId, poolId, address string, options map[string]string) (string, error)
+	ReleaseAddress(asId, poolId, address string) error
 }
 
 // AddressConfigSource configures the address pools managed by AddressManager.
@@ -40,7 +52,7 @@ type addressConfigSink interface {
 }
 
 // Creates a new address manager.
-func newAddressManager() (*addressManager, error) {
+func NewAddressManager() (AddressManager, error) {
 	am := &addressManager{
 		AddrSpaces: make(map[string]*addressSpace),
 	}
@@ -51,7 +63,7 @@ func newAddressManager() (*addressManager, error) {
 // Initialize configures address manager.
 func (am *addressManager) Initialize(config *common.PluginConfig, environment string) error {
 	am.store = config.Store
-	am.netApi, _ = config.NetApi.(network.NetApi)
+	am.netApi, _ = config.NetApi.(network.NetworkManager)
 
 	// Restore persisted state.
 	err := am.restore()
