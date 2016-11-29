@@ -1,7 +1,7 @@
 // Copyright Microsoft Corp.
 // All rights reserved.
 
-package common
+package plugin
 
 const (
 	// Libnetwork remote plugin paths

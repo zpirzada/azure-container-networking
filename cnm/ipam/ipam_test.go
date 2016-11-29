@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 	mux = plugin.(*ipamPlugin).Listener.GetMux()
 
 	// Get the internal config sink interface.
-	sink = plugin.(*ipamPlugin).am.(*addressManager)
+	sink = plugin.(*ipamPlugin).am
 
 	// Run tests.
 	exitCode := m.Run()
