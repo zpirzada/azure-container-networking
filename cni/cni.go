@@ -5,33 +5,20 @@ package cni
 
 import (
 	"encoding/json"
-
-	cniSkel "github.com/containernetworking/cni/pkg/skel"
-	cniTypes "github.com/containernetworking/cni/pkg/types"
 )
-
-// Plugin is the interface implemented by CNI plugins.
-type Plugin interface {
-	Add(args *cniSkel.CmdArgs) error
-	Delete(args *cniSkel.CmdArgs) error
-
-	AddImpl(args *cniSkel.CmdArgs, nwCfg *NetworkConfig) (*cniTypes.Result, error)
-	DeleteImpl(args *cniSkel.CmdArgs, nwCfg *NetworkConfig) (*cniTypes.Result, error)
-}
 
 // NetworkConfig represents the Azure CNI plugin's network configuration.
 type NetworkConfig struct {
 	CniVersion string `json:"cniVersion"`
 	Name       string `json:"name"`
 	Type       string `json:"type"`
-	Bridge     string `json:"bridge"`
-	IfName     string `json:"ifName"`
+	Bridge     string `json:"bridge,omitempty"`
+	IfName     string `json:"ifName,omitempty"`
 	Ipam       struct {
 		Type      string `json:"type"`
-		AddrSpace string `json:"addressSpace"`
-		Subnet    string `json:"subnet"`
-		Address   string `json:"ipAddress"`
-		Result    string `json:"result"`
+		AddrSpace string `json:"addressSpace,omitempty"`
+		Subnet    string `json:"subnet,omitempty"`
+		Address   string `json:"ipAddress,omitempty"`
 	}
 }
 

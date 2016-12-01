@@ -138,12 +138,7 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 		IP4: &cniTypes.IPConfig{IP: *cidr},
 	}
 
-	// Output response.
-	if nwCfg.Ipam.Result == "" {
-		result.Print()
-	} else {
-		args.Args = result.String()
-	}
+	result.Print()
 
 	log.Printf("[ipam] ADD succeeded with output %+v.", result)
 
@@ -164,69 +159,6 @@ func (plugin *ipamPlugin) Delete(args *cniSkel.CmdArgs) error {
 
 	log.Printf("[ipam] Read network configuration %+v.", nwCfg)
 
-	// Process command.
-	result, err := plugin.DeleteImpl(args, nwCfg)
-	if err != nil {
-		log.Printf("[ipam] Failed to process command: %v.", err)
-		return nil
-	}
-
-	// Output response.
-	if result != nil {
-		result.Print()
-	}
-
-	log.Printf("[ipam] DEL succeeded with output %+v.", result)
-
-	return err
-}
-
-// AddImpl handles CNI add commands.
-func (plugin *ipamPlugin) AddImpl(args *cniSkel.CmdArgs, nwCfg *cni.NetworkConfig) (*cniTypes.Result, error) {
-	// Assume default address space if not specified.
-	if nwCfg.Ipam.AddrSpace == "" {
-		nwCfg.Ipam.AddrSpace = defaultAddressSpaceId
-	}
-
-	// Check if an address pool is specified.
-	if nwCfg.Ipam.Subnet == "" {
-		// Allocate an address pool.
-		poolId, subnet, err := plugin.am.RequestPool(nwCfg.Ipam.AddrSpace, "", "", nil, false)
-		if err != nil {
-			log.Printf("[ipam] Failed to allocate pool, err:%v.", err)
-			return nil, err
-		}
-
-		nwCfg.Ipam.Subnet = subnet
-		log.Printf("[ipam] Allocated address poolId %v with subnet %v.", poolId, subnet)
-	}
-
-	// Allocate an address for the endpoint.
-	address, err := plugin.am.RequestAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address, nil)
-	if err != nil {
-		log.Printf("[ipam] Failed to allocate address, err:%v.", err)
-		return nil, err
-	}
-
-	log.Printf("[ipam] Allocated address %v.", address)
-
-	// Output the result.
-	ip, cidr, err := net.ParseCIDR(address)
-	cidr.IP = ip
-	if err != nil {
-		log.Printf("[ipam] Failed to parse address, err:%v.", err)
-		return nil, err
-	}
-
-	result := &cniTypes.Result{
-		IP4: &cniTypes.IPConfig{IP: *cidr},
-	}
-
-	return result, nil
-}
-
-// DeleteImpl handles CNI delete commands.
-func (plugin *ipamPlugin) DeleteImpl(args *cniSkel.CmdArgs, nwCfg *cni.NetworkConfig) (*cniTypes.Result, error) {
 	// Assume default address space if not specified.
 	if nwCfg.Ipam.AddrSpace == "" {
 		nwCfg.Ipam.AddrSpace = defaultAddressSpaceId
@@ -238,16 +170,18 @@ func (plugin *ipamPlugin) DeleteImpl(args *cniSkel.CmdArgs, nwCfg *cni.NetworkCo
 		err := plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address)
 		if err != nil {
 			log.Printf("[cni] Failed to release address, err:%v.", err)
-			return nil, err
+			return nil
 		}
 	} else {
 		// Release the pool.
 		err := plugin.am.ReleasePool(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet)
 		if err != nil {
 			log.Printf("[cni] Failed to release pool, err:%v.", err)
-			return nil, err
+			return nil
 		}
 	}
 
-	return nil, nil
+	log.Printf("[ipam] DEL succeeded.")
+
+	return err
 }
