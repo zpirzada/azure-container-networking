@@ -6,8 +6,10 @@ package network
 import (
 	"net/http"
 
+	"github.com/Azure/azure-container-networking/cnm"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/network"
 )
 
 const (
@@ -18,27 +20,27 @@ const (
 	scope = "local"
 )
 
-// NetPlugin object and its interface
+// NetPlugin represents a CNM (libnetwork) network plugin.
 type netPlugin struct {
-	*common.Plugin
+	*cnm.Plugin
 	scope string
-	nm    NetworkManager
+	nm    network.NetworkManager
 }
 
 type NetPlugin interface {
 	common.PluginApi
 }
 
-// Creates a new NetPlugin object.
+// NewPlugin creates a new NetPlugin object.
 func NewPlugin(config *common.PluginConfig) (NetPlugin, error) {
 	// Setup base plugin.
-	plugin, err := common.NewPlugin(name, config.Version, endpointType)
+	plugin, err := cnm.NewPlugin(name, config.Version, endpointType)
 	if err != nil {
 		return nil, err
 	}
 
 	// Setup network manager.
-	nm, err := NewNetworkManager()
+	nm, err := network.NewNetworkManager()
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +54,7 @@ func NewPlugin(config *common.PluginConfig) (NetPlugin, error) {
 	}, nil
 }
 
-// Starts the plugin.
+// Start starts the plugin.
 func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 	// Initialize base plugin.
 	err := plugin.Initialize(config)
@@ -84,7 +86,7 @@ func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 	return nil
 }
 
-// Stops the plugin.
+// Stop stops the plugin.
 func (plugin *netPlugin) Stop() {
 	plugin.nm.Uninitialize()
 	plugin.Uninitialize()
@@ -120,7 +122,7 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Process request.
-	nwInfo := NetworkInfo{
+	nwInfo := network.NetworkInfo{
 		Id:      req.NetworkID,
 		Options: req.Options,
 	}
@@ -189,7 +191,7 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 		ipv4Address = req.Interface.Address
 	}
 
-	epInfo := EndpointInfo{
+	epInfo := network.EndpointInfo{
 		Id:          req.EndpointID,
 		IPv4Address: ipv4Address,
 	}

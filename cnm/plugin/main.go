@@ -9,10 +9,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/Azure/azure-container-networking/cnm/ipam"
+	"github.com/Azure/azure-container-networking/cnm/network"
 	"github.com/Azure/azure-container-networking/common"
-	"github.com/Azure/azure-container-networking/ipam"
 	"github.com/Azure/azure-container-networking/log"
-	"github.com/Azure/azure-container-networking/network"
 	"github.com/Azure/azure-container-networking/store"
 )
 
@@ -83,11 +83,6 @@ func printVersion() {
 
 // Main is the entry point for CNM plugin.
 func main() {
-	var netPlugin network.NetPlugin
-	var ipamPlugin ipam.IpamPlugin
-	var config common.PluginConfig
-	var err error
-
 	// Initialize and parse command line arguments.
 	common.ParseArgs(&args, printVersion)
 
@@ -102,20 +97,21 @@ func main() {
 	}
 
 	// Initialize plugin common configuration.
+	var config common.PluginConfig
 	config.Name = name
 	config.Version = version
 
 	// Create network plugin.
-	netPlugin, err = network.NewPlugin(&config)
+	netPlugin, err := network.NewPlugin(&config)
 	if err != nil {
-		fmt.Printf("Failed to create network plugin %v\n", err)
+		fmt.Printf("Failed to create network plugin, err:%v.\n", err)
 		return
 	}
 
 	// Create IPAM plugin.
-	ipamPlugin, err = ipam.NewPlugin(&config)
+	ipamPlugin, err := ipam.NewPlugin(&config)
 	if err != nil {
-		fmt.Printf("Failed to create IPAM plugin %v\n", err)
+		fmt.Printf("Failed to create IPAM plugin, err:%v.\n", err)
 		return
 	}
 
@@ -148,7 +144,7 @@ func main() {
 	if netPlugin != nil {
 		err = netPlugin.Start(&config)
 		if err != nil {
-			fmt.Printf("Failed to start network plugin %v\n", err)
+			fmt.Printf("Failed to start network plugin, err:%v.\n", err)
 			return
 		}
 	}
@@ -156,7 +152,7 @@ func main() {
 	if ipamPlugin != nil {
 		err = ipamPlugin.Start(&config)
 		if err != nil {
-			fmt.Printf("Failed to start IPAM plugin %v\n", err)
+			fmt.Printf("Failed to start IPAM plugin, err:%v.\n", err)
 			return
 		}
 	}

@@ -6,7 +6,9 @@ package ipam
 import (
 	"net/http"
 
+	"github.com/Azure/azure-container-networking/cnm"
 	"github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/ipam"
 	"github.com/Azure/azure-container-networking/log"
 )
 
@@ -14,31 +16,31 @@ const (
 	// Plugin name.
 	name = "ipam"
 
-	// Libnetwork IPAM plugin capabilities.
+	// Plugin capabilities reported to libnetwork.
 	requiresMACAddress    = false
 	requiresRequestReplay = false
 )
 
-// IpamPlugin object and interface
+// IpamPlugin represents a CNM (libnetwork) IPAM plugin.
 type ipamPlugin struct {
-	*common.Plugin
-	am AddressManager
+	*cnm.Plugin
+	am ipam.AddressManager
 }
 
 type IpamPlugin interface {
 	common.PluginApi
 }
 
-// Creates a new IpamPlugin object.
+// NewPlugin creates a new IpamPlugin object.
 func NewPlugin(config *common.PluginConfig) (IpamPlugin, error) {
 	// Setup base plugin.
-	plugin, err := common.NewPlugin(name, config.Version, endpointType)
+	plugin, err := cnm.NewPlugin(name, config.Version, EndpointType)
 	if err != nil {
 		return nil, err
 	}
 
 	// Setup address manager.
-	am, err := NewAddressManager()
+	am, err := ipam.NewAddressManager()
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +53,7 @@ func NewPlugin(config *common.PluginConfig) (IpamPlugin, error) {
 	}, nil
 }
 
-// Starts the plugin.
+// Start starts the plugin.
 func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 	// Initialize base plugin.
 	err := plugin.Initialize(config)
@@ -82,7 +84,7 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 	return nil
 }
 
-// Stops the plugin.
+// Stop stops the plugin.
 func (plugin *ipamPlugin) Stop() {
 	plugin.am.Uninitialize()
 	plugin.Uninitialize()
@@ -147,7 +149,7 @@ func (plugin *ipamPlugin) requestPool(w http.ResponseWriter, r *http.Request) {
 
 	// Encode response.
 	data := make(map[string]string)
-	poolId = NewAddressPoolId(req.AddressSpace, poolId, "").String()
+	poolId = ipam.NewAddressPoolId(req.AddressSpace, poolId, "").String()
 	resp := requestPoolResponse{PoolID: poolId, Pool: subnet, Data: data}
 
 	err = plugin.Listener.Encode(w, &resp)
@@ -167,7 +169,7 @@ func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Process request.
-	poolId, err := NewAddressPoolIdFromString(req.PoolID)
+	poolId, err := ipam.NewAddressPoolIdFromString(req.PoolID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -199,7 +201,7 @@ func (plugin *ipamPlugin) requestAddress(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Process request.
-	poolId, err := NewAddressPoolIdFromString(req.PoolID)
+	poolId, err := ipam.NewAddressPoolIdFromString(req.PoolID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
@@ -232,7 +234,7 @@ func (plugin *ipamPlugin) releaseAddress(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Process request.
-	poolId, err := NewAddressPoolIdFromString(req.PoolID)
+	poolId, err := ipam.NewAddressPoolIdFromString(req.PoolID)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
