@@ -6,7 +6,7 @@ package ipam
 import (
 	"net/http"
 
-	"github.com/Azure/azure-container-networking/cnm/plugin"
+	"github.com/Azure/azure-container-networking/cnm"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/ipam"
 	"github.com/Azure/azure-container-networking/log"
@@ -23,7 +23,7 @@ const (
 
 // IpamPlugin represents a CNM (libnetwork) IPAM plugin.
 type ipamPlugin struct {
-	*plugin.Plugin
+	*cnm.Plugin
 	am ipam.AddressManager
 }
 
@@ -34,7 +34,7 @@ type IpamPlugin interface {
 // NewPlugin creates a new IpamPlugin object.
 func NewPlugin(config *common.PluginConfig) (IpamPlugin, error) {
 	// Setup base plugin.
-	plugin, err := plugin.NewPlugin(name, config.Version, EndpointType)
+	plugin, err := cnm.NewPlugin(name, config.Version, EndpointType)
 	if err != nil {
 		return nil, err
 	}

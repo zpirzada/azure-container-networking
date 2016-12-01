@@ -1,7 +1,7 @@
 // Copyright Microsoft Corp.
 // All rights reserved.
 
-package plugin
+package cnm
 
 import (
 	"net/http"

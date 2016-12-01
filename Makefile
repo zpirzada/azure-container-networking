@@ -1,6 +1,12 @@
 SOURCEFILES = \
 	$(wildcard cni/*.go) \
+	$(wildcard cni/ipam/*.go) \
+	$(wildcard cni/network/*.go) \
+	$(wildcard cni/plugin/*.go) \
 	$(wildcard cnm/*.go) \
+	$(wildcard cnm/ipam/*.go) \
+	$(wildcard cnm/network/*.go) \
+	$(wildcard cnm/plugin/*.go) \
 	$(wildcard common/*.go) \
 	$(wildcard ebtables/*.go) \
 	$(wildcard ipam/*.go) \
@@ -9,9 +15,9 @@ SOURCEFILES = \
 	$(wildcard network/*.go) \
 	$(wildcard store/*.go)
 
-CNIDIR = cni
+CNMDIR = cnm/plugin
 
-CNMDIR = cnm
+CNIDIR = cni/plugin
 
 OUTPUTDIR = out
 

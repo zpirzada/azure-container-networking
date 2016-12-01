@@ -6,7 +6,7 @@ package network
 import (
 	"net/http"
 
-	"github.com/Azure/azure-container-networking/cnm/plugin"
+	"github.com/Azure/azure-container-networking/cnm"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network"
@@ -22,7 +22,7 @@ const (
 
 // NetPlugin represents a CNM (libnetwork) network plugin.
 type netPlugin struct {
-	*plugin.Plugin
+	*cnm.Plugin
 	scope string
 	nm    network.NetworkManager
 }
@@ -34,7 +34,7 @@ type NetPlugin interface {
 // NewPlugin creates a new NetPlugin object.
 func NewPlugin(config *common.PluginConfig) (NetPlugin, error) {
 	// Setup base plugin.
-	plugin, err := plugin.NewPlugin(name, config.Version, endpointType)
+	plugin, err := cnm.NewPlugin(name, config.Version, endpointType)
 	if err != nil {
 		return nil, err
 	}
