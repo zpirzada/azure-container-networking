@@ -157,7 +157,7 @@ func (as *addressSpace) merge(newas *addressSpace) {
 			// This is a new address pool.
 			// Merge it to the existing address space.
 			as.Pools[pk] = pv
-			delete(newas.Pools, pk)
+			pv.as = as
 			pv.epoch = as.epoch
 		} else {
 			// This pool already exists.
@@ -169,29 +169,39 @@ func (as *addressSpace) merge(newas *addressSpace) {
 					// This is a new address record.
 					// Merge it to the existing address pool.
 					ap.Addresses[ak] = av
-					delete(ap.Addresses, ak)
 					av.epoch = as.epoch
 				} else {
 					// This address record already exists.
 					ar.epoch = as.epoch
 				}
+
+				delete(pv.Addresses, ak)
 			}
 
-			ap.epoch = as.epoch
+			pv.as = nil
 		}
+
+		delete(newas.Pools, pk)
 	}
 
 	// Cleanup stale pools and addresses from the old epoch.
 	// Those currently in use will be deleted after they are released.
 	for pk, pv := range as.Pools {
 		if pv.epoch < as.epoch {
+			// This pool may have stale addresses.
 			for ak, av := range pv.Addresses {
-				if !av.InUse {
+				if av.epoch == as.epoch || av.InUse {
+					// Pool has at least one valid or in-use address.
+					pv.epoch = as.epoch
+				} else {
+					// This address is no longer available.
 					delete(pv.Addresses, ak)
 				}
 			}
 
-			if !pv.InUse {
+			// Delete the pool if it has no addresses left.
+			if pv.epoch < as.epoch && !pv.InUse {
+				pv.as = nil
 				delete(as.Pools, pk)
 			}
 		}
