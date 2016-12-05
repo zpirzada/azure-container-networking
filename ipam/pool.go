@@ -43,7 +43,7 @@ type addressPool struct {
 	Addresses map[string]*addressRecord
 	IsIPv6    bool
 	Priority  int
-	InUse     bool
+	RefCount  int
 	epoch     int
 }
 
@@ -200,7 +200,7 @@ func (as *addressSpace) merge(newas *addressSpace) {
 			}
 
 			// Delete the pool if it has no addresses left.
-			if pv.epoch < as.epoch && !pv.InUse {
+			if pv.epoch < as.epoch && !pv.isInUse() {
 				pv.as = nil
 				delete(as.Pools, pk)
 			}
@@ -257,18 +257,13 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 		if ap == nil {
 			return nil, errAddressPoolNotFound
 		}
-
-		// Fail if requested pool is already in use.
-		if ap.InUse {
-			return nil, errAddressPoolInUse
-		}
 	} else {
 		// Return any available address pool.
 		highestPriority := -1
 
 		for _, pool := range as.Pools {
 			// Skip if pool is already in use.
-			if pool.InUse {
+			if pool.isInUse() {
 				continue
 			}
 
@@ -289,7 +284,7 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 		}
 	}
 
-	ap.InUse = true
+	ap.RefCount++
 
 	return ap, nil
 }
@@ -301,14 +296,14 @@ func (as *addressSpace) releasePool(poolId string) error {
 		return errAddressPoolNotFound
 	}
 
-	if !ap.InUse {
+	if !ap.isInUse() {
 		return errAddressPoolNotInUse
 	}
 
-	ap.InUse = false
+	ap.RefCount--
 
 	// Delete address pool if it is no longer available.
-	if ap.epoch < as.epoch {
+	if ap.epoch < as.epoch && !ap.isInUse() {
 		delete(as.Pools, poolId)
 	}
 
@@ -318,6 +313,11 @@ func (as *addressSpace) releasePool(poolId string) error {
 //
 // AddressPool
 //
+
+// Returns if an addess pool is currently in use.
+func (ap *addressPool) isInUse() bool {
+	return ap.RefCount > 0
+}
 
 // Creates a new addressRecord object.
 func (ap *addressPool) newAddressRecord(addr *net.IP) (*addressRecord, error) {
