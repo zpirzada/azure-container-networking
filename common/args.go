@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -56,16 +57,28 @@ func ParseArgs(args *ArgumentList, usage func()) {
 		case "bool":
 			arg.Value = arg.boolVal
 		case "string":
-			arg.strVal = strings.ToLower(arg.strVal)
-			arg.Value = arg.strVal
-			if arg.ValueMap[arg.strVal] == nil {
-				printErrorForArg(arg)
+			if arg.ValueMap == nil {
+				// Argument is a free-form string.
+				arg.Value = arg.strVal
+			} else {
+				// Argument must match one of the values in the map.
+				arg.strVal = strings.ToLower(arg.strVal)
+				arg.Value = arg.strVal
+				if arg.ValueMap[arg.strVal] == nil {
+					printErrorForArg(arg)
+				}
 			}
 		case "int":
-			arg.strVal = strings.ToLower(arg.strVal)
-			arg.Value = arg.ValueMap[arg.strVal]
-			if arg.Value == nil {
-				printErrorForArg(arg)
+			if arg.ValueMap == nil {
+				// Argument is a free-form integer.
+				arg.Value, _ = strconv.Atoi(arg.strVal)
+			} else {
+				// Argument must match one of the values in the map.
+				arg.strVal = strings.ToLower(arg.strVal)
+				arg.Value = arg.ValueMap[arg.strVal]
+				if arg.Value == nil {
+					printErrorForArg(arg)
+				}
 			}
 		}
 	}
