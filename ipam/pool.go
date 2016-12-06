@@ -253,6 +253,7 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 
 	if poolId != "" {
 		// Return the specific address pool requested.
+		// Note sharing of pools is allowed when specifically requested.
 		ap = as.Pools[poolId]
 		if ap == nil {
 			return nil, errAddressPoolNotFound
@@ -260,6 +261,7 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 	} else {
 		// Return any available address pool.
 		highestPriority := -1
+		highestNumAddr := -1
 
 		for _, pool := range as.Pools {
 			// Skip if pool is already in use.
@@ -272,9 +274,15 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 				continue
 			}
 
-			// Pick the pool with the highest priority.
+			// Prefer the pool with the highest priority.
 			if pool.Priority > highestPriority {
 				highestPriority = pool.Priority
+				ap = pool
+			}
+
+			// Prefer the pool with the highest number of addresses.
+			if len(pool.Addresses) > highestNumAddr {
+				highestNumAddr = len(pool.Addresses)
 				ap = pool
 			}
 		}
@@ -361,6 +369,7 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 			if !ar.InUse {
 				break
 			}
+			ar = nil
 		}
 
 		if ar == nil {
