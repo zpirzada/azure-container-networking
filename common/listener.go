@@ -24,7 +24,7 @@ type Listener struct {
 // Creates a new Listener.
 func NewListener(protocol string, localAddress string) (*Listener, error) {
 	listener := Listener{
-		protocol: protocol,
+		protocol:     protocol,
 		localAddress: localAddress,
 	}
 

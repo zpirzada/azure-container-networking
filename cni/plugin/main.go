@@ -85,7 +85,7 @@ func main() {
 	common.LogNetworkInterfaces()
 
 	// Set plugin options.
-	ipamPlugin.SetOption(common.OptEnvironmentKey, environment)
+	ipamPlugin.SetOption(common.OptEnvironment, environment)
 
 	// Start plugins.
 	if netPlugin != nil {

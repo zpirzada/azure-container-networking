@@ -19,12 +19,6 @@ import (
 const (
 	// Plugin name.
 	name = "azure"
-
-	// Command line options.
-	OptEnvironment = "environment"
-	OptLogLevel    = "log-level"
-	OptLogTarget   = "log-target"
-	OptVersion     = "version"
 )
 
 // Version is populated by make during build.
@@ -33,42 +27,49 @@ var version string
 // Command line arguments for CNM plugin.
 var args = common.ArgumentList{
 	{
-		Name:         OptEnvironment,
-		Shorthand:    "e",
+		Name:         common.OptEnvironment,
+		Shorthand:    common.OptEnvironmentAlias,
 		Description:  "Set the operating environment",
 		Type:         "string",
-		DefaultValue: "azure",
+		DefaultValue: common.OptEnvironmentAzure,
 		ValueMap: map[string]interface{}{
-			"azure": 0,
-			"mas":   0,
+			common.OptEnvironmentAzure: 0,
+			common.OptEnvironmentMAS:   0,
 		},
 	},
 	{
-		Name:         OptLogLevel,
-		Shorthand:    "l",
+		Name:         common.OptLogLevel,
+		Shorthand:    common.OptLogLevelAlias,
 		Description:  "Set the logging level",
 		Type:         "int",
-		DefaultValue: "info",
+		DefaultValue: common.OptLogLevelInfo,
 		ValueMap: map[string]interface{}{
-			"info":  log.LevelInfo,
-			"debug": log.LevelDebug,
+			common.OptLogLevelInfo:  log.LevelInfo,
+			common.OptLogLevelDebug: log.LevelDebug,
 		},
 	},
 	{
-		Name:         OptLogTarget,
-		Shorthand:    "t",
+		Name:         common.OptLogTarget,
+		Shorthand:    common.OptLogTargetAlias,
 		Description:  "Set the logging target",
 		Type:         "int",
-		DefaultValue: "logfile",
+		DefaultValue: common.OptLogTargetFile,
 		ValueMap: map[string]interface{}{
-			"syslog":  log.TargetSyslog,
-			"stderr":  log.TargetStderr,
-			"logfile": log.TargetLogfile,
+			common.OptLogTargetSyslog: log.TargetSyslog,
+			common.OptLogTargetStderr: log.TargetStderr,
+			common.OptLogTargetFile:   log.TargetLogfile,
 		},
 	},
 	{
-		Name:         OptVersion,
-		Shorthand:    "v",
+		Name:         common.OptIpamQueryInterval,
+		Shorthand:    common.OptIpamQueryIntervalAlias,
+		Description:  "Set the IPAM plugin query interval",
+		Type:         "int",
+		DefaultValue: "",
+	},
+	{
+		Name:         common.OptVersion,
+		Shorthand:    common.OptVersionAlias,
 		Description:  "Print version information",
 		Type:         "bool",
 		DefaultValue: false,
@@ -86,10 +87,11 @@ func main() {
 	// Initialize and parse command line arguments.
 	common.ParseArgs(&args, printVersion)
 
-	environment := common.GetArg(OptEnvironment).(string)
-	logLevel := common.GetArg(OptLogLevel).(int)
-	logTarget := common.GetArg(OptLogTarget).(int)
-	vers := common.GetArg(OptVersion).(bool)
+	environment := common.GetArg(common.OptEnvironment).(string)
+	logLevel := common.GetArg(common.OptLogLevel).(int)
+	logTarget := common.GetArg(common.OptLogTarget).(int)
+	ipamQueryInterval, _ := common.GetArg(common.OptIpamQueryInterval).(int)
+	vers := common.GetArg(common.OptVersion).(bool)
 
 	if vers {
 		printVersion()
@@ -138,7 +140,8 @@ func main() {
 	common.LogNetworkInterfaces()
 
 	// Set plugin options.
-	ipamPlugin.SetOption(common.OptEnvironmentKey, environment)
+	ipamPlugin.SetOption(common.OptEnvironment, environment)
+	ipamPlugin.SetOption(common.OptIpamQueryInterval, ipamQueryInterval)
 
 	// Start plugins.
 	if netPlugin != nil {
