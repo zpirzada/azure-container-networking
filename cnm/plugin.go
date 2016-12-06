@@ -5,6 +5,7 @@ package cnm
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
@@ -36,13 +37,16 @@ func (plugin *Plugin) Initialize(config *common.PluginConfig) error {
 	// Initialize the base plugin.
 	plugin.Plugin.Initialize(config)
 
+	// Create the plugin path.
+	os.MkdirAll(pluginPath, 0660)
+
 	// Create the listener.
-	var socketName string
+	var localAddr string
 	if plugin.Name != "test" {
-		socketName = config.Name + plugin.Name
+		localAddr = config.Name + plugin.Name
 	}
 
-	listener, err := common.NewListener(socketName)
+	listener, err := common.NewListener("unix", localAddr)
 	if err != nil {
 		return err
 	}
