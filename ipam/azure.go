@@ -9,22 +9,25 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/Azure/azure-container-networking/common"
 )
 
 const (
 	// Host URL to query.
 	azureQueryUrl = "http://169.254.169.254/machine/plugins?comp=nmagent&type=getinterfaceinfov1"
 
-	// Minimum delay between consecutive polls.
-	azureDefaultMinPollPeriod = 30 * time.Second
+	// Minimum time interval between consecutive queries.
+	azureQueryInterval = 10 * time.Second
 )
 
 // Microsoft Azure IPAM configuration source.
 type azureSource struct {
 	name          string
 	sink          addressConfigSink
+	queryUrl      string
+	queryInterval time.Duration
 	lastRefresh   time.Time
-	minPollPeriod time.Duration
 }
 
 // Azure host agent XML document format.
@@ -49,10 +52,22 @@ type xmlDocument struct {
 }
 
 // Creates the Azure source.
-func newAzureSource() (*azureSource, error) {
+func newAzureSource(options map[string]interface{}) (*azureSource, error) {
+	queryUrl, _ := options[common.OptIpamQueryUrl].(string)
+	if queryUrl == "" {
+		queryUrl = azureQueryUrl
+	}
+
+	i, _ := options[common.OptIpamQueryInterval].(int)
+	queryInterval := time.Duration(i) * time.Second
+	if queryInterval == 0 {
+		queryInterval = azureQueryInterval
+	}
+
 	return &azureSource{
 		name:          "Azure",
-		minPollPeriod: azureDefaultMinPollPeriod,
+		queryUrl:      queryUrl,
+		queryInterval: queryInterval,
 	}, nil
 }
 
@@ -71,8 +86,8 @@ func (s *azureSource) stop() {
 // Refreshes configuration.
 func (s *azureSource) refresh() error {
 
-	// Refresh only if enough time has passed since the last poll.
-	if time.Since(s.lastRefresh) < s.minPollPeriod {
+	// Refresh only if enough time has passed since the last query.
+	if time.Since(s.lastRefresh) < s.queryInterval {
 		return nil
 	}
 	s.lastRefresh = time.Now()
@@ -90,7 +105,7 @@ func (s *azureSource) refresh() error {
 	}
 
 	// Fetch configuration.
-	resp, err := http.Get(azureQueryUrl)
+	resp, err := http.Get(s.queryUrl)
 	if err != nil {
 		return err
 	}
@@ -115,7 +130,7 @@ func (s *azureSource) refresh() error {
 		for _, iface := range interfaces {
 			macAddr := strings.Replace(iface.HardwareAddr.String(), ":", "", -1)
 			macAddr = strings.ToLower(macAddr)
-			if macAddr == i.MacAddress {
+			if macAddr == i.MacAddress || i.MacAddress == "*" {
 				ifName = iface.Name
 
 				// Prioritize secondary interfaces.

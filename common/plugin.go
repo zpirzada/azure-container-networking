@@ -11,7 +11,7 @@ import (
 type Plugin struct {
 	Name    string
 	Version string
-	Options map[string]string
+	Options map[string]interface{}
 	ErrChan chan error
 	Store   store.KeyValueStore
 }
@@ -20,8 +20,8 @@ type Plugin struct {
 type PluginApi interface {
 	Start(*PluginConfig) error
 	Stop()
-	GetOption(string) string
-	SetOption(string, string)
+	GetOption(string) interface{}
+	SetOption(string, interface{})
 }
 
 // Plugin common configuration.
@@ -37,9 +37,9 @@ type PluginConfig struct {
 // NewPlugin creates a new Plugin object.
 func NewPlugin(name, version string) (*Plugin, error) {
 	return &Plugin{
-		Name:         name,
-		Version:      version,
-		Options:      make(map[string]string),
+		Name:    name,
+		Version: version,
+		Options: make(map[string]interface{}),
 	}, nil
 }
 
@@ -56,11 +56,11 @@ func (plugin *Plugin) Uninitialize() {
 }
 
 // GetOption gets the option value for the given key.
-func (plugin *Plugin) GetOption(key string) string {
+func (plugin *Plugin) GetOption(key string) interface{} {
 	return plugin.Options[key]
 }
 
 // SetOption sets the option value for the given key.
-func (plugin *Plugin) SetOption(key, value string) {
+func (plugin *Plugin) SetOption(key string, value interface{}) {
 	plugin.Options[key] = value
 }

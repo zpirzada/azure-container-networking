@@ -8,22 +8,25 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/Azure/azure-container-networking/common"
 )
 
 const (
 	// Host URL to query.
 	masQueryUrl = "http://169.254.169.254:6642/ListNetwork"
 
-	// Minimum delay between consecutive polls.
-	masDefaultMinPollPeriod = 30 * time.Second
+	// Minimum time interval between consecutive queries.
+	masQueryInterval = 10 * time.Second
 )
 
 // Microsoft Azure Stack IPAM configuration source.
 type masSource struct {
 	name          string
 	sink          addressConfigSink
+	queryUrl      string
+	queryInterval time.Duration
 	lastRefresh   time.Time
-	minPollPeriod time.Duration
 }
 
 // MAS host agent JSON object format.
@@ -39,10 +42,22 @@ type jsonObject struct {
 }
 
 // Creates the MAS source.
-func newMasSource() (*masSource, error) {
+func newMasSource(options map[string]interface{}) (*masSource, error) {
+	queryUrl, _ := options[common.OptIpamQueryUrl].(string)
+	if queryUrl == "" {
+		queryUrl = masQueryUrl
+	}
+
+	i, _ := options[common.OptIpamQueryInterval].(int)
+	queryInterval := time.Duration(i) * time.Second
+	if queryInterval == 0 {
+		queryInterval = masQueryInterval
+	}
+
 	return &masSource{
 		name:          "MAS",
-		minPollPeriod: masDefaultMinPollPeriod,
+		queryUrl:      queryUrl,
+		queryInterval: queryInterval,
 	}, nil
 }
 
@@ -61,8 +76,8 @@ func (s *masSource) stop() {
 // Refreshes configuration.
 func (s *masSource) refresh() error {
 
-	// Refresh only if enough time has passed since the last poll.
-	if time.Since(s.lastRefresh) < s.minPollPeriod {
+	// Refresh only if enough time has passed since the last query.
+	if time.Since(s.lastRefresh) < s.queryInterval {
 		return nil
 	}
 	s.lastRefresh = time.Now()
@@ -74,7 +89,7 @@ func (s *masSource) refresh() error {
 	}
 
 	// Fetch configuration.
-	resp, err := http.Get(masQueryUrl)
+	resp, err := http.Get(s.queryUrl)
 	if err != nil {
 		return err
 	}

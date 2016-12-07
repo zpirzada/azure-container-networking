@@ -43,7 +43,7 @@ type addressPool struct {
 	Addresses map[string]*addressRecord
 	IsIPv6    bool
 	Priority  int
-	InUse     bool
+	RefCount  int
 	epoch     int
 }
 
@@ -157,7 +157,7 @@ func (as *addressSpace) merge(newas *addressSpace) {
 			// This is a new address pool.
 			// Merge it to the existing address space.
 			as.Pools[pk] = pv
-			delete(newas.Pools, pk)
+			pv.as = as
 			pv.epoch = as.epoch
 		} else {
 			// This pool already exists.
@@ -169,29 +169,39 @@ func (as *addressSpace) merge(newas *addressSpace) {
 					// This is a new address record.
 					// Merge it to the existing address pool.
 					ap.Addresses[ak] = av
-					delete(ap.Addresses, ak)
 					av.epoch = as.epoch
 				} else {
 					// This address record already exists.
 					ar.epoch = as.epoch
 				}
+
+				delete(pv.Addresses, ak)
 			}
 
-			ap.epoch = as.epoch
+			pv.as = nil
 		}
+
+		delete(newas.Pools, pk)
 	}
 
 	// Cleanup stale pools and addresses from the old epoch.
 	// Those currently in use will be deleted after they are released.
 	for pk, pv := range as.Pools {
 		if pv.epoch < as.epoch {
+			// This pool may have stale addresses.
 			for ak, av := range pv.Addresses {
-				if !av.InUse {
+				if av.epoch == as.epoch || av.InUse {
+					// Pool has at least one valid or in-use address.
+					pv.epoch = as.epoch
+				} else {
+					// This address is no longer available.
 					delete(pv.Addresses, ak)
 				}
 			}
 
-			if !pv.InUse {
+			// Delete the pool if it has no addresses left.
+			if pv.epoch < as.epoch && !pv.isInUse() {
+				pv.as = nil
 				delete(as.Pools, pk)
 			}
 		}
@@ -243,22 +253,19 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 
 	if poolId != "" {
 		// Return the specific address pool requested.
+		// Note sharing of pools is allowed when specifically requested.
 		ap = as.Pools[poolId]
 		if ap == nil {
 			return nil, errAddressPoolNotFound
 		}
-
-		// Fail if requested pool is already in use.
-		if ap.InUse {
-			return nil, errAddressPoolInUse
-		}
 	} else {
 		// Return any available address pool.
 		highestPriority := -1
+		highestNumAddr := -1
 
 		for _, pool := range as.Pools {
 			// Skip if pool is already in use.
-			if pool.InUse {
+			if pool.isInUse() {
 				continue
 			}
 
@@ -267,9 +274,15 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 				continue
 			}
 
-			// Pick the pool with the highest priority.
+			// Prefer the pool with the highest priority.
 			if pool.Priority > highestPriority {
 				highestPriority = pool.Priority
+				ap = pool
+			}
+
+			// Prefer the pool with the highest number of addresses.
+			if len(pool.Addresses) > highestNumAddr {
+				highestNumAddr = len(pool.Addresses)
 				ap = pool
 			}
 		}
@@ -279,7 +292,7 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 		}
 	}
 
-	ap.InUse = true
+	ap.RefCount++
 
 	return ap, nil
 }
@@ -291,14 +304,14 @@ func (as *addressSpace) releasePool(poolId string) error {
 		return errAddressPoolNotFound
 	}
 
-	if !ap.InUse {
+	if !ap.isInUse() {
 		return errAddressPoolNotInUse
 	}
 
-	ap.InUse = false
+	ap.RefCount--
 
 	// Delete address pool if it is no longer available.
-	if ap.epoch < as.epoch {
+	if ap.epoch < as.epoch && !ap.isInUse() {
 		delete(as.Pools, poolId)
 	}
 
@@ -308,6 +321,11 @@ func (as *addressSpace) releasePool(poolId string) error {
 //
 // AddressPool
 //
+
+// Returns if an addess pool is currently in use.
+func (ap *addressPool) isInUse() bool {
+	return ap.RefCount > 0
+}
 
 // Creates a new addressRecord object.
 func (ap *addressPool) newAddressRecord(addr *net.IP) (*addressRecord, error) {
@@ -351,6 +369,7 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 			if !ar.InUse {
 				break
 			}
+			ar = nil
 		}
 
 		if ar == nil {

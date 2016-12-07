@@ -28,7 +28,7 @@ type addressManager struct {
 
 // AddressManager API.
 type AddressManager interface {
-	Initialize(config *common.PluginConfig, environment string) error
+	Initialize(config *common.PluginConfig, options map[string]interface{}) error
 	Uninitialize()
 
 	GetDefaultAddressSpaces() (string, string)
@@ -61,7 +61,7 @@ func NewAddressManager() (AddressManager, error) {
 }
 
 // Initialize configures address manager.
-func (am *addressManager) Initialize(config *common.PluginConfig, environment string) error {
+func (am *addressManager) Initialize(config *common.PluginConfig, options map[string]interface{}) error {
 	am.store = config.Store
 	am.netApi, _ = config.NetApi.(network.NetworkManager)
 
@@ -72,7 +72,7 @@ func (am *addressManager) Initialize(config *common.PluginConfig, environment st
 	}
 
 	// Start source.
-	err = am.startSource(environment)
+	err = am.startSource(options)
 
 	return err
 }
@@ -129,15 +129,17 @@ func (am *addressManager) save() error {
 }
 
 // Starts configuration source.
-func (am *addressManager) startSource(environment string) error {
+func (am *addressManager) startSource(options map[string]interface{}) error {
 	var err error
+
+	environment, _ := options[common.OptEnvironment].(string)
 
 	switch environment {
 	case common.OptEnvironmentAzure:
-		am.source, err = newAzureSource()
+		am.source, err = newAzureSource(options)
 
 	case common.OptEnvironmentMAS:
-		am.source, err = newMasSource()
+		am.source, err = newMasSource(options)
 
 	case "null":
 		am.source, err = newNullSource()

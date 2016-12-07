@@ -9,27 +9,27 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path"
 
 	"github.com/Azure/azure-container-networking/log"
 )
 
-// Libnetwork plugin path
-const pluginPath = "/run/docker/plugins"
-
 // Listener object
 type Listener struct {
-	socketName string
-	l          net.Listener
-	mux        *http.ServeMux
+	protocol     string
+	localAddress string
+	l            net.Listener
+	mux          *http.ServeMux
 }
 
 // Creates a new Listener.
-func NewListener(socketName string) (*Listener, error) {
-	var listener Listener
+func NewListener(protocol string, localAddress string) (*Listener, error) {
+	listener := Listener{
+		protocol:     protocol,
+		localAddress: localAddress,
+	}
 
-	if socketName != "" {
-		listener.socketName = path.Join(pluginPath, socketName) + ".sock"
+	if protocol == "unix" && localAddress != "" {
+		listener.localAddress = localAddress + ".sock"
 	}
 
 	listener.mux = http.NewServeMux()
@@ -37,25 +37,22 @@ func NewListener(socketName string) (*Listener, error) {
 	return &listener, nil
 }
 
-// Starts listening for requests from libnetwork and routes them to the corresponding plugin.
+// Start creates the listener socket and starts the HTTP server.
 func (listener *Listener) Start(errChan chan error) error {
 	var err error
 
 	// Succeed early if no socket was requested.
-	if listener.socketName == "" {
+	if listener.localAddress == "" {
 		return nil
 	}
 
-	// Create a socket.
-	os.MkdirAll(pluginPath, 0660)
-
-	listener.l, err = net.Listen("unix", listener.socketName)
+	listener.l, err = net.Listen(listener.protocol, listener.localAddress)
 	if err != nil {
 		log.Printf("Listener: Failed to listen %+v", err)
 		return err
 	}
 
-	log.Printf("Listener: Started listening on %s.", listener.socketName)
+	log.Printf("[Listener] Started listening on %s.", listener.localAddress)
 
 	// Launch goroutine for servicing requests.
 	go func() {
@@ -69,17 +66,19 @@ func (listener *Listener) Start(errChan chan error) error {
 func (listener *Listener) Stop() {
 
 	// Succeed early if no socket was requested.
-	if listener.socketName == "" {
+	if listener.localAddress == "" {
 		return
 	}
 
 	// Stop servicing requests.
 	listener.l.Close()
 
-	// Delete the socket.
-	os.Remove(listener.socketName)
+	// Delete the unix socket.
+	if listener.protocol == "unix" {
+		os.Remove(listener.localAddress)
+	}
 
-	log.Printf("Listener: Stopped listening on %s", listener.socketName)
+	log.Printf("[Listener] Stopped listening on %s", listener.localAddress)
 }
 
 // Returns the HTTP mux for the listener.
@@ -104,7 +103,7 @@ func (listener *Listener) Decode(w http.ResponseWriter, r *http.Request, request
 
 	if err != nil {
 		http.Error(w, "Failed to decode request: "+err.Error(), http.StatusBadRequest)
-		log.Printf("Listener: Failed to decode request: %v\n", err.Error())
+		log.Printf("[Listener] Failed to decode request: %v\n", err.Error())
 	}
 	return err
 }
@@ -114,7 +113,7 @@ func (listener *Listener) Encode(w http.ResponseWriter, response interface{}) er
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
 		http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
-		log.Printf("Listener: Failed to encode response: %v\n", err.Error())
+		log.Printf("[Listener] Failed to encode response: %v\n", err.Error())
 	}
 	return err
 }
