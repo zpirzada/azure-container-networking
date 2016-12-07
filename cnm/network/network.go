@@ -18,6 +18,9 @@ const (
 
 	// Plugin capabilities.
 	scope = "local"
+
+	// Prefix for container network interface names.
+	containerInterfacePrefix = "eth"
 )
 
 // NetPlugin represents a CNM (libnetwork) network plugin.
@@ -257,8 +260,8 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 
 	// Encode response.
 	ifname := interfaceName{
-		SrcName:   ep.SrcName,
-		DstPrefix: ep.DstPrefix,
+		SrcName:   ep.IfName,
+		DstPrefix: containerInterfacePrefix,
 	}
 
 	resp := joinResponse{
