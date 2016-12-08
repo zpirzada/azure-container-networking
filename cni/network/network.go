@@ -158,13 +158,20 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		return nil
 	}
 
+	ip, ipv4Address, err := net.ParseCIDR(address)
+	ipv4Address.IP = ip
+	if err != nil {
+		log.Printf("[cni] Failed to parse address %v, err:%v.", address, err)
+		return nil
+	}
+
 	log.Printf("[cni] Allocated address: %v", address)
 
 	// Create the endpoint.
 	epInfo := network.EndpointInfo{
 		Id:          endpointId,
 		IfName:      args.IfName,
-		IPv4Address: address,
+		IPv4Address: *ipv4Address,
 		NetNsPath:   args.Netns,
 	}
 
@@ -175,15 +182,8 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	}
 
 	// Output the result.
-	ip, cidr, err := net.ParseCIDR(address)
-	cidr.IP = ip
-	if err != nil {
-		log.Printf("[cni] Failed to parse address, err:%v.", err)
-		return nil
-	}
-
 	result := &cniTypes.Result{
-		IP4: &cniTypes.IPConfig{IP: *cidr},
+		IP4: &cniTypes.IPConfig{IP: *ipv4Address},
 	}
 
 	result.Print()
@@ -238,7 +238,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	}
 
 	// Release the address.
-	err = plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwInfo.Subnets[0], epInfo.IPv4Address)
+	err = plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwInfo.Subnets[0], epInfo.IPv4Address.IP.String())
 	if err != nil {
 		log.Printf("[cni] Failed to release address, err:%v.", err)
 		return nil
