@@ -251,7 +251,7 @@ func (nm *networkManager) GetEndpointInfo(networkId string, endpointId string) (
 
 	epInfo := &EndpointInfo{
 		Id:          endpointId,
-		IPv4Address: ep.IPv4Address.String(),
+		IPv4Address: ep.IPv4Address,
 	}
 
 	return epInfo, nil

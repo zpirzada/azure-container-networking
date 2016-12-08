@@ -4,6 +4,7 @@
 package network
 
 import (
+	"net"
 	"net/http"
 
 	"github.com/Azure/azure-container-networking/cnm"
@@ -189,14 +190,20 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Process request.
-	var ipv4Address string
+	var ipv4Address *net.IPNet
 	if req.Interface != nil {
-		ipv4Address = req.Interface.Address
+		var ip net.IP
+		ip, ipv4Address, err = net.ParseCIDR(req.Interface.Address)
+		if err != nil {
+			plugin.SendErrorResponse(w, err)
+			return
+		}
+		ipv4Address.IP = ip
 	}
 
 	epInfo := network.EndpointInfo{
 		Id:          req.EndpointID,
-		IPv4Address: ipv4Address,
+		IPv4Address: *ipv4Address,
 	}
 
 	err = plugin.nm.CreateEndpoint(req.NetworkID, &epInfo)

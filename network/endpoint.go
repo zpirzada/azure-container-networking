@@ -37,8 +37,8 @@ type endpoint struct {
 type EndpointInfo struct {
 	Id          string
 	IfName      string
-	IPv4Address string
 	NetNsPath   string
+	IPv4Address net.IPNet
 }
 
 // NewEndpoint creates a new endpoint in the network.
@@ -54,12 +54,7 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 		return nil, errEndpointExists
 	}
 
-	// Parse IP address.
-	ipAddr, ipNet, err := net.ParseCIDR(epInfo.IPv4Address)
-	ipNet.IP = ipAddr
-	if err != nil {
-		return nil, err
-	}
+	ipAddr := epInfo.IPv4Address
 
 	// Create a veth pair.
 	hostIfName := fmt.Sprintf("%s%s", hostInterfacePrefix, epInfo.Id[:7])
@@ -102,7 +97,7 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 
 	// Setup MAC address translation rules for container interface.
 	log.Printf("[net] Setting up MAC address translation rules for endpoint %v.", contIfName)
-	err = ebtables.SetupDnatBasedOnIPV4Address(ipAddr.String(), containerIf.HardwareAddr.String())
+	err = ebtables.SetupDnatBasedOnIPV4Address(ipAddr.IP.String(), containerIf.HardwareAddr.String())
 	if err != nil {
 		goto cleanup
 	}
@@ -158,8 +153,8 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	}
 
 	// Assign IP address to container network interface.
-	log.Printf("[net] Adding IP address %v to link %v.", ipAddr, contIfName)
-	err = netlink.AddIpAddress(contIfName, ipAddr, ipNet)
+	log.Printf("[net] Adding IP address %v to link %v.", ipAddr.String(), contIfName)
+	err = netlink.AddIpAddress(contIfName, ipAddr.IP, &ipAddr)
 	if err != nil {
 		goto cleanup
 	}
@@ -180,7 +175,7 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 		IfName:      contIfName,
 		HostIfName:  hostIfName,
 		MacAddress:  containerIf.HardwareAddr,
-		IPv4Address: *ipNet,
+		IPv4Address: ipAddr,
 		IPv6Address: net.IPNet{},
 		IPv4Gateway: nw.extIf.IPv4Gateway,
 		IPv6Gateway: nw.extIf.IPv6Gateway,
