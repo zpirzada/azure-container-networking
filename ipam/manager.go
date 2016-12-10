@@ -34,6 +34,8 @@ type AddressManager interface {
 	GetDefaultAddressSpaces() (string, string)
 	RequestPool(asId, poolId, subPoolId string, options map[string]string, v6 bool) (string, string, error)
 	ReleasePool(asId, poolId string) error
+	GetPoolInfo(asId, poolId string) (*AddressPoolInfo, error)
+
 	RequestAddress(asId, poolId, address string, options map[string]string) (string, error)
 	ReleaseAddress(asId, poolId, address string) error
 }
@@ -252,6 +254,24 @@ func (am *addressManager) ReleasePool(asId string, poolId string) error {
 	}
 
 	return nil
+}
+
+// GetPoolInfo returns information about the given address pool.
+func (am *addressManager) GetPoolInfo(asId string, poolId string) (*AddressPoolInfo, error) {
+	am.Lock()
+	defer am.Unlock()
+
+	as, err := am.getAddressSpace(asId)
+	if err != nil {
+		return nil, err
+	}
+
+	ap, err := as.getAddressPool(poolId)
+	if err != nil {
+		return nil, err
+	}
+
+	return ap.getInfo(), nil
 }
 
 // RequestAddress reserves a new address from the address pool.
