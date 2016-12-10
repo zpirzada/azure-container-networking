@@ -5,7 +5,54 @@ package cni
 
 import (
 	"encoding/json"
+
+	cniSkel "github.com/containernetworking/cni/pkg/skel"
+	cniTypes "github.com/containernetworking/cni/pkg/types"
 )
+
+const (
+	Internal = "internal"
+
+	CmdAdd = "ADD"
+	CmdDel = "DEL"
+)
+
+// CNI contract.
+type CniPlugin interface {
+	Add(args *cniSkel.CmdArgs) error
+	Delete(args *cniSkel.CmdArgs) error
+}
+
+// CallPlugin calls the given CNI plugin through the internal interface.
+func CallPlugin(plugin CniPlugin, cmd string, args *cniSkel.CmdArgs, nwCfg *NetworkConfig) (*cniTypes.Result, error) {
+	var err error
+
+	savedType := nwCfg.Ipam.Type
+	nwCfg.Ipam.Type = Internal
+	args.StdinData = nwCfg.Serialize()
+
+	// Call the plugin's internal interface.
+	if cmd == CmdAdd {
+		err = plugin.Add(args)
+	} else {
+		err = plugin.Delete(args)
+	}
+
+	nwCfg.Ipam.Type = savedType
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Read back the result.
+	var result cniTypes.Result
+	err = json.Unmarshal(args.StdinData, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
 
 // NetworkConfig represents the Azure CNI plugin's network configuration.
 type NetworkConfig struct {
@@ -13,12 +60,15 @@ type NetworkConfig struct {
 	Name       string `json:"name"`
 	Type       string `json:"type"`
 	Bridge     string `json:"bridge,omitempty"`
-	IfName     string `json:"ifName,omitempty"`
+	LogLevel   string `json:"logLevel,omitempty"`
+	LogTarget  string `json:"logTarget,omitempty"`
 	Ipam       struct {
-		Type      string `json:"type"`
-		AddrSpace string `json:"addressSpace,omitempty"`
-		Subnet    string `json:"subnet,omitempty"`
-		Address   string `json:"ipAddress,omitempty"`
+		Type          string `json:"type"`
+		Environment   string `json:"environment,omitempty"`
+		AddrSpace     string `json:"addressSpace,omitempty"`
+		Subnet        string `json:"subnet,omitempty"`
+		Address       string `json:"ipAddress,omitempty"`
+		QueryInterval string `json:"queryInterval,omitempty"`
 	}
 }
 

@@ -19,3 +19,14 @@ func generateAddress(subnet *net.IPNet, hostId net.IP) net.IP {
 
 	return address
 }
+
+// ConvertAddressToIPNet returns the given IP address as an IPNet object.
+func ConvertAddressToIPNet(address string) (*net.IPNet, error) {
+	ip, ipnet, err := net.ParseCIDR(address)
+	if err != nil {
+		return nil, err
+	}
+
+	ipnet.IP = ip
+	return ipnet, nil
+}
