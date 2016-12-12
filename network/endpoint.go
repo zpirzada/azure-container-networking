@@ -246,6 +246,20 @@ func (nw *network) getEndpoint(endpointId string) (*endpoint, error) {
 	return ep, nil
 }
 
+//
+// Endpoint
+//
+
+// GetInfo returns information about the endpoint.
+func (ep *endpoint) getInfo() *EndpointInfo {
+	info := &EndpointInfo{
+		Id:          ep.Id,
+		IPv4Address: ep.IPv4Address,
+	}
+
+	return info
+}
+
 // Attach attaches an endpoint to a sandbox.
 func (ep *endpoint) attach(sandboxKey string, options map[string]interface{}) error {
 	if ep.SandboxKey != "" {
