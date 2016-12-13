@@ -203,7 +203,7 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 
 	epInfo := network.EndpointInfo{
 		Id:          req.EndpointID,
-		IPv4Address: *ipv4Address,
+		IPAddresses: []net.IPNet{*ipv4Address},
 	}
 
 	err = plugin.nm.CreateEndpoint(req.NetworkID, &epInfo)
@@ -273,8 +273,7 @@ func (plugin *netPlugin) join(w http.ResponseWriter, r *http.Request) {
 
 	resp := joinResponse{
 		InterfaceName: ifname,
-		Gateway:       ep.IPv4Gateway.String(),
-		GatewayIPv6:   ep.IPv6Gateway.String(),
+		Gateway:       ep.Gateways[0].String(),
 	}
 
 	err = plugin.Listener.Encode(w, &resp)

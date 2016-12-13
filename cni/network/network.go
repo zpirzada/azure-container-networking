@@ -151,10 +151,18 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	// Create the endpoint.
 	epInfo := &network.EndpointInfo{
-		Id:          endpointId,
-		IfName:      args.IfName,
-		IPv4Address: result.IP4.IP,
-		NetNsPath:   args.Netns,
+		Id:        endpointId,
+		IfName:    args.IfName,
+		NetNsPath: args.Netns,
+	}
+
+	// Populate addresses and routes.
+	if result.IP4 != nil {
+		epInfo.IPAddresses = append(epInfo.IPAddresses, result.IP4.IP)
+
+		for _, route := range result.IP4.Routes {
+			epInfo.Routes = append(epInfo.Routes, network.RouteInfo{Dst: route.Dst, Gw: route.GW})
+		}
 	}
 
 	err = plugin.nm.CreateEndpoint(networkId, epInfo)
@@ -210,13 +218,15 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		return nil
 	}
 
-	// Call into IPAM plugin to release the endpoint's address.
+	// Call into IPAM plugin to release the endpoint's addresses.
 	nwCfg.Ipam.Subnet = nwInfo.Subnets[0]
-	nwCfg.Ipam.Address = epInfo.IPv4Address.IP.String()
-	_, err = cni.CallPlugin(plugin.ipamPlugin, cni.CmdDel, args, nwCfg)
-	if err != nil {
-		log.Printf("[cni-net] Failed to release address, err:%v.", err)
-		return nil
+	for _, address := range epInfo.IPAddresses {
+		nwCfg.Ipam.Address = address.IP.String()
+		_, err = cni.CallPlugin(plugin.ipamPlugin, cni.CmdDel, args, nwCfg)
+		if err != nil {
+			log.Printf("[cni-net] Failed to release address, err:%v.", err)
+			return nil
+		}
 	}
 
 	log.Printf("[cni-net] DEL succeeded.")
