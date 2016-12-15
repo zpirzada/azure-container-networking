@@ -38,5 +38,5 @@ const (
 
 	// Help.
 	OptHelp      = "help"
-	OptHelpAlias = "?"
+	OptHelpAlias = "h"
 )
