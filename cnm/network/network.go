@@ -76,6 +76,7 @@ func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 
 	// Add protocol handlers.
 	listener := plugin.Listener
+	listener.AddEndpoint(plugin.EndpointType)
 	listener.AddHandler(getCapabilitiesPath, plugin.getCapabilities)
 	listener.AddHandler(createNetworkPath, plugin.createNetwork)
 	listener.AddHandler(deleteNetworkPath, plugin.deleteNetwork)

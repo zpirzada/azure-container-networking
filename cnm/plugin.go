@@ -38,28 +38,36 @@ func (plugin *Plugin) Initialize(config *common.PluginConfig) error {
 	// Initialize the base plugin.
 	plugin.Plugin.Initialize(config)
 
-	// Create the plugin path.
-	os.MkdirAll(pluginPath, 0660)
+	if config.Listener == nil {
+		// Create the plugin path.
+		os.MkdirAll(pluginPath, 0660)
 
-	// Create the listener.
-	var localAddr string
-	if plugin.Name != "test" {
-		localAddr = path.Join(pluginPath, config.Name+plugin.Name)
+		// Create the listener.
+		var localAddr string
+		if plugin.Name != "test" {
+			localAddr = path.Join(pluginPath, config.Name+plugin.Name)
+		}
+
+		listener, err := common.NewListener("unix", localAddr)
+		if err != nil {
+			return err
+		}
+
+		// Add generic protocol handlers.
+		listener.AddHandler(activatePath, plugin.activate)
+
+		// Start the listener.
+		err = listener.Start(config.ErrChan)
+		if err != nil {
+			return err
+		}
+
+		config.Listener = listener
 	}
 
-	listener, err := common.NewListener("unix", localAddr)
-	if err != nil {
-		return err
-	}
+	plugin.Listener = config.Listener
 
-	// Add generic protocol handlers.
-	listener.AddHandler(activatePath, plugin.activate)
-
-	// Start the listener.
-	err = listener.Start(config.ErrChan)
-	plugin.Listener = listener
-
-	return err
+	return nil
 }
 
 // Uninitializes the plugin.
@@ -78,7 +86,7 @@ func (plugin *Plugin) activate(w http.ResponseWriter, r *http.Request) {
 
 	log.Request(plugin.Name, &req, nil)
 
-	resp := activateResponse{[]string{plugin.EndpointType}}
+	resp := activateResponse{Implements: plugin.Listener.GetEndpoints()}
 	err := plugin.Listener.Encode(w, &resp)
 
 	log.Response(plugin.Name, &resp, err)
