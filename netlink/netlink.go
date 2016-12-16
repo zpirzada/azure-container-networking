@@ -10,12 +10,12 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Initializes netlink module.
+// Init initializes netlink module.
 func init() {
 	initEncoder()
 }
 
-// Sends a netlink echo request message.
+// Echo sends a netlink echo request message.
 func Echo(text string) error {
 	s, err := getSocket()
 	if err != nil {
@@ -32,7 +32,7 @@ func Echo(text string) error {
 	return s.sendAndWaitForAck(req)
 }
 
-// Adds a new network link of a specified type.
+// AddLink adds a new network interface of a specified type.
 func AddLink(name string, linkType string) error {
 	if name == "" || linkType == "" {
 		return fmt.Errorf("Invalid link name or type")
@@ -58,7 +58,7 @@ func AddLink(name string, linkType string) error {
 	return s.sendAndWaitForAck(req)
 }
 
-// Deletes a network link.
+// DeleteLink deletes a network interface.
 func DeleteLink(name string) error {
 	if name == "" {
 		return fmt.Errorf("Invalid link name")
@@ -83,7 +83,7 @@ func DeleteLink(name string) error {
 	return s.sendAndWaitForAck(req)
 }
 
-// Sets the name of a network interface.
+// SetLinkName sets the name of a network interface.
 func SetLinkName(name string, newName string) error {
 	s, err := getSocket()
 	if err != nil {
@@ -110,7 +110,7 @@ func SetLinkName(name string, newName string) error {
 	return s.sendAndWaitForAck(req)
 }
 
-// Sets the operational state of a network interface.
+// SetLinkState sets the operational state of a network interface.
 func SetLinkState(name string, up bool) error {
 	s, err := getSocket()
 	if err != nil {
@@ -141,7 +141,7 @@ func SetLinkState(name string, up bool) error {
 	return s.sendAndWaitForAck(req)
 }
 
-// Sets the master (upper) device of a network interface.
+// SetLinkMaster sets the master (upper) device of a network interface.
 func SetLinkMaster(name string, master string) error {
 	s, err := getSocket()
 	if err != nil {
@@ -177,7 +177,7 @@ func SetLinkMaster(name string, master string) error {
 	return s.sendAndWaitForAck(req)
 }
 
-// Sets the network namespace of a network interface.
+// SetLinkNetNs sets the network namespace of a network interface.
 func SetLinkNetNs(name string, fd uintptr) error {
 	s, err := getSocket()
 	if err != nil {
@@ -204,7 +204,7 @@ func SetLinkNetNs(name string, fd uintptr) error {
 	return s.sendAndWaitForAck(req)
 }
 
-// Sets the link layer hardware address of a network interface.
+// SetLinkAddress sets the link layer hardware address of a network interface.
 func SetLinkAddress(ifName string, hwAddress net.HardwareAddr) error {
 	s, err := getSocket()
 	if err != nil {
@@ -230,7 +230,7 @@ func SetLinkAddress(ifName string, hwAddress net.HardwareAddr) error {
 	return s.sendAndWaitForAck(req)
 }
 
-// Adds a new veth pair.
+// AddVethPair adds a new veth pair.
 func AddVethPair(name1 string, name2 string) error {
 	s, err := getSocket()
 	if err != nil {
@@ -262,8 +262,8 @@ func AddVethPair(name1 string, name2 string) error {
 	return s.sendAndWaitForAck(req)
 }
 
-// Returns the address family of an IP address.
-func getIpAddressFamily(ip net.IP) int {
+// GetIpAddressFamily returns the address family of an IP address.
+func GetIpAddressFamily(ip net.IP) int {
 	if len(ip) <= net.IPv4len {
 		return unix.AF_INET
 	}
@@ -273,7 +273,7 @@ func getIpAddressFamily(ip net.IP) int {
 	return unix.AF_INET6
 }
 
-// Sends an IP address set request.
+// setIpAddress sends an IP address set request.
 func setIpAddress(ifName string, ipAddress net.IP, ipNet *net.IPNet, add bool) error {
 	var msgType, flags int
 
@@ -297,7 +297,7 @@ func setIpAddress(ifName string, ipAddress net.IP, ipNet *net.IPNet, add bool) e
 
 	req := newRequest(msgType, flags)
 
-	family := getIpAddressFamily(ipAddress)
+	family := GetIpAddressFamily(ipAddress)
 
 	ifAddr := newIfAddrMsg(family)
 	ifAddr.Index = uint32(iface.Index)
@@ -318,12 +318,12 @@ func setIpAddress(ifName string, ipAddress net.IP, ipNet *net.IPNet, add bool) e
 	return s.sendAndWaitForAck(req)
 }
 
-// Adds an IP address to an interface.
+// AddIpAddress adds an IP address to a network interface.
 func AddIpAddress(ifName string, ipAddress net.IP, ipNet *net.IPNet) error {
 	return setIpAddress(ifName, ipAddress, ipNet, true)
 }
 
-// Deletes an IP address from an interface.
+// DeleteIpAddress deletes an IP address from a network interface.
 func DeleteIpAddress(ifName string, ipAddress net.IP, ipNet *net.IPNet) error {
 	return setIpAddress(ifName, ipAddress, ipNet, false)
 }
@@ -345,7 +345,7 @@ type Route struct {
 	ILinkIndex int
 }
 
-// Decodes a netlink message into a Route struct.
+// deserializeRoute decodes a netlink message into a Route struct.
 func deserializeRoute(msg *message) (*Route, error) {
 	// Parse route message.
 	rtmsg := deserializeRtMsg(msg.data)
@@ -388,7 +388,7 @@ func deserializeRoute(msg *message) (*Route, error) {
 	return &route, nil
 }
 
-// Returns a list of IP routes matching the given filter.
+// GetIpRoute returns a list of IP routes matching the given filter.
 func GetIpRoute(filter *Route) ([]*Route, error) {
 	s, err := getSocket()
 	if err != nil {
@@ -460,7 +460,7 @@ func GetIpRoute(filter *Route) ([]*Route, error) {
 	return routes, nil
 }
 
-// Sends an IP route set request.
+// setIpRoute sends an IP route set request.
 func setIpRoute(route *Route, add bool) error {
 	var msgType, flags int
 
@@ -528,12 +528,12 @@ func setIpRoute(route *Route, add bool) error {
 	return s.sendAndWaitForAck(req)
 }
 
-// Adds an IP route to the route table.
+// AddIpRoute adds an IP route to the route table.
 func AddIpRoute(route *Route) error {
 	return setIpRoute(route, true)
 }
 
-// Deletes an IP route from the route table.
+// DeleteIpRoute deletes an IP route from the route table.
 func DeleteIpRoute(route *Route) error {
 	return setIpRoute(route, false)
 }

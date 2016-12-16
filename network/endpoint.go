@@ -27,10 +27,8 @@ type endpoint struct {
 	IfName      string
 	HostIfName  string
 	MacAddress  net.HardwareAddr
-	IPv4Address net.IPNet
-	IPv6Address net.IPNet
-	IPv4Gateway net.IP
-	IPv6Gateway net.IP
+	IPAddresses []net.IPNet
+	Gateways    []net.IP
 }
 
 // EndpointInfo contains read-only information about an endpoint.
@@ -38,7 +36,14 @@ type EndpointInfo struct {
 	Id          string
 	IfName      string
 	NetNsPath   string
-	IPv4Address net.IPNet
+	IPAddresses []net.IPNet
+	Routes      []RouteInfo
+}
+
+// RouteInfo contains information about an IP route.
+type RouteInfo struct {
+	Dst net.IPNet
+	Gw  net.IP
 }
 
 // NewEndpoint creates a new endpoint in the network.
@@ -53,8 +58,6 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	if nw.Endpoints[epInfo.Id] != nil {
 		return nil, errEndpointExists
 	}
-
-	ipAddr := epInfo.IPv4Address
 
 	// Create a veth pair.
 	hostIfName := fmt.Sprintf("%s%s", hostInterfacePrefix, epInfo.Id[:7])
@@ -97,9 +100,11 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 
 	// Setup MAC address translation rules for container interface.
 	log.Printf("[net] Setting up MAC address translation rules for endpoint %v.", contIfName)
-	err = ebtables.SetupDnatBasedOnIPV4Address(ipAddr.IP.String(), containerIf.HardwareAddr.String())
-	if err != nil {
-		goto cleanup
+	for _, ipAddr := range epInfo.IPAddresses {
+		err = ebtables.SetupDnatBasedOnIPV4Address(ipAddr.IP.String(), containerIf.HardwareAddr.String())
+		if err != nil {
+			goto cleanup
+		}
 	}
 
 	// If a network namespace for the container interface is specified...
@@ -153,10 +158,29 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	}
 
 	// Assign IP address to container network interface.
-	log.Printf("[net] Adding IP address %v to link %v.", ipAddr.String(), contIfName)
-	err = netlink.AddIpAddress(contIfName, ipAddr.IP, &ipAddr)
-	if err != nil {
-		goto cleanup
+	for _, ipAddr := range epInfo.IPAddresses {
+		log.Printf("[net] Adding IP address %v to link %v.", ipAddr.String(), contIfName)
+		err = netlink.AddIpAddress(contIfName, ipAddr.IP, &ipAddr)
+		if err != nil {
+			goto cleanup
+		}
+	}
+
+	// Add IP routes to container network interface.
+	for _, route := range epInfo.Routes {
+		log.Printf("[net] Adding IP route %+v to link %v.", route, contIfName)
+
+		nlRoute := &netlink.Route{
+			Family:    netlink.GetIpAddressFamily(route.Gw),
+			Dst:       &route.Dst,
+			Gw:        route.Gw,
+			LinkIndex: containerIf.Index,
+		}
+
+		err = netlink.AddIpRoute(nlRoute)
+		if err != nil {
+			goto cleanup
+		}
 	}
 
 	// If inside the container network namespace...
@@ -175,10 +199,8 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 		IfName:      contIfName,
 		HostIfName:  hostIfName,
 		MacAddress:  containerIf.HardwareAddr,
-		IPv4Address: ipAddr,
-		IPv6Address: net.IPNet{},
-		IPv4Gateway: nw.extIf.IPv4Gateway,
-		IPv6Gateway: nw.extIf.IPv6Gateway,
+		IPAddresses: epInfo.IPAddresses,
+		Gateways:    []net.IP{nw.extIf.IPv4Gateway},
 	}
 
 	nw.Endpoints[epInfo.Id] = ep
@@ -216,10 +238,12 @@ func (nw *network) deleteEndpoint(endpointId string) error {
 	}
 
 	// Delete MAC address translation rule.
-	log.Printf("[net] Deleting MAC address translation rule for endpoint %v.", endpointId)
-	err = ebtables.RemoveDnatBasedOnIPV4Address(ep.IPv4Address.IP.String(), ep.MacAddress.String())
-	if err != nil {
-		goto cleanup
+	log.Printf("[net] Deleting MAC address translation rules for endpoint %v.", endpointId)
+	for _, ipAddr := range ep.IPAddresses {
+		err = ebtables.RemoveDnatBasedOnIPV4Address(ipAddr.IP.String(), ep.MacAddress.String())
+		if err != nil {
+			goto cleanup
+		}
 	}
 
 	// Remove the endpoint object.
@@ -244,6 +268,20 @@ func (nw *network) getEndpoint(endpointId string) (*endpoint, error) {
 	}
 
 	return ep, nil
+}
+
+//
+// Endpoint
+//
+
+// GetInfo returns information about the endpoint.
+func (ep *endpoint) getInfo() *EndpointInfo {
+	info := &EndpointInfo{
+		Id:          ep.Id,
+		IPAddresses: ep.IPAddresses,
+	}
+
+	return info
 }
 
 // Attach attaches an endpoint to a sandbox.

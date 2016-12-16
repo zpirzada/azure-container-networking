@@ -13,15 +13,17 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 )
 
-// Listener object
+// Listener represents an HTTP listener.
 type Listener struct {
 	protocol     string
 	localAddress string
+	endpoints    []string
+	active       bool
 	l            net.Listener
 	mux          *http.ServeMux
 }
 
-// Creates a new Listener.
+// NewListener creates a new Listener.
 func NewListener(protocol string, localAddress string) (*Listener, error) {
 	listener := Listener{
 		protocol:     protocol,
@@ -59,16 +61,17 @@ func (listener *Listener) Start(errChan chan error) error {
 		errChan <- http.Serve(listener.l, listener.mux)
 	}()
 
+	listener.active = true
 	return nil
 }
 
-// Stops listening for requests from libnetwork.
+// Stop stops listening for requests.
 func (listener *Listener) Stop() {
-
-	// Succeed early if no socket was requested.
-	if listener.localAddress == "" {
+	// Ignore if not active.
+	if !listener.active {
 		return
 	}
+	listener.active = false
 
 	// Stop servicing requests.
 	listener.l.Close()
@@ -81,17 +84,27 @@ func (listener *Listener) Stop() {
 	log.Printf("[Listener] Stopped listening on %s", listener.localAddress)
 }
 
-// Returns the HTTP mux for the listener.
+// GetMux returns the HTTP mux for the listener.
 func (listener *Listener) GetMux() *http.ServeMux {
 	return listener.mux
 }
 
-// Registers a protocol handler.
+// GetEndpoints returns the list of registered protocol endpoints.
+func (listener *Listener) GetEndpoints() []string {
+	return listener.endpoints
+}
+
+// AddEndpoint registers a protocol endpoint.
+func (listener *Listener) AddEndpoint(endpoint string) {
+	listener.endpoints = append(listener.endpoints, endpoint)
+}
+
+// AddHandler registers a protocol handler.
 func (listener *Listener) AddHandler(path string, handler func(http.ResponseWriter, *http.Request)) {
 	listener.mux.HandleFunc(path, handler)
 }
 
-// Decodes JSON payload.
+// Decode receives and decodes JSON payload to a request.
 func (listener *Listener) Decode(w http.ResponseWriter, r *http.Request, request interface{}) error {
 	var err error
 
@@ -108,7 +121,7 @@ func (listener *Listener) Decode(w http.ResponseWriter, r *http.Request, request
 	return err
 }
 
-// Encodes JSON payload.
+// Encode encodes and sends a response as JSON payload.
 func (listener *Listener) Encode(w http.ResponseWriter, response interface{}) error {
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
@@ -116,9 +129,4 @@ func (listener *Listener) Encode(w http.ResponseWriter, response interface{}) er
 		log.Printf("[Listener] Failed to encode response: %v\n", err.Error())
 	}
 	return err
-}
-
-// Sends an error response.
-func (listener *Listener) SendError(w http.ResponseWriter, errMessage string) {
-	json.NewEncoder(w).Encode(map[string]string{"Err": errMessage})
 }

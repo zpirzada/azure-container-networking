@@ -71,6 +71,7 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 
 	// Add protocol handlers.
 	listener := plugin.Listener
+	listener.AddEndpoint(plugin.EndpointType)
 	listener.AddHandler(getCapabilitiesPath, plugin.getCapabilities)
 	listener.AddHandler(getAddressSpacesPath, plugin.getDefaultAddressSpaces)
 	listener.AddHandler(requestPoolPath, plugin.requestPool)

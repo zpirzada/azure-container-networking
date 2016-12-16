@@ -1,12 +1,5 @@
-SOURCEFILES = \
-	$(wildcard cni/*.go) \
-	$(wildcard cni/ipam/*.go) \
-	$(wildcard cni/network/*.go) \
-	$(wildcard cni/plugin/*.go) \
-	$(wildcard cnm/*.go) \
-	$(wildcard cnm/ipam/*.go) \
-	$(wildcard cnm/network/*.go) \
-	$(wildcard cnm/plugin/*.go) \
+# Source files common to all targets.
+COREFILES = \
 	$(wildcard common/*.go) \
 	$(wildcard ebtables/*.go) \
 	$(wildcard ipam/*.go) \
@@ -14,6 +7,22 @@ SOURCEFILES = \
 	$(wildcard netlink/*.go) \
 	$(wildcard network/*.go) \
 	$(wildcard store/*.go)
+
+# Source files for building CNM plugin.
+CNMFILES = \
+	$(wildcard cnm/*.go) \
+	$(wildcard cnm/ipam/*.go) \
+	$(wildcard cnm/network/*.go) \
+	$(wildcard cnm/plugin/*.go) \
+	$(COREFILES)
+
+# Source files for building CNI plugin.
+CNIFILES = \
+	$(wildcard cni/*.go) \
+	$(wildcard cni/ipam/*.go) \
+	$(wildcard cni/network/*.go) \
+	$(wildcard cni/plugin/*.go) \
+	$(COREFILES)
 
 CNMDIR = cnm/plugin
 
@@ -35,11 +44,11 @@ clean:
 	rm -rf $(OUTPUTDIR)
 
 # Build the Azure CNM plugin.
-$(OUTPUTDIR)/azure-cnm-plugin: $(SOURCEFILES)
+$(OUTPUTDIR)/azure-cnm-plugin: $(CNMFILES)
 	go build -v -o $(OUTPUTDIR)/azure-cnm-plugin -ldflags "-X main.version=$(VERSION) -s -w" $(CNMDIR)/*.go
 
 # Build the Azure CNI plugin.
-$(OUTPUTDIR)/azure-cni-plugin: $(SOURCEFILES)
+$(OUTPUTDIR)/azure-cni-plugin: $(CNIFILES)
 	go build -v -o $(OUTPUTDIR)/azure-cni-plugin -ldflags "-X main.version=$(VERSION) -s -w" $(CNIDIR)/*.go
 
 install:

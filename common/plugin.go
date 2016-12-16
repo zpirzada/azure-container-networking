@@ -26,12 +26,13 @@ type PluginApi interface {
 
 // Plugin common configuration.
 type PluginConfig struct {
-	Name    string
-	Version string
-	NetApi  interface{}
-	IpamApi interface{}
-	ErrChan chan error
-	Store   store.KeyValueStore
+	Name     string
+	Version  string
+	NetApi   interface{}
+	IpamApi  interface{}
+	Listener *Listener
+	ErrChan  chan error
+	Store    store.KeyValueStore
 }
 
 // NewPlugin creates a new Plugin object.

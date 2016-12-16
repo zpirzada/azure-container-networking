@@ -249,12 +249,7 @@ func (nm *networkManager) GetEndpointInfo(networkId string, endpointId string) (
 		return nil, err
 	}
 
-	epInfo := &EndpointInfo{
-		Id:          endpointId,
-		IPv4Address: ep.IPv4Address,
-	}
-
-	return epInfo, nil
+	return ep.getInfo(), nil
 }
 
 // AttachEndpoint attaches an endpoint to a sandbox.

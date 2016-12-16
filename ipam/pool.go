@@ -19,6 +19,13 @@ const (
 	globalScope = "global"
 )
 
+var (
+	// Azure VNET well-known host IDs.
+	defaultGatewayHostId = net.ParseIP("::1")
+	dnsPrimaryHostId     = net.ParseIP("::2")
+	dnsSecondaryHostId   = net.ParseIP("::3")
+)
+
 // Represents the key to an address pool.
 type addressPoolId struct {
 	AsId        string
@@ -45,6 +52,14 @@ type addressPool struct {
 	Priority  int
 	RefCount  int
 	epoch     int
+}
+
+// AddressPoolInfo contains information about an address pool.
+type AddressPoolInfo struct {
+	Subnet     net.IPNet
+	Gateway    net.IP
+	DnsServers []net.IP
+	IsIPv6     bool
 }
 
 // Represents an IP address in a pool.
@@ -322,7 +337,26 @@ func (as *addressSpace) releasePool(poolId string) error {
 // AddressPool
 //
 
-// Returns if an addess pool is currently in use.
+// Returns if an address pool is currently in use.
+func (ap *addressPool) getInfo() *AddressPoolInfo {
+	// Generate default gateway address from subnet.
+	gateway := generateAddress(&ap.Subnet, defaultGatewayHostId)
+
+	// Generate DNS server addresses from subnet.
+	dnsPrimary := generateAddress(&ap.Subnet, dnsPrimaryHostId)
+	dnsSecondary := generateAddress(&ap.Subnet, dnsSecondaryHostId)
+
+	info := &AddressPoolInfo{
+		Subnet:     ap.Subnet,
+		Gateway:    gateway,
+		DnsServers: []net.IP{dnsPrimary, dnsSecondary},
+		IsIPv6:     ap.IsIPv6,
+	}
+
+	return info
+}
+
+// Returns if an address pool is currently in use.
 func (ap *addressPool) isInUse() bool {
 	return ap.RefCount > 0
 }
