@@ -102,7 +102,7 @@ func (kvs *jsonFileStore) Write(key string, value interface{}) error {
 	return kvs.flush()
 }
 
-// Flush commits in-memory state to backing store.
+// Flush commits in-memory state to persistent store.
 func (kvs *jsonFileStore) Flush() error {
 	kvs.Mutex.Lock()
 	defer kvs.Mutex.Unlock()
@@ -192,4 +192,14 @@ func (kvs *jsonFileStore) Unlock() error {
 	kvs.locked = false
 
 	return nil
+}
+
+// GetModificationTime returns the modification time of the persistent store.
+func (kvs *jsonFileStore) GetModificationTime() (time.Time, error) {
+	info, err := os.Stat(kvs.fileName)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return info.ModTime(), nil
 }

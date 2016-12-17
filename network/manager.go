@@ -5,6 +5,7 @@ package network
 
 import (
 	"sync"
+	"time"
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
@@ -18,6 +19,8 @@ const (
 
 // NetworkManager manages the set of container networking resources.
 type networkManager struct {
+	Version            string
+	TimeStamp          time.Time
 	ExternalInterfaces map[string]*externalInterface
 	store              store.KeyValueStore
 	sync.Mutex
@@ -52,6 +55,7 @@ func NewNetworkManager() (NetworkManager, error) {
 
 // Initialize configures network manager.
 func (nm *networkManager) Initialize(config *common.PluginConfig) error {
+	nm.Version = config.Version
 	nm.store = config.Store
 
 	// Restore persisted state.
@@ -70,8 +74,20 @@ func (nm *networkManager) restore() error {
 		return nil
 	}
 
+	// After a reboot, all address resources are implicitly released.
+	// Ignore the persisted state if it is older than the last reboot time.
+	modTime, err := nm.store.GetModificationTime()
+	if err == nil {
+		rebootTime, err := common.GetLastRebootTime()
+		if err == nil && rebootTime.After(modTime) {
+			log.Printf("[net] Ignoring stale state from store.")
+			log.Printf("[net] Store timestamp %v is older than boot timestamp %v.", modTime, rebootTime)
+			return nil
+		}
+	}
+
 	// Read any persisted state.
-	err := nm.store.Read(storeKey, nm)
+	err = nm.store.Read(storeKey, nm)
 	if err != nil {
 		if err == store.ErrKeyNotFound {
 			// Considered successful.
@@ -100,6 +116,9 @@ func (nm *networkManager) save() error {
 	if nm.store == nil {
 		return nil
 	}
+
+	// Update time stamp.
+	nm.TimeStamp = time.Now()
 
 	err := nm.store.Write(storeKey, nm)
 	if err == nil {

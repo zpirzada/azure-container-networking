@@ -5,6 +5,7 @@ package ipam
 
 import (
 	"sync"
+	"time"
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
@@ -19,6 +20,8 @@ const (
 
 // AddressManager manages the set of address spaces and pools allocated to containers.
 type addressManager struct {
+	Version    string
+	TimeStamp  time.Time
 	AddrSpaces map[string]*addressSpace `json:"AddressSpaces"`
 	store      store.KeyValueStore
 	source     addressConfigSource
@@ -64,6 +67,7 @@ func NewAddressManager() (AddressManager, error) {
 
 // Initialize configures address manager.
 func (am *addressManager) Initialize(config *common.PluginConfig, options map[string]interface{}) error {
+	am.Version = config.Version
 	am.store = config.Store
 	am.netApi, _ = config.NetApi.(network.NetworkManager)
 
@@ -91,8 +95,20 @@ func (am *addressManager) restore() error {
 		return nil
 	}
 
+	// After a reboot, all address resources are implicitly released.
+	// Ignore the persisted state if it is older than the last reboot time.
+	modTime, err := am.store.GetModificationTime()
+	if err == nil {
+		rebootTime, err := common.GetLastRebootTime()
+		if err == nil && rebootTime.After(modTime) {
+			log.Printf("[ipam] Ignoring stale state from store.")
+			log.Printf("[ipam] Store timestamp %v is older than boot timestamp %v.", modTime, rebootTime)
+			return nil
+		}
+	}
+
 	// Read any persisted state.
-	err := am.store.Read(storeKey, am)
+	err = am.store.Read(storeKey, am)
 	if err != nil {
 		if err == store.ErrKeyNotFound {
 			return nil
@@ -120,6 +136,9 @@ func (am *addressManager) save() error {
 	if am.store == nil {
 		return nil
 	}
+
+	// Update time stamp.
+	am.TimeStamp = time.Now()
 
 	err := am.store.Write(storeKey, am)
 	if err == nil {

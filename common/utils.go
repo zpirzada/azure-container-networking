@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os/exec"
+	"time"
 
 	"github.com/Azure/azure-container-networking/log"
 )
@@ -33,6 +34,26 @@ func LogNetworkInterfaces() {
 		addrs, _ := iface.Addrs()
 		log.Printf("Network interface: %+v with IP addresses: %+v", iface, addrs)
 	}
+}
+
+// GetLastRebootTime returns the last time the system rebooted.
+func GetLastRebootTime() (time.Time, error) {
+	// Query last reboot time.
+	out, err := exec.Command("uptime", "-s").Output()
+	if err != nil {
+		log.Printf("Failed to query uptime, err:%v", err)
+		return time.Time{}, err
+	}
+
+	// Parse the output.
+	layout := "2006-01-02 15:04:05"
+	rebootTime, err := time.Parse(layout, string(out[:len(out)-1]))
+	if err != nil {
+		log.Printf("Failed to parse uptime, err:%v", err)
+		return time.Time{}, err
+	}
+
+	return rebootTime, nil
 }
 
 // ExecuteShellCommand executes a shell command.

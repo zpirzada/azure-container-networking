@@ -5,6 +5,7 @@ package store
 
 import (
 	"fmt"
+	"time"
 )
 
 // KeyValueStore represents a persistent store of (key,value) pairs.
@@ -14,6 +15,7 @@ type KeyValueStore interface {
 	Flush() error
 	Lock(block bool) error
 	Unlock() error
+	GetModificationTime() (time.Time, error)
 }
 
 var (
