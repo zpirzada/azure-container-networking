@@ -101,7 +101,7 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	// Setup MAC address translation rules for container interface.
 	log.Printf("[net] Setting up MAC address translation rules for endpoint %v.", contIfName)
 	for _, ipAddr := range epInfo.IPAddresses {
-		err = ebtables.SetupDnatBasedOnIPV4Address(ipAddr.IP.String(), containerIf.HardwareAddr.String())
+		err = ebtables.SetDnatForIPAddress(ipAddr.IP, containerIf.HardwareAddr, ebtables.Append)
 		if err != nil {
 			goto cleanup
 		}
@@ -240,7 +240,7 @@ func (nw *network) deleteEndpoint(endpointId string) error {
 	// Delete MAC address translation rule.
 	log.Printf("[net] Deleting MAC address translation rules for endpoint %v.", endpointId)
 	for _, ipAddr := range ep.IPAddresses {
-		err = ebtables.RemoveDnatBasedOnIPV4Address(ipAddr.IP.String(), ep.MacAddress.String())
+		err = ebtables.SetDnatForIPAddress(ipAddr.IP, ep.MacAddress, ebtables.Delete)
 		if err != nil {
 			goto cleanup
 		}

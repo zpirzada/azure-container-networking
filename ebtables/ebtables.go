@@ -6,16 +6,18 @@ package ebtables
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os/exec"
 	"strings"
 
 	"github.com/Azure/azure-container-networking/log"
 )
 
-// Init initializes the ebtables module.
-func init() {
-	installEbtables()
-}
+const (
+	// Ebtables actions.
+	Append = "-A"
+	Delete = "-D"
+)
 
 // InstallEbtables installs the ebtables package.
 func installEbtables() {
@@ -31,64 +33,31 @@ func installEbtables() {
 	}
 }
 
-// SetupSnatForOutgoingPackets sets up snat
-func SetupSnatForOutgoingPackets(interfaceName string, snatAddress string) error {
-	command := fmt.Sprintf("ebtables -t nat -A POSTROUTING -o %s -j snat --to-source %s --snat-arp", interfaceName, snatAddress)
-	err := executeShellCommand(command)
-	if err != nil {
-		return err
-	}
-	return nil
+// SetSnatForInterface sets a MAC SNAT rule for an interface.
+func SetSnatForInterface(interfaceName string, macAddress net.HardwareAddr, action string) error {
+	command := fmt.Sprintf(
+		"ebtables -t nat %s POSTROUTING -o %s -j snat --to-src %s --snat-arp",
+		action, interfaceName, macAddress.String())
+
+	return executeShellCommand(command)
 }
 
-// CleanupSnatForOutgoingPackets cleans up snat
-func CleanupSnatForOutgoingPackets(interfaceName string, snatAddress string) error {
-	command := fmt.Sprintf("ebtables -t nat -D POSTROUTING -o %s -j snat --to-source %s --snat-arp", interfaceName, snatAddress)
-	err := executeShellCommand(command)
-	if err != nil {
-		return err
-	}
-	return nil
+// SetDnatForArpReplies sets a MAC DNAT rule for ARP replies received on an interface.
+func SetDnatForArpReplies(interfaceName string, action string) error {
+	command := fmt.Sprintf(
+		"ebtables -t nat %s PREROUTING -p ARP -i %s -j dnat --to-dst ff:ff:ff:ff:ff:ff",
+		action, interfaceName)
+
+	return executeShellCommand(command)
 }
 
-// SetupDnatForArpReplies sets up dnat
-func SetupDnatForArpReplies(interfaceName string) error {
-	command := fmt.Sprintf("ebtables -t nat -A PREROUTING -i %s -p arp -j dnat --to-destination ff:ff:ff:ff:ff:ff", interfaceName)
-	err := executeShellCommand(command)
-	if err != nil {
-		return err
-	}
-	return nil
-}
+// SetDnatForIPAddress sets a MAC DNAT rule for an IP address.
+func SetDnatForIPAddress(ipAddress net.IP, macAddress net.HardwareAddr, action string) error {
+	command := fmt.Sprintf(
+		"ebtables -t nat %s PREROUTING -p IPv4 --ip-dst %s -j dnat --to-dst %s",
+		action, ipAddress.String(), macAddress.String())
 
-// CleanupDnatForArpReplies cleans up dnat
-func CleanupDnatForArpReplies(interfaceName string) error {
-	command := fmt.Sprintf("ebtables -t nat -D PREROUTING -i %s -p arp -j dnat --to-destination ff:ff:ff:ff:ff:ff", interfaceName)
-	err := executeShellCommand(command)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// SetupDnatBasedOnIPV4Address sets up dnat
-func SetupDnatBasedOnIPV4Address(ipv4Address string, macAddress string) error {
-	command := fmt.Sprintf("ebtables -t nat -A PREROUTING -p IPv4  --ip-dst %s -j dnat --to-dst %s --dnat-target ACCEPT", ipv4Address, macAddress)
-	err := executeShellCommand(command)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// RemoveDnatBasedOnIPV4Address cleans up dnat
-func RemoveDnatBasedOnIPV4Address(ipv4Address string, macAddress string) error {
-	command := fmt.Sprintf("ebtables -t nat -D PREROUTING -p IPv4  --ip-dst %s -j dnat --to-dst %s --dnat-target ACCEPT", ipv4Address, macAddress)
-	err := executeShellCommand(command)
-	if err != nil {
-		return err
-	}
-	return nil
+	return executeShellCommand(command)
 }
 
 func executeShellCommand(command string) error {

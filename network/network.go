@@ -172,12 +172,12 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, bri
 
 	// Setup MAC address translation rules for external interface.
 	log.Printf("[net] Setting up MAC address translation rules for %v.", hostIf.Name)
-	err = ebtables.SetupSnatForOutgoingPackets(hostIf.Name, hostIf.HardwareAddr.String())
+	err = ebtables.SetSnatForInterface(hostIf.Name, hostIf.HardwareAddr, ebtables.Append)
 	if err != nil {
 		goto cleanup
 	}
 
-	err = ebtables.SetupDnatForArpReplies(hostIf.Name)
+	err = ebtables.SetDnatForArpReplies(hostIf.Name, ebtables.Append)
 	if err != nil {
 		goto cleanup
 	}
@@ -240,8 +240,8 @@ cleanup:
 	log.Printf("[net] Connecting interface %v failed, err:%v.", extIf.Name, err)
 
 	// Roll back the changes for the network.
-	ebtables.CleanupDnatForArpReplies(extIf.Name)
-	ebtables.CleanupSnatForOutgoingPackets(extIf.Name, extIf.MacAddress.String())
+	ebtables.SetDnatForArpReplies(extIf.Name, ebtables.Delete)
+	ebtables.SetSnatForInterface(extIf.Name, extIf.MacAddress, ebtables.Delete)
 
 	netlink.DeleteLink(bridgeName)
 
@@ -253,8 +253,8 @@ func (nm *networkManager) disconnectExternalInterface(extIf *externalInterface) 
 	log.Printf("[net] Disconnecting interface %v.", extIf.Name)
 
 	// Cleanup MAC address translation rules.
-	ebtables.CleanupDnatForArpReplies(extIf.Name)
-	ebtables.CleanupSnatForOutgoingPackets(extIf.Name, extIf.MacAddress.String())
+	ebtables.SetDnatForArpReplies(extIf.Name, ebtables.Delete)
+	ebtables.SetSnatForInterface(extIf.Name, extIf.MacAddress, ebtables.Delete)
 
 	// Disconnect external interface from its bridge.
 	err := netlink.SetLinkMaster(extIf.Name, "")
