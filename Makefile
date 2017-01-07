@@ -32,6 +32,9 @@ REPO_PATH = /go/src/github.com/Azure/azure-container-networking
 BUILD_CONTAINER_IMAGE = acn-build
 BUILD_USER ?= $(shell id -u)
 
+CNM_PLUGIN_IMAGE = ofiliz/azure-cnm-plugin
+CNM_PLUGIN_ROOTFS = azure-cnm-plugin-rootfs
+
 VERSION ?= $(shell git describe --tags --always --dirty)
 
 ENSURE_OUTPUTDIR_EXISTS := $(shell mkdir -p $(OUTPUTDIR))
@@ -67,3 +70,35 @@ build-containerized:
 			chown -R $(BUILD_USER):$(BUILD_USER) $(OUTPUTDIR) \
 		'
 
+# Build the Azure CNM plugin image, installable with "docker plugin install".
+.PHONY: azure-cnm-plugin-image
+azure-cnm-plugin-image: azure-cnm-plugin
+	# Build the plugin image, keeping any old image during build for cache, but remove it afterwards.
+	docker images -q $(CNM_PLUGIN_ROOTFS):$(VERSION) > cid
+	docker build -f Dockerfile.cnm -t $(CNM_PLUGIN_ROOTFS):$(VERSION) .
+	$(eval CID := `cat cid`)
+	docker rmi $(CID) || true
+
+	# Create a container using the image and export its rootfs.
+	docker create $(CNM_PLUGIN_ROOTFS):$(VERSION) > cid
+	$(eval CID := `cat cid`)
+	mkdir -p $(OUTPUTDIR)/$(CID)/rootfs
+	docker export $(CID) | tar -x -C $(OUTPUTDIR)/$(CID)/rootfs
+	docker rm -vf $(CID)
+
+	# Copy the plugin configuration and set ownership.
+	cp cnm/config.json $(OUTPUTDIR)/$(CID)
+	chgrp -R docker $(OUTPUTDIR)/$(CID)
+
+	# Create the plugin.
+	docker plugin rm $(CNM_PLUGIN_IMAGE):$(VERSION) || true
+	docker plugin create $(CNM_PLUGIN_IMAGE):$(VERSION) $(OUTPUTDIR)/$(CID)
+
+	# Cleanup temporary files.
+	rm -rf $(OUTPUTDIR)/$(CID)
+	rm cid
+
+# Publish the Azure CNM plugin image to a Docker registry.
+.PHONY: publish-azure-cnm-plugin-image
+publish-azure-cnm-plugin-image:
+	docker plugin push $(CNM_PLUGIN_IMAGE):$(VERSION)
