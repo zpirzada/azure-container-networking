@@ -61,7 +61,7 @@ type createEndpointRequest struct {
 	NetworkID  string
 	EndpointID string
 	Options    map[string]interface{}
-	Interface  *endpointInterface
+	Interface  endpointInterface
 }
 
 // Represents a libnetwork endpoint interface.
@@ -73,7 +73,7 @@ type endpointInterface struct {
 
 // Response sent by plugin when an endpoint is created.
 type createEndpointResponse struct {
-	Interface *endpointInterface
+	Interface endpointInterface
 }
 
 // Request sent by libnetwork when deleting an existing endpoint.
