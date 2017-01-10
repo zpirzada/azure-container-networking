@@ -192,7 +192,7 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 
 	// Process request.
 	var ipv4Address *net.IPNet
-	if req.Interface != nil {
+	if req.Interface.Address != "" {
 		var ip net.IP
 		ip, ipv4Address, err = net.ParseCIDR(req.Interface.Address)
 		if err != nil {
@@ -214,9 +214,7 @@ func (plugin *netPlugin) createEndpoint(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Encode response.
-	resp := createEndpointResponse{
-		Interface: nil,
-	}
+	resp := createEndpointResponse{}
 
 	err = plugin.Listener.Encode(w, &resp)
 
