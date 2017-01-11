@@ -60,13 +60,14 @@ $(OUTPUTDIR)/azure-cni-plugin: $(CNIFILES)
 # Build all binaries in a container.
 .PHONY: build-containerized
 build-containerized:
+	pwd && ls -l
 	docker build -f Dockerfile.build -t $(BUILD_CONTAINER_IMAGE):$(VERSION) .
 	docker run --rm \
 		-v "${PWD}":"$(REPO_PATH)":ro \
 		-v "${PWD}/$(OUTPUTDIR)":"$(REPO_PATH)/$(OUTPUTDIR)" \
 		$(BUILD_CONTAINER_IMAGE):$(VERSION) \
 		bash -c '\
-			ls -l && \
+			pwd && ls -l && \
 			make all-binaries && \
 			chown -R $(BUILD_USER):$(BUILD_USER) $(OUTPUTDIR) \
 		'
