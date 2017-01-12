@@ -27,11 +27,14 @@ CNIFILES = \
 CNMDIR = cnm/plugin
 CNIDIR = cni/plugin
 OUTPUTDIR = out
-REPO_PATH = /go/src/github.com/Azure/azure-container-networking
 
+# Containerized build parameters.
 BUILD_CONTAINER_IMAGE = acn-build
+BUILD_CONTAINER_NAME = acn-builder
+BUILD_CONTAINER_REPO_PATH = /go/src/github.com/Azure/azure-container-networking
 BUILD_USER ?= $(shell id -u)
 
+# Docker plugin image parameters.
 CNM_PLUGIN_IMAGE = ofiliz/azure-cnm-plugin
 CNM_PLUGIN_ROOTFS = azure-cnm-plugin-rootfs
 
@@ -62,15 +65,16 @@ $(OUTPUTDIR)/azure-cni-plugin: $(CNIFILES)
 build-containerized:
 	pwd && ls -l
 	docker build -f Dockerfile.build -t $(BUILD_CONTAINER_IMAGE):$(VERSION) .
-	docker run --rm \
-		-v "${PWD}":"$(REPO_PATH)":ro \
-		-v "${PWD}/$(OUTPUTDIR)":"$(REPO_PATH)/$(OUTPUTDIR)" \
+	docker run --name $(BUILD_CONTAINER_NAME) \
 		$(BUILD_CONTAINER_IMAGE):$(VERSION) \
 		bash -c '\
 			pwd && ls -l && \
 			make all-binaries && \
 			chown -R $(BUILD_USER):$(BUILD_USER) $(OUTPUTDIR) \
 		'
+	docker cp $(BUILD_CONTAINER_NAME):$(BUILD_CONTAINER_REPO_PATH)/$(OUTPUTDIR) .
+	docker rm $(BUILD_CONTAINER_NAME)
+	docker rmi $(BUILD_CONTAINER_IMAGE):$(VERSION)
 
 # Build the Azure CNM plugin image, installable with "docker plugin install".
 .PHONY: azure-cnm-plugin-image
