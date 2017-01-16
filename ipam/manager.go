@@ -9,7 +9,6 @@ import (
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
-	"github.com/Azure/azure-container-networking/network"
 	"github.com/Azure/azure-container-networking/store"
 )
 
@@ -25,7 +24,7 @@ type addressManager struct {
 	AddrSpaces map[string]*addressSpace `json:"AddressSpaces"`
 	store      store.KeyValueStore
 	source     addressConfigSource
-	netApi     network.NetworkManager
+	netApi     common.NetApi
 	sync.Mutex
 }
 
@@ -69,7 +68,7 @@ func NewAddressManager() (AddressManager, error) {
 func (am *addressManager) Initialize(config *common.PluginConfig, options map[string]interface{}) error {
 	am.Version = config.Version
 	am.store = config.Store
-	am.netApi, _ = config.NetApi.(network.NetworkManager)
+	am.netApi = config.NetApi
 
 	// Restore persisted state.
 	err := am.restore()

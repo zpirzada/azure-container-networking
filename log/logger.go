@@ -4,10 +4,7 @@
 package log
 
 import (
-	"fmt"
-	"io"
 	"log"
-	"log/syslog"
 	"os"
 )
 
@@ -27,13 +24,8 @@ const (
 	TargetLogfile
 )
 
-// Log path and file
-const logFile = "/var/log/azure-container-networking.log"
-const logFilePerm = os.FileMode(0664)
-
 // Log prefix
 const logPrefix = ""
-const syslogTag = "AzureContainerNet"
 
 // Logger object
 type Logger struct {
@@ -41,7 +33,7 @@ type Logger struct {
 	level int
 }
 
-// Creates a new Logger with default settings.
+// NewLogger creates a new Logger with default settings.
 func NewLogger() *Logger {
 	var logger Logger
 
@@ -51,35 +43,12 @@ func NewLogger() *Logger {
 	return &logger
 }
 
-// Sets the log target.
-func (logger *Logger) SetTarget(target int) error {
-	var out io.Writer
-	var err error
-
-	switch target {
-	case TargetStderr:
-		out = os.Stderr
-	case TargetSyslog:
-		out, err = syslog.New(log.LstdFlags, syslogTag)
-	case TargetLogfile:
-		out, err = os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, logFilePerm)
-	default:
-		err = fmt.Errorf("Invalid log target %d", target)
-	}
-
-	if err == nil {
-		logger.l.SetOutput(out)
-	}
-
-	return err
-}
-
-// Sets the log chattiness.
+// SetLevel sets the log chattiness.
 func (logger *Logger) SetLevel(level int) {
 	logger.level = level
 }
 
-// Logs a structured request.
+// Request logs a structured request.
 func (logger *Logger) Request(tag string, request interface{}, err error) {
 	if err == nil {
 		logger.Printf("[%s] Received %T %+v.", tag, request, request)
@@ -88,7 +57,7 @@ func (logger *Logger) Request(tag string, request interface{}, err error) {
 	}
 }
 
-// Logs a structured response.
+// Response logs a structured response.
 func (logger *Logger) Response(tag string, response interface{}, err error) {
 	if err == nil {
 		logger.Printf("[%s] Sent %T %+v.", tag, response, response)
@@ -97,14 +66,14 @@ func (logger *Logger) Response(tag string, response interface{}, err error) {
 	}
 }
 
-// Logs a formatted string at info level.
+// Printf logs a formatted string at info level.
 func (logger *Logger) Printf(format string, args ...interface{}) {
 	if logger.level >= LevelInfo {
 		logger.l.Printf(format, args...)
 	}
 }
 
-// Logs a formatted string at debug level.
+// Debugf logs a formatted string at debug level.
 func (logger *Logger) Debugf(format string, args ...interface{}) {
 	if logger.level >= LevelDebug {
 		logger.l.Printf(format, args...)
