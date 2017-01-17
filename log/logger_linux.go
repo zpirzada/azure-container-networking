@@ -6,6 +6,7 @@ package log
 import (
 	"fmt"
 	"io"
+	"log"
 	"log/syslog"
 	"os"
 )
