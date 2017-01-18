@@ -5,7 +5,6 @@ package log
 
 import (
 	"log"
-	"os"
 )
 
 // Log level
@@ -30,17 +29,25 @@ const logPrefix = ""
 // Logger object
 type Logger struct {
 	l     *log.Logger
+	name  string
 	level int
 }
 
-// NewLogger creates a new Logger with default settings.
-func NewLogger() *Logger {
+// NewLogger creates a new Logger.
+func NewLogger(name string, level int, target int) *Logger {
 	var logger Logger
 
-	logger.l = log.New(os.Stderr, logPrefix, log.LstdFlags)
-	logger.level = LevelInfo
+	logger.l = log.New(nil, logPrefix, log.LstdFlags)
+	logger.name = name
+	logger.level = level
+	logger.SetTarget(target)
 
 	return &logger
+}
+
+// SetName sets the log name.
+func (logger *Logger) SetName(name string) {
+	logger.name = name
 }
 
 // SetLevel sets the log chattiness.
