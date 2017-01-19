@@ -22,7 +22,8 @@ func (logger *Logger) SetTarget(target int) error {
 	case TargetStderr:
 		out = os.Stderr
 	case TargetLogfile:
-		out, err = os.OpenFile(logFilePath+logger.name, os.O_CREATE|os.O_APPEND|os.O_RDWR, logFilePerm)
+		fileName := logFilePath + logger.name + ".log"
+		out, err = os.OpenFile(fileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, logFilePerm)
 	default:
 		err = fmt.Errorf("Invalid log target %d", target)
 	}
