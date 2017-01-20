@@ -33,7 +33,11 @@ type AddressManager interface {
 	Initialize(config *common.PluginConfig, options map[string]interface{}) error
 	Uninitialize()
 
+	StartSource(options map[string]interface{}) error
+	StopSource()
+
 	GetDefaultAddressSpaces() (string, string)
+
 	RequestPool(asId, poolId, subPoolId string, options map[string]string, v6 bool) (string, string, error)
 	ReleasePool(asId, poolId string) error
 	GetPoolInfo(asId, poolId string) (*AddressPoolInfo, error)
@@ -77,14 +81,14 @@ func (am *addressManager) Initialize(config *common.PluginConfig, options map[st
 	}
 
 	// Start source.
-	err = am.startSource(options)
+	err = am.StartSource(options)
 
 	return err
 }
 
 // Uninitialize cleans up address manager.
 func (am *addressManager) Uninitialize() {
-	am.stopSource()
+	am.StopSource()
 }
 
 // Restore reads address manager state from persistent store.
@@ -149,7 +153,7 @@ func (am *addressManager) save() error {
 }
 
 // Starts configuration source.
-func (am *addressManager) startSource(options map[string]interface{}) error {
+func (am *addressManager) StartSource(options map[string]interface{}) error {
 	var err error
 
 	environment, _ := options[common.OptEnvironment].(string)
@@ -172,14 +176,19 @@ func (am *addressManager) startSource(options map[string]interface{}) error {
 	}
 
 	if am.source != nil {
+		log.Printf("[ipam] Starting source %v.", environment)
 		err = am.source.start(am)
+	}
+
+	if err != nil {
+		log.Printf("[ipam] Failed to start source %v, err:%v.", environment, err)
 	}
 
 	return err
 }
 
 // Stops the configuration source.
-func (am *addressManager) stopSource() {
+func (am *addressManager) StopSource() {
 	if am.source != nil {
 		am.source.stop()
 		am.source = nil
