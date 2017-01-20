@@ -11,10 +11,14 @@ import (
 )
 
 const (
-	Internal = "internal"
+	// Supported CNI versions.
+	Version = "0.2.0"
 
+	// CNI commands.
 	CmdAdd = "ADD"
 	CmdDel = "DEL"
+
+	Internal = "internal"
 )
 
 // CNI contract.
@@ -59,6 +63,7 @@ type NetworkConfig struct {
 	CniVersion string `json:"cniVersion"`
 	Name       string `json:"name"`
 	Type       string `json:"type"`
+	Master     string `json:"master"`
 	Bridge     string `json:"bridge,omitempty"`
 	LogLevel   string `json:"logLevel,omitempty"`
 	LogTarget  string `json:"logTarget,omitempty"`
