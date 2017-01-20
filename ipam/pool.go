@@ -275,6 +275,7 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 		}
 	} else {
 		// Return any available address pool.
+		ifName := options[OptInterface]
 		highestPriority := -1
 		highestNumAddr := -1
 
@@ -286,6 +287,11 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 
 			// Pick a pool from the same address family.
 			if pool.IsIPv6 != v6 {
+				continue
+			}
+
+			// Skip if pool is not on the requested interface.
+			if ifName != "" && ifName != pool.IfName {
 				continue
 			}
 
