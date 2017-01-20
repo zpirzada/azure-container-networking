@@ -20,12 +20,14 @@ CNMFILES = \
 CNIFILES = \
 	$(wildcard cni/*.go) \
 	$(wildcard cni/ipam/*.go) \
+	$(wildcard cni/ipam/plugin/*.go) \
 	$(wildcard cni/network/*.go) \
-	$(wildcard cni/plugin/*.go) \
+	$(wildcard cni/network/plugin/*.go) \
 	$(COREFILES)
 
 CNMDIR = cnm/plugin
-CNIDIR = cni/plugin
+CNI_NET_DIR = cni/network/plugin
+CNI_IPAM_DIR = cni/ipam/plugin
 OUTPUTDIR = out
 
 # Containerized build parameters.
@@ -44,7 +46,9 @@ ENSURE_OUTPUTDIR_EXISTS := $(shell mkdir -p $(OUTPUTDIR))
 
 # Shorthand target names for convenience.
 azure-cnm-plugin: $(OUTPUTDIR)/azure-cnm-plugin
-azure-cni-plugin: $(OUTPUTDIR)/azure-cni-plugin
+azure-vnet: $(OUTPUTDIR)/azure-vnet
+azure-vnet-ipam: $(OUTPUTDIR)/azure-vnet-ipam
+azure-cni-plugin: azure-vnet azure-vnet-ipam
 all-binaries: azure-cnm-plugin azure-cni-plugin
 
 # Clean all build artifacts.
@@ -56,9 +60,17 @@ clean:
 $(OUTPUTDIR)/azure-cnm-plugin: $(CNMFILES)
 	go build -v -o $(OUTPUTDIR)/azure-cnm-plugin -ldflags "-X main.version=$(VERSION) -s -w" $(CNMDIR)/*.go
 
-# Build the Azure CNI plugin.
-$(OUTPUTDIR)/azure-cni-plugin: $(CNIFILES)
-	go build -v -o $(OUTPUTDIR)/azure-cni-plugin -ldflags "-X main.version=$(VERSION) -s -w" $(CNIDIR)/*.go
+# Build the Azure CNI network plugin.
+$(OUTPUTDIR)/azure-vnet: $(CNIFILES)
+	go build -v -o $(OUTPUTDIR)/azure-vnet -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_NET_DIR)/*.go
+
+# Build the Azure CNI IPAM plugin.
+$(OUTPUTDIR)/azure-vnet-ipam: $(CNIFILES)
+	go build -v -o $(OUTPUTDIR)/azure-vnet-ipam -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_IPAM_DIR)/*.go
+
+# Build the Azure CNI IPAM plugin for windows_amd64.
+$(OUTPUTDIR)/windows_amd64/azure-vnet-ipam: $(CNIFILES)
+	GOOS=windows GOARCH=amd64 go build -v -o $(OUTPUTDIR)/windows_amd64/azure-vnet-ipam -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_IPAM_DIR)/*.go
 
 # Build all binaries in a container.
 .PHONY: build-containerized
