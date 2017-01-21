@@ -9,10 +9,11 @@ import (
 	"log"
 	"log/syslog"
 	"os"
+
+	"github.com/Azure/azure-container-networking/platform"
 )
 
 // Log file properties.
-const logFilePath = "/var/log/"
 const logFilePerm = os.FileMode(0664)
 
 const syslogTag = "AzureContainerNet"
@@ -28,7 +29,7 @@ func (logger *Logger) SetTarget(target int) error {
 	case TargetSyslog:
 		out, err = syslog.New(log.LstdFlags, syslogTag)
 	case TargetLogfile:
-		fileName := logFilePath + logger.name + ".log"
+		fileName := platform.LogPath + logger.name + logFileExtension
 		out, err = os.OpenFile(fileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, logFilePerm)
 	default:
 		err = fmt.Errorf("Invalid log target %d", target)

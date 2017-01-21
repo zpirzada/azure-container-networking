@@ -23,8 +23,10 @@ const (
 	TargetLogfile
 )
 
-// Log prefix
-const logPrefix = ""
+const (
+	logPrefix        = ""
+	logFileExtension = ".log"
+)
 
 // Logger object
 type Logger struct {

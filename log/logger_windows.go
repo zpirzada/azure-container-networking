@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/Azure/azure-container-networking/platform"
 )
 
 // Log file properties.
-const logFilePath = ""
 const logFilePerm = os.FileMode(0664)
 
 // SetTarget sets the log target.
@@ -22,7 +23,7 @@ func (logger *Logger) SetTarget(target int) error {
 	case TargetStderr:
 		out = os.Stderr
 	case TargetLogfile:
-		fileName := logFilePath + logger.name + ".log"
+		fileName := platform.LogPath + logger.name + logFileExtension
 		out, err = os.OpenFile(fileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, logFilePerm)
 	default:
 		err = fmt.Errorf("Invalid log target %d", target)
