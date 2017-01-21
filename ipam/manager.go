@@ -9,6 +9,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/store"
 )
 
@@ -102,10 +103,11 @@ func (am *addressManager) restore() error {
 	// Ignore the persisted state if it is older than the last reboot time.
 	modTime, err := am.store.GetModificationTime()
 	if err == nil {
-		rebootTime, err := common.GetLastRebootTime()
+		log.Printf("[ipam] Store timestamp is %v.", modTime)
+
+		rebootTime, err := platform.GetLastRebootTime()
 		if err == nil && rebootTime.After(modTime) {
-			log.Printf("[ipam] Ignoring stale state from store.")
-			log.Printf("[ipam] Store timestamp %v is older than boot timestamp %v.", modTime, rebootTime)
+			log.Printf("[ipam] Ignoring stale state older than last reboot %v.", rebootTime)
 			return nil
 		}
 	}

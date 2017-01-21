@@ -6,6 +6,7 @@ COREFILES = \
 	$(wildcard log/*.go) \
 	$(wildcard netlink/*.go) \
 	$(wildcard network/*.go) \
+	$(wildcard platform/*.go) \
 	$(wildcard store/*.go)
 
 # Source files for building CNM plugin.

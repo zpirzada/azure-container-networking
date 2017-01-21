@@ -61,8 +61,6 @@ func (plugin *Plugin) Initialize(config *common.PluginConfig) error {
 		config.Store = plugin.Store
 	}
 
-	log.Printf("[cni] Plugin %v version %v initialized.", plugin.Name, plugin.Version)
-
 	return nil
 }
 

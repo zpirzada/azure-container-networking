@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network"
+	"github.com/Azure/azure-container-networking/platform"
 
 	cniIpam "github.com/containernetworking/cni/pkg/ipam"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
@@ -58,7 +59,8 @@ func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 	}
 
 	// Log platform information.
-	common.LogPlatformInfo()
+	log.Printf("[cni-net] Plugin %v version %v.", plugin.Name, plugin.Version)
+	log.Printf("[cni-net] Running on %v", platform.GetOSInfo())
 	common.LogNetworkInterfaces()
 
 	// Initialize network manager.

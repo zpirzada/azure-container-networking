@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-container-networking/cni/network"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/store"
 
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
@@ -81,7 +82,7 @@ func main() {
 
 	// Log platform information.
 	log.Printf("[cni] Plugin enter.")
-	common.LogPlatformInfo()
+	log.Printf("Running on %v", platform.GetOSInfo())
 	common.LogNetworkInterfaces()
 
 	// Set plugin options.

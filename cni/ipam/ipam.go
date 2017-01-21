@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/ipam"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
@@ -74,6 +75,10 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 		log.Printf("[cni-ipam] Failed to initialize base plugin, err:%v.", err)
 		return err
 	}
+
+	// Log platform information.
+	log.Printf("[cni-ipam] Plugin %v version %v.", plugin.Name, plugin.Version)
+	log.Printf("[cni-ipam] Running on %v", platform.GetOSInfo())
 
 	// Initialize address manager.
 	err = plugin.am.Initialize(config, plugin.Options)
