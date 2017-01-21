@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/cni/ipam"
 	"github.com/Azure/azure-container-networking/cni/network"
 	"github.com/Azure/azure-container-networking/common"
@@ -19,16 +20,7 @@ import (
 
 const (
 	// Plugin name.
-	name = "azure-cni-plugin"
-
-	// CNI version supported by this plugin.
-	cniVersion = "0.2.0"
-
-	// Plugin execution environment.
-	environment = "azure"
-
-	// JSON file for storing state.
-	storeFileName = "/etc/cni/azure-container-networking.json"
+	name = "azure-vnet"
 )
 
 // Version is populated by make during build.
@@ -59,7 +51,7 @@ func main() {
 	config.ErrChan = make(chan error, 1)
 
 	// Create the key value store.
-	config.Store, err = store.NewJsonFileStore(storeFileName)
+	config.Store, err = store.NewJsonFileStore(platform.RuntimePath + name + ".json")
 	if err != nil {
 		log.Printf("[cni] Failed to create store, err:%v.", err)
 		return
@@ -86,7 +78,7 @@ func main() {
 	common.LogNetworkInterfaces()
 
 	// Set plugin options.
-	ipamPlugin.SetOption(common.OptEnvironment, environment)
+	ipamPlugin.SetOption(common.OptEnvironment, common.OptEnvironmentAzure)
 
 	// Start plugins.
 	if netPlugin != nil {
@@ -106,7 +98,7 @@ func main() {
 	}
 
 	// Set supported CNI versions.
-	pluginInfo := cniVers.PluginSupports(cniVersion)
+	pluginInfo := cniVers.PluginSupports(cni.cniVersion)
 
 	// Parse args and call the appropriate cmd handler.
 	cniSkel.PluginMain(netPlugin.Add, netPlugin.Delete, pluginInfo)

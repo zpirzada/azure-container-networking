@@ -122,7 +122,7 @@ func main() {
 	config.ErrChan = make(chan error, 1)
 
 	// Create the key value store.
-	config.Store, err = store.NewJsonFileStore("")
+	config.Store, err = store.NewJsonFileStore(platform.RuntimePath + "azure-vnet.json")
 	if err != nil {
 		fmt.Printf("Failed to create store: %v\n", err)
 		return

@@ -6,6 +6,7 @@ package cni
 import (
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/store"
 )
 
@@ -45,7 +46,7 @@ func (plugin *Plugin) Initialize(config *common.PluginConfig) error {
 	if plugin.Store == nil {
 		// Create the key value store.
 		var err error
-		plugin.Store, err = store.NewJsonFileStore("/etc/cni/" + plugin.Name + ".conf")
+		plugin.Store, err = store.NewJsonFileStore(platform.RuntimePath + plugin.Name + ".json")
 		if err != nil {
 			log.Printf("[cni] Failed to create store, err:%v.", err)
 			return err
