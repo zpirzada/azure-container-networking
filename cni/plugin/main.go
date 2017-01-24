@@ -98,7 +98,7 @@ func main() {
 	}
 
 	// Set supported CNI versions.
-	pluginInfo := cniVers.PluginSupports(cni.cniVersion)
+	pluginInfo := cniVers.PluginSupports(cni.Version)
 
 	// Parse args and call the appropriate cmd handler.
 	cniSkel.PluginMain(netPlugin.Add, netPlugin.Delete, pluginInfo)

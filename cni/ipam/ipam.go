@@ -16,7 +16,6 @@ import (
 
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
-	cniVers "github.com/containernetworking/cni/pkg/version"
 )
 
 const (
@@ -88,12 +87,6 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 	}
 
 	log.Printf("[cni-ipam] Plugin started.")
-
-	// Set supported CNI versions.
-	pluginInfo := cniVers.PluginSupports(cni.Version)
-
-	// Parse args and call the appropriate cmd handler.
-	cniSkel.PluginMain(plugin.Add, plugin.Delete, pluginInfo)
 
 	return nil
 }

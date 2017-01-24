@@ -22,13 +22,13 @@ const (
 )
 
 // CNI contract.
-type CniPlugin interface {
+type PluginApi interface {
 	Add(args *cniSkel.CmdArgs) error
 	Delete(args *cniSkel.CmdArgs) error
 }
 
 // CallPlugin calls the given CNI plugin through the internal interface.
-func CallPlugin(plugin CniPlugin, cmd string, args *cniSkel.CmdArgs, nwCfg *NetworkConfig) (*cniTypes.Result, error) {
+func CallPlugin(plugin PluginApi, cmd string, args *cniSkel.CmdArgs, nwCfg *NetworkConfig) (*cniTypes.Result, error) {
 	var err error
 
 	savedType := nwCfg.Ipam.Type

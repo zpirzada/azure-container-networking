@@ -5,7 +5,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/cni/ipam"
 	"github.com/Azure/azure-container-networking/common"
 )
@@ -15,22 +17,26 @@ var version string
 
 // Main is the entry point for CNI IPAM plugin.
 func main() {
-	// Initialize plugin common configuration.
 	var config common.PluginConfig
 	config.Version = version
 
-	// Create IPAM plugin.
 	ipamPlugin, err := ipam.NewPlugin(&config)
 	if err != nil {
-		fmt.Printf("[cni] Failed to create IPAM plugin, err:%v.\n", err)
-		return
+		fmt.Printf("Failed to create IPAM plugin, err:%v.\n", err)
+		os.Exit(1)
 	}
 
 	err = ipamPlugin.Start(&config)
 	if err != nil {
-		fmt.Printf("[cni] Failed to start IPAM plugin, err:%v.\n", err)
-		return
+		fmt.Printf("Failed to start IPAM plugin, err:%v.\n", err)
+		os.Exit(1)
 	}
 
+	err = ipamPlugin.Execute(cni.PluginApi(ipamPlugin))
+
 	ipamPlugin.Stop()
+
+	if err != nil {
+		os.Exit(1)
+	}
 }
