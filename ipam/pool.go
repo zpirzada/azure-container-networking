@@ -11,12 +11,14 @@ import (
 
 const (
 	// Default address space IDs.
-	localDefaultAddressSpaceId  = "LocalDefaultAddressSpace"
-	globalDefaultAddressSpaceId = "GlobalDefaultAddressSpace"
+	LocalDefaultAddressSpaceId  = "local"
+	GlobalDefaultAddressSpaceId = "global"
+)
 
+const (
 	// Address space scopes.
-	localScope  = "local"
-	globalScope = "global"
+	LocalScope = iota
+	GlobalScope
 )
 
 var (
@@ -36,7 +38,7 @@ type addressPoolId struct {
 // Represents a set of non-overlapping address pools.
 type addressSpace struct {
 	Id    string
-	Scope string
+	Scope int
 	Pools map[string]*addressPool
 	epoch int
 }
@@ -116,8 +118,8 @@ func (pid *addressPoolId) String() string {
 //
 
 // Creates a new addressSpace object.
-func (am *addressManager) newAddressSpace(id string, scope string) (*addressSpace, error) {
-	if scope != localScope && scope != globalScope {
+func (am *addressManager) newAddressSpace(id string, scope int) (*addressSpace, error) {
+	if scope != LocalScope && scope != GlobalScope {
 		return nil, errInvalidScope
 	}
 

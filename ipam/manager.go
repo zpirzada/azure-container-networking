@@ -56,7 +56,7 @@ type addressConfigSource interface {
 
 // AddressConfigSink interface is used by AddressConfigSources to configure address pools.
 type addressConfigSink interface {
-	newAddressSpace(id string, scope string) (*addressSpace, error)
+	newAddressSpace(id string, scope int) (*addressSpace, error)
 	setAddressSpace(*addressSpace) error
 }
 
@@ -222,12 +222,12 @@ func (am *addressManager) GetDefaultAddressSpaces() (string, string) {
 
 	am.refreshSource()
 
-	local := am.AddrSpaces[localDefaultAddressSpaceId]
+	local := am.AddrSpaces[LocalDefaultAddressSpaceId]
 	if local != nil {
 		localId = local.Id
 	}
 
-	global := am.AddrSpaces[globalDefaultAddressSpaceId]
+	global := am.AddrSpaces[GlobalDefaultAddressSpaceId]
 	if global != nil {
 		globalId = global.Id
 	}

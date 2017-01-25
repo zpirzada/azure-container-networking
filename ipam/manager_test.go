@@ -78,7 +78,7 @@ func setupTestAddressSpace(am AddressManager) error {
 	amImpl := am.(*addressManager)
 
 	// Configure an empty global address space.
-	globalAs, err := amImpl.newAddressSpace(globalDefaultAddressSpaceId, globalScope)
+	globalAs, err := amImpl.newAddressSpace(GlobalDefaultAddressSpaceId, GlobalScope)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func setupTestAddressSpace(am AddressManager) error {
 	}
 
 	// Configure a local address space.
-	localAs, err := amImpl.newAddressSpace(localDefaultAddressSpaceId, localScope)
+	localAs, err := amImpl.newAddressSpace(LocalDefaultAddressSpaceId, LocalScope)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func cleanupTestAddressSpace(am AddressManager) error {
 	amImpl := am.(*addressManager)
 
 	// Configure an empty local address space.
-	localAs, err := amImpl.newAddressSpace(localDefaultAddressSpaceId, localScope)
+	localAs, err := amImpl.newAddressSpace(LocalDefaultAddressSpaceId, LocalScope)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func cleanupTestAddressSpace(am AddressManager) error {
 	}
 
 	// Configure an empty global address space.
-	globalAs, err := amImpl.newAddressSpace(globalDefaultAddressSpaceId, globalScope)
+	globalAs, err := amImpl.newAddressSpace(GlobalDefaultAddressSpaceId, GlobalScope)
 	if err != nil {
 		return err
 	}
@@ -152,11 +152,11 @@ func TestAddressSpaceCreateAndGet(t *testing.T) {
 	// Test if the address spaces are returned correctly.
 	local, global := am.GetDefaultAddressSpaces()
 
-	if local != localDefaultAddressSpaceId {
+	if local != LocalDefaultAddressSpaceId {
 		t.Errorf("GetDefaultAddressSpaces returned invalid local address space.")
 	}
 
-	if global != globalDefaultAddressSpaceId {
+	if global != GlobalDefaultAddressSpaceId {
 		t.Errorf("GetDefaultAddressSpaces returned invalid global address space.")
 	}
 }
@@ -171,7 +171,7 @@ func TestAddressSpaceUpdate(t *testing.T) {
 	amImpl := am.(*addressManager)
 
 	// Create a new local address space to update the existing one.
-	localAs, err := amImpl.newAddressSpace(localDefaultAddressSpaceId, localScope)
+	localAs, err := amImpl.newAddressSpace(LocalDefaultAddressSpaceId, LocalScope)
 	if err != nil {
 		t.Errorf("newAddressSpace failed, err:%+v.", err)
 	}
@@ -192,7 +192,7 @@ func TestAddressSpaceUpdate(t *testing.T) {
 	}
 
 	// Test that the address space was updated correctly.
-	localAs, err = amImpl.getAddressSpace(localDefaultAddressSpaceId)
+	localAs, err = amImpl.getAddressSpace(LocalDefaultAddressSpaceId)
 	if err != nil {
 		t.Errorf("getAddressSpace failed, err:%+v.", err)
 	}
@@ -250,12 +250,12 @@ func TestAddressPoolRequestsForSeparatePools(t *testing.T) {
 	}
 
 	// Request two separate address pools.
-	poolId1, subnet1, err := am.RequestPool(localDefaultAddressSpaceId, "", "", nil, false)
+	poolId1, subnet1, err := am.RequestPool(LocalDefaultAddressSpaceId, "", "", nil, false)
 	if err != nil {
 		t.Errorf("RequestPool failed, err:%v", err)
 	}
 
-	poolId2, subnet2, err := am.RequestPool(localDefaultAddressSpaceId, "", "", nil, false)
+	poolId2, subnet2, err := am.RequestPool(LocalDefaultAddressSpaceId, "", "", nil, false)
 	if err != nil {
 		t.Errorf("RequestPool failed, err:%v", err)
 	}
@@ -266,12 +266,12 @@ func TestAddressPoolRequestsForSeparatePools(t *testing.T) {
 	}
 
 	// Release the address pools.
-	err = am.ReleasePool(localDefaultAddressSpaceId, poolId1)
+	err = am.ReleasePool(LocalDefaultAddressSpaceId, poolId1)
 	if err != nil {
 		t.Errorf("ReleasePool failed, err:%v", err)
 	}
 
-	err = am.ReleasePool(localDefaultAddressSpaceId, poolId2)
+	err = am.ReleasePool(LocalDefaultAddressSpaceId, poolId2)
 	if err != nil {
 		t.Errorf("ReleasePool failed, err:%v", err)
 	}
@@ -286,12 +286,12 @@ func TestAddressPoolRequestsForSamePool(t *testing.T) {
 	}
 
 	// Request the same address pool twice.
-	poolId1, subnet1, err := am.RequestPool(localDefaultAddressSpaceId, "", "", nil, false)
+	poolId1, subnet1, err := am.RequestPool(LocalDefaultAddressSpaceId, "", "", nil, false)
 	if err != nil {
 		t.Errorf("RequestPool failed, err:%v", err)
 	}
 
-	poolId2, subnet2, err := am.RequestPool(localDefaultAddressSpaceId, poolId1, "", nil, false)
+	poolId2, subnet2, err := am.RequestPool(LocalDefaultAddressSpaceId, poolId1, "", nil, false)
 	if err != nil {
 		t.Errorf("RequestPool failed, err:%v", err)
 	}
@@ -302,18 +302,18 @@ func TestAddressPoolRequestsForSamePool(t *testing.T) {
 	}
 
 	// Release the address pools.
-	err = am.ReleasePool(localDefaultAddressSpaceId, poolId1)
+	err = am.ReleasePool(LocalDefaultAddressSpaceId, poolId1)
 	if err != nil {
 		t.Errorf("ReleasePool failed, err:%v", err)
 	}
 
-	err = am.ReleasePool(localDefaultAddressSpaceId, poolId2)
+	err = am.ReleasePool(LocalDefaultAddressSpaceId, poolId2)
 	if err != nil {
 		t.Errorf("ReleasePool failed, err:%v", err)
 	}
 
 	// Third release should fail.
-	err = am.ReleasePool(localDefaultAddressSpaceId, poolId1)
+	err = am.ReleasePool(LocalDefaultAddressSpaceId, poolId1)
 	if err == nil {
 		t.Errorf("ReleasePool succeeded extra, err:%v", err)
 	}
@@ -328,13 +328,13 @@ func TestAddressRequestsFromTheSamePool(t *testing.T) {
 	}
 
 	// Request a pool.
-	poolId, _, err := am.RequestPool(localDefaultAddressSpaceId, "", "", nil, false)
+	poolId, _, err := am.RequestPool(LocalDefaultAddressSpaceId, "", "", nil, false)
 	if err != nil {
 		t.Errorf("RequestPool failed, err:%v", err)
 	}
 
 	// Request two addresses from the pool.
-	address1, err := am.RequestAddress(localDefaultAddressSpaceId, poolId, "", nil)
+	address1, err := am.RequestAddress(LocalDefaultAddressSpaceId, poolId, "", nil)
 	if err != nil {
 		t.Errorf("RequestAddress failed, err:%v", err)
 	}
@@ -342,7 +342,7 @@ func TestAddressRequestsFromTheSamePool(t *testing.T) {
 	addr, _, _ := net.ParseCIDR(address1)
 	address1 = addr.String()
 
-	address2, err := am.RequestAddress(localDefaultAddressSpaceId, poolId, "", nil)
+	address2, err := am.RequestAddress(LocalDefaultAddressSpaceId, poolId, "", nil)
 	if err != nil {
 		t.Errorf("RequestAddress failed, err:%v", err)
 	}
@@ -356,17 +356,17 @@ func TestAddressRequestsFromTheSamePool(t *testing.T) {
 	}
 
 	// Release addresses and the pool.
-	err = am.ReleaseAddress(localDefaultAddressSpaceId, poolId, address1)
+	err = am.ReleaseAddress(LocalDefaultAddressSpaceId, poolId, address1)
 	if err != nil {
 		t.Errorf("ReleaseAddress failed, err:%v", err)
 	}
 
-	err = am.ReleaseAddress(localDefaultAddressSpaceId, poolId, address2)
+	err = am.ReleaseAddress(LocalDefaultAddressSpaceId, poolId, address2)
 	if err != nil {
 		t.Errorf("ReleaseAddress failed, err:%v", err)
 	}
 
-	err = am.ReleasePool(localDefaultAddressSpaceId, poolId)
+	err = am.ReleasePool(LocalDefaultAddressSpaceId, poolId)
 	if err != nil {
 		t.Errorf("ReleasePool failed, err:%v", err)
 	}

@@ -99,7 +99,7 @@ func (s *azureSource) refresh() error {
 	}
 
 	// Configure the local default address space.
-	local, err := s.sink.newAddressSpace(localDefaultAddressSpaceId, localScope)
+	local, err := s.sink.newAddressSpace(LocalDefaultAddressSpaceId, LocalScope)
 	if err != nil {
 		return err
 	}

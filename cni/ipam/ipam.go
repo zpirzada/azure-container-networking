@@ -21,9 +21,6 @@ import (
 const (
 	// Plugin name.
 	name = "azure-vnet-ipam"
-
-	// The default address space ID used when an explicit ID is not specified.
-	defaultAddressSpaceId = "LocalDefaultAddressSpace"
 )
 
 var (
@@ -129,7 +126,7 @@ func (plugin *ipamPlugin) Configure(stdinData []byte) (*cni.NetworkConfig, error
 
 	// Set default address space if not specified.
 	if nwCfg.Ipam.AddrSpace == "" {
-		nwCfg.Ipam.AddrSpace = defaultAddressSpaceId
+		nwCfg.Ipam.AddrSpace = ipam.LocalDefaultAddressSpaceId
 	}
 
 	return nwCfg, nil
