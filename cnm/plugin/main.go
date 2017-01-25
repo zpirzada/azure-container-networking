@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/azure-container-networking/cnm/network"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/store"
 )
 
@@ -121,7 +122,7 @@ func main() {
 	config.ErrChan = make(chan error, 1)
 
 	// Create the key value store.
-	config.Store, err = store.NewJsonFileStore("")
+	config.Store, err = store.NewJsonFileStore(platform.RuntimePath + "azure-vnet.json")
 	if err != nil {
 		fmt.Printf("Failed to create store: %v\n", err)
 		return
@@ -136,7 +137,7 @@ func main() {
 	}
 
 	// Log platform information.
-	common.LogPlatformInfo()
+	log.Printf("Running on %v", platform.GetOSInfo())
 	common.LogNetworkInterfaces()
 
 	// Set plugin options.

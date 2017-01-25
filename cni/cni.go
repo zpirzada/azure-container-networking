@@ -11,20 +11,24 @@ import (
 )
 
 const (
-	Internal = "internal"
+	// Supported CNI versions.
+	Version = "0.2.0"
 
+	// CNI commands.
 	CmdAdd = "ADD"
 	CmdDel = "DEL"
+
+	Internal = "internal"
 )
 
 // CNI contract.
-type CniPlugin interface {
+type PluginApi interface {
 	Add(args *cniSkel.CmdArgs) error
 	Delete(args *cniSkel.CmdArgs) error
 }
 
 // CallPlugin calls the given CNI plugin through the internal interface.
-func CallPlugin(plugin CniPlugin, cmd string, args *cniSkel.CmdArgs, nwCfg *NetworkConfig) (*cniTypes.Result, error) {
+func CallPlugin(plugin PluginApi, cmd string, args *cniSkel.CmdArgs, nwCfg *NetworkConfig) (*cniTypes.Result, error) {
 	var err error
 
 	savedType := nwCfg.Ipam.Type
@@ -59,6 +63,7 @@ type NetworkConfig struct {
 	CniVersion string `json:"cniVersion"`
 	Name       string `json:"name"`
 	Type       string `json:"type"`
+	Master     string `json:"master"`
 	Bridge     string `json:"bridge,omitempty"`
 	LogLevel   string `json:"logLevel,omitempty"`
 	LogTarget  string `json:"logTarget,omitempty"`

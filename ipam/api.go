@@ -24,4 +24,7 @@ var (
 	errAddressInUse            = fmt.Errorf("Address already in use")
 	errAddressNotInUse         = fmt.Errorf("Address not in use")
 	errNoAvailableAddresses    = fmt.Errorf("No available addresses")
+
+	// Options used by AddressManager.
+	OptInterface = "azure.interface"
 )

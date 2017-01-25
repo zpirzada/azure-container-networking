@@ -8,27 +8,28 @@ import (
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network"
+	"github.com/Azure/azure-container-networking/platform"
 
+	cniIpam "github.com/containernetworking/cni/pkg/ipam"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
 )
 
 const (
 	// Plugin name.
-	name = "net"
+	name = "azure-vnet"
 )
 
-// NetPlugin object and its interface
+// NetPlugin represents the CNI network plugin.
 type netPlugin struct {
-	*common.Plugin
-	nm         network.NetworkManager
-	ipamPlugin cni.CniPlugin
+	*cni.Plugin
+	nm network.NetworkManager
 }
 
 // NewPlugin creates a new netPlugin object.
 func NewPlugin(config *common.PluginConfig) (*netPlugin, error) {
 	// Setup base plugin.
-	plugin, err := common.NewPlugin(name, config.Version)
+	plugin, err := cni.NewPlugin(name, config.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -56,14 +57,17 @@ func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 		return err
 	}
 
+	// Log platform information.
+	log.Printf("[cni-net] Plugin %v version %v.", plugin.Name, plugin.Version)
+	log.Printf("[cni-net] Running on %v", platform.GetOSInfo())
+	common.LogNetworkInterfaces()
+
 	// Initialize network manager.
 	err = plugin.nm.Initialize(config)
 	if err != nil {
 		log.Printf("[cni-net] Failed to initialize network manager, err:%v.", err)
 		return err
 	}
-
-	plugin.ipamPlugin = config.IpamApi.(cni.CniPlugin)
 
 	log.Printf("[cni-net] Plugin started.")
 
@@ -108,17 +112,24 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		log.Printf("[cni-net] Creating network.")
 
 		// Call into IPAM plugin to allocate an address pool for the network.
-		result, err = cni.CallPlugin(plugin.ipamPlugin, cni.CmdAdd, args, nwCfg)
+		result, err = cniIpam.ExecAdd(nwCfg.Ipam.Type, nwCfg.Serialize())
 		if err != nil {
 			log.Printf("[cni-net] Failed to allocate pool, err:%v.", err)
 			return nil
 		}
 
+		log.Printf("[cni-net] IPAM plugin returned result %v.", result)
+
 		// Derive the subnet from allocated IP address.
 		subnet := result.IP4.IP
 		subnet.IP = subnet.IP.Mask(subnet.Mask)
 
-		log.Printf("[cni-net] IPAM plugin returned subnet %v and address %v.", subnet, result.IP4.IP.String())
+		// Add the master as an external interface.
+		err = plugin.nm.AddExternalInterface(nwCfg.Master, subnet.String())
+		if err != nil {
+			log.Printf("[cni-net] Failed to add external interface, err:%v.", err)
+			return nil
+		}
 
 		// Create the network.
 		nwInfo := network.NetworkInfo{
@@ -133,23 +144,23 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 			return nil
 		}
 
-		log.Printf("[cni-net] Created network %v with subnet %v.", networkId, subnet)
+		log.Printf("[cni-net] Created network %v with subnet %v.", networkId, subnet.String())
 	} else {
 		// Network already exists.
 		log.Printf("[cni-net] Found network %v with subnet %v.", networkId, nwInfo.Subnets[0])
 
 		// Call into IPAM plugin to allocate an address for the endpoint.
 		nwCfg.Ipam.Subnet = nwInfo.Subnets[0]
-		result, err = cni.CallPlugin(plugin.ipamPlugin, cni.CmdAdd, args, nwCfg)
+		result, err = cniIpam.ExecAdd(nwCfg.Ipam.Type, nwCfg.Serialize())
 		if err != nil {
 			log.Printf("[cni-net] Failed to allocate address, err:%v.", err)
 			return nil
 		}
 
-		log.Printf("[cni-net] IPAM plugin returned address %v.", result.IP4.IP.String())
+		log.Printf("[cni-net] IPAM plugin returned result %v.", result)
 	}
 
-	// Create the endpoint.
+	// Initialize endpoint info.
 	epInfo := &network.EndpointInfo{
 		Id:        endpointId,
 		IfName:    args.IfName,
@@ -165,6 +176,8 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		}
 	}
 
+	// Create the endpoint.
+	log.Printf("[cni-net] Creating endpoint %+v", epInfo)
 	err = plugin.nm.CreateEndpoint(networkId, epInfo)
 	if err != nil {
 		log.Printf("[cni-net] Failed to create endpoint, err:%v.", err)
@@ -222,7 +235,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	nwCfg.Ipam.Subnet = nwInfo.Subnets[0]
 	for _, address := range epInfo.IPAddresses {
 		nwCfg.Ipam.Address = address.IP.String()
-		_, err = cni.CallPlugin(plugin.ipamPlugin, cni.CmdDel, args, nwCfg)
+		err = cniIpam.ExecDel(nwCfg.Ipam.Type, nwCfg.Serialize())
 		if err != nil {
 			log.Printf("[cni-net] Failed to release address, err:%v.", err)
 			return nil

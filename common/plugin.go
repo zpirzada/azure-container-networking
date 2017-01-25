@@ -24,12 +24,21 @@ type PluginApi interface {
 	SetOption(string, interface{})
 }
 
+// Network internal interface.
+type NetApi interface {
+	AddExternalInterface(ifName string, subnet string) error
+}
+
+// IPAM internal interface.
+type IpamApi interface {
+}
+
 // Plugin common configuration.
 type PluginConfig struct {
 	Name     string
 	Version  string
-	NetApi   interface{}
-	IpamApi  interface{}
+	NetApi   NetApi
+	IpamApi  IpamApi
 	Listener *Listener
 	ErrChan  chan error
 	Store    store.KeyValueStore

@@ -9,7 +9,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
-	"github.com/Azure/azure-container-networking/network"
+	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/store"
 )
 
@@ -25,7 +25,7 @@ type addressManager struct {
 	AddrSpaces map[string]*addressSpace `json:"AddressSpaces"`
 	store      store.KeyValueStore
 	source     addressConfigSource
-	netApi     network.NetworkManager
+	netApi     common.NetApi
 	sync.Mutex
 }
 
@@ -34,7 +34,11 @@ type AddressManager interface {
 	Initialize(config *common.PluginConfig, options map[string]interface{}) error
 	Uninitialize()
 
+	StartSource(options map[string]interface{}) error
+	StopSource()
+
 	GetDefaultAddressSpaces() (string, string)
+
 	RequestPool(asId, poolId, subPoolId string, options map[string]string, v6 bool) (string, string, error)
 	ReleasePool(asId, poolId string) error
 	GetPoolInfo(asId, poolId string) (*AddressPoolInfo, error)
@@ -52,7 +56,7 @@ type addressConfigSource interface {
 
 // AddressConfigSink interface is used by AddressConfigSources to configure address pools.
 type addressConfigSink interface {
-	newAddressSpace(id string, scope string) (*addressSpace, error)
+	newAddressSpace(id string, scope int) (*addressSpace, error)
 	setAddressSpace(*addressSpace) error
 }
 
@@ -69,7 +73,7 @@ func NewAddressManager() (AddressManager, error) {
 func (am *addressManager) Initialize(config *common.PluginConfig, options map[string]interface{}) error {
 	am.Version = config.Version
 	am.store = config.Store
-	am.netApi, _ = config.NetApi.(network.NetworkManager)
+	am.netApi = config.NetApi
 
 	// Restore persisted state.
 	err := am.restore()
@@ -78,14 +82,14 @@ func (am *addressManager) Initialize(config *common.PluginConfig, options map[st
 	}
 
 	// Start source.
-	err = am.startSource(options)
+	err = am.StartSource(options)
 
 	return err
 }
 
 // Uninitialize cleans up address manager.
 func (am *addressManager) Uninitialize() {
-	am.stopSource()
+	am.StopSource()
 }
 
 // Restore reads address manager state from persistent store.
@@ -99,10 +103,11 @@ func (am *addressManager) restore() error {
 	// Ignore the persisted state if it is older than the last reboot time.
 	modTime, err := am.store.GetModificationTime()
 	if err == nil {
-		rebootTime, err := common.GetLastRebootTime()
+		log.Printf("[ipam] Store timestamp is %v.", modTime)
+
+		rebootTime, err := platform.GetLastRebootTime()
 		if err == nil && rebootTime.After(modTime) {
-			log.Printf("[ipam] Ignoring stale state from store.")
-			log.Printf("[ipam] Store timestamp %v is older than boot timestamp %v.", modTime, rebootTime)
+			log.Printf("[ipam] Ignoring stale state older than last reboot %v.", rebootTime)
 			return nil
 		}
 	}
@@ -150,7 +155,7 @@ func (am *addressManager) save() error {
 }
 
 // Starts configuration source.
-func (am *addressManager) startSource(options map[string]interface{}) error {
+func (am *addressManager) StartSource(options map[string]interface{}) error {
 	var err error
 
 	environment, _ := options[common.OptEnvironment].(string)
@@ -173,14 +178,19 @@ func (am *addressManager) startSource(options map[string]interface{}) error {
 	}
 
 	if am.source != nil {
+		log.Printf("[ipam] Starting source %v.", environment)
 		err = am.source.start(am)
+	}
+
+	if err != nil {
+		log.Printf("[ipam] Failed to start source %v, err:%v.", environment, err)
 	}
 
 	return err
 }
 
 // Stops the configuration source.
-func (am *addressManager) stopSource() {
+func (am *addressManager) StopSource() {
 	if am.source != nil {
 		am.source.stop()
 		am.source = nil
@@ -212,12 +222,12 @@ func (am *addressManager) GetDefaultAddressSpaces() (string, string) {
 
 	am.refreshSource()
 
-	local := am.AddrSpaces[localDefaultAddressSpaceId]
+	local := am.AddrSpaces[LocalDefaultAddressSpaceId]
 	if local != nil {
 		localId = local.Id
 	}
 
-	global := am.AddrSpaces[globalDefaultAddressSpaceId]
+	global := am.AddrSpaces[GlobalDefaultAddressSpaceId]
 	if global != nil {
 		globalId = global.Id
 	}

@@ -6,11 +6,13 @@ package ipam
 import (
 	"encoding/json"
 	"net"
+	"strconv"
 
 	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/ipam"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
@@ -18,10 +20,7 @@ import (
 
 const (
 	// Plugin name.
-	name = "ipam"
-
-	// The default address space ID used when an explicit ID is not specified.
-	defaultAddressSpaceId = "LocalDefaultAddressSpace"
+	name = "azure-vnet-ipam"
 )
 
 var (
@@ -33,16 +32,16 @@ var (
 	ipv4DefaultRouteDstPrefix = net.IPNet{net.IPv4zero, net.IPv4Mask(0, 0, 0, 0)}
 )
 
-// IpamPlugin represents a CNI IPAM plugin.
+// IpamPlugin represents the CNI IPAM plugin.
 type ipamPlugin struct {
-	*common.Plugin
+	*cni.Plugin
 	am ipam.AddressManager
 }
 
 // NewPlugin creates a new ipamPlugin object.
 func NewPlugin(config *common.PluginConfig) (*ipamPlugin, error) {
 	// Setup base plugin.
-	plugin, err := common.NewPlugin(name, config.Version)
+	plugin, err := cni.NewPlugin(name, config.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +72,10 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 		return err
 	}
 
+	// Log platform information.
+	log.Printf("[cni-ipam] Plugin %v version %v.", plugin.Name, plugin.Version)
+	log.Printf("[cni-ipam] Running on %v", platform.GetOSInfo())
+
 	// Initialize address manager.
 	err = plugin.am.Initialize(config, plugin.Options)
 	if err != nil {
@@ -92,6 +95,43 @@ func (plugin *ipamPlugin) Stop() {
 	log.Printf("[cni-ipam] Plugin stopped.")
 }
 
+// Configure parses and applies the given network configuration.
+func (plugin *ipamPlugin) Configure(stdinData []byte) (*cni.NetworkConfig, error) {
+	// Parse network configuration from stdin.
+	nwCfg, err := cni.ParseNetworkConfig(stdinData)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("[cni-ipam] Read network configuration %+v.", nwCfg)
+
+	// Apply IPAM configuration.
+
+	// Set deployment environment.
+	if nwCfg.Ipam.Environment == "" {
+		nwCfg.Ipam.Environment = common.OptEnvironmentAzure
+	}
+	plugin.SetOption(common.OptEnvironment, nwCfg.Ipam.Environment)
+
+	// Set query interval.
+	if nwCfg.Ipam.QueryInterval != "" {
+		i, _ := strconv.Atoi(nwCfg.Ipam.QueryInterval)
+		plugin.SetOption(common.OptIpamQueryInterval, i)
+	}
+
+	err = plugin.am.StartSource(plugin.Options)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set default address space if not specified.
+	if nwCfg.Ipam.AddrSpace == "" {
+		nwCfg.Ipam.AddrSpace = ipam.LocalDefaultAddressSpaceId
+	}
+
+	return nwCfg, nil
+}
+
 //
 // CNI implementation
 // https://github.com/containernetworking/cni/blob/master/SPEC.md
@@ -103,17 +143,10 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path)
 
 	// Parse network configuration from stdin.
-	nwCfg, err := cni.ParseNetworkConfig(args.StdinData)
+	nwCfg, err := plugin.Configure(args.StdinData)
 	if err != nil {
-		log.Printf("[cni-ipam] Failed to parse network configuration: %v.", err)
+		log.Printf("[cni-ipam] Failed to parse network configuration, err:%v.", err)
 		return nil
-	}
-
-	log.Printf("[cni-ipam] Read network configuration %+v.", nwCfg)
-
-	// Assume default address space if not specified.
-	if nwCfg.Ipam.AddrSpace == "" {
-		nwCfg.Ipam.AddrSpace = defaultAddressSpaceId
 	}
 
 	var poolId string
@@ -124,8 +157,12 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	// Check if an address pool is specified.
 	if nwCfg.Ipam.Subnet == "" {
+		// Select the requested interface.
+		options := make(map[string]string)
+		options[ipam.OptInterface] = nwCfg.Master
+
 		// Allocate an address pool.
-		poolId, subnet, err = plugin.am.RequestPool(nwCfg.Ipam.AddrSpace, "", "", nil, false)
+		poolId, subnet, err = plugin.am.RequestPool(nwCfg.Ipam.AddrSpace, "", "", options, false)
 		if err != nil {
 			log.Printf("[cni-ipam] Failed to allocate pool, err:%v.", err)
 			return nil
@@ -211,17 +248,10 @@ func (plugin *ipamPlugin) Delete(args *cniSkel.CmdArgs) error {
 		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path)
 
 	// Parse network configuration from stdin.
-	nwCfg, err := cni.ParseNetworkConfig(args.StdinData)
+	nwCfg, err := plugin.Configure(args.StdinData)
 	if err != nil {
-		log.Printf("[cni-ipam] Failed to parse network configuration: %v.", err)
+		log.Printf("[cni-ipam] Failed to parse network configuration, err:%v.", err)
 		return nil
-	}
-
-	log.Printf("[cni-ipam] Read network configuration %+v.", nwCfg)
-
-	// Assume default address space if not specified.
-	if nwCfg.Ipam.AddrSpace == "" {
-		nwCfg.Ipam.AddrSpace = defaultAddressSpaceId
 	}
 
 	// If an address is specified, release that address. Otherwise, release the pool.
