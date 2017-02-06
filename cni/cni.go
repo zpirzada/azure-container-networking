@@ -8,13 +8,13 @@ import (
 )
 
 const (
-	// Supported CNI versions.
-	Version = "0.2.0"
-
 	// CNI commands.
 	CmdAdd = "ADD"
 	CmdDel = "DEL"
 )
+
+// Supported CNI versions.
+var supportedVersions = []string{"0.1.0", "0.2.0", "0.3.0"}
 
 // CNI contract.
 type PluginApi interface {
