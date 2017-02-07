@@ -10,9 +10,10 @@ import (
 	"github.com/Azure/azure-container-networking/network"
 	"github.com/Azure/azure-container-networking/platform"
 
-	cniIpam "github.com/containernetworking/cni/pkg/ipam"
+	cniInvoke "github.com/containernetworking/cni/pkg/invoke"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
+	cniTypesImpl "github.com/containernetworking/cni/pkg/types/020"
 )
 
 const (
@@ -101,7 +102,8 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	log.Printf("[cni-net] Read network configuration %+v.", nwCfg)
 
 	// Initialize values from network config.
-	var result *cniTypes.Result
+	var result cniTypes.Result
+	var resultImpl *cniTypesImpl.Result
 	networkId := nwCfg.Name
 	endpointId := args.ContainerID
 
@@ -112,16 +114,18 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		log.Printf("[cni-net] Creating network.")
 
 		// Call into IPAM plugin to allocate an address pool for the network.
-		result, err = cniIpam.ExecAdd(nwCfg.Ipam.Type, nwCfg.Serialize())
+		result, err = cniInvoke.DelegateAdd(nwCfg.Ipam.Type, nwCfg.Serialize())
 		if err != nil {
 			log.Printf("[cni-net] Failed to allocate pool, err:%v.", err)
 			return nil
 		}
 
-		log.Printf("[cni-net] IPAM plugin returned result %v.", result)
+		resultImpl, err = cniTypesImpl.GetResult(result)
+
+		log.Printf("[cni-net] IPAM plugin returned result %v.", resultImpl)
 
 		// Derive the subnet from allocated IP address.
-		subnet := result.IP4.IP
+		subnet := resultImpl.IP4.IP
 		subnet.IP = subnet.IP.Mask(subnet.Mask)
 
 		// Add the master as an external interface.
@@ -151,13 +155,15 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 		// Call into IPAM plugin to allocate an address for the endpoint.
 		nwCfg.Ipam.Subnet = nwInfo.Subnets[0]
-		result, err = cniIpam.ExecAdd(nwCfg.Ipam.Type, nwCfg.Serialize())
+		result, err = cniInvoke.DelegateAdd(nwCfg.Ipam.Type, nwCfg.Serialize())
 		if err != nil {
 			log.Printf("[cni-net] Failed to allocate address, err:%v.", err)
 			return nil
 		}
 
-		log.Printf("[cni-net] IPAM plugin returned result %v.", result)
+		resultImpl, err = cniTypesImpl.GetResult(result)
+
+		log.Printf("[cni-net] IPAM plugin returned result %v.", resultImpl)
 	}
 
 	// Initialize endpoint info.
@@ -168,10 +174,10 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	}
 
 	// Populate addresses and routes.
-	if result.IP4 != nil {
-		epInfo.IPAddresses = append(epInfo.IPAddresses, result.IP4.IP)
+	if resultImpl.IP4 != nil {
+		epInfo.IPAddresses = append(epInfo.IPAddresses, resultImpl.IP4.IP)
 
-		for _, route := range result.IP4.Routes {
+		for _, route := range resultImpl.IP4.Routes {
 			epInfo.Routes = append(epInfo.Routes, network.RouteInfo{Dst: route.Dst, Gw: route.GW})
 		}
 	}
@@ -182,6 +188,12 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	if err != nil {
 		log.Printf("[cni-net] Failed to create endpoint, err:%v.", err)
 		return nil
+	}
+
+	// Convert result to the requested CNI version.
+	result, err = resultImpl.GetAsVersion(nwCfg.CniVersion)
+	if err != nil {
+		return err
 	}
 
 	// Output the result to stdout.
@@ -235,7 +247,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	nwCfg.Ipam.Subnet = nwInfo.Subnets[0]
 	for _, address := range epInfo.IPAddresses {
 		nwCfg.Ipam.Address = address.IP.String()
-		err = cniIpam.ExecDel(nwCfg.Ipam.Type, nwCfg.Serialize())
+		err = cniInvoke.DelegateDel(nwCfg.Ipam.Type, nwCfg.Serialize())
 		if err != nil {
 			log.Printf("[cni-net] Failed to release address, err:%v.", err)
 			return nil

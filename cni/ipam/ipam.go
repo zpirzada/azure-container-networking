@@ -16,6 +16,7 @@ import (
 
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
+	cniTypesImpl "github.com/containernetworking/cni/pkg/types/020"
 )
 
 const (
@@ -152,7 +153,8 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	var poolId string
 	var subnet string
 	var ipv4Address *net.IPNet
-	var result *cniTypes.Result
+	var result cniTypes.Result
+	var resultImpl *cniTypesImpl.Result
 	var apInfo *ipam.AddressPoolInfo
 
 	// Check if an address pool is specified.
@@ -194,8 +196,8 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	}
 
 	// Populate IP configuration.
-	result = &cniTypes.Result{
-		IP4: &cniTypes.IPConfig{
+	resultImpl = &cniTypesImpl.Result{
+		IP4: &cniTypesImpl.IPConfig{
 			IP:      *ipv4Address,
 			Gateway: apInfo.Gateway,
 			Routes: []cniTypes.Route{
@@ -209,7 +211,13 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	// Populate DNS servers.
 	for _, ip := range apInfo.DnsServers {
-		result.DNS.Nameservers = append(result.DNS.Nameservers, ip.String())
+		resultImpl.DNS.Nameservers = append(resultImpl.DNS.Nameservers, ip.String())
+	}
+
+	// Convert result to the requested CNI version.
+	result, err = resultImpl.GetAsVersion(nwCfg.CniVersion)
+	if err != nil {
+		goto Rollback
 	}
 
 	// Output the result.

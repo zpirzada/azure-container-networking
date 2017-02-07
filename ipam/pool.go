@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net"
 	"strings"
+
+	"github.com/Azure/azure-container-networking/log"
 )
 
 const (
@@ -267,74 +269,101 @@ func (as *addressSpace) getAddressPool(poolId string) (*addressPool, error) {
 // Requests a new address pool from the address space.
 func (as *addressSpace) requestPool(poolId string, subPoolId string, options map[string]string, v6 bool) (*addressPool, error) {
 	var ap *addressPool
+	var err error
+
+	log.Printf("[ipam] Requesting pool with poolId:%v options:%+v v6:%v.", poolId, options, v6)
 
 	if poolId != "" {
 		// Return the specific address pool requested.
 		// Note sharing of pools is allowed when specifically requested.
 		ap = as.Pools[poolId]
 		if ap == nil {
-			return nil, errAddressPoolNotFound
+			err = errAddressPoolNotFound
 		}
 	} else {
 		// Return any available address pool.
 		ifName := options[OptInterface]
-		highestPriority := -1
-		highestNumAddr := -1
 
 		for _, pool := range as.Pools {
+			log.Printf("[ipam] Checking pool %v.", pool.Id)
+
 			// Skip if pool is already in use.
 			if pool.isInUse() {
+				log.Printf("[ipam] Pool is in use.")
 				continue
 			}
 
 			// Pick a pool from the same address family.
 			if pool.IsIPv6 != v6 {
+				log.Printf("[ipam] Pool is of a different address family.")
 				continue
 			}
 
 			// Skip if pool is not on the requested interface.
 			if ifName != "" && ifName != pool.IfName {
+				log.Printf("[ipam] Pool is not on the requested interface.")
+				continue
+			}
+
+			log.Printf("[ipam] Pool %v matches requirements.", pool.Id)
+
+			if ap == nil {
+				ap = pool
 				continue
 			}
 
 			// Prefer the pool with the highest priority.
-			if pool.Priority > highestPriority {
-				highestPriority = pool.Priority
+			if pool.Priority > ap.Priority {
+				log.Printf("[ipam] Pool is preferred because of priority.")
 				ap = pool
 			}
 
 			// Prefer the pool with the highest number of addresses.
-			if len(pool.Addresses) > highestNumAddr {
-				highestNumAddr = len(pool.Addresses)
+			if len(pool.Addresses) > len(ap.Addresses) {
+				log.Printf("[ipam] Pool is preferred because of capacity.")
 				ap = pool
 			}
 		}
 
 		if ap == nil {
-			return nil, errNoAvailableAddressPools
+			err = errNoAvailableAddressPools
 		}
 	}
 
-	ap.RefCount++
+	if ap != nil {
+		ap.RefCount++
+	}
 
-	return ap, nil
+	log.Printf("[ipam] Pool request completed with pool:%+v err:%v.", ap, err)
+
+	return ap, err
 }
 
 // Releases a previously requested address pool back to its address space.
 func (as *addressSpace) releasePool(poolId string) error {
+	var err error
+
+	log.Printf("[ipam] Releasing pool with poolId:%v.", poolId)
+
 	ap, ok := as.Pools[poolId]
 	if !ok {
-		return errAddressPoolNotFound
+		err = errAddressPoolNotFound
+	} else {
+		if !ap.isInUse() {
+			err = errAddressPoolNotInUse
+		}
 	}
 
-	if !ap.isInUse() {
-		return errAddressPoolNotInUse
+	if err != nil {
+		log.Printf("[ipam] Failed to release pool, err:%v.", err)
+		return err
 	}
 
 	ap.RefCount--
 
 	// Delete address pool if it is no longer available.
 	if ap.epoch < as.epoch && !ap.isInUse() {
+		log.Printf("[ipam] Deleting stale pool with poolId:%v.", poolId)
 		delete(as.Pools, poolId)
 	}
 
