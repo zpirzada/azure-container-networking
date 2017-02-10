@@ -1,8 +1,10 @@
 # Binaries
 out/*
-azure-cnm-plugin
-azure-cni-plugin
+output/*
 
 # Artifacts
 azure-*.json
 ipam-*.xml
+
+# Environment
+.vscode/*
