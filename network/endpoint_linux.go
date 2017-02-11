@@ -1,5 +1,7 @@
-// Copyright Microsoft Corp.
-// All rights reserved.
+// Copyright 2017 Microsoft. All rights reserved.
+// MIT License
+
+// +build linux
 
 package network
 
@@ -20,44 +22,12 @@ const (
 	containerInterfacePrefix = "eth"
 )
 
-// Endpoint represents a container network interface.
-type endpoint struct {
-	Id          string
-	SandboxKey  string
-	IfName      string
-	HostIfName  string
-	MacAddress  net.HardwareAddr
-	IPAddresses []net.IPNet
-	Gateways    []net.IP
-}
-
-// EndpointInfo contains read-only information about an endpoint.
-type EndpointInfo struct {
-	Id          string
-	IfName      string
-	NetNsPath   string
-	IPAddresses []net.IPNet
-	Routes      []RouteInfo
-}
-
-// RouteInfo contains information about an IP route.
-type RouteInfo struct {
-	Dst net.IPNet
-	Gw  net.IP
-}
-
-// NewEndpoint creates a new endpoint in the network.
-func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
+// newEndpointImpl creates a new endpoint in the network.
+func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	var containerIf *net.Interface
 	var ns *Namespace
 	var ep *endpoint
 	var err error
-
-	log.Printf("[net] Creating endpoint %v in network %v.", epInfo.Id, nw.Id)
-
-	if nw.Endpoints[epInfo.Id] != nil {
-		return nil, errEndpointExists
-	}
 
 	// Create a veth pair.
 	hostIfName := fmt.Sprintf("%s%s", hostInterfacePrefix, epInfo.Id[:7])
@@ -203,42 +173,28 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 		Gateways:    []net.IP{nw.extIf.IPv4Gateway},
 	}
 
-	nw.Endpoints[epInfo.Id] = ep
-
-	log.Printf("[net] Created endpoint %+v.", ep)
-
 	return ep, nil
 
 cleanup:
-	log.Printf("[net] Creating endpoint %v failed, err:%v.", contIfName, err)
-
 	// Roll back the changes for the endpoint.
 	netlink.DeleteLink(contIfName)
 
 	return nil, err
 }
 
-// DeleteEndpoint deletes an existing endpoint from the network.
-func (nw *network) deleteEndpoint(endpointId string) error {
-	log.Printf("[net] Deleting endpoint %v from network %v.", endpointId, nw.Id)
-
-	// Look up the endpoint.
-	ep, err := nw.getEndpoint(endpointId)
-	if err != nil {
-		goto cleanup
-	}
-
+// deleteEndpointImpl deletes an existing endpoint from the network.
+func (nw *network) deleteEndpointImpl(ep *endpoint) error {
 	// Delete the veth pair by deleting one of the peer interfaces.
 	// Deleting the host interface is more convenient since it does not require
 	// entering the container netns and hence works both for CNI and CNM.
 	log.Printf("[net] Deleting veth pair %v %v.", ep.HostIfName, ep.IfName)
-	err = netlink.DeleteLink(ep.HostIfName)
+	err := netlink.DeleteLink(ep.HostIfName)
 	if err != nil {
 		goto cleanup
 	}
 
 	// Delete MAC address translation rule.
-	log.Printf("[net] Deleting MAC address translation rules for endpoint %v.", endpointId)
+	log.Printf("[net] Deleting MAC address translation rules for endpoint %v.", ep.Id)
 	for _, ipAddr := range ep.IPAddresses {
 		err = ebtables.SetDnatForIPAddress(ipAddr.IP, ep.MacAddress, ebtables.Delete)
 		if err != nil {
@@ -246,66 +202,6 @@ func (nw *network) deleteEndpoint(endpointId string) error {
 		}
 	}
 
-	// Remove the endpoint object.
-	delete(nw.Endpoints, endpointId)
-
-	log.Printf("[net] Deleted endpoint %+v.", ep)
-
-	return nil
-
 cleanup:
-	log.Printf("[net] Deleting endpoint %v failed, err:%v.", endpointId, err)
-
 	return err
-}
-
-// GetEndpoint returns the endpoint with the given ID.
-func (nw *network) getEndpoint(endpointId string) (*endpoint, error) {
-	ep := nw.Endpoints[endpointId]
-
-	if ep == nil {
-		return nil, errEndpointNotFound
-	}
-
-	return ep, nil
-}
-
-//
-// Endpoint
-//
-
-// GetInfo returns information about the endpoint.
-func (ep *endpoint) getInfo() *EndpointInfo {
-	info := &EndpointInfo{
-		Id:          ep.Id,
-		IPAddresses: ep.IPAddresses,
-	}
-
-	return info
-}
-
-// Attach attaches an endpoint to a sandbox.
-func (ep *endpoint) attach(sandboxKey string, options map[string]interface{}) error {
-	if ep.SandboxKey != "" {
-		return errEndpointInUse
-	}
-
-	ep.SandboxKey = sandboxKey
-
-	log.Printf("[net] Attached endpoint %v to sandbox %v.", ep.Id, sandboxKey)
-
-	return nil
-}
-
-// Detach detaches an endpoint from its sandbox.
-func (ep *endpoint) detach() error {
-	if ep.SandboxKey == "" {
-		return errEndpointNotInUse
-	}
-
-	log.Printf("[net] Detached endpoint %v from sandbox %v.", ep.Id, ep.SandboxKey)
-
-	ep.SandboxKey = ""
-
-	return nil
 }
