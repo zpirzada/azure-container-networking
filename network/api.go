@@ -1,5 +1,5 @@
-// Copyright Microsoft Corp.
-// All rights reserved.
+// Copyright 2017 Microsoft. All rights reserved.
+// MIT License
 
 package network
 
@@ -9,6 +9,7 @@ import (
 
 var (
 	// Error responses returned by NetworkManager.
+	errSubnetNotFound   = fmt.Errorf("Subnet not found")
 	errNetworkExists    = fmt.Errorf("Network already exists")
 	errNetworkNotFound  = fmt.Errorf("Network not found")
 	errEndpointExists   = fmt.Errorf("Endpoint already exists")
