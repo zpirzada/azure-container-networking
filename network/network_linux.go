@@ -1,5 +1,7 @@
-// Copyright Microsoft Corp.
-// All rights reserved.
+// Copyright 2017 Microsoft. All rights reserved.
+// MIT License
+
+// +build linux
 
 package network
 
@@ -18,83 +20,34 @@ const (
 	bridgePrefix = "azure"
 )
 
-// ExternalInterface represents a host network interface that bridges containers to external networks.
-type externalInterface struct {
-	Name        string
-	Networks    map[string]*network
-	Subnets     []string
-	BridgeName  string
-	MacAddress  net.HardwareAddr
-	IPAddresses []*net.IPNet
-	Routes      []*netlink.Route
-	IPv4Gateway net.IP
-	IPv6Gateway net.IP
-}
+// Linux implementation of route.
+type route netlink.Route
 
-// A container network is a set of endpoints allowed to communicate with each other.
-type network struct {
-	Id        string
-	Endpoints map[string]*endpoint
-	extIf     *externalInterface
-}
-
-// NetworkInfo contains read-only information about a container network.
-type NetworkInfo struct {
-	Id         string
-	Subnets    []string
-	BridgeName string
-	Options    map[string]interface{}
-}
-
-type options map[string]interface{}
-
-// NewExternalInterface adds a host interface to the list of available external interfaces.
-func (nm *networkManager) newExternalInterface(ifName string, subnet string) error {
-	// Check whether the external interface is already configured.
-	if nm.ExternalInterfaces[ifName] != nil {
-		return nil
-	}
-
-	// Find the host interface.
-	hostIf, err := net.InterfaceByName(ifName)
-	if err != nil {
-		return err
-	}
-
-	extIf := externalInterface{
-		Name:        ifName,
-		Networks:    make(map[string]*network),
-		MacAddress:  hostIf.HardwareAddr,
-		IPv4Gateway: net.IPv4zero,
-		IPv6Gateway: net.IPv6unspecified,
-	}
-
-	extIf.Subnets = append(extIf.Subnets, subnet)
-
-	nm.ExternalInterfaces[ifName] = &extIf
-
-	log.Printf("[net] Added ExternalInterface %v for subnet %v.", ifName, subnet)
-
-	return nil
-}
-
-// DeleteExternalInterface removes an interface from the list of available external interfaces.
-func (nm *networkManager) deleteExternalInterface(ifName string) error {
-	delete(nm.ExternalInterfaces, ifName)
-
-	log.Printf("[net] Deleted ExternalInterface %v.", ifName)
-
-	return nil
-}
-
-// FindExternalInterfaceBySubnet finds an external interface connected to the given subnet.
-func (nm *networkManager) findExternalInterfaceBySubnet(subnet string) *externalInterface {
-	for _, extIf := range nm.ExternalInterfaces {
-		for _, s := range extIf.Subnets {
-			if s == subnet {
-				return extIf
-			}
+// NewNetworkImpl creates a new container network.
+func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInterface) (*network, error) {
+	// Connect the external interface if not already connected.
+	if extIf.BridgeName == "" {
+		err := nm.connectExternalInterface(extIf, nwInfo.BridgeName)
+		if err != nil {
+			return nil, err
 		}
+	}
+
+	// Create the network object.
+	nw := &network{
+		Id:        nwInfo.Id,
+		Endpoints: make(map[string]*endpoint),
+		extIf:     extIf,
+	}
+
+	return nw, nil
+}
+
+// DeleteNetworkImpl deletes an existing container network.
+func (nm *networkManager) deleteNetworkImpl(nw *network) error {
+	// Disconnect the interface if this was the last network using it.
+	if len(nw.extIf.Networks) == 0 {
+		nm.disconnectExternalInterface(nw.extIf)
 	}
 
 	return nil
@@ -103,6 +56,7 @@ func (nm *networkManager) findExternalInterfaceBySubnet(subnet string) *external
 // ConnectExternalInterface connects the given host interface to a bridge.
 func (nm *networkManager) connectExternalInterface(extIf *externalInterface, bridgeName string) error {
 	var addrs []net.Addr
+	var routes []*netlink.Route
 
 	log.Printf("[net] Connecting interface %v.", extIf.Name)
 
@@ -137,10 +91,13 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, bri
 	}
 
 	// Query the default routes on the external interface.
-	extIf.Routes, err = netlink.GetIpRoute(&netlink.Route{Dst: &net.IPNet{}, LinkIndex: hostIf.Index})
+	routes, err = netlink.GetIpRoute(&netlink.Route{Dst: &net.IPNet{}, LinkIndex: hostIf.Index})
 	if err != nil {
 		log.Printf("[net] Failed to query routes, err:%v.", err)
 		goto cleanup
+	}
+	for _, r := range routes {
+		extIf.Routes = append(extIf.Routes, (*route)(r))
 	}
 
 	// Assign external interface's IP addresses to the bridge for host traffic.
@@ -222,7 +179,7 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, bri
 
 		route.LinkIndex = bridge.Index
 		log.Printf("[net] Adding IP route %+v.", route)
-		err = netlink.AddIpRoute(route)
+		err = netlink.AddIpRoute((*netlink.Route)(route))
 		route.LinkIndex = hostIf.Index
 
 		if err != nil {
@@ -284,7 +241,7 @@ func (nm *networkManager) disconnectExternalInterface(extIf *externalInterface) 
 	// Restore routes.
 	for _, route := range extIf.Routes {
 		log.Printf("[net] Adding IP route %v to interface %v.", route, extIf.Name)
-		err = netlink.AddIpRoute(route)
+		err = netlink.AddIpRoute((*netlink.Route)(route))
 		if err != nil {
 			log.Printf("[net] Failed to add IP route %v, err:%v.", route, err)
 		}
@@ -295,75 +252,4 @@ func (nm *networkManager) disconnectExternalInterface(extIf *externalInterface) 
 	log.Printf("[net] Disconnected interface %v.", extIf.Name)
 
 	return nil
-}
-
-// NewNetwork creates a new container network.
-func (nm *networkManager) newNetwork(nwInfo *NetworkInfo) (*network, error) {
-
-	log.Printf("[net] Creating network %+v.", nwInfo)
-
-	// Find the external interface for this subnet.
-	extIf := nm.findExternalInterfaceBySubnet(nwInfo.Subnets[0])
-	if extIf == nil {
-		return nil, fmt.Errorf("Pool not found")
-	}
-
-	if extIf.Networks[nwInfo.Id] != nil {
-		return nil, errNetworkExists
-	}
-
-	// Connect the external interface if not already connected.
-	if extIf.BridgeName == "" {
-		err := nm.connectExternalInterface(extIf, nwInfo.BridgeName)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Create the network object.
-	nw := &network{
-		Id:        nwInfo.Id,
-		Endpoints: make(map[string]*endpoint),
-		extIf:     extIf,
-	}
-
-	extIf.Networks[nwInfo.Id] = nw
-
-	log.Printf("[net] Created network %v on interface %v.", nwInfo.Id, extIf.Name)
-
-	return nw, nil
-}
-
-// DeleteNetwork deletes an existing container network.
-func (nm *networkManager) deleteNetwork(networkId string) error {
-	nw, err := nm.getNetwork(networkId)
-	if err != nil {
-		return err
-	}
-
-	log.Printf("[net] Deleting network %+v.", nw)
-
-	// Remove the network object.
-	delete(nw.extIf.Networks, networkId)
-
-	// Disconnect the interface if this was the last network using it.
-	if len(nw.extIf.Networks) == 0 {
-		nm.disconnectExternalInterface(nw.extIf)
-	}
-
-	log.Printf("[net] Deleted network %+v.", nw)
-
-	return nil
-}
-
-// GetNetwork returns the network with the given ID.
-func (nm *networkManager) getNetwork(networkId string) (*network, error) {
-	for _, extIf := range nm.ExternalInterfaces {
-		nw, ok := extIf.Networks[networkId]
-		if ok {
-			return nw, nil
-		}
-	}
-
-	return nil, errNetworkNotFound
 }
