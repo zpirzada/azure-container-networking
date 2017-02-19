@@ -1,89 +1,48 @@
+# Microsoft Azure Container Networking
+
 ## Overview
-This repository contains plugins and tools for container networking in Azure:
-* A [libnetwork (CNM) plugin](https://github.com/docker/libnetwork/blob/master/docs/remote.md) for Docker containers on Microsoft Azure. The plugin connects containers to Azure's [VNET](link), to take advantage of SDN capabilities.
-* A [CNI plugin](https://github.com/containernetworking/cni/blob/master/SPEC.md) for Kubernetes and Mesos on Azure.
+This repository is a place for the community to build the best container networking experience on Azure. It contains container networking plugins and tools for Linux and Windows containers running on Azure:
+* [libnetwork (CNM) network and IPAM plugins](docs/cnm.md) for Docker Engine and Docker Swarm. 
+* [CNI network and IPAM plugins](docs/cni,md) for Kubernetes and DC/OS.
 
-We welcome your feedback!
+Plugins implement similar functionality for their respective use cases on both platforms. The network plugins connect containers to your [Azure VNET](https://docs.microsoft.com/en-us/azure/virtual-network/virtual-networks-overview), to take advantage of Azure SDN capabilities. The IPAM plugins provide IP address management functionality for container IP addresses from Azure VNET address space.
 
-## Setup
-Download the latest official stable release from Docker plugin store.
-```bash
-$ docker plugin pull azure/azure-cnm-plugin
-```
+Two environments are supported:
+
+* [Microsoft Azure](https://azure.microsoft.com): Available in all Azure regions.
+* [Microsoft Azure Stack](https://azure.microsoft.com/en-us/overview/azure-stack/): The hybrid cloud platform that enables you to deliver Azure services from your own datacenter.
+
+Plugins are offered as part of [Azure Container Service (ACS)](https://azure.microsoft.com/en-us/services/container-service), as well as for individual Azure IaaS VMs. For ACS clusters created by [acs-engine](https://github.com/Azure/acs-engine), the deployment and configuration of both plugins on both Linux and Windows nodes is automatic.
+
+## Documentation
+See [Documentation](docs/README.md) for details, use cases and examples.
 
 ## Build
-If you want the very latest version, you can also build plugins directly from this repo.
+This repository builds on Windows and Linux. Build plugins directly from the source code for the latest version.
 
-Clone the azure-container-networking repo:
 ```bash
-$ git clone https://github/com/Azure/azure-container-networking
+$ git clone https://github.com/Azure/azure-container-networking
 $ cd azure-container-networking
+$ make all-binaries
 ```
 
-Build the plugin for your environment. For Docker:
-```bash
-$ make azure-cnm-plugin
-```
+Then follow the instructions for the plugin in [Documentation](docs/README.md).
 
-For Kubernetes and Mesos:
-```bash
-$ make azure-cni-plugin
-```
+## Contributions
+Contributions in the form of bug reports, feature requests and PRs are always welcome.
 
-The plugin is placed in the azure-container-networking/out directory.
-
-## Supported Environments
-[Microsoft Azure](https://azure.microsoft.com)<br>
-[Microsoft Azure Stack](https://azure.microsoft.com/en-us/overview/azure-stack/)
-
-## Usage
-```bash
-Usage: azure-cnm-plugin [OPTIONS]
-
-Options:
-  -e, --environment={azure|mas}         Set the operating environment.
-  -l, --log-level={info|debug}          Set the logging level.
-  -t, --log-target={syslog|stderr}      Set the logging target.
-  -?, --help                            Print usage and version information.
-```
-
-## Examples
-To connect your containers to other resources on your Azure virtual network, you need to first create a Docker network. A network is a group of uniquely addressable endpoints that can communicate with each other.
-
-Create a network:<br>
-```bash
-$ docker network create --driver=azurenet --ipam-driver=azureipam azure
-```
-
-When the command succeeds, it will return the network ID. Networks can also be listed by:
-```bash
-$ docker network ls
-NETWORK ID          NAME                DRIVER              SCOPE
-3159b0528a83        azure               azurenet            local
-515779dadc8a        bridge              bridge              local
-ed6e704a74ef        host                host                local
-b35e3b663cc1        none                null                local
-```
-
-Connect containers to your network by specifying the network name when starting them:<br>
-```bash
-$ docker run --net=azure -it ubuntu:latest /bin/bash
-```
-
-Finally, once all containers on the network exit, you can delete the network:
-```bash
-$ docker network rm azure
-```
-
-All endpoints on the network must be deleted before the network itself can be deleted.
-
-## Topology
-The plugin creates a bridge for each underlying Azure virtual network. The bridge functions in L2 mode and is bridged to the host network interface. The bridge itself can also be assigned an IP address, turning it into a gateway for containers.
-
-If the container host VM has multiple network interfaces, the primary network interface is reserved for management traffic. A secondary interface is used for container traffic whenever possible.
+Please follow these instructions before submitting a PR:
+* Create an issue describing the problem you are trying to solve.
+* Clone the repository and create a topic branch.
+* Make changes, adding new tests for new functionality.
+* Run the checkin validation tests.
+* Submit a PR.
 
 ## Changelog
-See [CHANGELOG](CHANGELOG.md)
+See [CHANGELOG](CHANGELOG.md).
+
+## License
+See [LICENSE](LICENSE).
 
 ## Code of Conduct
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
