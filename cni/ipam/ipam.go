@@ -146,8 +146,7 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	// Parse network configuration from stdin.
 	nwCfg, err := plugin.Configure(args.StdinData)
 	if err != nil {
-		log.Printf("[cni-ipam] Failed to parse network configuration, err:%v.", err)
-		return nil
+		return plugin.Errorf("Failed to parse network configuration: %v", err)
 	}
 
 	var poolId string
@@ -166,8 +165,7 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 		// Allocate an address pool.
 		poolId, subnet, err = plugin.am.RequestPool(nwCfg.Ipam.AddrSpace, "", "", options, false)
 		if err != nil {
-			log.Printf("[cni-ipam] Failed to allocate pool, err:%v.", err)
-			return nil
+			return plugin.Errorf("Failed to allocate pool: %v.", err)
 		}
 
 		nwCfg.Ipam.Subnet = subnet
@@ -177,7 +175,7 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	// Allocate an address for the endpoint.
 	address, err := plugin.am.RequestAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address, nil)
 	if err != nil {
-		log.Printf("[cni-ipam] Failed to allocate address, err:%v.", err)
+		err = plugin.Errorf("Failed to allocate address: %v", err)
 		goto Rollback
 	}
 
@@ -186,12 +184,14 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	// Parse IP address.
 	ipv4Address, err = ipam.ConvertAddressToIPNet(address)
 	if err != nil {
+		err = plugin.Errorf("Failed to parse address: %v", err)
 		goto Rollback
 	}
 
 	// Query pool information for gateways and DNS servers.
 	apInfo, err = plugin.am.GetPoolInfo(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet)
 	if err != nil {
+		err = plugin.Errorf("Failed to get pool information: %v", err)
 		goto Rollback
 	}
 
@@ -217,6 +217,7 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	// Convert result to the requested CNI version.
 	result, err = resultImpl.GetAsVersion(nwCfg.CniVersion)
 	if err != nil {
+		err = plugin.Errorf("Failed to convert result: %v", err)
 		goto Rollback
 	}
 
@@ -239,12 +240,12 @@ Rollback:
 
 	if address != "" {
 		log.Printf("[cni-ipam] Releasing address %v.", address)
-		err = plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, address)
+		plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, address)
 	}
 
 	if poolId != "" {
 		log.Printf("[cni-ipam] Releasing pool %v.", poolId)
-		err = plugin.am.ReleasePool(nwCfg.Ipam.AddrSpace, poolId)
+		plugin.am.ReleasePool(nwCfg.Ipam.AddrSpace, poolId)
 	}
 
 	return err
@@ -258,8 +259,7 @@ func (plugin *ipamPlugin) Delete(args *cniSkel.CmdArgs) error {
 	// Parse network configuration from stdin.
 	nwCfg, err := plugin.Configure(args.StdinData)
 	if err != nil {
-		log.Printf("[cni-ipam] Failed to parse network configuration, err:%v.", err)
-		return nil
+		plugin.Errorf("Failed to parse network configuration: %v", err)
 	}
 
 	// If an address is specified, release that address. Otherwise, release the pool.
@@ -267,15 +267,13 @@ func (plugin *ipamPlugin) Delete(args *cniSkel.CmdArgs) error {
 		// Release the address.
 		err := plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address)
 		if err != nil {
-			log.Printf("[cni-ipam] Failed to release address, err:%v.", err)
-			return nil
+			plugin.Errorf("Failed to release address: %v", err)
 		}
 	} else {
 		// Release the pool.
 		err := plugin.am.ReleasePool(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet)
 		if err != nil {
-			log.Printf("[cni-ipam] Failed to release pool, err:%v.", err)
-			return nil
+			plugin.Errorf("Failed to release pool: %v", err)
 		}
 	}
 

@@ -1,4 +1,5 @@
 FROM ubuntu:14.04.3
+ARG BUILD_DIR
 
 # Install dependencies.
 RUN apt-get update && apt-get install -y ebtables
@@ -7,7 +8,7 @@ RUN apt-get update && apt-get install -y ebtables
 RUN mkdir -p /run/docker/plugins
 
 # Install plugin.
-COPY ./out/azure-cnm-plugin /usr/bin
+COPY $BUILD_DIR/azure-cnm-plugin /usr/bin
 WORKDIR /usr/bin
 
 CMD ["/usr/bin/azure-cnm-plugin"]

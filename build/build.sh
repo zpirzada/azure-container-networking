@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-make build-containerized
+make all-binaries-containerized

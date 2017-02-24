@@ -29,7 +29,8 @@ CNIFILES = \
 CNMDIR = cnm/plugin
 CNI_NET_DIR = cni/network/plugin
 CNI_IPAM_DIR = cni/ipam/plugin
-OUTPUTDIR = out
+OUTPUT_DIR = output
+BUILD_DIR = $(OUTPUT_DIR)/$(GOOS)_$(GOARCH)
 
 # Containerized build parameters.
 BUILD_CONTAINER_IMAGE = acn-build
@@ -43,49 +44,47 @@ CNM_PLUGIN_ROOTFS = azure-cnm-plugin-rootfs
 
 VERSION ?= $(shell git describe --tags --always --dirty)
 
-ENSURE_OUTPUTDIR_EXISTS := $(shell mkdir -p $(OUTPUTDIR))
+ENSURE_OUTPUT_DIR_EXISTS := $(shell mkdir -p $(OUTPUT_DIR))
 
 # Shorthand target names for convenience.
-azure-cnm-plugin: $(OUTPUTDIR)/azure-cnm-plugin
-azure-vnet: $(OUTPUTDIR)/azure-vnet
-azure-vnet-ipam: $(OUTPUTDIR)/azure-vnet-ipam
-azure-cni-plugin: azure-vnet azure-vnet-ipam
+azure-cnm-plugin: $(BUILD_DIR)/azure-cnm-plugin
+azure-vnet: $(BUILD_DIR)/azure-vnet
+azure-vnet-ipam: $(BUILD_DIR)/azure-vnet-ipam
+azure-cni-plugin: azure-vnet azure-vnet-ipam tarball
 all-binaries: azure-cnm-plugin azure-cni-plugin
 
 # Clean all build artifacts.
 .PHONY: clean
 clean:
-	rm -rf $(OUTPUTDIR)
+	rm -rf $(OUTPUT_DIR)
 
 # Build the Azure CNM plugin.
-$(OUTPUTDIR)/azure-cnm-plugin: $(CNMFILES)
-	go build -v -o $(OUTPUTDIR)/azure-cnm-plugin -ldflags "-X main.version=$(VERSION) -s -w" $(CNMDIR)/*.go
+$(BUILD_DIR)/azure-cnm-plugin: $(CNMFILES)
+	go build -v -o $(BUILD_DIR)/azure-cnm-plugin -ldflags "-X main.version=$(VERSION) -s -w" $(CNMDIR)/*.go
 
 # Build the Azure CNI network plugin.
-$(OUTPUTDIR)/azure-vnet: $(CNIFILES)
-	go build -v -o $(OUTPUTDIR)/azure-vnet -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_NET_DIR)/*.go
+$(BUILD_DIR)/azure-vnet: $(CNIFILES)
+	go build -v -o $(BUILD_DIR)/azure-vnet -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_NET_DIR)/*.go
 
 # Build the Azure CNI IPAM plugin.
-$(OUTPUTDIR)/azure-vnet-ipam: $(CNIFILES)
-	go build -v -o $(OUTPUTDIR)/azure-vnet-ipam -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_IPAM_DIR)/*.go
-
-# Build the Azure CNI IPAM plugin for windows_amd64.
-$(OUTPUTDIR)/windows_amd64/azure-vnet-ipam: $(CNIFILES)
-	GOOS=windows GOARCH=amd64 go build -v -o $(OUTPUTDIR)/windows_amd64/azure-vnet-ipam -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_IPAM_DIR)/*.go
+$(BUILD_DIR)/azure-vnet-ipam: $(CNIFILES)
+	go build -v -o $(BUILD_DIR)/azure-vnet-ipam -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_IPAM_DIR)/*.go
 
 # Build all binaries in a container.
-.PHONY: build-containerized
-build-containerized:
+.PHONY: all-binaries-containerized
+all-binaries-containerized:
 	pwd && ls -l
 	docker build -f Dockerfile.build -t $(BUILD_CONTAINER_IMAGE):$(VERSION) .
 	docker run --name $(BUILD_CONTAINER_NAME) \
 		$(BUILD_CONTAINER_IMAGE):$(VERSION) \
 		bash -c '\
 			pwd && ls -l && \
+			export GOOS=$(GOOS) && \
+			export GOARCH=$(GOARCH) && \
 			make all-binaries && \
-			chown -R $(BUILD_USER):$(BUILD_USER) $(OUTPUTDIR) \
+			chown -R $(BUILD_USER):$(BUILD_USER) $(BUILD_DIR) \
 		'
-	docker cp $(BUILD_CONTAINER_NAME):$(BUILD_CONTAINER_REPO_PATH)/$(OUTPUTDIR) .
+	docker cp $(BUILD_CONTAINER_NAME):$(BUILD_CONTAINER_REPO_PATH)/$(BUILD_DIR) $(OUTPUT_DIR)
 	docker rm $(BUILD_CONTAINER_NAME)
 	docker rmi $(BUILD_CONTAINER_IMAGE):$(VERSION)
 
@@ -94,30 +93,41 @@ build-containerized:
 azure-cnm-plugin-image: azure-cnm-plugin
 	# Build the plugin image, keeping any old image during build for cache, but remove it afterwards.
 	docker images -q $(CNM_PLUGIN_ROOTFS):$(VERSION) > cid
-	docker build -f Dockerfile.cnm -t $(CNM_PLUGIN_ROOTFS):$(VERSION) .
+	docker build \
+		-f Dockerfile.cnm \
+		-t $(CNM_PLUGIN_ROOTFS):$(VERSION) \
+		--build-arg BUILD_DIR=$(BUILD_DIR) \
+		.
 	$(eval CID := `cat cid`)
 	docker rmi $(CID) || true
 
 	# Create a container using the image and export its rootfs.
 	docker create $(CNM_PLUGIN_ROOTFS):$(VERSION) > cid
 	$(eval CID := `cat cid`)
-	mkdir -p $(OUTPUTDIR)/$(CID)/rootfs
-	docker export $(CID) | tar -x -C $(OUTPUTDIR)/$(CID)/rootfs
+	mkdir -p $(OUTPUT_DIR)/$(CID)/rootfs
+	docker export $(CID) | tar -x -C $(OUTPUT_DIR)/$(CID)/rootfs
 	docker rm -vf $(CID)
 
 	# Copy the plugin configuration and set ownership.
-	cp cnm/config.json $(OUTPUTDIR)/$(CID)
-	chgrp -R docker $(OUTPUTDIR)/$(CID)
+	cp cnm/config.json $(OUTPUT_DIR)/$(CID)
+	chgrp -R docker $(OUTPUT_DIR)/$(CID)
 
 	# Create the plugin.
 	docker plugin rm $(CNM_PLUGIN_IMAGE):$(VERSION) || true
-	docker plugin create $(CNM_PLUGIN_IMAGE):$(VERSION) $(OUTPUTDIR)/$(CID)
+	docker plugin create $(CNM_PLUGIN_IMAGE):$(VERSION) $(OUTPUT_DIR)/$(CID)
 
 	# Cleanup temporary files.
-	rm -rf $(OUTPUTDIR)/$(CID)
+	rm -rf $(OUTPUT_DIR)/$(CID)
 	rm cid
 
 # Publish the Azure CNM plugin image to a Docker registry.
 .PHONY: publish-azure-cnm-plugin-image
 publish-azure-cnm-plugin-image:
 	docker plugin push $(CNM_PLUGIN_IMAGE):$(VERSION)
+
+# Create a tarball for the current platform.
+.PHONY: tarball
+tarball:
+	cd $(BUILD_DIR) && \
+	tar -czvf azure-vnet-$(VERSION).tgz --exclude=*.tgz *
+	chown -R $(BUILD_USER):$(BUILD_USER) $(BUILD_DIR)/azure-vnet-$(VERSION).tgz
