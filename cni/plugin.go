@@ -4,12 +4,15 @@
 package cni
 
 import (
+	"fmt"
+
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/store"
 
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
+	cniTypes "github.com/containernetworking/cni/pkg/types"
 	cniVers "github.com/containernetworking/cni/pkg/version"
 )
 
@@ -91,4 +94,24 @@ func (plugin *Plugin) Execute(api PluginApi) error {
 	}
 
 	return nil
+}
+
+// Error creates and logs a structured CNI error.
+func (plugin *Plugin) Error(err error) *cniTypes.Error {
+	var cniErr *cniTypes.Error
+	var ok bool
+
+	// Wrap error if necessary.
+	if cniErr, ok = err.(*cniTypes.Error); !ok {
+		cniErr = &cniTypes.Error{Code: 100, Msg: err.Error()}
+	}
+
+	log.Printf("[%v] %+v.", plugin.Name, cniErr.Error())
+
+	return cniErr
+}
+
+// Errorf creates and logs a custom CNI error according to a format specifier.
+func (plugin *Plugin) Errorf(format string, args ...interface{}) *cniTypes.Error {
+	return plugin.Error(fmt.Errorf(format, args...))
 }
