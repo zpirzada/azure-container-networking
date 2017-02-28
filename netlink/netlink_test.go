@@ -4,16 +4,39 @@
 package netlink
 
 import (
-	"fmt"
+	"net"
 	"testing"
 )
 
-const ifname string = "nltest"
+const (
+	ifName    = "nltest"
+	ifName2   = "nltest2"
+	dummyName = "dummy0"
+)
 
-// Tests basic netlink messaging via echo.
+// AddDummyInterface creates a dummy test interface used during actual tests.
+func addDummyInterface(name string) (*net.Interface, error) {
+	err := AddLink(&DummyLink{
+		LinkInfo: LinkInfo{
+			Type: LINK_TYPE_DUMMY,
+			Name: name,
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	dummy, err := net.InterfaceByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return dummy, err
+}
+
+// TestEcho tests basic netlink messaging via echo.
 func TestEcho(t *testing.T) {
-	fmt.Println("Test: Echo")
-
 	err := Echo("this is a test")
 
 	if err != nil {
@@ -21,40 +44,122 @@ func TestEcho(t *testing.T) {
 	}
 }
 
-// Tests creating a new network interface.
-func TestAddLink(t *testing.T) {
-	fmt.Println("Test: AddLink")
+// TestAddDeleteBridge tests adding and deleting an ethernet bridge.
+func TestAddDeleteBridge(t *testing.T) {
+	link := BridgeLink{
+		LinkInfo: LinkInfo{
+			Type: LINK_TYPE_BRIDGE,
+			Name: ifName,
+		},
+	}
 
-	err := AddLink(ifname, "bridge")
-
+	err := AddLink(&link)
 	if err != nil {
 		t.Errorf("AddLink failed: %+v", err)
 	}
+
+	err = DeleteLink(ifName)
+	if err != nil {
+		t.Errorf("DeleteLink failed: %+v", err)
+	}
+
+	_, err = net.InterfaceByName(ifName)
+	if err == nil {
+		t.Errorf("Interface not deleted")
+	}
 }
 
-// Tests setting the operational state of a network interface.
+// TestAddDeleteVEth tests adding and deleting a virtual ethernet pair.
+func TestAddDeleteVEth(t *testing.T) {
+	link := VEthLink{
+		LinkInfo: LinkInfo{
+			Type: LINK_TYPE_VETH,
+			Name: ifName,
+		},
+		PeerName: ifName2,
+	}
+
+	err := AddLink(&link)
+	if err != nil {
+		t.Errorf("AddLink failed: %+v", err)
+	}
+
+	err = DeleteLink(ifName)
+	if err != nil {
+		t.Errorf("DeleteLink failed: %+v", err)
+	}
+
+	_, err = net.InterfaceByName(ifName)
+	if err == nil {
+		t.Errorf("Interface not deleted")
+	}
+}
+
+// TestAddDeleteIPVlan tests adding and deleting an IPVLAN interface.
+func TestAddDeleteIPVlan(t *testing.T) {
+	dummy, err := addDummyInterface(dummyName)
+	if err != nil {
+		t.Errorf("addDummyInterface failed: %v", err)
+	}
+
+	link := IPVlanLink{
+		LinkInfo: LinkInfo{
+			Type:        LINK_TYPE_IPVLAN,
+			Name:        ifName,
+			ParentIndex: dummy.Index,
+		},
+		Mode: IPVLAN_MODE_L2,
+	}
+
+	err = AddLink(&link)
+	if err != nil {
+		t.Errorf("AddLink failed: %+v", err)
+	}
+
+	err = DeleteLink(ifName)
+	if err != nil {
+		t.Errorf("DeleteLink failed: %+v", err)
+	}
+
+	_, err = net.InterfaceByName(ifName)
+	if err == nil {
+		t.Errorf("Interface not deleted")
+	}
+
+	err = DeleteLink(dummyName)
+	if err != nil {
+		t.Errorf("DeleteLink failed: %v", err)
+	}
+}
+
+// TestSetLinkState tests setting the operational state of a network interface.
 func TestSetLinkState(t *testing.T) {
-	fmt.Println("Test: SetLinkState")
+	_, err := addDummyInterface(ifName)
+	if err != nil {
+		t.Errorf("addDummyInterface failed: %v", err)
+	}
 
-	err := SetLinkState(ifname, true)
-
+	err = SetLinkState(ifName, true)
 	if err != nil {
 		t.Errorf("SetLinkState up failed: %+v", err)
 	}
 
-	err = SetLinkState(ifname, false)
+	dummy, err := net.InterfaceByName(ifName)
+	if err != nil || (dummy.Flags&net.FlagUp) == 0 {
+		t.Errorf("Interface not up")
+	}
 
+	err = SetLinkState(ifName, false)
 	if err != nil {
 		t.Errorf("SetLinkState down failed: %+v", err)
 	}
-}
 
-// Tests deleting a network interface.
-func TestDeleteLink(t *testing.T) {
-	fmt.Println("Test: DeleteLink")
+	dummy, err = net.InterfaceByName(ifName)
+	if err != nil || (dummy.Flags&net.FlagUp) != 0 {
+		t.Errorf("Interface not down")
+	}
 
-	err := DeleteLink(ifname)
-
+	err = DeleteLink(ifName)
 	if err != nil {
 		t.Errorf("DeleteLink failed: %+v", err)
 	}
