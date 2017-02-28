@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	// Plugin socket name.
-	socketName = "azure-vnet"
+	// Plugin name as used in socket, log and store names.
+	name = "azure-vnet"
 )
 
 // Version is populated by make during build.
@@ -102,7 +102,10 @@ func main() {
 	// Initialize plugin common configuration.
 	var config common.PluginConfig
 	config.Version = version
-	config.SockName = socketName
+	config.SockName = name
+
+	// Create a channel to receive unhandled errors from the plugins.
+	config.ErrChan = make(chan error, 1)
 
 	// Create network plugin.
 	netPlugin, err := network.NewPlugin(&config)
@@ -118,17 +121,15 @@ func main() {
 		return
 	}
 
-	// Create a channel to receive unhandled errors from the plugins.
-	config.ErrChan = make(chan error, 1)
-
 	// Create the key value store.
-	config.Store, err = store.NewJsonFileStore(platform.RuntimePath + "azure-vnet.json")
+	config.Store, err = store.NewJsonFileStore(platform.RuntimePath + name + ".json")
 	if err != nil {
 		fmt.Printf("Failed to create store: %v\n", err)
 		return
 	}
 
 	// Create logging provider.
+	log.SetName(name)
 	log.SetLevel(logLevel)
 	err = log.SetTarget(logTarget)
 	if err != nil {
@@ -161,22 +162,16 @@ func main() {
 		}
 	}
 
-	// Shutdown on two conditions:
-	//    a. Unhandled exceptions in plugins
-	//    b. Explicit OS signal
-	osSignalChannel := make(chan os.Signal, 1)
-
 	// Relay these incoming signals to OS signal channel.
+	osSignalChannel := make(chan os.Signal, 1)
 	signal.Notify(osSignalChannel, os.Interrupt, os.Kill, syscall.SIGTERM)
 
 	// Wait until receiving a signal.
 	select {
 	case sig := <-osSignalChannel:
-		fmt.Printf("\nCaught signal <" + sig.String() + "> shutting down...\n")
+		log.Printf("Received OS signal <" + sig.String() + ">, shutting down.")
 	case err := <-config.ErrChan:
-		if err != nil {
-			fmt.Printf("\nReceived unhandled error %v, shutting down...\n", err)
-		}
+		log.Printf("Received unhandled plugin error %v, shutting down.", err)
 	}
 
 	// Cleanup.
