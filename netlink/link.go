@@ -10,9 +10,70 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// Link types.
+const (
+	LINK_TYPE_BRIDGE = "bridge"
+	LINK_TYPE_VETH   = "veth"
+	LINK_TYPE_IPVLAN = "ipvlan"
+	LINK_TYPE_DUMMY  = "dummy"
+)
+
+// IPVLAN link attributes.
+type IPVlanMode uint16
+
+const (
+	IPVLAN_MODE_L2 IPVlanMode = iota
+	IPVLAN_MODE_L3
+	IPVLAN_MODE_L3S
+	IPVLAN_MODE_MAX
+)
+
+// Link represents a network interface.
+type Link interface {
+	Info() *LinkInfo
+}
+
+// LinkInfo respresents the common properties of all network interfaces.
+type LinkInfo struct {
+	Type        string
+	Name        string
+	MTU         uint
+	TxQLen      uint
+	ParentIndex int
+}
+
+func (linkInfo *LinkInfo) Info() *LinkInfo {
+	return linkInfo
+}
+
+// BridgeLink represents an ethernet bridge.
+type BridgeLink struct {
+	LinkInfo
+}
+
+// VEthLink represents a virtual ethernet network interface.
+type VEthLink struct {
+	LinkInfo
+	PeerName string
+}
+
+// IPVlanLink represents an IPVlan network interface.
+type IPVlanLink struct {
+	LinkInfo
+	Mode IPVlanMode
+}
+
+// DummyLink represents a dummy network interface.
+type DummyLink struct {
+	LinkInfo
+}
+
 // AddLink adds a new network interface of a specified type.
-func AddLink(name string, linkType string) error {
-	if name == "" || linkType == "" {
+func AddLink(link Link) error {
+	var info *LinkInfo
+	info = link.Info()
+
+	if info.Name == "" || info.Type == "" {
 		return fmt.Errorf("Invalid link name or type")
 	}
 
@@ -26,12 +87,50 @@ func AddLink(name string, linkType string) error {
 	ifInfo := newIfInfoMsg()
 	req.addPayload(ifInfo)
 
-	attrLinkInfo := newAttribute(unix.IFLA_LINKINFO, nil)
-	attrLinkInfo.addNested(newAttributeString(IFLA_INFO_KIND, linkType))
-	req.addPayload(attrLinkInfo)
-
-	attrIfName := newAttributeStringZ(unix.IFLA_IFNAME, name)
+	// Set interface name.
+	attrIfName := newAttributeStringZ(unix.IFLA_IFNAME, info.Name)
 	req.addPayload(attrIfName)
+
+	// Set MTU.
+	if info.MTU > 0 {
+		req.addPayload(newAttributeUint32(unix.IFLA_MTU, uint32(info.MTU)))
+	}
+
+	// Set transmission queue length.
+	if info.TxQLen > 0 {
+		req.addPayload(newAttributeUint32(unix.IFLA_TXQLEN, uint32(info.TxQLen)))
+	}
+
+	// Set parent interface index.
+	if info.ParentIndex != 0 {
+		req.addPayload(newAttributeUint32(unix.IFLA_LINK, uint32(info.ParentIndex)))
+	}
+
+	// Set link info.
+	attrLinkInfo := newAttribute(unix.IFLA_LINKINFO, nil)
+	attrLinkInfo.addNested(newAttributeString(IFLA_INFO_KIND, info.Type))
+
+	// Set link type-specific attributes.
+	if veth, ok := link.(*VEthLink); ok {
+		// Set VEth attributes.
+		attrData := newAttribute(IFLA_INFO_DATA, nil)
+
+		attrPeer := newAttribute(VETH_INFO_PEER, nil)
+		attrPeer.addNested(newIfInfoMsg())
+		attrPeer.addNested(newAttributeStringZ(unix.IFLA_IFNAME, veth.PeerName))
+		attrData.addNested(attrPeer)
+
+		attrLinkInfo.addNested(attrData)
+
+	} else if ipvlan, ok := link.(*IPVlanLink); ok {
+		// Set IPVlan attributes.
+		attrData := newAttribute(IFLA_INFO_DATA, nil)
+		attrData.addNested(newAttributeUint16(IFLA_IPVLAN_MODE, uint16(ipvlan.Mode)))
+
+		attrLinkInfo.addNested(attrData)
+	}
+
+	req.addPayload(attrLinkInfo)
 
 	return s.sendAndWaitForAck(req)
 }
@@ -204,38 +303,6 @@ func SetLinkAddress(ifName string, hwAddress net.HardwareAddr) error {
 	req.addPayload(ifInfo)
 
 	req.addPayload(newAttribute(unix.IFLA_ADDRESS, hwAddress))
-
-	return s.sendAndWaitForAck(req)
-}
-
-// AddVethPair adds a new veth pair.
-func AddVethPair(name1 string, name2 string) error {
-	s, err := getSocket()
-	if err != nil {
-		return err
-	}
-
-	req := newRequest(unix.RTM_NEWLINK, unix.NLM_F_CREATE|unix.NLM_F_EXCL|unix.NLM_F_ACK)
-
-	ifInfo := newIfInfoMsg()
-	req.addPayload(ifInfo)
-
-	attrIfName := newAttributeStringZ(unix.IFLA_IFNAME, name1)
-	req.addPayload(attrIfName)
-
-	attrLinkInfo := newAttribute(unix.IFLA_LINKINFO, nil)
-	attrLinkInfo.addNested(newAttributeStringZ(IFLA_INFO_KIND, "veth"))
-
-	attrData := newAttribute(IFLA_INFO_DATA, nil)
-
-	attrPeer := newAttribute(VETH_INFO_PEER, nil)
-	attrPeer.addNested(newIfInfoMsg())
-	attrPeer.addNested(newAttributeStringZ(unix.IFLA_IFNAME, name2))
-
-	attrLinkInfo.addNested(attrData)
-	attrData.addNested(attrPeer)
-
-	req.addPayload(attrLinkInfo)
 
 	return s.sendAndWaitForAck(req)
 }

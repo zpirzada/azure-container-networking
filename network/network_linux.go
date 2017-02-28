@@ -46,7 +46,7 @@ func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInt
 // DeleteNetworkImpl deletes an existing container network.
 func (nm *networkManager) deleteNetworkImpl(nw *network) error {
 	// Disconnect the interface if this was the last network using it.
-	if len(nw.extIf.Networks) == 0 {
+	if len(nw.extIf.Networks) == 1 {
 		nm.disconnectExternalInterface(nw.extIf)
 	}
 
@@ -76,7 +76,15 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, bri
 	if err != nil {
 		// Create the bridge.
 		log.Printf("[net] Creating bridge %v.", bridgeName)
-		err = netlink.AddLink(bridgeName, "bridge")
+
+		link := netlink.BridgeLink{
+			LinkInfo: netlink.LinkInfo{
+				Type: netlink.LINK_TYPE_BRIDGE,
+				Name: bridgeName,
+			},
+		}
+
+		err = netlink.AddLink(&link)
 		if err != nil {
 			return err
 		}

@@ -34,7 +34,16 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	contIfName := fmt.Sprintf("%s%s-2", hostInterfacePrefix, epInfo.Id[:7])
 
 	log.Printf("[net] Creating veth pair %v %v.", hostIfName, contIfName)
-	err = netlink.AddVethPair(contIfName, hostIfName)
+
+	link := netlink.VEthLink{
+		LinkInfo: netlink.LinkInfo{
+			Type: netlink.LINK_TYPE_VETH,
+			Name: contIfName,
+		},
+		PeerName: hostIfName,
+	}
+
+	err = netlink.AddLink(&link)
 	if err != nil {
 		log.Printf("[net] Failed to create veth pair, err:%v.", err)
 		return nil, err

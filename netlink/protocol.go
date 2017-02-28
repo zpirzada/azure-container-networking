@@ -13,11 +13,12 @@ import (
 
 // Netlink protocol constants that are not already defined in unix package.
 const (
-	IFLA_INFO_KIND = 1
-	IFLA_INFO_DATA = 2
-	IFLA_NET_NS_FD = 28
-	VETH_INFO_PEER = 1
-	DEFAULT_CHANGE = 0xFFFFFFFF
+	IFLA_INFO_KIND   = 1
+	IFLA_INFO_DATA   = 2
+	IFLA_NET_NS_FD   = 28
+	IFLA_IPVLAN_MODE = 1
+	VETH_INFO_PEER   = 1
+	DEFAULT_CHANGE   = 0xFFFFFFFF
 )
 
 // Serializable types are used to construct netlink messages.
@@ -156,6 +157,13 @@ func newAttributeStringZ(attrType int, value string) *attribute {
 func newAttributeUint32(attrType int, value uint32) *attribute {
 	buf := make([]byte, 4)
 	encoder.PutUint32(buf, value)
+	return newAttribute(attrType, buf)
+}
+
+// Creates a new attribute with a uint16 value.
+func newAttributeUint16(attrType int, value uint16) *attribute {
+	buf := make([]byte, 2)
+	encoder.PutUint16(buf, value)
 	return newAttribute(attrType, buf)
 }
 
