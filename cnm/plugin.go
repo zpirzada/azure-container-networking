@@ -43,12 +43,14 @@ func (plugin *Plugin) Initialize(config *common.PluginConfig) error {
 		os.MkdirAll(pluginPath, 0660)
 
 		// Create the listener.
-		var localAddr string
-		if plugin.Name != "test" {
-			localAddr = path.Join(pluginPath, config.Name+plugin.Name)
+		var sockName string
+		if config.SockName != "" {
+			sockName = config.SockName
+		} else if plugin.Name != "test" {
+			sockName = plugin.Name
 		}
 
-		listener, err := common.NewListener("unix", localAddr)
+		listener, err := common.NewListener("unix", path.Join(pluginPath, sockName))
 		if err != nil {
 			return err
 		}

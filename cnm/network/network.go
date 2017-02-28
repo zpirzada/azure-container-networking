@@ -15,7 +15,7 @@ import (
 
 const (
 	// Plugin name.
-	name = "net"
+	name = "azure-vnet"
 
 	// Plugin capabilities.
 	scope = "local"

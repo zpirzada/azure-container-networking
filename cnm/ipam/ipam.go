@@ -14,7 +14,7 @@ import (
 
 const (
 	// Plugin name.
-	name = "ipam"
+	name = "azure-vnet-ipam"
 
 	// Plugin capabilities reported to libnetwork.
 	requiresMACAddress    = false

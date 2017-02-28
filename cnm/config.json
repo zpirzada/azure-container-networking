@@ -4,7 +4,7 @@
 	"entrypoint": ["/usr/bin/azure-cnm-plugin"],
 	"interface": {
 		"types": ["docker.networkdriver/1.0", "docker.ipamdriver/1.0"],
-		"socket": "azurenet.sock"
+		"socket": "azure-vnet.sock"
 	},
 	"network": {
 		"type": "host"

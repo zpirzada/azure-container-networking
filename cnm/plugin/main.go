@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	// Plugin name.
-	name = "azure"
+	// Plugin socket name.
+	socketName = "azure-vnet"
 )
 
 // Version is populated by make during build.
@@ -101,8 +101,8 @@ func main() {
 
 	// Initialize plugin common configuration.
 	var config common.PluginConfig
-	config.Name = name
 	config.Version = version
+	config.SockName = socketName
 
 	// Create network plugin.
 	netPlugin, err := network.NewPlugin(&config)
