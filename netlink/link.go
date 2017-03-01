@@ -37,6 +37,7 @@ type Link interface {
 type LinkInfo struct {
 	Type        string
 	Name        string
+	Flags       net.Flags
 	MTU         uint
 	TxQLen      uint
 	ParentIndex int
@@ -84,7 +85,14 @@ func AddLink(link Link) error {
 
 	req := newRequest(unix.RTM_NEWLINK, unix.NLM_F_CREATE|unix.NLM_F_EXCL|unix.NLM_F_ACK)
 
+	// Set interface information.
 	ifInfo := newIfInfoMsg()
+
+	// Set interface flags.
+	if info.Flags&net.FlagUp != 0 {
+		ifInfo.Change = unix.IFF_UP
+		ifInfo.Flags = unix.IFF_UP
+	}
 	req.addPayload(ifInfo)
 
 	// Set interface name.
