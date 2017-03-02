@@ -9,6 +9,11 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 )
 
+const (
+	// Network types.
+	NetworkTypeBridge = "bridge"
+)
+
 // ExternalInterface is a host network interface that bridges containers to external networks.
 type externalInterface struct {
 	Name        string
@@ -26,6 +31,7 @@ type externalInterface struct {
 type network struct {
 	Id        string
 	HnsId     string `json:",omitempty"`
+	Type      string
 	Endpoints map[string]*endpoint
 	extIf     *externalInterface
 }
@@ -33,6 +39,7 @@ type network struct {
 // NetworkInfo contains read-only information about a container network.
 type NetworkInfo struct {
 	Id         string
+	Type       string
 	Subnets    []string
 	BridgeName string
 	Options    map[string]interface{}
