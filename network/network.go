@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	// Network types.
-	NetworkTypeBridge = "bridge"
+	// Operational modes.
+	OpModeBridge = "bridge"
 )
 
 // ExternalInterface is a host network interface that bridges containers to external networks.
@@ -31,7 +31,7 @@ type externalInterface struct {
 type network struct {
 	Id        string
 	HnsId     string `json:",omitempty"`
-	Type      string
+	Mode      string
 	Endpoints map[string]*endpoint
 	extIf     *externalInterface
 }
@@ -39,7 +39,7 @@ type network struct {
 // NetworkInfo contains read-only information about a container network.
 type NetworkInfo struct {
 	Id         string
-	Type       string
+	Mode       string
 	Subnets    []string
 	BridgeName string
 	Options    map[string]interface{}

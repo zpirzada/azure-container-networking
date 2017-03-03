@@ -25,13 +25,13 @@ type route netlink.Route
 
 // NewNetworkImpl creates a new container network.
 func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInterface) (*network, error) {
-	if nwInfo.Type == "" {
-		nwInfo.Type = NetworkTypeBridge
+	if nwInfo.Mode == "" {
+		nwInfo.Mode = OpModeBridge
 	}
 
 	// Connect the external interface.
-	switch nwInfo.Type {
-	case NetworkTypeBridge:
+	switch nwInfo.Mode {
+	case OpModeBridge:
 		err := nm.connectExternalInterface(extIf, nwInfo.BridgeName)
 		if err != nil {
 			return nil, err
@@ -43,7 +43,7 @@ func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInt
 	// Create the network object.
 	nw := &network{
 		Id:        nwInfo.Id,
-		Type:      nwInfo.Type,
+		Mode:      nwInfo.Mode,
 		Endpoints: make(map[string]*endpoint),
 		extIf:     extIf,
 	}
@@ -63,6 +63,25 @@ func (nm *networkManager) deleteNetworkImpl(nw *network) error {
 
 //  SaveIPConfig saves the IP configuration of an interface.
 func (nm *networkManager) saveIPConfig(hostIf *net.Interface, extIf *externalInterface) error {
+	// Save the default routes on the interface.
+	routes, err := netlink.GetIpRoute(&netlink.Route{Dst: &net.IPNet{}, LinkIndex: hostIf.Index})
+	if err != nil {
+		log.Printf("[net] Failed to query routes: %v.", err)
+		return err
+	}
+
+	for _, r := range routes {
+		if r.Dst == nil {
+			if r.Family == unix.AF_INET {
+				extIf.IPv4Gateway = r.Gw
+			} else if r.Family == unix.AF_INET6 {
+				extIf.IPv6Gateway = r.Gw
+			}
+		}
+
+		extIf.Routes = append(extIf.Routes, (*route)(r))
+	}
+
 	// Save global unicast IP addresses on the interface.
 	addrs, err := hostIf.Addrs()
 	for _, addr := range addrs {
@@ -86,25 +105,6 @@ func (nm *networkManager) saveIPConfig(hostIf *net.Interface, extIf *externalInt
 		}
 	}
 
-	// Save the default routes on the interface.
-	routes, err := netlink.GetIpRoute(&netlink.Route{Dst: &net.IPNet{}, LinkIndex: hostIf.Index})
-	if err != nil {
-		log.Printf("[net] Failed to query routes: %v.", err)
-		return err
-	}
-
-	for _, r := range routes {
-		if r.Dst == nil {
-			if r.Family == unix.AF_INET {
-				extIf.IPv4Gateway = r.Gw
-			} else if r.Family == unix.AF_INET6 {
-				extIf.IPv6Gateway = r.Gw
-			}
-		}
-
-		extIf.Routes = append(extIf.Routes, (*route)(r))
-	}
-
 	log.Printf("[net] Saved interface IP configuration %+v.", extIf)
 
 	return err
@@ -114,15 +114,9 @@ func (nm *networkManager) saveIPConfig(hostIf *net.Interface, extIf *externalInt
 func (nm *networkManager) applyIPConfig(extIf *externalInterface, targetIf *net.Interface) error {
 	// Add IP addresses.
 	for _, addr := range extIf.IPAddresses {
-		ipAddr, ipNet, err := net.ParseCIDR(addr.String())
-		ipNet.IP = ipAddr
-		if err != nil {
-			return err
-		}
+		log.Printf("[net] Adding IP address %v to interface %v.", addr, targetIf.Name)
 
-		log.Printf("[net] Adding IP address %v to interface %v.", ipNet, targetIf.Name)
-
-		err = netlink.AddIpAddress(targetIf.Name, ipAddr, ipNet)
+		err := netlink.AddIpAddress(targetIf.Name, addr.IP, addr)
 		if err != nil {
 			log.Printf("[net] Failed to add IP address %v: %v.", addr, err)
 			return err
