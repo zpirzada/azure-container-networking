@@ -200,6 +200,7 @@ func (am *addressManager) StopSource() {
 // Signals configuration source to refresh.
 func (am *addressManager) refreshSource() {
 	if am.source != nil {
+		log.Printf("[ipam] Refreshing address source.")
 		err := am.source.refresh()
 		if err != nil {
 			log.Printf("[ipam] Source refresh failed, err:%v.\n", err)
