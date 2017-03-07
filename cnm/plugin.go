@@ -78,6 +78,12 @@ func (plugin *Plugin) Uninitialize() {
 	plugin.Plugin.Uninitialize()
 }
 
+// ParseOptions returns generic options from a libnetwork request.
+func (plugin *Plugin) ParseOptions(options OptionMap) OptionMap {
+	opt, _ := options[genericData].(OptionMap)
+	return opt
+}
+
 //
 // Libnetwork remote plugin API
 //

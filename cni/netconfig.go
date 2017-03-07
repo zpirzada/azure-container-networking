@@ -12,6 +12,7 @@ type NetworkConfig struct {
 	CniVersion string `json:"cniVersion"`
 	Name       string `json:"name"`
 	Type       string `json:"type"`
+	Mode       string `json:"mode"`
 	Master     string `json:"master"`
 	Bridge     string `json:"bridge,omitempty"`
 	LogLevel   string `json:"logLevel,omitempty"`

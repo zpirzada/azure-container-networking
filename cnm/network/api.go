@@ -16,6 +16,9 @@ const (
 	joinPath             = "/NetworkDriver.Join"
 	leavePath            = "/NetworkDriver.Leave"
 	endpointOperInfoPath = "/NetworkDriver.EndpointOperInfo"
+
+	// Libnetwork network plugin options
+	modeOption = "com.microsoft.azure.network.mode"
 )
 
 // Request sent by libnetwork when querying plugin capabilities.

@@ -132,6 +132,12 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 		Options: req.Options,
 	}
 
+	// Parse network options.
+	options := plugin.ParseOptions(req.Options)
+	if options != nil {
+		nwInfo.Mode, _ = options[modeOption].(string)
+	}
+
 	// Assume single pool per address family.
 	if len(req.IPv4Data) > 0 {
 		nwInfo.Subnets = append(nwInfo.Subnets, req.IPv4Data[0].Pool)

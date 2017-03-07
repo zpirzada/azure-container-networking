@@ -10,7 +10,7 @@ import (
 var (
 	// Error responses returned by NetworkManager.
 	errSubnetNotFound     = fmt.Errorf("Subnet not found")
-	errNetworkTypeInvalid = fmt.Errorf("Network type is invalid")
+	errNetworkModeInvalid = fmt.Errorf("Network mode is invalid")
 	errNetworkExists      = fmt.Errorf("Network already exists")
 	errNetworkNotFound    = fmt.Errorf("Network not found")
 	errEndpointExists     = fmt.Errorf("Endpoint already exists")

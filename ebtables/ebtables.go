@@ -36,8 +36,17 @@ func installEbtables() {
 // SetSnatForInterface sets a MAC SNAT rule for an interface.
 func SetSnatForInterface(interfaceName string, macAddress net.HardwareAddr, action string) error {
 	command := fmt.Sprintf(
-		"ebtables -t nat %s POSTROUTING -o %s -j snat --to-src %s --snat-arp",
+		"ebtables -t nat %s POSTROUTING -s unicast -o %s -j snat --to-src %s --snat-arp --snat-target ACCEPT",
 		action, interfaceName, macAddress.String())
+
+	return executeShellCommand(command)
+}
+
+// SetArpReply sets an ARP reply rule for the given target IP address and MAC address.
+func SetArpReply(ipAddress net.IP, macAddress net.HardwareAddr, action string) error {
+	command := fmt.Sprintf(
+		"ebtables -t nat %s PREROUTING -p ARP --arp-ip-dst %s -j arpreply --arpreply-mac %s --arpreply-target DROP",
+		action, ipAddress, macAddress.String())
 
 	return executeShellCommand(command)
 }
@@ -45,17 +54,26 @@ func SetSnatForInterface(interfaceName string, macAddress net.HardwareAddr, acti
 // SetDnatForArpReplies sets a MAC DNAT rule for ARP replies received on an interface.
 func SetDnatForArpReplies(interfaceName string, action string) error {
 	command := fmt.Sprintf(
-		"ebtables -t nat %s PREROUTING -p ARP -i %s -j dnat --to-dst ff:ff:ff:ff:ff:ff",
+		"ebtables -t nat %s PREROUTING -p ARP -i %s -j dnat --to-dst ff:ff:ff:ff:ff:ff --dnat-target ACCEPT",
 		action, interfaceName)
 
 	return executeShellCommand(command)
 }
 
-// SetDnatForIPAddress sets a MAC DNAT rule for an IP address.
-func SetDnatForIPAddress(ipAddress net.IP, macAddress net.HardwareAddr, action string) error {
+// SetVepaMode sets the VEPA mode for an interface.
+func SetVepaMode(upstreamIfName string, upstreamMacAddress string, action string) error {
 	command := fmt.Sprintf(
-		"ebtables -t nat %s PREROUTING -p IPv4 --ip-dst %s -j dnat --to-dst %s",
-		action, ipAddress.String(), macAddress.String())
+		"ebtables -t nat %s PREROUTING -i ! %s -j dnat --to-dst %s --dnat-target ACCEPT",
+		action, upstreamIfName, upstreamMacAddress)
+
+	return executeShellCommand(command)
+}
+
+// SetDnatForIPAddress sets a MAC DNAT rule for an IP address.
+func SetDnatForIPAddress(interfaceName string, ipAddress net.IP, macAddress net.HardwareAddr, action string) error {
+	command := fmt.Sprintf(
+		"ebtables -t nat %s PREROUTING -p IPv4 -i %s --ip-dst %s -j dnat --to-dst %s --dnat-target ACCEPT",
+		action, interfaceName, ipAddress.String(), macAddress.String())
 
 	return executeShellCommand(command)
 }

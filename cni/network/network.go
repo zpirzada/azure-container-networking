@@ -135,6 +135,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		// Create the network.
 		nwInfo := network.NetworkInfo{
 			Id:         networkId,
+			Mode:       nwCfg.Mode,
 			Subnets:    []string{subnet.String()},
 			BridgeName: nwCfg.Bridge,
 		}

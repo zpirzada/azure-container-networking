@@ -18,6 +18,9 @@ import (
 const (
 	// Prefix for bridge names.
 	bridgePrefix = "azure"
+
+	// Virtual MAC address used by Azure VNET.
+	virtualMacAddress = "12:34:56:78:9a:bc"
 )
 
 // Linux implementation of route.
@@ -25,19 +28,17 @@ type route netlink.Route
 
 // NewNetworkImpl creates a new container network.
 func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInterface) (*network, error) {
-	if nwInfo.Mode == "" {
-		nwInfo.Mode = OpModeBridge
-	}
-
 	// Connect the external interface.
 	switch nwInfo.Mode {
-	case OpModeBridge:
-		err := nm.connectExternalInterface(extIf, nwInfo.BridgeName)
+	case opModeTunnel:
+		fallthrough
+	case opModeBridge:
+		err := nm.connectExternalInterface(extIf, nwInfo)
 		if err != nil {
 			return nil, err
 		}
 	default:
-		return nil, errNetworkTypeInvalid
+		return nil, errNetworkModeInvalid
 	}
 
 	// Create the network object.
@@ -139,8 +140,54 @@ func (nm *networkManager) applyIPConfig(extIf *externalInterface, targetIf *net.
 	return nil
 }
 
+// AddBridgeRules adds bridge frame table rules for container traffic.
+func (nm *networkManager) addBridgeRules(extIf *externalInterface, hostIf *net.Interface, opMode string) error {
+	// Add SNAT rule to translate container egress traffic.
+	log.Printf("[net] Adding SNAT rule for egress traffic on %v.", hostIf.Name)
+	err := ebtables.SetSnatForInterface(hostIf.Name, hostIf.HardwareAddr, ebtables.Append)
+	if err != nil {
+		return err
+	}
+
+	// Add ARP reply rule for host primary IP address.
+	// ARP requests for all IP addresses are forwarded to the SDN fabric, but fabric
+	// doesn't respond to ARP requests from the VM for its own primary IP address.
+	primary := extIf.IPAddresses[0].IP
+	log.Printf("[net] Adding ARP reply rule for primary IP address %v.", primary)
+	err = ebtables.SetArpReply(primary, hostIf.HardwareAddr, ebtables.Append)
+	if err != nil {
+		return err
+	}
+
+	// Add DNAT rule to forward ARP replies to container interfaces.
+	log.Printf("[net] Adding DNAT rule for ingress ARP traffic on interface %v.", hostIf.Name)
+	err = ebtables.SetDnatForArpReplies(hostIf.Name, ebtables.Append)
+	if err != nil {
+		return err
+	}
+
+	// Enable VEPA for host policy enforcement if necessary.
+	if opMode == opModeTunnel {
+		log.Printf("[net] Enabling VEPA mode for %v.", hostIf.Name)
+		err = ebtables.SetVepaMode(hostIf.Name, virtualMacAddress, ebtables.Append)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// DeleteBridgeRules deletes bridge rules for container traffic.
+func (nm *networkManager) deleteBridgeRules(extIf *externalInterface) {
+	ebtables.SetVepaMode(extIf.Name, virtualMacAddress, ebtables.Delete)
+	ebtables.SetDnatForArpReplies(extIf.Name, ebtables.Delete)
+	ebtables.SetArpReply(extIf.IPAddresses[0].IP, extIf.MacAddress, ebtables.Delete)
+	ebtables.SetSnatForInterface(extIf.Name, extIf.MacAddress, ebtables.Delete)
+}
+
 // ConnectExternalInterface connects the given host interface to a bridge.
-func (nm *networkManager) connectExternalInterface(extIf *externalInterface, bridgeName string) error {
+func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwInfo *NetworkInfo) error {
 	log.Printf("[net] Connecting interface %v.", extIf.Name)
 
 	// Check whether this interface is already connected.
@@ -156,6 +203,7 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, bri
 	}
 
 	// If a bridge name is not specified, generate one based on the external interface index.
+	bridgeName := nwInfo.BridgeName
 	if bridgeName == "" {
 		bridgeName = fmt.Sprintf("%s%d", bridgePrefix, hostIf.Index)
 	}
@@ -193,14 +241,8 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, bri
 		log.Printf("[net] Failed to save IP configuration for interface %v: %v.", hostIf.Name, err)
 	}
 
-	// Setup MAC address translation rules for external interface.
-	log.Printf("[net] Setting up MAC address translation rules for %v.", hostIf.Name)
-	err = ebtables.SetSnatForInterface(hostIf.Name, hostIf.HardwareAddr, ebtables.Append)
-	if err != nil {
-		goto cleanup
-	}
-
-	err = ebtables.SetDnatForArpReplies(hostIf.Name, ebtables.Append)
+	// Add the bridge rules.
+	err = nm.addBridgeRules(extIf, hostIf, nwInfo.Mode)
 	if err != nil {
 		goto cleanup
 	}
@@ -249,9 +291,7 @@ cleanup:
 	log.Printf("[net] Connecting interface %v failed, err:%v.", extIf.Name, err)
 
 	// Roll back the changes for the network.
-	ebtables.SetDnatForArpReplies(extIf.Name, ebtables.Delete)
-	ebtables.SetSnatForInterface(extIf.Name, extIf.MacAddress, ebtables.Delete)
-
+	nm.deleteBridgeRules(extIf)
 	netlink.DeleteLink(bridgeName)
 
 	return err
@@ -261,9 +301,8 @@ cleanup:
 func (nm *networkManager) disconnectExternalInterface(extIf *externalInterface) error {
 	log.Printf("[net] Disconnecting interface %v.", extIf.Name)
 
-	// Cleanup MAC address translation rules.
-	ebtables.SetDnatForArpReplies(extIf.Name, ebtables.Delete)
-	ebtables.SetSnatForInterface(extIf.Name, extIf.MacAddress, ebtables.Delete)
+	// Delete bridge rules set on the external interface.
+	nm.deleteBridgeRules(extIf)
 
 	// Disconnect external interface from its bridge.
 	err := netlink.SetLinkMaster(extIf.Name, "")

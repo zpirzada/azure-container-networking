@@ -11,7 +11,9 @@ import (
 
 const (
 	// Operational modes.
-	OpModeBridge = "bridge"
+	opModeBridge  = "bridge"
+	opModeTunnel  = "tunnel"
+	opModeDefault = opModeTunnel
 )
 
 // ExternalInterface is a host network interface that bridges containers to external networks.
@@ -103,6 +105,11 @@ func (nm *networkManager) newNetwork(nwInfo *NetworkInfo) (*network, error) {
 	var err error
 
 	log.Printf("[net] Creating network %+v.", nwInfo)
+
+	// Set defaults.
+	if nwInfo.Mode == "" {
+		nwInfo.Mode = opModeDefault
+	}
 
 	// Find the external interface for this subnet.
 	extIf := nm.findExternalInterfaceBySubnet(nwInfo.Subnets[0])

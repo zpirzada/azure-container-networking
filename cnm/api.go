@@ -9,7 +9,12 @@ const (
 
 	// Libnetwork remote plugin paths
 	activatePath = "/Plugin.Activate"
+
+	// Libnetwork labels
+	genericData = "com.docker.network.generic"
 )
+
+type OptionMap map[string]interface{}
 
 //
 // Libnetwork remote plugin API
