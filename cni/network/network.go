@@ -82,6 +82,11 @@ func (plugin *netPlugin) Stop() {
 	log.Printf("[cni-net] Plugin stopped.")
 }
 
+// GetEndpointID returns a unique endpoint ID based on the CNI args.
+func (plugin *netPlugin) getEndpointID(args *cniSkel.CmdArgs) string {
+	return args.ContainerID + "-" + args.IfName
+}
+
 //
 // CNI implementation
 // https://github.com/containernetworking/cni/blob/master/SPEC.md
@@ -104,7 +109,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	var result cniTypes.Result
 	var resultImpl *cniTypesImpl.Result
 	networkId := nwCfg.Name
-	endpointId := args.ContainerID
+	endpointId := plugin.getEndpointID(args)
 
 	// Check whether the network already exists.
 	nwInfo, err := plugin.nm.GetNetworkInfo(networkId)
@@ -164,9 +169,10 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	// Initialize endpoint info.
 	epInfo := &network.EndpointInfo{
-		Id:        endpointId,
-		IfName:    args.IfName,
-		NetNsPath: args.Netns,
+		Id:          endpointId,
+		ContainerID: args.ContainerID,
+		NetNsPath:   args.Netns,
+		IfName:      args.IfName,
 	}
 
 	// Populate addresses and routes.
@@ -177,6 +183,10 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 			epInfo.Routes = append(epInfo.Routes, network.RouteInfo{Dst: route.Dst, Gw: route.GW})
 		}
 	}
+
+	// Populate DNS info.
+	epInfo.DNSSuffix = resultImpl.DNS.Domain
+	epInfo.DNSServers = resultImpl.DNS.Nameservers
 
 	// Create the endpoint.
 	log.Printf("[cni-net] Creating endpoint %+v", epInfo)
@@ -214,7 +224,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 
 	// Initialize values from network config.
 	networkId := nwCfg.Name
-	endpointId := args.ContainerID
+	endpointId := plugin.getEndpointID(args)
 
 	// Query the network.
 	nwInfo, err := plugin.nm.GetNetworkInfo(networkId)

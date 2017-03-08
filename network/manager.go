@@ -288,7 +288,7 @@ func (nm *networkManager) AttachEndpoint(networkId string, endpointId string, sa
 		return nil, err
 	}
 
-	err = ep.attach(sandboxKey, nil)
+	err = ep.attach(sandboxKey)
 	if err != nil {
 		return nil, err
 	}

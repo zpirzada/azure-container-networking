@@ -24,10 +24,13 @@ type endpoint struct {
 // EndpointInfo contains read-only information about an endpoint.
 type EndpointInfo struct {
 	Id          string
-	IfName      string
+	ContainerID string
 	NetNsPath   string
+	IfName      string
 	IPAddresses []net.IPNet
 	Routes      []RouteInfo
+	DNSSuffix   string
+	DNSServers  []string
 }
 
 // RouteInfo contains information about an IP route.
@@ -121,7 +124,7 @@ func (ep *endpoint) getInfo() *EndpointInfo {
 }
 
 // Attach attaches an endpoint to a sandbox.
-func (ep *endpoint) attach(sandboxKey string, options map[string]interface{}) error {
+func (ep *endpoint) attach(sandboxKey string) error {
 	if ep.SandboxKey != "" {
 		return errEndpointInUse
 	}
