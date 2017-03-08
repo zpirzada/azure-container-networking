@@ -44,7 +44,7 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	var ep *endpoint
 	var err error
 
-	log.Printf("[net] Creating endpoint %v in network %v.", epInfo.Id, nw.Id)
+	log.Printf("[net] Creating endpoint %+v in network %v.", epInfo, nw.Id)
 
 	if nw.Endpoints[epInfo.Id] != nil {
 		err = errEndpointExists

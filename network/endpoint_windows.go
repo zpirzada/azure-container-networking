@@ -7,6 +7,8 @@ package network
 
 import (
 	"encoding/json"
+	"net"
+	"strings"
 
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Microsoft/hcsshim"
@@ -16,7 +18,29 @@ import (
 func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	// Initialize HNS endpoint.
 	hnsEndpoint := &hcsshim.HNSEndpoint{
-		Name: epInfo.Id,
+		Name:           epInfo.Id,
+		VirtualNetwork: nw.HnsId,
+		DNSSuffix:      epInfo.DNSSuffix,
+		DNSServerList:  strings.Join(epInfo.DNSServers, ","),
+	}
+
+	// HNS currently supports only one IP address per endpoint.
+	if epInfo.IPAddresses != nil {
+		hnsEndpoint.IPAddress = epInfo.IPAddresses[0].IP
+		pl, _ := epInfo.IPAddresses[0].Mask.Size()
+		hnsEndpoint.PrefixLength = uint8(pl)
+	}
+
+	// HNS currently supports only one (default) route per endpoint.
+	for _, route := range epInfo.Routes {
+		var pl int
+		if route.Dst.Mask != nil {
+			pl, _ = route.Dst.Mask.Size()
+		}
+		if route.Dst.Mask == nil || pl == 0 {
+			hnsEndpoint.GatewayAddress = route.Gw.String()
+			break
+		}
 	}
 
 	// Marshal the request.
@@ -34,11 +58,25 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		return nil, err
 	}
 
+	// Attach the endpoint.
+	log.Printf("[net] Attaching endpoint %v to container %v.", hnsResponse.Id, epInfo.ContainerID)
+	err = hcsshim.HotAttachEndpoint(epInfo.ContainerID, hnsResponse.Id)
+	if err != nil {
+		log.Printf("[net] Failed to attach endpoint: %v.", err)
+		return nil, err
+	}
+
 	// Create the endpoint object.
 	ep := &endpoint{
 		Id:          epInfo.Id,
 		HnsId:       hnsResponse.Id,
+		SandboxKey:  epInfo.ContainerID,
+		IfName:      epInfo.IfName,
+		IPAddresses: epInfo.IPAddresses,
+		Gateways:    []net.IP{net.ParseIP(hnsEndpoint.GatewayAddress)},
 	}
+
+	ep.MacAddress, _ = net.ParseMAC(hnsResponse.MacAddress)
 
 	return ep, nil
 }

@@ -14,8 +14,8 @@ import (
 
 const (
 	// HNS network types.
-	HnsL2bridge = "l2bridge"
-	HnsL2tunnel = "l2tunnel"
+	hnsL2bridge = "l2bridge"
+	hnsL2tunnel = "l2tunnel"
 )
 
 // Windows implementation of route.
@@ -26,18 +26,24 @@ func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInt
 	// Initialize HNS network.
 	hnsNetwork := &hcsshim.HNSNetwork{
 		Name:               nwInfo.Id,
-		Type:               HnsL2bridge,
 		NetworkAdapterName: extIf.Name,
-		SourceMac:          extIf.MacAddress.String(),
-		DNSSuffix:          "",
-		DNSServerList:      "10.1.1.2",
+	}
+
+	// Set network mode.
+	switch nwInfo.Mode {
+	case opModeBridge:
+		hnsNetwork.Type = hnsL2bridge
+	case opModeTunnel:
+		hnsNetwork.Type = hnsL2tunnel
+	default:
+		return nil, errNetworkModeInvalid
 	}
 
 	// Populate subnets.
 	for _, subnet := range nwInfo.Subnets {
 		hnsSubnet := hcsshim.Subnet{
 			AddressPrefix:  subnet,
-			GatewayAddress: "10.1.1.1",
+			GatewayAddress: extIf.IPv4Gateway.String(),
 		}
 
 		hnsNetwork.Subnets = append(hnsNetwork.Subnets, hnsSubnet)
