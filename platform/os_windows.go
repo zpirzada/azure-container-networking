@@ -8,9 +8,11 @@ import (
 )
 
 const (
-	// Filesystem paths.
+	// RuntimePath is the path where runtime files are stored.
 	RuntimePath = ""
-	LogPath     = ""
+
+	// LogPath is the path where log files are stored.
+	LogPath = ""
 )
 
 // GetOSInfo returns OS version information.

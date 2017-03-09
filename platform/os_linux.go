@@ -10,19 +10,21 @@ import (
 )
 
 const (
-	// Filesystem paths.
+	// RuntimePath is the path where runtime files are stored.
 	RuntimePath = "/var/run/"
-	LogPath     = "/var/log/"
+
+	// LogPath is the path where log files are stored.
+	LogPath = "/var/log/"
 )
 
 // GetOSInfo returns OS version information.
 func GetOSInfo() string {
 	info, err := ioutil.ReadFile("/proc/version")
-	if err == nil {
-		return string(info)
-	} else {
+	if err != nil {
 		return "unknown"
 	}
+
+	return string(info)
 }
 
 // GetLastRebootTime returns the last time the system rebooted.
