@@ -84,7 +84,7 @@ func (plugin *netPlugin) Stop() {
 
 // GetEndpointID returns a unique endpoint ID based on the CNI args.
 func (plugin *netPlugin) getEndpointID(args *cniSkel.CmdArgs) string {
-	return args.ContainerID + "-" + args.IfName
+	return args.ContainerID[:8] + "-" + args.IfName
 }
 
 //
@@ -115,7 +115,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	nwInfo, err := plugin.nm.GetNetworkInfo(networkId)
 	if err != nil {
 		// Network does not exist.
-		log.Printf("[cni-net] Creating network.")
+		log.Printf("[cni-net] Creating network %v.", networkId)
 
 		// Call into IPAM plugin to allocate an address pool for the network.
 		result, err = cniInvoke.DelegateAdd(nwCfg.Ipam.Type, nwCfg.Serialize())
@@ -127,21 +127,27 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 		log.Printf("[cni-net] IPAM plugin returned result %v.", resultImpl)
 
-		// Derive the subnet from allocated IP address.
-		subnet := resultImpl.IP4.IP
-		subnet.IP = subnet.IP.Mask(subnet.Mask)
+		// Derive the subnet prefix from allocated IP address.
+		subnetPrefix := resultImpl.IP4.IP
+		subnetPrefix.IP = subnetPrefix.IP.Mask(subnetPrefix.Mask)
 
 		// Add the master as an external interface.
-		err = plugin.nm.AddExternalInterface(nwCfg.Master, subnet.String())
+		err = plugin.nm.AddExternalInterface(nwCfg.Master, subnetPrefix.String())
 		if err != nil {
 			return plugin.Errorf("Failed to add external interface: %v", err)
 		}
 
 		// Create the network.
 		nwInfo := network.NetworkInfo{
-			Id:         networkId,
-			Mode:       nwCfg.Mode,
-			Subnets:    []string{subnet.String()},
+			Id:   networkId,
+			Mode: nwCfg.Mode,
+			Subnets: []network.SubnetInfo{
+				network.SubnetInfo{
+					Family:  platform.AfINET,
+					Prefix:  subnetPrefix,
+					Gateway: resultImpl.IP4.Gateway,
+				},
+			},
 			BridgeName: nwCfg.Bridge,
 		}
 
@@ -150,13 +156,14 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 			return plugin.Errorf("Failed to create network: %v", err)
 		}
 
-		log.Printf("[cni-net] Created network %v with subnet %v.", networkId, subnet.String())
+		log.Printf("[cni-net] Created network %v with subnet %v.", networkId, subnetPrefix.String())
 	} else {
 		// Network already exists.
-		log.Printf("[cni-net] Found network %v with subnet %v.", networkId, nwInfo.Subnets[0])
+		subnetPrefix := nwInfo.Subnets[0].Prefix.String()
+		log.Printf("[cni-net] Found network %v with subnet %v.", networkId, subnetPrefix)
 
 		// Call into IPAM plugin to allocate an address for the endpoint.
-		nwCfg.Ipam.Subnet = nwInfo.Subnets[0]
+		nwCfg.Ipam.Subnet = subnetPrefix
 		result, err = cniInvoke.DelegateAdd(nwCfg.Ipam.Type, nwCfg.Serialize())
 		if err != nil {
 			return plugin.Errorf("Failed to allocate address: %v", err)
@@ -185,11 +192,11 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	}
 
 	// Populate DNS info.
-	epInfo.DNSSuffix = resultImpl.DNS.Domain
-	epInfo.DNSServers = resultImpl.DNS.Nameservers
+	epInfo.DNS.Suffix = resultImpl.DNS.Domain
+	epInfo.DNS.Servers = resultImpl.DNS.Nameservers
 
 	// Create the endpoint.
-	log.Printf("[cni-net] Creating endpoint %+v", epInfo)
+	log.Printf("[cni-net] Creating endpoint %v.", epInfo.Id)
 	err = plugin.nm.CreateEndpoint(networkId, epInfo)
 	if err != nil {
 		return plugin.Errorf("Failed to create endpoint: %v", err)
@@ -245,7 +252,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	}
 
 	// Call into IPAM plugin to release the endpoint's addresses.
-	nwCfg.Ipam.Subnet = nwInfo.Subnets[0]
+	nwCfg.Ipam.Subnet = nwInfo.Subnets[0].Prefix.String()
 	for _, address := range epInfo.IPAddresses {
 		nwCfg.Ipam.Address = address.IP.String()
 		err = cniInvoke.DelegateDel(nwCfg.Ipam.Type, nwCfg.Serialize())

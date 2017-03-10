@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 )
 
 const (
@@ -34,6 +35,7 @@ type network struct {
 	Id        string
 	HnsId     string `json:",omitempty"`
 	Mode      string
+	Subnets   []SubnetInfo
 	Endpoints map[string]*endpoint
 	extIf     *externalInterface
 }
@@ -42,9 +44,23 @@ type network struct {
 type NetworkInfo struct {
 	Id         string
 	Mode       string
-	Subnets    []string
+	Subnets    []SubnetInfo
+	DNS        DNSInfo
 	BridgeName string
 	Options    map[string]interface{}
+}
+
+// SubnetInfo contains subnet information for a container network.
+type SubnetInfo struct {
+	Family  platform.AddressFamily
+	Prefix  net.IPNet
+	Gateway net.IP
+}
+
+// DNSInfo contains DNS information for a container network or endpoint.
+type DNSInfo struct {
+	Suffix  string
+	Servers []string
 }
 
 // NewExternalInterface adds a host interface to the list of available external interfaces.
@@ -112,7 +128,7 @@ func (nm *networkManager) newNetwork(nwInfo *NetworkInfo) (*network, error) {
 	}
 
 	// Find the external interface for this subnet.
-	extIf := nm.findExternalInterfaceBySubnet(nwInfo.Subnets[0])
+	extIf := nm.findExternalInterfaceBySubnet(nwInfo.Subnets[0].Prefix.String())
 	if extIf == nil {
 		err = errSubnetNotFound
 		goto fail
@@ -131,6 +147,7 @@ func (nm *networkManager) newNetwork(nwInfo *NetworkInfo) (*network, error) {
 	}
 
 	// Add the network object.
+	nw.Subnets = nwInfo.Subnets
 	extIf.Networks[nwInfo.Id] = nw
 
 	log.Printf("[net] Created network %v on interface %v.", nwInfo.Id, extIf.Name)

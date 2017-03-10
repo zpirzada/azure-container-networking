@@ -42,8 +42,8 @@ func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInt
 	// Populate subnets.
 	for _, subnet := range nwInfo.Subnets {
 		hnsSubnet := hcsshim.Subnet{
-			AddressPrefix:  subnet,
-			GatewayAddress: extIf.IPv4Gateway.String(),
+			AddressPrefix:  subnet.Prefix.String(),
+			GatewayAddress: subnet.Gateway.String(),
 		}
 
 		hnsNetwork.Subnets = append(hnsNetwork.Subnets, hnsSubnet)
@@ -68,6 +68,7 @@ func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInt
 	nw := &network{
 		Id:        nwInfo.Id,
 		HnsId:     hnsResponse.Id,
+		Mode:      nwInfo.Mode,
 		Endpoints: make(map[string]*endpoint),
 		extIf:     extIf,
 	}

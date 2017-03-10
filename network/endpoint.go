@@ -29,8 +29,7 @@ type EndpointInfo struct {
 	IfName      string
 	IPAddresses []net.IPNet
 	Routes      []RouteInfo
-	DNSSuffix   string
-	DNSServers  []string
+	DNS         DNSInfo
 }
 
 // RouteInfo contains information about an IP route.

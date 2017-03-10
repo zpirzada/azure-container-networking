@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network"
+	"github.com/Azure/azure-container-networking/platform"
 )
 
 const (
@@ -138,13 +139,22 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 		nwInfo.Mode, _ = options[modeOption].(string)
 	}
 
-	// Assume single pool per address family.
-	if len(req.IPv4Data) > 0 {
-		nwInfo.Subnets = append(nwInfo.Subnets, req.IPv4Data[0].Pool)
-	}
+	// Populate subnets.
+	for _, data := range [][]ipamData{req.IPv4Data, req.IPv6Data} {
+		for _, ipamData := range data {
+			_, prefix, err := net.ParseCIDR(ipamData.Pool)
+			if err != nil {
+				continue
+			}
 
-	if len(req.IPv6Data) > 0 {
-		nwInfo.Subnets = append(nwInfo.Subnets, req.IPv6Data[0].Pool)
+			subnet := network.SubnetInfo{
+				Family:  platform.GetAddressFamily(&prefix.IP),
+				Prefix:  *prefix,
+				Gateway: net.ParseIP(ipamData.Gateway),
+			}
+
+			nwInfo.Subnets = append(nwInfo.Subnets, subnet)
+		}
 	}
 
 	err = plugin.nm.CreateNetwork(&nwInfo)

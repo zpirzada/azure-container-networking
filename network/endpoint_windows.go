@@ -20,8 +20,8 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	hnsEndpoint := &hcsshim.HNSEndpoint{
 		Name:           epInfo.Id,
 		VirtualNetwork: nw.HnsId,
-		DNSSuffix:      epInfo.DNSSuffix,
-		DNSServerList:  strings.Join(epInfo.DNSServers, ","),
+		DNSSuffix:      epInfo.DNS.Suffix,
+		DNSServerList:  strings.Join(epInfo.DNS.Servers, ","),
 	}
 
 	// HNS currently supports only one IP address per endpoint.
@@ -29,18 +29,6 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		hnsEndpoint.IPAddress = epInfo.IPAddresses[0].IP
 		pl, _ := epInfo.IPAddresses[0].Mask.Size()
 		hnsEndpoint.PrefixLength = uint8(pl)
-	}
-
-	// HNS currently supports only one (default) route per endpoint.
-	for _, route := range epInfo.Routes {
-		var pl int
-		if route.Dst.Mask != nil {
-			pl, _ = route.Dst.Mask.Size()
-		}
-		if route.Dst.Mask == nil || pl == 0 {
-			hnsEndpoint.GatewayAddress = route.Gw.String()
-			break
-		}
 	}
 
 	// Marshal the request.

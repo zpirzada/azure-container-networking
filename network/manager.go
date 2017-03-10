@@ -203,7 +203,7 @@ func (nm *networkManager) GetNetworkInfo(networkId string) (*NetworkInfo, error)
 
 	nwInfo := &NetworkInfo{
 		Id:      networkId,
-		Subnets: []string{nw.extIf.Subnets[0]},
+		Subnets: nw.Subnets,
 	}
 
 	return nwInfo, nil
