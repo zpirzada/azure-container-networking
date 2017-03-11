@@ -26,6 +26,11 @@ CNIFILES = \
 	$(wildcard cni/network/plugin/*.go) \
 	$(COREFILES)
 
+# Build defaults.
+GOOS ?= linux
+GOARCH ?= amd64
+
+# Build directories.
 CNMDIR = cnm/plugin
 CNI_NET_DIR = cni/network/plugin
 CNI_IPAM_DIR = cni/ipam/plugin
@@ -129,5 +134,6 @@ publish-azure-cnm-plugin-image:
 .PHONY: tarball
 tarball:
 	cd $(BUILD_DIR) && \
+	chmod 0755 * && \
 	tar -czvf azure-vnet-$(VERSION).tgz --exclude=*.tgz *
 	chown -R $(BUILD_USER):$(BUILD_USER) $(BUILD_DIR)/azure-vnet-$(VERSION).tgz
