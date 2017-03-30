@@ -4,6 +4,8 @@
 package network
 
 import (
+	"net"
+
 	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
@@ -87,6 +89,34 @@ func (plugin *netPlugin) getEndpointID(args *cniSkel.CmdArgs) string {
 	return args.ContainerID[:8] + "-" + args.IfName
 }
 
+// FindMasterInterface returns the name of the master interface.
+func (plugin *netPlugin) findMasterInterface(nwCfg *cni.NetworkConfig, subnetPrefix *net.IPNet) string {
+	// An explicit master configuration wins. Explicitly specifying a master is
+	// useful if host has multiple interfaces with addresses in the same subnet.
+	if nwCfg.Master != "" {
+		return nwCfg.Master
+	}
+
+	// Otherwise, pick the first interface with an IP address in the given subnet.
+	subnetPrefixString := subnetPrefix.String()
+	interfaces, _ := net.Interfaces()
+	for _, iface := range interfaces {
+		addrs, _ := iface.Addrs()
+		for _, addr := range addrs {
+			_, ipnet, err := net.ParseCIDR(addr.String())
+			if err != nil {
+				continue
+			}
+			if subnetPrefixString == ipnet.String() {
+				return iface.Name
+			}
+		}
+	}
+
+	// Failed to find a suitable interface.
+	return ""
+}
+
 //
 // CNI implementation
 // https://github.com/containernetworking/cni/blob/master/SPEC.md
@@ -131,8 +161,15 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		subnetPrefix := resultImpl.IP4.IP
 		subnetPrefix.IP = subnetPrefix.IP.Mask(subnetPrefix.Mask)
 
+		// Find the master interface.
+		masterIfName := plugin.findMasterInterface(nwCfg, &subnetPrefix)
+		if masterIfName == "" {
+			return plugin.Errorf("Failed to find the master interface")
+		}
+		log.Printf("[cni-net] Found master interface %v.", masterIfName)
+
 		// Add the master as an external interface.
-		err = plugin.nm.AddExternalInterface(nwCfg.Master, subnetPrefix.String())
+		err = plugin.nm.AddExternalInterface(masterIfName, subnetPrefix.String())
 		if err != nil {
 			return plugin.Errorf("Failed to add external interface: %v", err)
 		}
