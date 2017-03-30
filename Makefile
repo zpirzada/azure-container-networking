@@ -43,7 +43,11 @@ BUILD_CONTAINER_NAME = acn-builder
 BUILD_CONTAINER_REPO_PATH = /go/src/github.com/Azure/azure-container-networking
 BUILD_USER ?= $(shell id -u)
 
-# Docker plugin image parameters.
+# TAR file names.
+CNM_TAR_NAME = azure-vnet-cnm-$(GOOS)-$(GOARCH)-$(VERSION).tgz
+CNI_TAR_NAME = azure-vnet-cni-$(GOOS)-$(GOARCH)-$(VERSION).tgz
+
+# Docker libnetwork (CNM) plugin v2 image parameters.
 CNM_PLUGIN_IMAGE = ofiliz/azure-cnm-plugin
 CNM_PLUGIN_ROOTFS = azure-cnm-plugin-rootfs
 
@@ -52,10 +56,10 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 ENSURE_OUTPUT_DIR_EXISTS := $(shell mkdir -p $(OUTPUT_DIR))
 
 # Shorthand target names for convenience.
-azure-cnm-plugin: $(BUILD_DIR)/azure-cnm-plugin
+azure-cnm-plugin: $(BUILD_DIR)/azure-cnm-plugin cnm-tar
 azure-vnet: $(BUILD_DIR)/azure-vnet
 azure-vnet-ipam: $(BUILD_DIR)/azure-vnet-ipam
-azure-cni-plugin: azure-vnet azure-vnet-ipam tarball
+azure-cni-plugin: azure-vnet azure-vnet-ipam cni-tar
 all-binaries: azure-cnm-plugin azure-cni-plugin
 
 # Clean all build artifacts.
@@ -130,10 +134,17 @@ azure-cnm-plugin-image: azure-cnm-plugin
 publish-azure-cnm-plugin-image:
 	docker plugin push $(CNM_PLUGIN_IMAGE):$(VERSION)
 
-# Create a tarball for the current platform.
-.PHONY: tarball
-tarball:
-	cd $(BUILD_DIR) && \
-	chmod 0755 * && \
-	tar -czvf azure-vnet-$(VERSION).tgz --exclude=*.tgz *
-	chown -R $(BUILD_USER):$(BUILD_USER) $(BUILD_DIR)/azure-vnet-$(VERSION).tgz
+# Create a CNI tarball for the current platform.
+.PHONY: cni-tar
+cni-tar:
+	cp cni/azure.conf $(BUILD_DIR)/10-azure.conf
+	chmod 0755 $(BUILD_DIR)/azure-vnet $(BUILD_DIR)/azure-vnet-ipam
+	cd $(BUILD_DIR) && tar -czvf $(CNI_TAR_NAME) azure-vnet azure-vnet-ipam 10-azure.conf
+	chown $(BUILD_USER):$(BUILD_USER) $(BUILD_DIR)/$(CNI_TAR_NAME)
+
+# Create a CNM tarball for the current platform.
+.PHONY: cnm-tar
+cnm-tar:
+	chmod 0755 $(BUILD_DIR)/azure-cnm-plugin
+	cd $(BUILD_DIR) && tar -czvf $(CNM_TAR_NAME) azure-cnm-plugin
+	chown $(BUILD_USER):$(BUILD_USER) $(BUILD_DIR)/$(CNM_TAR_NAME)
