@@ -314,3 +314,68 @@ func SetLinkAddress(ifName string, hwAddress net.HardwareAddr) error {
 
 	return s.sendAndWaitForAck(req)
 }
+
+// SetLinkPromisc sets the promiscuous mode of a network interface.
+func SetLinkPromisc(ifName string, on bool) error {
+	s, err := getSocket()
+	if err != nil {
+		return err
+	}
+
+	iface, err := net.InterfaceByName(ifName)
+	if err != nil {
+		return err
+	}
+
+	req := newRequest(unix.RTM_SETLINK, unix.NLM_F_ACK)
+
+	ifInfo := newIfInfoMsg()
+	ifInfo.Type = unix.RTM_SETLINK
+	ifInfo.Index = int32(iface.Index)
+
+	if on {
+		ifInfo.Flags = unix.IFF_PROMISC
+		ifInfo.Change = unix.IFF_PROMISC
+	} else {
+		ifInfo.Flags = 0 & ^unix.IFF_PROMISC
+		ifInfo.Change = unix.IFF_PROMISC
+	}
+
+	req.addPayload(ifInfo)
+
+	return s.sendAndWaitForAck(req)
+}
+
+// SetLinkHairpin sets the hairpin (reflective relay) mode of a bridged interface.
+func SetLinkHairpin(bridgeName string, on bool) error {
+	s, err := getSocket()
+	if err != nil {
+		return err
+	}
+
+	iface, err := net.InterfaceByName(bridgeName)
+	if err != nil {
+		return err
+	}
+
+	req := newRequest(unix.RTM_SETLINK, unix.NLM_F_ACK)
+
+	ifInfo := newIfInfoMsg()
+	ifInfo.Family = unix.AF_BRIDGE
+	ifInfo.Type = unix.RTM_SETLINK
+	ifInfo.Index = int32(iface.Index)
+	ifInfo.Flags = unix.NLM_F_REQUEST
+	ifInfo.Change = DEFAULT_CHANGE
+	req.addPayload(ifInfo)
+
+	hairpin := []byte{0}
+	if on {
+		hairpin[0] = byte(1)
+	}
+
+	attrProtInfo := newAttribute(unix.IFLA_PROTINFO|unix.NLA_F_NESTED, nil)
+	attrProtInfo.addNested(newAttribute(IFLA_BRPORT_MODE, hairpin))
+	req.addPayload(attrProtInfo)
+
+	return s.sendAndWaitForAck(req)
+}

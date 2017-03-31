@@ -164,3 +164,71 @@ func TestSetLinkState(t *testing.T) {
 		t.Errorf("DeleteLink failed: %+v", err)
 	}
 }
+
+// TestSetLinkPromisc tests setting the promiscuous mode of a network interface.
+func TestSetLinkPromisc(t *testing.T) {
+	_, err := addDummyInterface(ifName)
+	if err != nil {
+		t.Errorf("addDummyInterface failed: %v", err)
+	}
+
+	err = SetLinkPromisc(ifName, true)
+	if err != nil {
+		t.Errorf("SetLinkPromisc on failed: %+v", err)
+	}
+
+	err = SetLinkPromisc(ifName, false)
+	if err != nil {
+		t.Errorf("SetLinkPromisc off failed: %+v", err)
+	}
+
+	err = DeleteLink(ifName)
+	if err != nil {
+		t.Errorf("DeleteLink failed: %+v", err)
+	}
+}
+
+// TestSetHairpinMode tests setting the hairpin mode of a bridged interface.
+func TestSetLinkHairpin(t *testing.T) {
+	link := BridgeLink{
+		LinkInfo: LinkInfo{
+			Type: LINK_TYPE_BRIDGE,
+			Name: ifName,
+		},
+	}
+
+	err := AddLink(&link)
+	if err != nil {
+		t.Errorf("AddLink failed: %+v", err)
+	}
+
+	_, err = addDummyInterface(ifName2)
+	if err != nil {
+		t.Errorf("addDummyInterface failed: %v", err)
+	}
+
+	err = SetLinkMaster(ifName2, ifName)
+	if err != nil {
+		t.Errorf("SetLinkMaster failed: %+v", err)
+	}
+
+	err = SetLinkHairpin(ifName2, true)
+	if err != nil {
+		t.Errorf("SetLinkHairpin on failed: %+v", err)
+	}
+
+	err = SetLinkHairpin(ifName2, false)
+	if err != nil {
+		t.Errorf("SetLinkHairpin off failed: %+v", err)
+	}
+
+	err = DeleteLink(ifName2)
+	if err != nil {
+		t.Errorf("DeleteLink failed: %+v", err)
+	}
+
+	err = DeleteLink(ifName)
+	if err != nil {
+		t.Errorf("DeleteLink failed: %+v", err)
+	}
+}

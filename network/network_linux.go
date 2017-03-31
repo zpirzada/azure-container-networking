@@ -268,6 +268,13 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 		goto cleanup
 	}
 
+	// External interface hairpin on.
+	log.Printf("[net] Setting link %v hairpin on.", hostIf.Name)
+	err = netlink.SetLinkHairpin(hostIf.Name, true)
+	if err != nil {
+		goto cleanup
+	}
+
 	// Bridge up.
 	log.Printf("[net] Setting link %v state up.", bridgeName)
 	err = netlink.SetLinkState(bridgeName, true)
