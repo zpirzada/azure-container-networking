@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7 (2017-03-31)
+- Unified CNI network config file for Linux and Windows containers.
+- Added hairpinning for Linux l2tunnel mode.
+- Added master interface discovery.
+
 ## v0.6 (2017-03-13)
 - Refactored all code to compile on both Windows and Linux.
 - Added Windows CNI network and IPAM plugins.
@@ -15,7 +20,7 @@
 
 ## v0.5 (2017-01-06)
 - Added CNI support.
-- Added Docker managed plugin support.
+- Added Docker pluginv2 support.
 - Various bug fixes.
 
 ## v0.4 (2016-09-30)
@@ -26,5 +31,5 @@
 
 ## v0.3 (2016-07-29)
 - Initial release of network and IPAM plugin.
-- Added Libnetwork CNM support.
+- Added libnetwork plugin support.
 - Added JSON store support.
