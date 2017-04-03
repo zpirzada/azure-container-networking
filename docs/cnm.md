@@ -1,15 +1,23 @@
 # Microsoft Azure Container Networking
 
-## Azure VNET CNM (libnetwork) Plugins
+## Azure VNET CNM (libnetwork) Plugin
 The `azure-vnet` libnetwork plugin implements the Docker libnetwork [network](https://github.com/docker/libnetwork/blob/master/docs/remote.md) and [IPAM](https://github.com/docker/libnetwork/blob/master/docs/ipam.md) remote plugin interfaces.
 
+The plugin is available on both Linux and Windows platforms.
+
 ## Install
-Copy the plugin package from the release share to your Azure VM, extract the contents and run in the background.
+Copy the plugin package from the [release](https://github.com/Azure/azure-container-networking/releases) share to your Azure VM, extract the contents and run the plugin in the background.
 
 ```bash
-$ curl -sSL https://github.com/Azure/azure-container-networking/releases/download/${VERSION}/azure-vnet-amd64-${VERSION}.tgz
+$ curl -sSL https://github.com/Azure/azure-container-networking/releases/download/${VERSION}/azure-vnet-cnm-linux-amd64-${VERSION}.tgz
 $ tar xzvf azure-vnet-cnm-linux-amd64-${VERSION}.tar.gz
 $ azure-cnm-plugin&
+```
+
+The `azure-vnet` plugin also requires the ebtables package when running on Linux. This step is not required on Windows.
+
+```bash
+$ apt-get install -y ebtables
 ```
 
 ## Build
