@@ -1,6 +1,6 @@
 # Microsoft Azure Container Networking
 
-## Deployment Options
+## Operational Modes
 Azure VNET plugins can be configured to operate in two modes:
 * `l2-tunnel`: This operation mode connects all containers to Azure VNET as a first-class citizen. All Azure SDN features that are available to VMs are also available to containers. This is the recommended and default option.
 
