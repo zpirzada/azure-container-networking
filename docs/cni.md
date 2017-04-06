@@ -7,7 +7,9 @@
 
 The plugins are available on both Linux and Windows platforms.
 
-The plugins are designed to work together. The IPAM plugin can also be used by 3rd party software to manage IP addresses from Azure VNET space.
+The network and IPAM plugins are designed to work together. The IPAM plugin can also be used by 3rd party software to manage IP addresses from Azure VNET space.
+
+This page describes how to setup the CNI plugins manually on Azure IaaS VMs. If you are planning to deploy an ACS cluster, see [ACS](acs.md) instead.
 
 ## Install
 Copy the plugin package from the [release](https://github.com/Azure/azure-container-networking/releases) share to your Azure VM and extract the contents to the CNI directories.
