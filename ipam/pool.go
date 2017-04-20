@@ -28,6 +28,9 @@ var (
 	defaultGatewayHostId = net.ParseIP("::1")
 	dnsPrimaryHostId     = net.ParseIP("::2")
 	dnsSecondaryHostId   = net.ParseIP("::3")
+
+	// Azure DNS host proxy well-known address.
+	dnsHostProxyAddress  = net.ParseIP("168.63.129.16")
 )
 
 // Represents the key to an address pool.
@@ -379,14 +382,10 @@ func (ap *addressPool) getInfo() *AddressPoolInfo {
 	// Generate default gateway address from subnet.
 	gateway := generateAddress(&ap.Subnet, defaultGatewayHostId)
 
-	// Generate DNS server addresses from subnet.
-	dnsPrimary := generateAddress(&ap.Subnet, dnsPrimaryHostId)
-	dnsSecondary := generateAddress(&ap.Subnet, dnsSecondaryHostId)
-
 	info := &AddressPoolInfo{
 		Subnet:     ap.Subnet,
 		Gateway:    gateway,
-		DnsServers: []net.IP{dnsPrimary, dnsSecondary},
+		DnsServers: []net.IP{dnsHostProxyAddress},
 		IsIPv6:     ap.IsIPv6,
 	}
 
