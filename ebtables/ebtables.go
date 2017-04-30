@@ -45,7 +45,7 @@ func SetSnatForInterface(interfaceName string, macAddress net.HardwareAddr, acti
 // SetArpReply sets an ARP reply rule for the given target IP address and MAC address.
 func SetArpReply(ipAddress net.IP, macAddress net.HardwareAddr, action string) error {
 	command := fmt.Sprintf(
-		"ebtables -t nat %s PREROUTING -p ARP --arp-ip-dst %s -j arpreply --arpreply-mac %s --arpreply-target DROP",
+		"ebtables -t nat %s PREROUTING -p ARP --arp-op Request --arp-ip-dst %s -j arpreply --arpreply-mac %s --arpreply-target DROP",
 		action, ipAddress, macAddress.String())
 
 	return executeShellCommand(command)
@@ -54,7 +54,7 @@ func SetArpReply(ipAddress net.IP, macAddress net.HardwareAddr, action string) e
 // SetDnatForArpReplies sets a MAC DNAT rule for ARP replies received on an interface.
 func SetDnatForArpReplies(interfaceName string, action string) error {
 	command := fmt.Sprintf(
-		"ebtables -t nat %s PREROUTING -p ARP -i %s -j dnat --to-dst ff:ff:ff:ff:ff:ff --dnat-target ACCEPT",
+		"ebtables -t nat %s PREROUTING -p ARP -i %s --arp-op Reply -j dnat --to-dst ff:ff:ff:ff:ff:ff --dnat-target ACCEPT",
 		action, interfaceName)
 
 	return executeShellCommand(command)
