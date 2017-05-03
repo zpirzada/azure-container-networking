@@ -6,6 +6,7 @@ package ipam
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"testing"
 
@@ -35,7 +36,8 @@ func TestMain(m *testing.M) {
 	var config common.PluginConfig
 
 	// Create a fake local agent to handle requests from IPAM plugin.
-	testAgent, err := common.NewListener("tcp", ipamQueryUrl)
+	u, _ := url.Parse("tcp://" + ipamQueryUrl)
+	testAgent, err := common.NewListener(u)
 	if err != nil {
 		fmt.Printf("Failed to create agent, err:%v.\n", err)
 		return
@@ -56,8 +58,8 @@ func TestMain(m *testing.M) {
 	}
 
 	// Configure test mode.
-	plugin.Name = "test"
 	plugin.SetOption(common.OptEnvironment, common.OptEnvironmentAzure)
+	plugin.SetOption(common.OptAPIServerURL, "null")
 	plugin.SetOption(common.OptIpamQueryUrl, "http://"+ipamQueryUrl)
 
 	// Start the plugin.

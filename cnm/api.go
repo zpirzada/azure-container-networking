@@ -4,9 +4,6 @@
 package cnm
 
 const (
-	// Libnetwork plugin path
-	pluginPath = "/run/docker/plugins"
-
 	// Libnetwork remote plugin paths
 	activatePath = "/Plugin.Activate"
 

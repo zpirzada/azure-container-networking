@@ -87,6 +87,13 @@ func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 	listener.AddHandler(leavePath, plugin.leave)
 	listener.AddHandler(endpointOperInfoPath, plugin.endpointOperInfo)
 
+	// Plugin is ready to be discovered.
+	err = plugin.EnableDiscovery()
+	if err != nil {
+		log.Printf("[net] Failed to enable discovery: %v.", err)
+		return err
+	}
+
 	log.Printf("[net] Plugin started.")
 
 	return nil
@@ -94,6 +101,7 @@ func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 
 // Stop stops the plugin.
 func (plugin *netPlugin) Stop() {
+	plugin.DisableDiscovery()
 	plugin.nm.Uninitialize()
 	plugin.Uninitialize()
 	log.Printf("[net] Plugin stopped.")

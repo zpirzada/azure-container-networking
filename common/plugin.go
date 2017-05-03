@@ -36,7 +36,6 @@ type IpamApi interface {
 // Plugin common configuration.
 type PluginConfig struct {
 	Version  string
-	SockName string
 	NetApi   NetApi
 	IpamApi  IpamApi
 	Listener *Listener

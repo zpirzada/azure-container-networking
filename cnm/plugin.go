@@ -4,9 +4,10 @@
 package cnm
 
 import (
+	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
-	"path"
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
@@ -19,7 +20,7 @@ type Plugin struct {
 	Listener     *common.Listener
 }
 
-// Creates a new Plugin object.
+// NewPlugin creates a new Plugin object.
 func NewPlugin(name, version, endpointType string) (*Plugin, error) {
 	// Setup base plugin.
 	plugin, err := common.NewPlugin(name, version)
@@ -33,24 +34,21 @@ func NewPlugin(name, version, endpointType string) (*Plugin, error) {
 	}, nil
 }
 
-// Initializes the plugin and starts the listener.
+// Initialize initializes the plugin and starts the listener.
 func (plugin *Plugin) Initialize(config *common.PluginConfig) error {
 	// Initialize the base plugin.
 	plugin.Plugin.Initialize(config)
 
+	// Initialize the shared listener.
 	if config.Listener == nil {
-		// Create the plugin path.
-		os.MkdirAll(pluginPath, 0660)
-
-		// Create the listener.
-		var sockName string
-		if config.SockName != "" {
-			sockName = config.SockName
-		} else if plugin.Name != "test" {
-			sockName = plugin.Name
+		// Fetch and parse the API server URL.
+		u, err := url.Parse(plugin.getAPIServerURL())
+		if err != nil {
+			return err
 		}
 
-		listener, err := common.NewListener("unix", path.Join(pluginPath, sockName))
+		// Create the listener.
+		listener, err := common.NewListener(u)
 		if err != nil {
 			return err
 		}
@@ -72,10 +70,39 @@ func (plugin *Plugin) Initialize(config *common.PluginConfig) error {
 	return nil
 }
 
-// Uninitializes the plugin.
+// Uninitialize cleans up the plugin.
 func (plugin *Plugin) Uninitialize() {
 	plugin.Listener.Stop()
 	plugin.Plugin.Uninitialize()
+}
+
+// EnableDiscovery enables Docker to discover the plugin by creating the plugin spec file.
+func (plugin *Plugin) EnableDiscovery() error {
+	// Plugins using unix domain sockets do not need a spec file.
+	if plugin.Listener.URL.Scheme == "unix" {
+		return nil
+	}
+
+	// Create the spec directory.
+	path := plugin.getSpecPath()
+	os.MkdirAll(path, 0755)
+
+	// Write the listener URL to the spec file.
+	fileName := path + plugin.Name + ".spec"
+	url := plugin.Listener.URL.String()
+	err := ioutil.WriteFile(fileName, []byte(url), 0644)
+	return err
+}
+
+// DisableDiscovery disables discovery by deleting the plugin spec file.
+func (plugin *Plugin) DisableDiscovery() {
+	// Plugins using unix domain sockets do not need a spec file.
+	if plugin.Listener.URL.Scheme == "unix" {
+		return
+	}
+
+	fileName := plugin.getSpecPath() + plugin.Name + ".spec"
+	os.Remove(fileName)
 }
 
 // ParseOptions returns generic options from a libnetwork request.
@@ -88,7 +115,7 @@ func (plugin *Plugin) ParseOptions(options OptionMap) OptionMap {
 // Libnetwork remote plugin API
 //
 
-// Handles Activate requests.
+// Activate handles Activate requests.
 func (plugin *Plugin) activate(w http.ResponseWriter, r *http.Request) {
 	var req activateRequest
 
@@ -100,7 +127,7 @@ func (plugin *Plugin) activate(w http.ResponseWriter, r *http.Request) {
 	log.Response(plugin.Name, &resp, err)
 }
 
-// Sends and logs an error response.
+// SendErrorResponse sends and logs an error response.
 func (plugin *Plugin) SendErrorResponse(w http.ResponseWriter, errMsg error) {
 	resp := errorResponse{errMsg.Error()}
 	err := plugin.Listener.Encode(w, &resp)

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/Azure/azure-container-networking/log"
@@ -15,6 +16,7 @@ import (
 
 // Listener represents an HTTP listener.
 type Listener struct {
+	URL          *url.URL
 	protocol     string
 	localAddress string
 	endpoints    []string
@@ -24,14 +26,11 @@ type Listener struct {
 }
 
 // NewListener creates a new Listener.
-func NewListener(protocol string, localAddress string) (*Listener, error) {
+func NewListener(u *url.URL) (*Listener, error) {
 	listener := Listener{
-		protocol:     protocol,
-		localAddress: localAddress,
-	}
-
-	if protocol == "unix" && localAddress != "" {
-		listener.localAddress = localAddress + ".sock"
+		URL:          u,
+		protocol:     u.Scheme,
+		localAddress: u.Host + u.Path,
 	}
 
 	listener.mux = http.NewServeMux()
@@ -44,13 +43,13 @@ func (listener *Listener) Start(errChan chan error) error {
 	var err error
 
 	// Succeed early if no socket was requested.
-	if listener.localAddress == "" {
+	if listener.localAddress == "null" {
 		return nil
 	}
 
 	listener.l, err = net.Listen(listener.protocol, listener.localAddress)
 	if err != nil {
-		log.Printf("Listener: Failed to listen %+v", err)
+		log.Printf("[Listener] Failed to listen: %+v", err)
 		return err
 	}
 

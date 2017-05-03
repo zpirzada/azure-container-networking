@@ -79,6 +79,13 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 	listener.AddHandler(requestAddressPath, plugin.requestAddress)
 	listener.AddHandler(releaseAddressPath, plugin.releaseAddress)
 
+	// Plugin is ready to be discovered.
+	err = plugin.EnableDiscovery()
+	if err != nil {
+		log.Printf("[ipam] Failed to enable discovery: %v.", err)
+		return err
+	}
+
 	log.Printf("[ipam] Plugin started.")
 
 	return nil
@@ -86,6 +93,7 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 
 // Stop stops the plugin.
 func (plugin *ipamPlugin) Stop() {
+	plugin.DisableDiscovery()
 	plugin.am.Uninitialize()
 	plugin.Uninitialize()
 	log.Printf("[ipam] Plugin stopped.")

@@ -11,6 +11,10 @@ const (
 	OptEnvironmentAzure = "azure"
 	OptEnvironmentMAS   = "mas"
 
+	// API server URL.
+	OptAPIServerURL      = "api-url"
+	OptAPIServerURLAlias = "u"
+
 	// Logging level.
 	OptLogLevel      = "log-level"
 	OptLogLevelAlias = "l"
@@ -26,7 +30,7 @@ const (
 
 	// IPAM query URL.
 	OptIpamQueryUrl      = "ipam-query-url"
-	OptIpamQueryUrlAlias = "u"
+	OptIpamQueryUrlAlias = "q"
 
 	// IPAM query interval.
 	OptIpamQueryInterval      = "ipam-query-interval"

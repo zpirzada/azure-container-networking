@@ -39,6 +39,13 @@ var args = common.ArgumentList{
 		},
 	},
 	{
+		Name:         common.OptAPIServerURL,
+		Shorthand:    common.OptAPIServerURLAlias,
+		Description:  "Set the API server URL",
+		Type:         "string",
+		DefaultValue: "",
+	},
+	{
 		Name:         common.OptLogLevel,
 		Shorthand:    common.OptLogLevelAlias,
 		Description:  "Set the logging level",
@@ -89,6 +96,7 @@ func main() {
 	common.ParseArgs(&args, printVersion)
 
 	environment := common.GetArg(common.OptEnvironment).(string)
+	url := common.GetArg(common.OptAPIServerURL).(string)
 	logLevel := common.GetArg(common.OptLogLevel).(int)
 	logTarget := common.GetArg(common.OptLogTarget).(int)
 	ipamQueryInterval, _ := common.GetArg(common.OptIpamQueryInterval).(int)
@@ -102,7 +110,6 @@ func main() {
 	// Initialize plugin common configuration.
 	var config common.PluginConfig
 	config.Version = version
-	config.SockName = name
 
 	// Create a channel to receive unhandled errors from the plugins.
 	config.ErrChan = make(chan error, 1)
@@ -142,7 +149,10 @@ func main() {
 	common.LogNetworkInterfaces()
 
 	// Set plugin options.
+	netPlugin.SetOption(common.OptAPIServerURL, url)
+
 	ipamPlugin.SetOption(common.OptEnvironment, environment)
+	ipamPlugin.SetOption(common.OptAPIServerURL, url)
 	ipamPlugin.SetOption(common.OptIpamQueryInterval, ipamQueryInterval)
 
 	// Start plugins.
