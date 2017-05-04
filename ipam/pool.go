@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 )
 
 const (
@@ -30,7 +31,7 @@ var (
 	dnsSecondaryHostId   = net.ParseIP("::3")
 
 	// Azure DNS host proxy well-known address.
-	dnsHostProxyAddress  = net.ParseIP("168.63.129.16")
+	dnsHostProxyAddress = net.ParseIP("168.63.129.16")
 )
 
 // Represents the key to an address pool.
@@ -380,7 +381,7 @@ func (as *addressSpace) releasePool(poolId string) error {
 // Returns if an address pool is currently in use.
 func (ap *addressPool) getInfo() *AddressPoolInfo {
 	// Generate default gateway address from subnet.
-	gateway := generateAddress(&ap.Subnet, defaultGatewayHostId)
+	gateway := platform.GenerateAddress(&ap.Subnet, defaultGatewayHostId)
 
 	info := &AddressPoolInfo{
 		Subnet:     ap.Subnet,

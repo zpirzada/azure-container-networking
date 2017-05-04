@@ -182,7 +182,7 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	log.Printf("[cni-ipam] Allocated address %v.", address)
 
 	// Parse IP address.
-	ipv4Address, err = ipam.ConvertAddressToIPNet(address)
+	ipv4Address, err = platform.ConvertStringToIPNet(address)
 	if err != nil {
 		err = plugin.Errorf("Failed to parse address: %v", err)
 		goto Rollback
