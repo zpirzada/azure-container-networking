@@ -158,7 +158,7 @@ func (plugin *netPlugin) createNetwork(w http.ResponseWriter, r *http.Request) {
 			subnet := network.SubnetInfo{
 				Family:  platform.GetAddressFamily(&prefix.IP),
 				Prefix:  *prefix,
-				Gateway: net.ParseIP(ipamData.Gateway),
+				Gateway: platform.ConvertStringToIPAddress(ipamData.Gateway),
 			}
 
 			nwInfo.Subnets = append(nwInfo.Subnets, subnet)
