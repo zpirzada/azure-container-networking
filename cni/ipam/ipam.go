@@ -160,7 +160,7 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	if nwCfg.Ipam.Subnet == "" {
 		// Select the requested interface.
 		options := make(map[string]string)
-		options[ipam.OptInterface] = nwCfg.Master
+		options[ipam.OptInterfaceName] = nwCfg.Master
 
 		// Allocate an address pool.
 		poolId, subnet, err = plugin.am.RequestPool(nwCfg.Ipam.AddrSpace, "", "", options, false)
