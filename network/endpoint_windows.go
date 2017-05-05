@@ -61,7 +61,7 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		SandboxKey:  epInfo.ContainerID,
 		IfName:      epInfo.IfName,
 		IPAddresses: epInfo.IPAddresses,
-		Gateways:    []net.IP{net.ParseIP(hnsEndpoint.GatewayAddress)},
+		Gateways:    []net.IP{net.ParseIP(hnsResponse.GatewayAddress)},
 	}
 
 	ep.MacAddress, _ = net.ParseMAC(hnsResponse.MacAddress)
