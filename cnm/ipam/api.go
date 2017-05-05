@@ -14,6 +14,10 @@ const (
 	releasePoolPath      = "/IpamDriver.ReleasePool"
 	requestAddressPath   = "/IpamDriver.RequestAddress"
 	releaseAddressPath   = "/IpamDriver.ReleaseAddress"
+
+	// Libnetwork IPAM plugin options
+	OptAddressType        = "RequestAddressType"
+	OptAddressTypeGateway = "com.docker.network.gateway"
 )
 
 // Request sent by libnetwork when querying plugin capabilities.

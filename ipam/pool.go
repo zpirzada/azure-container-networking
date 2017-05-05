@@ -55,6 +55,7 @@ type addressPool struct {
 	Id        string
 	IfName    string
 	Subnet    net.IPNet
+	Gateway   net.IP
 	Addresses map[string]*addressRecord
 	IsIPv6    bool
 	Priority  int
@@ -249,6 +250,7 @@ func (as *addressSpace) newAddressPool(ifName string, priority int, subnet *net.
 		Id:        id,
 		IfName:    ifName,
 		Subnet:    *subnet,
+		Gateway:   platform.GenerateAddress(subnet, defaultGatewayHostId),
 		Addresses: make(map[string]*addressRecord),
 		IsIPv6:    v6,
 		Priority:  priority,
@@ -286,7 +288,7 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 		}
 	} else {
 		// Return any available address pool.
-		ifName := options[OptInterface]
+		ifName := options[OptInterfaceName]
 
 		for _, pool := range as.Pools {
 			log.Printf("[ipam] Checking pool %v.", pool.Id)
@@ -380,12 +382,9 @@ func (as *addressSpace) releasePool(poolId string) error {
 
 // Returns if an address pool is currently in use.
 func (ap *addressPool) getInfo() *AddressPoolInfo {
-	// Generate default gateway address from subnet.
-	gateway := platform.GenerateAddress(&ap.Subnet, defaultGatewayHostId)
-
 	info := &AddressPoolInfo{
 		Subnet:     ap.Subnet,
-		Gateway:    gateway,
+		Gateway:    ap.Gateway,
 		DnsServers: []net.IP{dnsHostProxyAddress},
 		IsIPv6:     ap.IsIPv6,
 	}
@@ -434,6 +433,11 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 		if ar.InUse {
 			return "", errAddressInUse
 		}
+	} else if options[OptAddressType] == OptAddressTypeGateway {
+		// Return the pre-assigned gateway address.
+		ar = &addressRecord{
+			Addr: ap.Gateway,
+		}
 	} else {
 		// Return any available address.
 		for _, ar = range ap.Addresses {
@@ -463,8 +467,13 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 func (ap *addressPool) releaseAddress(address string) error {
 	ar := ap.Addresses[address]
 	if ar == nil {
+		// Handle pre-assigned addresses.
+		if address == ap.Gateway.String() {
+			return nil
+		}
 		return errAddressNotFound
 	}
+
 	if !ar.InUse {
 		return errAddressNotInUse
 	}

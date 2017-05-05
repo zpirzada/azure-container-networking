@@ -215,7 +215,13 @@ func (plugin *ipamPlugin) requestAddress(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	addr, err := plugin.am.RequestAddress(poolId.AsId, poolId.Subnet, req.Address, req.Options)
+	// Convert libnetwork IPAM options to core IPAM options.
+	options := make(map[string]string)
+	if req.Options[OptAddressType] == OptAddressTypeGateway {
+		options[ipam.OptAddressType] = ipam.OptAddressTypeGateway
+	}
+
+	addr, err := plugin.am.RequestAddress(poolId.AsId, poolId.Subnet, req.Address, options)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return

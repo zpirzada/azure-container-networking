@@ -26,5 +26,7 @@ var (
 	errNoAvailableAddresses    = fmt.Errorf("No available addresses")
 
 	// Options used by AddressManager.
-	OptInterface = "azure.interface"
+	OptInterfaceName      = "azure.interface.name"
+	OptAddressType        = "azure.address.type"
+	OptAddressTypeGateway = "gateway"
 )
