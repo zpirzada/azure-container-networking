@@ -1,6 +1,7 @@
-FROM golang:1.7.4
+FROM golang:1.8.1
 
 RUN go get -d golang.org/x/sys/unix
+RUN go get -d github.com/Microsoft/hcsshim
 RUN go get -d github.com/containernetworking/cni/pkg/skel
 
 COPY . /go/src/github.com/Azure/azure-container-networking
