@@ -9,7 +9,7 @@ import (
 
 // NetworkConfig represents Azure CNI plugin network configuration.
 type NetworkConfig struct {
-	CniVersion string `json:"cniVersion"`
+	CNIVersion string `json:"cniVersion"`
 	Name       string `json:"name"`
 	Type       string `json:"type"`
 	Mode       string `json:"mode"`
@@ -34,6 +34,10 @@ func ParseNetworkConfig(b []byte) (*NetworkConfig, error) {
 	err := json.Unmarshal(b, &nwCfg)
 	if err != nil {
 		return nil, err
+	}
+
+	if nwCfg.CNIVersion == "" {
+		nwCfg.CNIVersion = defaultVersion
 	}
 
 	return &nwCfg, nil

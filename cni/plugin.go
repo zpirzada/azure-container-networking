@@ -5,14 +5,17 @@ package cni
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/store"
 
+	cniInvoke "github.com/containernetworking/cni/pkg/invoke"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
+	cniTypesCurr "github.com/containernetworking/cni/pkg/types/current"
 	cniVers "github.com/containernetworking/cni/pkg/version"
 )
 
@@ -91,6 +94,46 @@ func (plugin *Plugin) Execute(api PluginApi) error {
 	if cniErr != nil {
 		cniErr.Print()
 		return cniErr
+	}
+
+	return nil
+}
+
+// DelegateAdd calls the given plugin's ADD command and returns the result.
+func (plugin *Plugin) DelegateAdd(pluginName string, nwCfg *NetworkConfig) (*cniTypesCurr.Result, error) {
+	var result *cniTypesCurr.Result
+	var err error
+
+	log.Printf("[cni] Calling plugin %v ADD nwCfg:%+v.", pluginName, nwCfg)
+	defer func() { log.Printf("[cni] Plugin %v returned result:%+v, err:%v.", pluginName, result, err) }()
+
+	os.Setenv(Cmd, CmdAdd)
+
+	res, err := cniInvoke.DelegateAdd(pluginName, nwCfg.Serialize())
+	if err != nil {
+		return nil, fmt.Errorf("Failed to delegate: %v", err)
+	}
+
+	result, err = cniTypesCurr.NewResultFromResult(res)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to convert result: %v", err)
+	}
+
+	return result, nil
+}
+
+// DelegateDel calls the given plugin's DEL command and returns the result.
+func (plugin *Plugin) DelegateDel(pluginName string, nwCfg *NetworkConfig) error {
+	var err error
+
+	log.Printf("[cni] Calling plugin %v DEL nwCfg:%+v.", pluginName, nwCfg)
+	defer func() { log.Printf("[cni] Plugin %v returned err:%v.", pluginName, err) }()
+
+	os.Setenv(Cmd, CmdDel)
+
+	err = cniInvoke.DelegateDel(pluginName, nwCfg.Serialize())
+	if err != nil {
+		return fmt.Errorf("Failed to delegate: %v", err)
 	}
 
 	return nil
