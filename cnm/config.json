@@ -9,7 +9,25 @@
 	"network": {
 		"type": "host"
 	},
+	"mounts": [
+		{
+			"name": "logs",
+			"description": "Mount /var/log to expose plugin logs to host",
+			"source": "/var/log",
+			"destination": "/var/log",
+			"type": "bind",
+			"options": ["rbind", "rw"]
+		},
+		{
+			"name": "modules",
+			"description": "Mount /lib/modules to load ebtables kernel module on demand",
+			"source": "/lib/modules",
+			"destination": "/lib/modules",
+			"type": "bind",
+			"options": ["rbind", "r"]
+		}
+	],
 	"linux": {
-		"capabilities": ["CAP_SYS_ADMIN", "CAP_NET_ADMIN"]
+		"capabilities": ["CAP_SYS_ADMIN", "CAP_NET_ADMIN", "CAP_SYS_MODULE"]
 	}
 }
