@@ -1,1 +1,1 @@
-See [scripts documentation](docs/scripts.md).
+See [scripts documentation](../docs/scripts.md).
