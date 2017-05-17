@@ -51,7 +51,6 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	err = hcsshim.HotAttachEndpoint(epInfo.ContainerID, hnsResponse.Id)
 	if err != nil {
 		log.Printf("[net] Failed to attach endpoint: %v.", err)
-		return nil, err
 	}
 
 	// Create the endpoint object.
@@ -77,4 +76,9 @@ func (nw *network) deleteEndpointImpl(ep *endpoint) error {
 	log.Printf("[net] HNSEndpointRequest DELETE response:%+v err:%v.", hnsResponse, err)
 
 	return err
+}
+
+// getInfoImpl returns information about the endpoint.
+func (ep *endpoint) getInfoImpl(epInfo *EndpointInfo) {
+	epInfo.Data["hnsid"] = ep.HnsId
 }

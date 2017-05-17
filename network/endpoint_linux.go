@@ -214,3 +214,7 @@ func (nw *network) deleteEndpointImpl(ep *endpoint) error {
 cleanup:
 	return err
 }
+
+// getInfoImpl returns information about the endpoint.
+func (ep *endpoint) getInfoImpl(epInfo *EndpointInfo) {
+}

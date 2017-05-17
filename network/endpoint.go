@@ -30,6 +30,7 @@ type EndpointInfo struct {
 	IPAddresses []net.IPNet
 	Routes      []RouteInfo
 	DNS         DNSInfo
+	Data        map[string]interface{}
 }
 
 // RouteInfo contains information about an IP route.
@@ -117,7 +118,11 @@ func (ep *endpoint) getInfo() *EndpointInfo {
 	info := &EndpointInfo{
 		Id:          ep.Id,
 		IPAddresses: ep.IPAddresses,
+		Data:        make(map[string]interface{}),
 	}
+
+	// Call the platform implementation.
+	ep.getInfoImpl(info)
 
 	return info
 }

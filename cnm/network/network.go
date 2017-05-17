@@ -340,12 +340,15 @@ func (plugin *netPlugin) endpointOperInfo(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	value := make(map[string]interface{})
-	//value["com.docker.network.endpoint.macaddress"] = macAddress
-	//value["MacAddress"] = macAddress
+	// Process request.
+	epInfo, err := plugin.nm.GetEndpointInfo(req.NetworkID, req.EndpointID)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
+	}
 
 	// Encode response.
-	resp := endpointOperInfoResponse{Value: value}
+	resp := endpointOperInfoResponse{Value: epInfo.Data}
 	err = plugin.Listener.Encode(w, &resp)
 
 	log.Response(plugin.Name, &resp, err)
