@@ -50,7 +50,7 @@ CNM_TAR_NAME = azure-vnet-cnm-$(GOOS)-$(GOARCH)-$(VERSION).tgz
 CNI_TAR_NAME = azure-vnet-cni-$(GOOS)-$(GOARCH)-$(VERSION).tgz
 
 # Docker libnetwork (CNM) plugin v2 image parameters.
-CNM_PLUGIN_IMAGE = ofiliz/azure-vnet-plugin
+CNM_PLUGIN_IMAGE ?= microsoft/azure-vnet-plugin
 CNM_PLUGIN_ROOTFS = azure-vnet-plugin-rootfs
 
 VERSION ?= $(shell git describe --tags --always --dirty)
