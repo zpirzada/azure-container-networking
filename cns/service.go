@@ -9,6 +9,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/store"
 )
 
 const (
@@ -25,8 +26,8 @@ type Service struct {
 }
 
 // NewService creates a new Service object.
-func NewService(name, version string) (*Service, error) {	
-	service, err := common.NewService(name, version)
+func NewService(name, version string, store store.KeyValueStore) (*Service, error) {	
+	service, err := common.NewService(name, version, store)
 
 	if err != nil {
 		return nil, err

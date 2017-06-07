@@ -63,6 +63,30 @@ func createNetwork() error{
 	return nil
 }
 
+func deleteNetwork() error{	
+	netRequest := cns.DeleteNetworkRequest{NetworkName:"azurenet"}
+    netRequestJSON := new(bytes.Buffer)
+    json.NewEncoder(netRequestJSON).Encode(netRequest)
+    res, err := 
+	http.Post(
+		defaultCNSServerURL+cns.DeleteNetworkPath, 
+		"application/json; charset=utf-8", 
+		netRequestJSON)
+	if err != nil {
+		fmt.Printf("Error received in DeleteNetwork post: %v ", err.Error())
+		return err
+	}    
+	
+	var deleteNetworkResponse cns.Response
+	err = json.NewDecoder(res.Body).Decode(&deleteNetworkResponse)
+	if err != nil{
+		fmt.Printf("Error received in decoding response from DeleteNetwork: %v ", err.Error())
+		return err
+	}
+	fmt.Printf("Response for DeleteNetwork: %+v\n", deleteNetworkResponse)
+	return nil
+}
+
 func reserveIPAddress() error{	
 	reserveIPRequest := cns.ReserveIPAddressRequest{ReservationID:"ip01"}
     reserveIPRequestJSON := new(bytes.Buffer)
@@ -214,6 +238,7 @@ func getAllIPAddresses() error{
 func main() {
 	setEnvironment()
 	createNetwork()
+	deleteNetwork()
 	reserveIPAddress()
 	releaseIPAddress()
 	getAvailableIPAddresses()
