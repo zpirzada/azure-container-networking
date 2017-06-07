@@ -92,7 +92,15 @@ func main() {
 	config.Name = name
 
 	// Create a channel to receive unhandled errors from CNS.
-	config.ErrChan = make(chan error, 1)
+	config.ErrChan = make(chan error, 1)	
+
+	// Create the key value store.
+	var err error
+	config.Store, err = store.NewJsonFileStore(platform.RuntimePath + name + ".json")
+	if err != nil {
+		fmt.Printf("Failed to create store: %v\n", err)
+		return
+	}
 
 	// Create CNS object.
 	httpRestService, err := restserver.NewHTTPRestService(&config)
@@ -101,12 +109,6 @@ func main() {
 		return
 	}
 
-	// Create the key value store.
-	config.Store, err = store.NewJsonFileStore(platform.RuntimePath + name + ".json")
-	if err != nil {
-		fmt.Printf("Failed to create store: %v\n", err)
-		return
-	}
 
 	// Create logging provider.
 	log.SetName(name)
@@ -119,7 +121,7 @@ func main() {
 
 	// Log platform information.
 	log.Printf("Running on %v", platform.GetOSInfo())
-		
+
 	// Set CNS options.
 	httpRestService.SetOption(common.OptAPIServerURL, url)
 

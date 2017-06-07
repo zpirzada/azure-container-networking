@@ -79,7 +79,7 @@ func TestCreateNetwork(t *testing.T) {
 
 	json.NewEncoder(&body).Encode(info)
 
-	req, err := http.NewRequest(http.MethodGet, cns.CreateNetworkPath, &body)
+	req, err := http.NewRequest(http.MethodPost, cns.CreateNetworkPath, &body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,6 +93,36 @@ func TestCreateNetwork(t *testing.T) {
 		t.Errorf("CreateNetwork response is invalid %+v", resp)
 	} else {
 		fmt.Printf ("CreateNetwork Responded with %+v\n", resp);
+	}
+}
+
+// Tests CreateNetwork functionality.
+func TestDeleteNetwork(t *testing.T) {
+	fmt.Println("Test: DeleteNetwork")
+
+	var body bytes.Buffer
+	var resp cns.Response
+
+	info := &cns.DeleteNetworkRequest{
+		NetworkName: "azurenet",
+	}
+
+	json.NewEncoder(&body).Encode(info)
+
+	req, err := http.NewRequest(http.MethodPost, cns.DeleteNetworkPath, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil || resp.ReturnCode != 0 {
+		t.Errorf("DeleteNetwork response is invalid %+v", resp)
+	} else {
+		fmt.Printf ("DeleteNetwork Responded with %+v\n", resp);
 	}
 }
 
