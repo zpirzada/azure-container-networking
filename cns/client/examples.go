@@ -238,7 +238,7 @@ func getAllIPAddresses() error{
 func main() {
 	setEnvironment()
 	createNetwork()
-	/*deleteNetwork()
+	deleteNetwork()
 	reserveIPAddress()
 	releaseIPAddress()
 	getAvailableIPAddresses()
@@ -246,5 +246,5 @@ func main() {
 	getGhostIPAddresses()
 	getAllIPAddresses()
 	getIPAddressUtilization()
-	getHostLocalIP()*/
+	getHostLocalIP()
 }

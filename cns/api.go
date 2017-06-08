@@ -19,7 +19,7 @@ const (
 	GetHealthReportPath         = "/Network/Health"
 )
 
-// SetEnvironmentRequest describes the Request to set the environment in HNS. 
+// SetEnvironmentRequest describes the Request to set the environment in CNS.
 type SetEnvironmentRequest struct {
 	Location string
 	NetworkType string

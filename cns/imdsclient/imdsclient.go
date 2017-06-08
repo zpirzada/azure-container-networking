@@ -30,12 +30,14 @@ func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo,
 		return nil, err
 	}
 	
-	foundInterface := false
+	foundPrimaryInterface := false
 
 	// For each interface.
 	for _, i := range doc.Interface {		
 		// Find primary Interface.
 		if i.IsPrimary {
+			interfaceInfo.IsPrimary = true
+
 			// Get the first subnet.
 			for _, s := range i.IPSubnet {
 				interfaceInfo.Subnet = s.Prefix				
@@ -52,16 +54,29 @@ func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo,
 				}
 
 				interfaceInfo.Gateway = fmt.Sprintf("%s.%s.%s.1", ip[0], ip[1], ip[2])
-				foundInterface = true
+				for _,ip := range s.IPAddress {
+					if ip.IsPrimary == true {
+						interfaceInfo.PrimaryIP = ip.Address						
+					}
+				}
+				imdsClient.primaryInterface = interfaceInfo
 				break;
 			}
+						
+			foundPrimaryInterface = true
 			break;
 		}
 	}	
 	var er error
 	er = nil
-	if (!foundInterface) {
+	if (!foundPrimaryInterface) {
 		er = fmt.Errorf("Unable to find primary NIC")
-	}
+	} 
 	return interfaceInfo, er 
+}
+
+// GetPrimaryInterfaceInfoFromMemory retrieves subnet and gateway of primary NIC that is saved in memory.
+func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromMemory() (*InterfaceInfo, error) {		
+	log.Printf("[Azure CNS] GetPrimaryInterfaceInfoFromMemory")
+	return imdsClient.primaryInterface, nil	
 }

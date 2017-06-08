@@ -33,10 +33,10 @@ func NewDockerClient(url string) (*DockerClient, error) {
 }
 
 // NewDefaultDockerClient create a new docker client.
-func NewDefaultDockerClient() (*DockerClient, error) {
+func NewDefaultDockerClient(imdsClient *imdsclient.ImdsClient) (*DockerClient, error) {
 	return &DockerClient{
 		connectionURL: defaultDockerConnectionURL,
-		imdsClient:    &imdsclient.ImdsClient{},
+		imdsClient:    imdsClient,
 	}, nil
 }
 
@@ -77,7 +77,7 @@ func (dockerClient *DockerClient) CreateNetwork(networkName string) error {
 	if err != nil {
 		return err
 	}
-
+	
 	config := &Config{
 		Subnet:  primaryNic.Subnet,
 	}

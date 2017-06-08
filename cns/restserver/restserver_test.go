@@ -90,7 +90,7 @@ func TestCreateNetwork(t *testing.T) {
 	err = decodeResponse(w, &resp)
 
 	if err != nil || resp.ReturnCode != 0 {
-		t.Errorf("CreateNetwork response is invalid %+v", resp)
+		t.Errorf("CreateNetwork failed with response %+v", resp)
 	} else {
 		fmt.Printf ("CreateNetwork Responded with %+v\n", resp);
 	}
@@ -120,7 +120,7 @@ func TestDeleteNetwork(t *testing.T) {
 	err = decodeResponse(w, &resp)
 
 	if err != nil || resp.ReturnCode != 0 {
-		t.Errorf("DeleteNetwork response is invalid %+v", resp)
+		t.Errorf("DeleteNetwork failed with response %+v", resp)
 	} else {
 		fmt.Printf ("DeleteNetwork Responded with %+v\n", resp);
 	}
@@ -145,7 +145,7 @@ func TestSetEnvironment(t *testing.T) {
 	err = decodeResponse(w, &resp)
 
 	if err != nil || resp.ReturnCode != 0 {
-		t.Errorf("SetEnvironment response is invalid %+v", resp)
+		t.Errorf("SetEnvironment failed with response %+v", resp)
 	} else {
 		fmt.Printf ("SetEnvironment Responded with %+v\n", resp);
 	}
@@ -162,7 +162,7 @@ func TestReserveIPAddress(t *testing.T){
 	envRequestJSON := new(bytes.Buffer)
     json.NewEncoder(envRequestJSON).Encode(envRequest)
 
-	req, err := http.NewRequest(http.MethodGet, cns.SetEnvironmentPath, envRequestJSON)
+	req, err := http.NewRequest(http.MethodGet, cns.ReserveIPAddressPath, envRequestJSON)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestReserveIPAddress(t *testing.T){
 	err = decodeResponse(w, &reserveIPAddressResponse)
 
 	if err != nil || reserveIPAddressResponse.Response.ReturnCode != 0 {
-		t.Errorf("SetEnvironment response is invalid %+v", reserveIPAddressResponse)
+		t.Errorf("SetEnvironment failed with response %+v", reserveIPAddressResponse)
 	} else {
 		fmt.Printf ("SetEnvironment Responded with %+v\n", reserveIPAddressResponse);
 	}
@@ -198,7 +198,7 @@ func TestReleaseIPAddress(t *testing.T){
 	err = decodeResponse(w, &releaseIPAddressResponse)
 
 	if err != nil || releaseIPAddressResponse.ReturnCode != 0 {
-		t.Errorf("SetEnvironment response is invalid %+v", releaseIPAddressResponse)
+		t.Errorf("SetEnvironment failed with response %+v", releaseIPAddressResponse)
 	} else {
 		fmt.Printf ("SetEnvironment Responded with %+v\n", releaseIPAddressResponse);
 	}
@@ -217,7 +217,7 @@ func TestGetIPAddressUtilization(t *testing.T){
 	err = decodeResponse(w, &iPAddressesUtilizationResponse)
 
 	if err != nil || iPAddressesUtilizationResponse.Response.ReturnCode != 0 {
-		t.Errorf("GetIPAddressUtilization response is invalid %+v", iPAddressesUtilizationResponse)
+		t.Errorf("GetIPAddressUtilization failed with response %+v", iPAddressesUtilizationResponse)
 	} else {
 		fmt.Printf ("GetIPAddressUtilization Responded with %+v\n", iPAddressesUtilizationResponse);
 	}
@@ -236,7 +236,7 @@ func TestGetHostLocalIP(t *testing.T){
 	err = decodeResponse(w, &hostLocalIPAddressResponse)
 
 	if err != nil || hostLocalIPAddressResponse.Response.ReturnCode != 0 {
-		t.Errorf("GetHostLocalIP response is invalid %+v", hostLocalIPAddressResponse)
+		t.Errorf("GetHostLocalIP failed with response %+v", hostLocalIPAddressResponse)
 	} else {
 		fmt.Printf ("GetHostLocalIP Responded with %+v\n", hostLocalIPAddressResponse);
 	}
@@ -255,7 +255,7 @@ func TestGetAvailableIPAddresses(t *testing.T){
 	err = decodeResponse(w, &getIPAddressesResponse)
 
 	if err != nil || getIPAddressesResponse.Response.ReturnCode != 0 {
-		t.Errorf("GetAvailableIPAddresses response is invalid %+v", getIPAddressesResponse)
+		t.Errorf("GetAvailableIPAddresses failed with response %+v", getIPAddressesResponse)
 	} else {
 		fmt.Printf ("GetAvailableIPAddresses Responded with %+v\n", getIPAddressesResponse);
 	}
@@ -274,7 +274,7 @@ func TestGetReservedIPAddresses(t *testing.T){
 	err = decodeResponse(w, &getIPAddressesResponse)
 
 	if err != nil || getIPAddressesResponse.Response.ReturnCode != 0 {
-		t.Errorf("GetReservedIPAddresses response is invalid %+v", getIPAddressesResponse)
+		t.Errorf("GetReservedIPAddresses failed with response %+v", getIPAddressesResponse)
 	} else {
 		fmt.Printf ("GetReservedIPAddresses Responded with %+v\n", getIPAddressesResponse);
 	}
@@ -293,7 +293,7 @@ func TestGetGhostIPAddresses(t *testing.T){
 	err = decodeResponse(w, &getIPAddressesResponse)
 
 	if err != nil || getIPAddressesResponse.Response.ReturnCode != 0 {
-		t.Errorf("GetGhostIPAddresses response is invalid %+v", getIPAddressesResponse)
+		t.Errorf("GetGhostIPAddresses failed with response %+v", getIPAddressesResponse)
 	} else {
 		fmt.Printf ("GetGhostIPAddresses Responded with %+v\n", getIPAddressesResponse);
 	}
@@ -312,7 +312,7 @@ func TestGetAllIPAddresses(t *testing.T){
 	err = decodeResponse(w, &getIPAddressesResponse)
 
 	if err != nil || getIPAddressesResponse.Response.ReturnCode != 0 {
-		t.Errorf("GetAllIPAddresses response is invalid %+v", getIPAddressesResponse)
+		t.Errorf("GetAllIPAddresses failed with response %+v", getIPAddressesResponse)
 	} else {
 		fmt.Printf ("GetAllIPAddresses Responded with %+v\n", getIPAddressesResponse);
 	}
