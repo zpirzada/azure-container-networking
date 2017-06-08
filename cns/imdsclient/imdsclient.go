@@ -78,5 +78,18 @@ func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo,
 // GetPrimaryInterfaceInfoFromMemory retrieves subnet and gateway of primary NIC that is saved in memory.
 func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromMemory() (*InterfaceInfo, error) {		
 	log.Printf("[Azure CNS] GetPrimaryInterfaceInfoFromMemory")
-	return imdsClient.primaryInterface, nil	
+	var iface *InterfaceInfo
+	var err error
+	if(imdsClient.primaryInterface == nil) {
+		log.Debugf("Azure-CNS] Primary interface in memory does not exist. Will get it from Host.")
+		iface, err = imdsClient.GetPrimaryInterfaceInfoFromHost()		
+		if err != nil {
+			log.Printf("[Azure-CNS] Unable to retrive primary interface info.")
+		 } else {
+			 log.Debugf("Azure-CNS] Primary interface received from HOST: %+v.", iface)
+		 }
+	} else {
+		iface = imdsClient.primaryInterface
+	}
+	return iface, err
 }
