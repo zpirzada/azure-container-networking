@@ -441,8 +441,11 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 			return "", err
 		}
 		if ar.InUse {
-			err = errAddressInUse
-			return "", err
+			// Return the same address if IDs match.
+			if id == "" || id != ar.ID {
+				err = errAddressInUse
+				return "", err
+			}
 		}
 	} else if options[OptAddressType] == OptAddressTypeGateway {
 		// Return the pre-assigned gateway address.
@@ -455,8 +458,8 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 		ar = ap.addrsByID[id]
 	}
 
+	// If no address was found, return any available address.
 	if ar == nil {
-		// Return any available address.
 		for _, ar = range ap.Addresses {
 			if !ar.InUse {
 				break
