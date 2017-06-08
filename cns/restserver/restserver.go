@@ -4,6 +4,7 @@
 package restserver
 
 import (
+	"fmt"
 	"time"
 	"net/http"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/store"
-	"fmt"
 )
 
 const (
@@ -28,10 +28,11 @@ type httpRestService struct {
 	state httpRestServiceState	
 }
 
-// httpRestServiceState contrains the state we would like to persist
+// httpRestServiceState contains the state we would like to persist.
 type httpRestServiceState struct {
-	Location 	string
-	NetworkType	string	
+	Location	string
+	NetworkType	string
+	Initialized	bool
 	TimeStamp	time.Time	
 }
 
@@ -107,7 +108,8 @@ func (service *httpRestService) setEnvironment(w http.ResponseWriter, r *http.Re
 	case "POST":
 		log.Printf("[Azure CNS]  POST received for SetEnvironment.")
 		service.state.Location = req.Location
-		service.state.NetworkType = req.NetworkType		
+		service.state.NetworkType = req.NetworkType	
+		service.state.Initialized = true
 		service.saveState()
 	default:
 	}
@@ -120,40 +122,65 @@ func (service *httpRestService) setEnvironment(w http.ResponseWriter, r *http.Re
 // Handles CreateNetwork requests.
 func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] createNetwork")
-	var req cns.CreateNetworkRequest
+	var err error
 	returnCode := 0
 	returnMessage := ""
-	err := service.Listener.Decode(w, r, &req)
-	log.Request(service.Name, &req, err)
-	if err != nil {
-		return
-	}
-	switch r.Method {
-		case "POST":
-			dc := service.dockerClient
-			err := dc.NetworkExists(req.NetworkName)
-			
-			// Network does not exist
-			if(err != nil) {
-				log.Printf("[Azure CNS] Goign to create network with name %v", req.NetworkName)
-				err := dc.CreateNetwork(req.NetworkName)
-				if(err != nil) {
-					returnMessage = fmt.Sprintf("[Azure CNS] Error. CreateNetwork failed %v.", err.Error())
-					returnCode = UnexpectedError
-				}
-			} else {
-				log.Printf("[Azure CNS] Received a request to create an already existing network %v", req.NetworkName)
-			}
-			
-		default:
-			returnMessage = "[Azure CNS] Error. CreateNetwork did not receive a POST."			
+
+	if(service.state.Initialized) {		
+
+		var req cns.CreateNetworkRequest		
+		err = service.Listener.Decode(w, r, &req)
+		log.Request(service.Name, &req, err)
+		
+		if err != nil {
+			returnMessage = fmt.Sprintf("[Azure CNS] Error. Unable to decode input request.")
 			returnCode = InvalidParameter
+		} else {
+			switch r.Method {
+				case "POST":
+					dc := service.dockerClient
+					err = dc.NetworkExists(req.NetworkName)
+					
+					// Network does not exist.
+					if(err != nil) {
+						switch service.state.NetworkType {
+							case "Underlay":
+								switch service.state.Location {
+									case "Azure":
+										log.Printf("[Azure CNS] Goign to create network with name %v.", req.NetworkName)
+										err = dc.CreateNetwork(req.NetworkName)
+										if(err != nil) {
+											returnMessage = fmt.Sprintf("[Azure CNS] Error. CreateNetwork failed %v.", err.Error())
+											returnCode = UnexpectedError
+										}
+									case "StandAlone":
+										returnMessage = fmt.Sprintf("[Azure CNS] Error. Underlay network is not supported in StandAlone environment. %v.", err.Error())
+										returnCode = UnsupportedEnvironment
+								}
+							case "Overlay":
+								returnMessage = fmt.Sprintf("[Azure CNS] Error. Overlay support not yet available. %v.", err.Error())
+								returnCode = UnsupportedEnvironment
+						}
+					} else {
+						log.Printf("[Azure CNS] Received a request to create an already existing network %v", req.NetworkName)
+					}
+					
+				default:
+					returnMessage = "[Azure CNS] Error. CreateNetwork did not receive a POST."			
+					returnCode = InvalidParameter
+			}
+		}		
+
+	} else {
+		returnMessage = fmt.Sprintf("[Azure CNS] Error. CNS is not yet initialized with environment.")
+		returnCode = UnsupportedEnvironment
 	}
 
 	resp := &cns.Response{
 		ReturnCode: returnCode, 
 		Message: returnMessage,
 	}
+
 	err = service.Listener.Encode(w, &resp)
 	log.Response(service.Name, resp, err)
 }
@@ -176,14 +203,14 @@ func (service *httpRestService) deleteNetwork(w http.ResponseWriter, r *http.Req
 			
 			// Network does exist
 			if(err == nil) {
-				log.Printf("[Azure CNS] Goign to delete network with name %v", req.NetworkName)
+				log.Printf("[Azure CNS] Goign to delete network with name %v.", req.NetworkName)
 				err := dc.DeleteNetwork(req.NetworkName)
 				if(err != nil) {
 					returnMessage = fmt.Sprintf("[Azure CNS] Error. DeleteNetwork failed %v.", err.Error())
 					returnCode = UnexpectedError
 				}
 			} else {
-				log.Printf("[Azure CNS] Received a request to delete network that does not exist: %v", req.NetworkName)
+				log.Printf("[Azure CNS] Received a request to delete network that does not exist: %v.", req.NetworkName)
 			}
 			
 		default:

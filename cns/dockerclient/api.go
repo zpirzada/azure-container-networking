@@ -7,30 +7,30 @@ import (
 )
 
 const (
-	createNetworkPath	= "/Networks/Create"
-	inspectNetworkPath	= "/Networks/"
+	createNetworkPath	= "/networks/create"
+	inspectNetworkPath	= "/networks/"
 )
 
-// Config describes subnet/gateway for ipam
+// Config describes subnet/gateway for ipam.
 type Config struct {
 	Subnet string
-	Gateway string
 }
 
 // IPAM describes ipam details
 type IPAM struct {
 	Driver string
-  Config *Config 
-	Options map[string] string
+    Config []Config 
 }
 
-// NetworkConfiguration describes configuration for docker entwork create
-type NetworkConfiguration struct
-{
+// NetworkConfiguration describes configuration for docker network create.
+type NetworkConfiguration struct {
   Name string
   Driver string
-  IPAM *IPAM
+  IPAM IPAM
   Internal bool
-  Options map[string]string
-  Labels map[string]string
+}
+
+// DockerErrorResponse defines the error response retunred by docker.
+type DockerErrorResponse struct {
+	message string
 }

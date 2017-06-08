@@ -11,12 +11,12 @@ const (
 	hostQueryURL = "http://169.254.169.254/machine/plugins?comp=nmagent&type=getinterfaceinfov1"
 )
 
-// ImdsClient cna be used to connect to VM Host agent in Azure
+// ImdsClient cna be used to connect to VM Host agent in Azure.
 type ImdsClient struct {
 	primaryInterface *InterfaceInfo
 }
 
-// InterfaceInfo specifies the information about an interface as retunred by Host Agent
+// InterfaceInfo specifies the information about an interface as returned by Host Agent.
 type InterfaceInfo struct {
 	Subnet string
 	Gateway string

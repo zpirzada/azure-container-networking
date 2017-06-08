@@ -12,7 +12,7 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 )
 
-// GetPrimaryInterfaceInfoFromHost retrieves subnet and gateway of primary NIC from Host
+// GetPrimaryInterfaceInfoFromHost retrieves subnet and gateway of primary NIC from Host.
 func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo, error) {	
 	log.Printf("[Azure CNS] GetPrimaryInterfaceInfoFromHost")
 	interfaceInfo := &InterfaceInfo{}
@@ -32,11 +32,11 @@ func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo,
 	
 	foundInterface := false
 
-	// For each interface...
+	// For each interface.
 	for _, i := range doc.Interface {		
-		// Find primary Interface
+		// Find primary Interface.
 		if i.IsPrimary {
-			// Get the first subnet
+			// Get the first subnet.
 			for _, s := range i.IPSubnet {
 				interfaceInfo.Subnet = s.Prefix				
 				malformedSubnetError := fmt.Errorf("Malformed subnet received from host %s", s.Prefix)

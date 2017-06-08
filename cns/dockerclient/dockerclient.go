@@ -15,16 +15,16 @@ import (
 
 const (
 	defaultDockerConnectionURL = "http://127.0.0.1:2375"
-	defaultIpamPlugin          = "azure-vnet-ipam"
+	defaultIpamPlugin          = "azure-vnet"
 )
 
-// DockerClient specifies a client to connect to docker
+// DockerClient specifies a client to connect to docker.
 type DockerClient struct {
 	connectionURL string
 	imdsClient    *imdsclient.ImdsClient
 }
 
-// NewDockerClient create a new docker client
+// NewDockerClient create a new docker client.
 func NewDockerClient(url string) (*DockerClient, error) {
 	return &DockerClient{
 		connectionURL: url,
@@ -32,7 +32,7 @@ func NewDockerClient(url string) (*DockerClient, error) {
 	}, nil
 }
 
-// NewDefaultDockerClient create a new docker client
+// NewDefaultDockerClient create a new docker client.
 func NewDefaultDockerClient() (*DockerClient, error) {
 	return &DockerClient{
 		connectionURL: defaultDockerConnectionURL,
@@ -40,7 +40,7 @@ func NewDefaultDockerClient() (*DockerClient, error) {
 	}, nil
 }
 
-// NetworkExists tries to retrieve a network from docker (if it exists)
+// NetworkExists tries to retrieve a network from docker (if it exists).
 func (dockerClient *DockerClient) NetworkExists(networkName string) error {
 	log.Printf("[Azure CNS] NetworkExists")
 
@@ -56,18 +56,20 @@ func (dockerClient *DockerClient) NetworkExists(networkName string) error {
 
 	// network exists
 	if res.StatusCode == 200 {
+		log.Debugf("[Azure CNS] Network with name %v already exists. Docker return code: %v", networkName, res.StatusCode)
 		return nil
 	}
 
 	// network not found
 	if res.StatusCode == 404 {
+		log.Debugf("[Azure CNS] Network with name %v does not exist. Docker return code: %v", networkName, res.StatusCode)
 		return fmt.Errorf("Network not found")
 	}
 
 	return fmt.Errorf("Unknown return code from docker inspect %d", res.StatusCode)
 }
 
-// CreateNetwork creates a network using docker network create
+// CreateNetwork creates a network using docker network create.
 func (dockerClient *DockerClient) CreateNetwork(networkName string) error {
 	log.Printf("[Azure CNS] CreateNetwork")
 
@@ -78,16 +80,17 @@ func (dockerClient *DockerClient) CreateNetwork(networkName string) error {
 
 	config := &Config{
 		Subnet:  primaryNic.Subnet,
-		Gateway: primaryNic.Gateway,
 	}
+	configs := make([]Config, 1)
+	configs[0] = *config	
 	ipamConfig := &IPAM{
 		Driver: defaultIpamPlugin,
-		Config: config,
+		Config: configs,
 	}
 	netConfig := &NetworkConfiguration{
 		Name:     networkName,
 		Driver:   defaultNetworkPlugin,
-		IPAM:     ipamConfig,
+		IPAM:     *ipamConfig,
 		Internal: true,
 	}
 	
@@ -108,14 +111,22 @@ func (dockerClient *DockerClient) CreateNetwork(networkName string) error {
 		log.Printf("[Azure CNS] Error received from http Post for docker network create %v", networkName)
 		return err
 	}
-	if res.StatusCode != 200 {
-		return fmt.Errorf("[Azure CNS] Create docker network failed with error code %v", res.StatusCode)
+	if res.StatusCode != 201 {
+		var createNetworkResponse DockerErrorResponse
+		err = json.NewDecoder(res.Body).Decode(&createNetworkResponse)
+		var ermsg string
+		ermsg = ""
+		if(err != nil){
+			ermsg = err.Error()
+		}
+		return fmt.Errorf("[Azure CNS] Create docker network failed with error code %v - %v - %v", res.StatusCode, createNetworkResponse.message, ermsg)
+
 	}
 
 	return nil
 }
 
-// DeleteNetwork creates a network using docker network create
+// DeleteNetwork creates a network using docker network create.
 func (dockerClient *DockerClient) DeleteNetwork(networkName string) error {
 	log.Printf("[Azure CNS] DeleteNetwork")	
 
@@ -132,12 +143,12 @@ func (dockerClient *DockerClient) DeleteNetwork(networkName string) error {
 	client := &http.Client{}
 	res, err := client.Do(req)
 
-	// network successfully deleted
+	// network successfully deleted.
 	if res.StatusCode == 204 {
 		return nil
 	}
 
-	// network not found
+	// network not found.
 	if res.StatusCode == 404 {
 		return fmt.Errorf("[Azure CNS] Network not found %v", networkName)
 	}
