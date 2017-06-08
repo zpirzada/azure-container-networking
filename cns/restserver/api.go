@@ -3,7 +3,7 @@
 
 package restserver
 
-// Container Network Service remote API Contract
+// Container Network Service remote API Contract.
 const (	
 	Success = 0
 	UnsupportedNetworkType = 1
