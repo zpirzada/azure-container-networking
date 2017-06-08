@@ -10,6 +10,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/dockerclient"
+	"github.com/Azure/azure-container-networking/cns/imdsclient"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/store"
@@ -24,6 +25,7 @@ const (
 type httpRestService struct {
 	*cns.Service
 	dockerClient *dockerclient.DockerClient
+	imdsClient   *imdsclient.ImdsClient
 	store store.KeyValueStore
 	state httpRestServiceState	
 }
@@ -47,8 +49,8 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	dc, err := dockerclient.NewDefaultDockerClient()
+	imdsClient := &imdsclient.ImdsClient{}
+	dc, err := dockerclient.NewDefaultDockerClient(imdsClient)
 	if(err != nil){
 		return nil, err
 	}
@@ -57,6 +59,7 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 		Service: service,
 		store: service.Service.Store,
 		dockerClient: dc,
+		imdsClient: imdsClient,
 	}, nil
 }
 
@@ -78,11 +81,13 @@ func (service *httpRestService) Start(config *common.ServiceConfig) error {
 	listener.AddHandler(cns.ReleaseIPAddressPath, service.releaseIPAddress)
 	listener.AddHandler(cns.GetHostLocalIPPath, service.getHostLocalIP)
 	listener.AddHandler(cns.GetIPAddressUtilizationPath, service.getIPAddressUtilization)
-	listener.AddHandler(cns.GetAvailableIPAddressesPath, service.getAvailableIPAddresses)
-	listener.AddHandler(cns.GetReservedIPAddressesPath, service.getReservedIPAddresses)
 	listener.AddHandler(cns.GetGhostIPAddressesPath, service.getGhostIPAddresses)
-	listener.AddHandler(cns.GetAllIPAddressesPath, service.getAllIPAddresses)
-	listener.AddHandler(cns.GetHealthReportPath, service.getHealthReport)
+
+	// Below APIs are not handled in this iteration.
+	// listener.AddHandler(cns.GetAvailableIPAddressesPath, service.getAvailableIPAddresses)
+	// listener.AddHandler(cns.GetReservedIPAddressesPath, service.getReservedIPAddresses)
+	// listener.AddHandler(cns.GetAllIPAddressesPath, service.getAllIPAddresses)
+	// listener.AddHandler(cns.GetHealthReportPath, service.getHealthReport)
 
 	log.Printf("[Azure CNS]  Listening.")
 	return nil
@@ -267,18 +272,42 @@ func (service *httpRestService) releaseIPAddress(w http.ResponseWriter, r *http.
 	log.Response(service.Name, resp, err)
 }
 
-// Retrieves the host local ip address.
+// Retrieves the host local ip address. Containers can talk to host using this IP address.
 func (service *httpRestService) getHostLocalIP(w http.ResponseWriter, r *http.Request) {
+	var found bool
+	var errmsg string
 	log.Printf("[Azure CNS] getHostLocalIP")
-	log.Request(service.Name, "getHostLocalIP", nil)	
+	log.Request(service.Name, "getHostLocalIP", nil)		
+	hostLocalIP := "0.0.0.0"		
 	switch r.Method {
 		case "GET":
+			switch (service.state.NetworkType) {
+				case "Underlay":
+					if (service.imdsClient != nil) {
+						piface, err := service.imdsClient.GetPrimaryInterfaceInfoFromMemory()
+						if err != nil {
+							hostLocalIP = piface.PrimaryIP
+							found = true;
+						} else {
+							log.Printf("[Azure-CNS] Received error from GetPrimaryInterfaceInfoFromMemory. err: %v", err.Error())
+						}
+					}
+				case "Overlay":	
+					errmsg = "[Azure-CNS] Overlay is not yet supported."
+			}
 		default:
+			errmsg = "[Azure-CNS] GetHostLocalIP API expects a GET."
 	}
-	resp := cns.Response{ReturnCode: 0}
+
+	returnCode := 0
+	if !found {
+		returnCode = NotFound
+	}
+
+	resp := cns.Response{ReturnCode: returnCode, Message: errmsg}
 	hostLocalIPResponse := &cns.HostLocalIPAddressResponse{
 		Response:  resp,
-		IPAddress: "0.0.0.0",
+		IPAddress: hostLocalIP,
 	}
 	err := service.Listener.Encode(w, &hostLocalIPResponse)
 	log.Response(service.Name, hostLocalIPResponse, err)

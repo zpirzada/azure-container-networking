@@ -14,5 +14,6 @@ const (
 	MalformedSubnet = 8
 	UnreachableDockerDaemon = 9
 	UnspecifiedNetworkName = 10
+	NotFound = 14
 	UnexpectedError = 99	
 )
