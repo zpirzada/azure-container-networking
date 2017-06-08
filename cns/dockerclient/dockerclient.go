@@ -44,10 +44,8 @@ func NewDefaultDockerClient(imdsClient *imdsclient.ImdsClient) (*DockerClient, e
 func (dockerClient *DockerClient) NetworkExists(networkName string) error {
 	log.Printf("[Azure CNS] NetworkExists")
 
-	res, err := http.Post(
-		dockerClient.connectionURL+inspectNetworkPath+networkName,
-		"application/json; charset=utf-8",
-		nil)
+	res, err := http.Get(
+		dockerClient.connectionURL+inspectNetworkPath+networkName)
 
 	if err != nil {
 		log.Printf("[Azure CNS] Error received from http Post for docker network inspect %v %v", networkName, err.Error())

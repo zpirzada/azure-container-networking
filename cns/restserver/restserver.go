@@ -54,7 +54,7 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 	if(err != nil){
 		return nil, err
 	}
-
+	
 	return &httpRestService{
 		Service: service,
 		store: service.Service.Store,
@@ -167,7 +167,8 @@ func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Req
 								returnCode = UnsupportedEnvironment
 						}
 					} else {
-						log.Printf("[Azure CNS] Received a request to create an already existing network %v", req.NetworkName)
+						returnMessage = fmt.Sprintf("[Azure CNS] Received a request to create an already existing network %v", req.NetworkName)
+						log.Printf(returnMessage)
 					}
 					
 				default:
@@ -279,29 +280,33 @@ func (service *httpRestService) getHostLocalIP(w http.ResponseWriter, r *http.Re
 	log.Printf("[Azure CNS] getHostLocalIP")
 	log.Request(service.Name, "getHostLocalIP", nil)		
 	hostLocalIP := "0.0.0.0"		
-	switch r.Method {
-		case "GET":
-			switch (service.state.NetworkType) {
-				case "Underlay":
-					if (service.imdsClient != nil) {
-						piface, err := service.imdsClient.GetPrimaryInterfaceInfoFromMemory()
-						if err != nil {
-							hostLocalIP = piface.PrimaryIP
-							found = true;
-						} else {
-							log.Printf("[Azure-CNS] Received error from GetPrimaryInterfaceInfoFromMemory. err: %v", err.Error())
+	if service.state.Initialized {
+		switch r.Method {
+			case "GET":
+				switch (service.state.NetworkType) {
+					case "Underlay":
+						if (service.imdsClient != nil) {
+							piface, err := service.imdsClient.GetPrimaryInterfaceInfoFromMemory()
+							if err == nil {
+								hostLocalIP = piface.PrimaryIP
+								found = true;
+							} else {
+								log.Printf("[Azure-CNS] Received error from GetPrimaryInterfaceInfoFromMemory. err: %v", err.Error())
+							}
 						}
-					}
-				case "Overlay":	
-					errmsg = "[Azure-CNS] Overlay is not yet supported."
-			}
-		default:
-			errmsg = "[Azure-CNS] GetHostLocalIP API expects a GET."
+					case "Overlay":	
+						errmsg = "[Azure-CNS] Overlay is not yet supported."
+				}
+			default:
+				errmsg = "[Azure-CNS] GetHostLocalIP API expects a GET."
+		}
 	}
-
 	returnCode := 0
 	if !found {
 		returnCode = NotFound
+		if(errmsg == ""){
+			errmsg = "[Azure-CNS] Unable to get host local ip. Check if environment is initialized.."
+		}
 	}
 
 	resp := cns.Response{ReturnCode: returnCode, Message: errmsg}
@@ -313,7 +318,7 @@ func (service *httpRestService) getHostLocalIP(w http.ResponseWriter, r *http.Re
 	log.Response(service.Name, hostLocalIPResponse, err)
 }
 
-// Handles ip address utiliztion requests.
+// Handles ip address utilization requests.
 func (service *httpRestService) getIPAddressUtilization(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] getIPAddressUtilization")
 	log.Request(service.Name, "getIPAddressUtilization", nil)	
