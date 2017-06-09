@@ -15,6 +15,7 @@ import (
 // GetPrimaryInterfaceInfoFromHost retrieves subnet and gateway of primary NIC from Host.
 func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo, error) {	
 	log.Printf("[Azure CNS] GetPrimaryInterfaceInfoFromHost")
+
 	interfaceInfo := &InterfaceInfo{}
 	resp, err := http.Get(hostQueryURL)
 	if(err != nil){
@@ -59,6 +60,7 @@ func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo,
 						interfaceInfo.PrimaryIP = ip.Address						
 					}
 				}
+				
 				imdsClient.primaryInterface = interfaceInfo
 				break;
 			}
@@ -67,17 +69,20 @@ func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo,
 			break;
 		}
 	}	
+
 	var er error
 	er = nil
 	if (!foundPrimaryInterface) {
 		er = fmt.Errorf("Unable to find primary NIC")
 	} 
+
 	return interfaceInfo, er 
 }
 
 // GetPrimaryInterfaceInfoFromMemory retrieves subnet and gateway of primary NIC that is saved in memory.
 func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromMemory() (*InterfaceInfo, error) {		
 	log.Printf("[Azure CNS] GetPrimaryInterfaceInfoFromMemory")
+
 	var iface *InterfaceInfo
 	var err error
 	if(imdsClient.primaryInterface == nil) {
@@ -91,5 +96,6 @@ func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromMemory() (*InterfaceInf
 	} else {
 		iface = imdsClient.primaryInterface
 	}
+	
 	return iface, err
 }

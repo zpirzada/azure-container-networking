@@ -38,14 +38,15 @@ type ServiceConfig struct {
 
 // NewService creates a new Service object.
 func NewService(name, version string, store store.KeyValueStore) (*Service, error) {
-
 	log.Debugf("[Azure CNS] Going to create a service object with name: %v. version: %v.", name, version)
+
 	svc := &Service{
 		Name:    name,
 		Version: version,
 		Options: make(map[string]interface{}),
 		Store:   store,
 	}
+
 	log.Debugf("[Azure CNS] Finished creating service object with name: %v. version: %v.", name, version)
 	return svc, nil
 }
@@ -59,10 +60,13 @@ func (service *Service) Initialize(config *ServiceConfig) error {
 	}
 
 	log.Debugf("[Azure CNS] Going to initialize the service: %+v with config: %+v.", service, config)
+	
 	service.ErrChan = config.ErrChan
 	service.Store = config.Store
 	service.Version = config.Version
+	
 	log.Debugf("[Azure CNS] nitialized service: %+v with config: %+v.", service, config)
+
 	return nil
 }
 

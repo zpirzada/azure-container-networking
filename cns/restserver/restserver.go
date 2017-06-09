@@ -49,6 +49,7 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	imdsClient := &imdsclient.ImdsClient{}
 	dc, err := dockerclient.NewDefaultDockerClient(imdsClient)
 	if(err != nil){
@@ -96,9 +97,11 @@ func (service *httpRestService) Stop() {
 // Handles requests to set the environment type.
 func (service *httpRestService) setEnvironment(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] setEnvironment")
+
 	var req cns.SetEnvironmentRequest
 	err := service.Listener.Decode(w, r, &req)
 	log.Request(service.Name, &req, err)
+
 	if err != nil {
 		return
 	}
@@ -115,18 +118,19 @@ func (service *httpRestService) setEnvironment(w http.ResponseWriter, r *http.Re
 
 	resp := &cns.Response{ReturnCode: 0}
 	err = service.Listener.Encode(w, &resp)
+
 	log.Response(service.Name, resp, err)
 }
 
 // Handles CreateNetwork requests.
 func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] createNetwork")
+
 	var err error
 	returnCode := 0
 	returnMessage := ""
 
 	if(service.state.Initialized) {		
-
 		var req cns.CreateNetworkRequest		
 		err = service.Listener.Decode(w, r, &req)
 		log.Request(service.Name, &req, err)
@@ -182,20 +186,24 @@ func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Req
 	}
 
 	err = service.Listener.Encode(w, &resp)
+
 	log.Response(service.Name, resp, err)
 }
 
 // Handles DeleteNetwork requests.
 func (service *httpRestService) deleteNetwork(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] deleteNetwork")
+
 	var req cns.DeleteNetworkRequest
 	returnCode := 0
 	returnMessage := ""
 	err := service.Listener.Decode(w, r, &req)
 	log.Request(service.Name, &req, err)
+
 	if err != nil {
 		return
 	}
+
 	switch r.Method {
 		case "POST":
 			dc := service.dockerClient
@@ -227,20 +235,25 @@ func (service *httpRestService) deleteNetwork(w http.ResponseWriter, r *http.Req
 		ReturnCode: returnCode, 
 		Message: returnMessage,
 	}
+
 	err = service.Listener.Encode(w, &resp)
+
 	log.Response(service.Name, resp, err)
 }
 
 // Handles ip reservation requests.
 func (service *httpRestService) reserveIPAddress(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] reserveIPAddress")
-	var req cns.ReserveIPAddressRequest
 
+	var req cns.ReserveIPAddressRequest
 	err := service.Listener.Decode(w, r, &req)
+
 	log.Request(service.Name, &req, err)
+
 	if err != nil {
 		return
 	}
+
 	switch r.Method {
 		case "POST":
 		default:
@@ -249,19 +262,23 @@ func (service *httpRestService) reserveIPAddress(w http.ResponseWriter, r *http.
 	resp := cns.Response{ReturnCode: 0}
 	reserveResp := &cns.ReserveIPAddressResponse{Response: resp, IPAddress: "0.0.0.0"}
 	err = service.Listener.Encode(w, &reserveResp)
+
 	log.Response(service.Name, reserveResp, err)
 }
 
 // Handles release ip reservation requests.
 func (service *httpRestService) releaseIPAddress(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] releaseIPAddress")
-	var req cns.ReleaseIPAddressRequest
 
 	err := service.Listener.Decode(w, r, &req)
 	log.Request(service.Name, &req, err)
+
+	var req cns.ReleaseIPAddressRequest
+
 	if err != nil {
 		return
 	}
+
 	switch r.Method {
 		case "POST":
 		default:
@@ -269,16 +286,19 @@ func (service *httpRestService) releaseIPAddress(w http.ResponseWriter, r *http.
 
 	resp := &cns.Response{ReturnCode: 0}
 	err = service.Listener.Encode(w, &resp)
+
 	log.Response(service.Name, resp, err)
 }
 
 // Retrieves the host local ip address. Containers can talk to host using this IP address.
 func (service *httpRestService) getHostLocalIP(w http.ResponseWriter, r *http.Request) {
-	var found bool
-	var errmsg string
 	log.Printf("[Azure CNS] getHostLocalIP")
 	log.Request(service.Name, "getHostLocalIP", nil)		
+	
+	var found bool
+	var errmsg string
 	hostLocalIP := "0.0.0.0"		
+
 	if service.state.Initialized {
 		switch r.Method {
 			case "GET":
@@ -293,13 +313,16 @@ func (service *httpRestService) getHostLocalIP(w http.ResponseWriter, r *http.Re
 								log.Printf("[Azure-CNS] Received error from GetPrimaryInterfaceInfoFromMemory. err: %v", err.Error())
 							}
 						}
+
 					case "Overlay":	
 						errmsg = "[Azure-CNS] Overlay is not yet supported."
 				}
+
 			default:
 				errmsg = "[Azure-CNS] GetHostLocalIP API expects a GET."
 		}
 	}
+
 	returnCode := 0
 	if !found {
 		returnCode = NotFound
@@ -313,7 +336,9 @@ func (service *httpRestService) getHostLocalIP(w http.ResponseWriter, r *http.Re
 		Response:  resp,
 		IPAddress: hostLocalIP,
 	}
+
 	err := service.Listener.Encode(w, &hostLocalIPResponse)
+
 	log.Response(service.Name, hostLocalIPResponse, err)
 }
 
@@ -321,16 +346,20 @@ func (service *httpRestService) getHostLocalIP(w http.ResponseWriter, r *http.Re
 func (service *httpRestService) getIPAddressUtilization(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] getIPAddressUtilization")
 	log.Request(service.Name, "getIPAddressUtilization", nil)	
+
 	switch r.Method {
 		case "GET":
 		default:
 	}
+
 	resp := cns.Response{ReturnCode: 0}
 	utilResponse := &cns.IPAddressesUtilizationResponse{
 		Response:  resp,
 		Available: 0,
 	}
+
 	err := service.Listener.Encode(w, &utilResponse)
+
 	log.Response(service.Name, utilResponse, err)
 }
 
@@ -338,13 +367,16 @@ func (service *httpRestService) getIPAddressUtilization(w http.ResponseWriter, r
 func (service *httpRestService) getAvailableIPAddresses(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] getAvailableIPAddresses")
 	log.Request(service.Name, "getAvailableIPAddresses", nil)
+
 	switch r.Method {
 		case "GET":
 		default:
 	}
+
 	resp := cns.Response{ReturnCode: 0}
 	ipResp := &cns.GetIPAddressesResponse{Response: resp}
 	err := service.Listener.Encode(w, &ipResp)
+
 	log.Response(service.Name, ipResp, err)
 }
 
@@ -352,13 +384,16 @@ func (service *httpRestService) getAvailableIPAddresses(w http.ResponseWriter, r
 func (service *httpRestService) getReservedIPAddresses(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] getReservedIPAddresses")
 	log.Request(service.Name, "getReservedIPAddresses", nil)
+
 	switch r.Method {
 		case "GET":	
 		default:
 	}
+
 	resp := cns.Response{ReturnCode: 0}
 	ipResp := &cns.GetIPAddressesResponse{Response: resp}
 	err := service.Listener.Encode(w, &ipResp)
+
 	log.Response(service.Name, ipResp, err)
 }
 
@@ -366,13 +401,16 @@ func (service *httpRestService) getReservedIPAddresses(w http.ResponseWriter, r 
 func (service *httpRestService) getUnhealthyIPAddresses(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] getUnhealthyIPAddresses")
 	log.Request(service.Name, "getUnhealthyIPAddresses", nil)
+
 	switch r.Method {
 		case "GET":
 		default:
 	}
+
 	resp := cns.Response{ReturnCode: 0}
 	ipResp := &cns.GetIPAddressesResponse{Response: resp}
 	err := service.Listener.Encode(w, &ipResp)
+
 	log.Response(service.Name, ipResp, err)
 }
 
@@ -380,13 +418,16 @@ func (service *httpRestService) getUnhealthyIPAddresses(w http.ResponseWriter, r
 func (service *httpRestService) getAllIPAddresses(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] getAllIPAddresses")
 	log.Request(service.Name, "getAllIPAddresses", nil)
+
 	switch r.Method {
 		case "GET":
 		default:
 	}
+
 	resp := cns.Response{ReturnCode: 0}
 	ipResp := &cns.GetIPAddressesResponse{Response: resp}
 	err := service.Listener.Encode(w, &ipResp)
+
 	log.Response(service.Name, ipResp, err)
 }
 
@@ -394,6 +435,7 @@ func (service *httpRestService) getAllIPAddresses(w http.ResponseWriter, r *http
 func (service *httpRestService) getHealthReport(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] getHealthReport")
 	log.Request(service.Name, "getHealthReport", nil)	
+
 	switch r.Method {
 		case "GET":
 		default:
@@ -401,12 +443,14 @@ func (service *httpRestService) getHealthReport(w http.ResponseWriter, r *http.R
 
 	resp := &cns.Response{ReturnCode: 0}
 	err := service.Listener.Encode(w, &resp)
+
 	log.Response(service.Name, resp, err)
 }
 
 // saveState writes CNS state to persistent store.
 func (service *httpRestService) saveState() error {
 	log.Printf("[Azure CNS] saveState")
+
 	// Skip if a store is not provided.
 	if service.store == nil {
 		log.Printf("[Azure CNS]  store not initialized.")
@@ -421,12 +465,14 @@ func (service *httpRestService) saveState() error {
 	} else {
 		log.Printf("[Azure CNS]  Failed to save state., err:%v\n", err)
 	}
+
 	return err
 }
 
 // restoreState restores CNS state from persistent store.
 func (service *httpRestService) restoreState() error {
 	log.Printf("[Azure CNS] restoreState")
+
 	// Skip if a store is not provided.
 	if service.store == nil {
 		log.Printf("[Azure CNS]  store not initialized.")

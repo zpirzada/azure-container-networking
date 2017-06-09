@@ -16,6 +16,8 @@ const (
 	defaultCNSServerURL = "http://localhost:10090"
 )
 
+// These are example showing how to use CNS APIs by clients
+
 func setEnvironment() error{	
 	envRequest := cns.SetEnvironmentRequest{Location:"Azure", NetworkType: "Underlay"}
     envRequestJSON := new(bytes.Buffer)
