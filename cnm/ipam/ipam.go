@@ -76,6 +76,7 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 	listener.AddHandler(getAddressSpacesPath, plugin.getDefaultAddressSpaces)
 	listener.AddHandler(requestPoolPath, plugin.requestPool)
 	listener.AddHandler(releasePoolPath, plugin.releasePool)
+	listener.AddHandler(getPoolInfoPath, plugin.getPoolInfo)
 	listener.AddHandler(requestAddressPath, plugin.requestAddress)
 	listener.AddHandler(releaseAddressPath, plugin.releaseAddress)
 
@@ -191,6 +192,45 @@ func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
 
 	// Encode response.
 	resp := releasePoolResponse{}
+
+	err = plugin.Listener.Encode(w, &resp)
+
+	log.Response(plugin.Name, &resp, err)
+}
+
+// Handles GetPoolInfo requests.
+func (plugin *ipamPlugin) getPoolInfo(w http.ResponseWriter, r *http.Request) {
+	var req getPoolInfoRequest
+
+	// Decode request.
+	err := plugin.Listener.Decode(w, r, &req)
+	log.Request(plugin.Name, &req, err)
+	if err != nil {
+		return
+	}
+
+	// Process request.
+	poolId, err := ipam.NewAddressPoolIdFromString(req.PoolID)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
+	}
+
+	apInfo, err := plugin.am.GetPoolInfo(poolId.AsId, poolId.Subnet)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
+	}
+
+	// Encode response.
+	resp := getPoolInfoResponse{
+		Capacity:  apInfo.Capacity,
+		Available: apInfo.Available,
+	}
+
+	for _, addr := range apInfo.UnhealthyAddrs {
+		resp.UnhealthyAddresses = append(resp.UnhealthyAddresses, addr.String())
+	}
 
 	err = plugin.Listener.Encode(w, &resp)
 
