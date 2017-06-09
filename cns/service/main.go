@@ -109,7 +109,6 @@ func main() {
 		return
 	}
 
-
 	// Create logging provider.
 	log.SetName(name)
 	log.SetLevel(logLevel)

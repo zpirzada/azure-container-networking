@@ -12,7 +12,7 @@ const (
 	ReleaseIPAddressPath        = "/network/ip/Release"	
 	GetHostLocalIPPath          = "/network/ip/HostLocal"
 	GetIPAddressUtilizationPath = "/network/ip/Utilization"
-	GetUnhealthyIPAddressesPath     = "/network/ipaddresses/unhealthy"
+	GetUnhealthyIPAddressesPath	= "/network/ipaddresses/unhealthy"
 	GetHealthReportPath         = "/network/health"
 )
 
