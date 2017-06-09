@@ -167,71 +167,20 @@ func getHostLocalIP() error{
 	return nil
 }
 
-func getAvailableIPAddresses() error{	
+func getUnhealthyIPAddresses() error{	
 	res, err := 
-	http.Get(defaultCNSServerURL+cns.GetAvailableIPAddressesPath)
+	http.Get(defaultCNSServerURL+cns.GetUnhealthyIPAddressesPath)
 	if err != nil {
-		fmt.Printf("Error received in GetAvailable IP Addresses: %v ", err.Error())
-		return err
-	}
-	var getIPAddressesResponse cns.GetIPAddressesResponse
-	err = json.NewDecoder(res.Body).Decode(&getIPAddressesResponse)
-	if err != nil {
-		fmt.Printf("Error received in decoding response from GetAvailableIPAddresses: %v ", err.Error())
-		return err
-	}
-	fmt.Printf("Response for GetAvailableIPAddresses: %+v\n", getIPAddressesResponse)
-	return nil
-}
-
-func getReservedIPAddresses() error{	
-	res, err := 
-	http.Get(defaultCNSServerURL+cns.GetReservedIPAddressesPath)
-	if err != nil {
-		fmt.Printf("Error received in GetReserved IP Addresses: %v ", err.Error())
+		fmt.Printf("Error received in GetUnhealthyIPAddresses IP Addresses: %v ", err.Error())
 		return err
 	}
     var getIPAddressesResponse cns.GetIPAddressesResponse
 	err = json.NewDecoder(res.Body).Decode(&getIPAddressesResponse)
 	if err != nil {
-		fmt.Printf("Error received in decoding response from getReservedIPAddresses: %v ", err.Error())
+		fmt.Printf("Error received in decoding response from GetUnhealthyIPAddresses: %v ", err.Error())
 		return err
 	}
-	fmt.Printf("Response for getReservedIPAddresses: %+v\n", getIPAddressesResponse)
-	return nil
-}
-
-func getGhostIPAddresses() error{	
-	res, err := 
-	http.Get(defaultCNSServerURL+cns.GetGhostIPAddressesPath)
-	if err != nil {
-		fmt.Printf("Error received in GetGhost IP Addresses: %v ", err.Error())
-		return err
-	}
-    var getIPAddressesResponse cns.GetIPAddressesResponse
-	err = json.NewDecoder(res.Body).Decode(&getIPAddressesResponse)
-	if err != nil {
-		fmt.Printf("Error received in decoding response from getGhostIPAddresses: %v ", err.Error())
-		return err
-	}
-	fmt.Printf("Response for getGhostIPAddresses: %+v\n", getIPAddressesResponse)
-	return nil
-}
-
-func getAllIPAddresses() error{	
-	res, err := 
-	http.Get(defaultCNSServerURL+cns.GetAllIPAddressesPath)
-	if err != nil {
-		fmt.Printf("Error received in GetAll IP Addresses: %v ", err.Error())
-		return err
-	}
-    var getIPAddressesResponse cns.GetIPAddressesResponse
-	err = json.NewDecoder(res.Body).Decode(&getIPAddressesResponse)
-	if err != nil {
-		fmt.Printf("Error received in decoding response from getAllIPAddresses: %v ", err.Error())
-		return err
-	}
-	fmt.Printf("Response for getAllIPAddresses: %+v\n", getIPAddressesResponse)
+	fmt.Printf("Response for GetUnhealthyIPAddresses: %+v\n", getIPAddressesResponse)
 	return nil
 }
 
@@ -241,10 +190,7 @@ func main() {
 	deleteNetwork()
 	reserveIPAddress()
 	releaseIPAddress()
-	getAvailableIPAddresses()
-	getReservedIPAddresses()
-	getGhostIPAddresses()
-	getAllIPAddresses()
+	getUnhealthyIPAddresses()
 	getIPAddressUtilization()
 	getHostLocalIP()
 }

@@ -5,18 +5,15 @@ package cns
 
 // Container Network Service remote API Contract
 const (	
-	SetEnvironmentPath          = "/Network/Environment"
-	CreateNetworkPath           = "/Network/Create"
-	DeleteNetworkPath           = "/Network/Delete"
-	ReserveIPAddressPath        = "/Network/IP/Reserve"
-	ReleaseIPAddressPath        = "/Network/IP/Release"	
-	GetHostLocalIPPath          = "/Network/IP/HostLocal"
-	GetIPAddressUtilizationPath = "/Network/IP/Utilization"
-	GetAvailableIPAddressesPath = "/Network/IPAddresses/Available"
-	GetReservedIPAddressesPath  = "/Network/IPAddresses/Reserved"
-	GetGhostIPAddressesPath     = "/Network/IPAddresses/Ghost"
-	GetAllIPAddressesPath       = "/Network/IPAddresses/All"
-	GetHealthReportPath         = "/Network/Health"
+	SetEnvironmentPath          = "/network/environment"
+	CreateNetworkPath           = "/network/create"
+	DeleteNetworkPath           = "/network/delete"
+	ReserveIPAddressPath        = "/network/ip/Reserve"
+	ReleaseIPAddressPath        = "/network/ip/Release"	
+	GetHostLocalIPPath          = "/network/ip/HostLocal"
+	GetIPAddressUtilizationPath = "/network/ip/Utilization"
+	GetUnhealthyIPAddressesPath     = "/network/ipaddresses/unhealthy"
+	GetHealthReportPath         = "/network/health"
 )
 
 // SetEnvironmentRequest describes the Request to set the environment in CNS.
@@ -65,7 +62,7 @@ type IPAddressesUtilizationResponse struct {
 	Response Response
 	Available int
 	Reserved int
-	Ghost int
+	Unhealthy int
 }
 
 // GetIPAddressesResponse describes response containing requested ip addresses.
@@ -84,7 +81,6 @@ type HostLocalIPAddressResponse struct {
 type IPAddress struct {
 	IPAddress string
 	ReservationID string
-	IsGhost bool
 }
 
 // Subnet contains the ip address and the number of bits in prefix.
