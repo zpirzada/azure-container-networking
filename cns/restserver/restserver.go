@@ -81,13 +81,7 @@ func (service *httpRestService) Start(config *common.ServiceConfig) error {
 	listener.AddHandler(cns.ReleaseIPAddressPath, service.releaseIPAddress)
 	listener.AddHandler(cns.GetHostLocalIPPath, service.getHostLocalIP)
 	listener.AddHandler(cns.GetIPAddressUtilizationPath, service.getIPAddressUtilization)
-	listener.AddHandler(cns.GetGhostIPAddressesPath, service.getGhostIPAddresses)
-
-	// Below APIs are not handled in this iteration.
-	// listener.AddHandler(cns.GetAvailableIPAddressesPath, service.getAvailableIPAddresses)
-	// listener.AddHandler(cns.GetReservedIPAddressesPath, service.getReservedIPAddresses)
-	// listener.AddHandler(cns.GetAllIPAddressesPath, service.getAllIPAddresses)
-	// listener.AddHandler(cns.GetHealthReportPath, service.getHealthReport)
+	listener.AddHandler(cns.GetUnhealthyIPAddressesPath, service.getUnhealthyIPAddresses)
 
 	log.Printf("[Azure CNS]  Listening.")
 	return nil
@@ -216,7 +210,12 @@ func (service *httpRestService) deleteNetwork(w http.ResponseWriter, r *http.Req
 					returnCode = UnexpectedError
 				}
 			} else {
-				log.Printf("[Azure CNS] Received a request to delete network that does not exist: %v.", req.NetworkName)
+				if(err == fmt.Errorf("Network not found")){
+					log.Printf("[Azure CNS] Received a request to delete network that does not exist: %v.", req.NetworkName)
+				} else {
+					returnCode = UnexpectedError
+					returnMessage = err.Error()
+				}
 			}
 			
 		default:
@@ -364,9 +363,9 @@ func (service *httpRestService) getReservedIPAddresses(w http.ResponseWriter, r 
 }
 
 // Handles retrieval of ghost ip addresses from ipam driver.
-func (service *httpRestService) getGhostIPAddresses(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[Azure CNS] getGhostIPAddresses")
-	log.Request(service.Name, "getGhostIPAddresses", nil)
+func (service *httpRestService) getUnhealthyIPAddresses(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[Azure CNS] getUnhealthyIPAddresses")
+	log.Request(service.Name, "getUnhealthyIPAddresses", nil)
 	switch r.Method {
 		case "GET":
 		default:
