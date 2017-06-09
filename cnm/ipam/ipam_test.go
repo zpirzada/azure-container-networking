@@ -28,6 +28,10 @@ var ipamQueryResponse = "" +
 	"			<IPAddress Address=\"10.0.0.4\" IsPrimary=\"true\"/>" +
 	"			<IPAddress Address=\"10.0.0.5\" IsPrimary=\"false\"/>" +
 	"			<IPAddress Address=\"10.0.0.6\" IsPrimary=\"false\"/>" +
+	"			<IPAddress Address=\"10.0.0.7\" IsPrimary=\"false\"/>" +
+	"			<IPAddress Address=\"10.0.0.8\" IsPrimary=\"false\"/>" +
+	"			<IPAddress Address=\"10.0.0.9\" IsPrimary=\"false\"/>" +
+	"			<IPAddress Address=\"10.0.0.10\" IsPrimary=\"false\"/>" +
 	"		</IPSubnet>" +
 	"	</Interface>" +
 	"</Interfaces>"
@@ -282,5 +286,31 @@ func TestReleasePool(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("ReleasePool response is invalid %+v", resp)
+	}
+}
+
+// Tests IpamDriver.GetPoolInfo functionality.
+func TestGetPoolInfo(t *testing.T) {
+	var body bytes.Buffer
+	var resp getPoolInfoResponse
+
+	payload := &getPoolInfoRequest{
+		PoolID: poolId1,
+	}
+
+	json.NewEncoder(&body).Encode(payload)
+
+	req, err := http.NewRequest(http.MethodGet, getPoolInfoPath, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil {
+		t.Errorf("GetPoolInfo response is invalid %+v", resp)
 	}
 }
