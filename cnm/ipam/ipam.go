@@ -296,7 +296,7 @@ func (plugin *ipamPlugin) releaseAddress(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = plugin.am.ReleaseAddress(poolId.AsId, poolId.Subnet, req.Address)
+	err = plugin.am.ReleaseAddress(poolId.AsId, poolId.Subnet, req.Address, req.Options)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return
