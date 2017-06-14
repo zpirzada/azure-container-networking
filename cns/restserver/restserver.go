@@ -5,16 +5,16 @@ package restserver
 
 import (
 	"fmt"
-	"time"
 	"net/http"
+	"time"
 
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/dockerclient"
 	"github.com/Azure/azure-container-networking/cns/imdsclient"
+	"github.com/Azure/azure-container-networking/cns/routes"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/store"
-	"github.com/Azure/azure-container-networking/cns/routes"
 )
 
 const (
@@ -28,16 +28,16 @@ type httpRestService struct {
 	dockerClient *dockerclient.DockerClient
 	imdsClient   *imdsclient.ImdsClient
 	routingTable *routes.RoutingTable
-	store store.KeyValueStore
-	state httpRestServiceState	
+	store        store.KeyValueStore
+	state        httpRestServiceState
 }
 
 // httpRestServiceState contains the state we would like to persist.
 type httpRestServiceState struct {
-	Location	string
-	NetworkType	string
-	Initialized	bool
-	TimeStamp	time.Time	
+	Location    string
+	NetworkType string
+	Initialized bool
+	TimeStamp   time.Time
 }
 
 // HTTPService describes the min API interface that every service should have.
@@ -55,15 +55,15 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 	imdsClient := &imdsclient.ImdsClient{}
 	routingTable := &routes.RoutingTable{}
 	dc, err := dockerclient.NewDefaultDockerClient(imdsClient)
-	if(err != nil){
+	if err != nil {
 		return nil, err
 	}
-	
+
 	return &httpRestService{
-		Service: service,
-		store: service.Service.Store,
+		Service:      service,
+		store:        service.Service.Store,
 		dockerClient: dc,
-		imdsClient: imdsClient,
+		imdsClient:   imdsClient,
 		routingTable: routingTable,
 	}, nil
 }
@@ -91,14 +91,14 @@ func (service *httpRestService) Start(config *common.ServiceConfig) error {
 	listener.AddHandler(cns.GetUnhealthyIPAddressesPath, service.getUnhealthyIPAddresses)
 
 	// handlers for v0.1
-	listener.AddHandler(cns.V1Prefix + cns.SetEnvironmentPath, service.setEnvironment)
-	listener.AddHandler(cns.V1Prefix + cns.CreateNetworkPath, service.createNetwork)
-	listener.AddHandler(cns.V1Prefix + cns.DeleteNetworkPath, service.deleteNetwork)
-	listener.AddHandler(cns.V1Prefix + cns.ReserveIPAddressPath, service.reserveIPAddress)
-	listener.AddHandler(cns.V1Prefix + cns.ReleaseIPAddressPath, service.releaseIPAddress)
-	listener.AddHandler(cns.V1Prefix + cns.GetHostLocalIPPath, service.getHostLocalIP)
-	listener.AddHandler(cns.V1Prefix + cns.GetIPAddressUtilizationPath, service.getIPAddressUtilization)
-	listener.AddHandler(cns.V1Prefix + cns.GetUnhealthyIPAddressesPath, service.getUnhealthyIPAddresses)
+	listener.AddHandler(cns.V1Prefix+cns.SetEnvironmentPath, service.setEnvironment)
+	listener.AddHandler(cns.V1Prefix+cns.CreateNetworkPath, service.createNetwork)
+	listener.AddHandler(cns.V1Prefix+cns.DeleteNetworkPath, service.deleteNetwork)
+	listener.AddHandler(cns.V1Prefix+cns.ReserveIPAddressPath, service.reserveIPAddress)
+	listener.AddHandler(cns.V1Prefix+cns.ReleaseIPAddressPath, service.releaseIPAddress)
+	listener.AddHandler(cns.V1Prefix+cns.GetHostLocalIPPath, service.getHostLocalIP)
+	listener.AddHandler(cns.V1Prefix+cns.GetIPAddressUtilizationPath, service.getIPAddressUtilization)
+	listener.AddHandler(cns.V1Prefix+cns.GetUnhealthyIPAddressesPath, service.getUnhealthyIPAddresses)
 
 	log.Printf("[Azure CNS]  Listening.")
 	return nil
@@ -126,7 +126,7 @@ func (service *httpRestService) setEnvironment(w http.ResponseWriter, r *http.Re
 	case "POST":
 		log.Printf("[Azure CNS]  POST received for SetEnvironment.")
 		service.state.Location = req.Location
-		service.state.NetworkType = req.NetworkType	
+		service.state.NetworkType = req.NetworkType
 		service.state.Initialized = true
 		service.saveState()
 	default:
@@ -146,67 +146,67 @@ func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Req
 	returnCode := 0
 	returnMessage := ""
 
-	if(service.state.Initialized) {		
-		var req cns.CreateNetworkRequest		
+	if service.state.Initialized {
+		var req cns.CreateNetworkRequest
 		err = service.Listener.Decode(w, r, &req)
 		log.Request(service.Name, &req, err)
-		
+
 		if err != nil {
 			returnMessage = fmt.Sprintf("[Azure CNS] Error. Unable to decode input request.")
 			returnCode = InvalidParameter
 		} else {
 			switch r.Method {
-				case "POST":
-					dc := service.dockerClient
-					rt := service.routingTable
-					err = dc.NetworkExists(req.NetworkName)
-					
-					// Network does not exist.
-					if(err != nil) {
-						switch service.state.NetworkType {
-							case "Underlay":
-								switch service.state.Location {
-									case "Azure":
-										log.Printf("[Azure CNS] Goign to create network with name %v.", req.NetworkName)
+			case "POST":
+				dc := service.dockerClient
+				rt := service.routingTable
+				err = dc.NetworkExists(req.NetworkName)
 
-										err = rt.GetRoutingTable()
-										if(err != nil) {
-											// We should not fail the call to create network for this.
-											// This is because restoring routes is a fallback mechanism in case 
-											// network driver is not behaving as expected.
-											// The responsibility to restore routes is with network driver.
-											log.Printf("[Azure CNS] Unable to get routing table from node, %+v.", err.Error())
-										}
+				// Network does not exist.
+				if err != nil {
+					switch service.state.NetworkType {
+					case "Underlay":
+						switch service.state.Location {
+						case "Azure":
+							log.Printf("[Azure CNS] Goign to create network with name %v.", req.NetworkName)
 
-										err = dc.CreateNetwork(req.NetworkName)
-										if(err != nil) {
-											returnMessage = fmt.Sprintf("[Azure CNS] Error. CreateNetwork failed %v.", err.Error())
-											returnCode = UnexpectedError
-										}
+							err = rt.GetRoutingTable()
+							if err != nil {
+								// We should not fail the call to create network for this.
+								// This is because restoring routes is a fallback mechanism in case
+								// network driver is not behaving as expected.
+								// The responsibility to restore routes is with network driver.
+								log.Printf("[Azure CNS] Unable to get routing table from node, %+v.", err.Error())
+							}
 
-										err = rt.RestoreRoutingTable()
-										if(err != nil) {
-											log.Printf("[Azure CNS] Unable to restore routing table on node, %+v.", err.Error())
-										}
-										
-									case "StandAlone":
-										returnMessage = fmt.Sprintf("[Azure CNS] Error. Underlay network is not supported in StandAlone environment. %v.", err.Error())
-										returnCode = UnsupportedEnvironment
-								}
-							case "Overlay":
-								returnMessage = fmt.Sprintf("[Azure CNS] Error. Overlay support not yet available. %v.", err.Error())
-								returnCode = UnsupportedEnvironment
+							err = dc.CreateNetwork(req.NetworkName)
+							if err != nil {
+								returnMessage = fmt.Sprintf("[Azure CNS] Error. CreateNetwork failed %v.", err.Error())
+								returnCode = UnexpectedError
+							}
+
+							err = rt.RestoreRoutingTable()
+							if err != nil {
+								log.Printf("[Azure CNS] Unable to restore routing table on node, %+v.", err.Error())
+							}
+
+						case "StandAlone":
+							returnMessage = fmt.Sprintf("[Azure CNS] Error. Underlay network is not supported in StandAlone environment. %v.", err.Error())
+							returnCode = UnsupportedEnvironment
 						}
-					} else {
-						returnMessage = fmt.Sprintf("[Azure CNS] Received a request to create an already existing network %v", req.NetworkName)
-						log.Printf(returnMessage)
+					case "Overlay":
+						returnMessage = fmt.Sprintf("[Azure CNS] Error. Overlay support not yet available. %v.", err.Error())
+						returnCode = UnsupportedEnvironment
 					}
-					
-				default:
-					returnMessage = "[Azure CNS] Error. CreateNetwork did not receive a POST."			
-					returnCode = InvalidParameter
+				} else {
+					returnMessage = fmt.Sprintf("[Azure CNS] Received a request to create an already existing network %v", req.NetworkName)
+					log.Printf(returnMessage)
+				}
+
+			default:
+				returnMessage = "[Azure CNS] Error. CreateNetwork did not receive a POST."
+				returnCode = InvalidParameter
 			}
-		}		
+		}
 
 	} else {
 		returnMessage = fmt.Sprintf("[Azure CNS] Error. CNS is not yet initialized with environment.")
@@ -214,8 +214,8 @@ func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Req
 	}
 
 	resp := &cns.Response{
-		ReturnCode: returnCode, 
-		Message: returnMessage,
+		ReturnCode: returnCode,
+		Message:    returnMessage,
 	}
 
 	err = service.Listener.Encode(w, &resp)
@@ -238,35 +238,35 @@ func (service *httpRestService) deleteNetwork(w http.ResponseWriter, r *http.Req
 	}
 
 	switch r.Method {
-		case "POST":
-			dc := service.dockerClient
-			err := dc.NetworkExists(req.NetworkName)
-			
-			// Network does exist
-			if(err == nil) {
-				log.Printf("[Azure CNS] Goign to delete network with name %v.", req.NetworkName)
-				err := dc.DeleteNetwork(req.NetworkName)
-				if(err != nil) {
-					returnMessage = fmt.Sprintf("[Azure CNS] Error. DeleteNetwork failed %v.", err.Error())
-					returnCode = UnexpectedError
-				}
-			} else {
-				if(err == fmt.Errorf("Network not found")){
-					log.Printf("[Azure CNS] Received a request to delete network that does not exist: %v.", req.NetworkName)
-				} else {
-					returnCode = UnexpectedError
-					returnMessage = err.Error()
-				}
+	case "POST":
+		dc := service.dockerClient
+		err := dc.NetworkExists(req.NetworkName)
+
+		// Network does exist
+		if err == nil {
+			log.Printf("[Azure CNS] Goign to delete network with name %v.", req.NetworkName)
+			err := dc.DeleteNetwork(req.NetworkName)
+			if err != nil {
+				returnMessage = fmt.Sprintf("[Azure CNS] Error. DeleteNetwork failed %v.", err.Error())
+				returnCode = UnexpectedError
 			}
-			
-		default:
-			returnMessage = "[Azure CNS] Error. DeleteNetwork did not receive a POST."			
-			returnCode = InvalidParameter
+		} else {
+			if err == fmt.Errorf("Network not found") {
+				log.Printf("[Azure CNS] Received a request to delete network that does not exist: %v.", req.NetworkName)
+			} else {
+				returnCode = UnexpectedError
+				returnMessage = err.Error()
+			}
+		}
+
+	default:
+		returnMessage = "[Azure CNS] Error. DeleteNetwork did not receive a POST."
+		returnCode = InvalidParameter
 	}
 
 	resp := &cns.Response{
-		ReturnCode: returnCode, 
-		Message: returnMessage,
+		ReturnCode: returnCode,
+		Message:    returnMessage,
 	}
 
 	err = service.Listener.Encode(w, &resp)
@@ -288,8 +288,8 @@ func (service *httpRestService) reserveIPAddress(w http.ResponseWriter, r *http.
 	}
 
 	switch r.Method {
-		case "POST":
-		default:
+	case "POST":
+	default:
 	}
 
 	resp := cns.Response{ReturnCode: 0}
@@ -312,8 +312,8 @@ func (service *httpRestService) releaseIPAddress(w http.ResponseWriter, r *http.
 	}
 
 	switch r.Method {
-		case "POST":
-		default:
+	case "POST":
+	default:
 	}
 
 	resp := &cns.Response{ReturnCode: 0}
@@ -325,40 +325,40 @@ func (service *httpRestService) releaseIPAddress(w http.ResponseWriter, r *http.
 // Retrieves the host local ip address. Containers can talk to host using this IP address.
 func (service *httpRestService) getHostLocalIP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] getHostLocalIP")
-	log.Request(service.Name, "getHostLocalIP", nil)		
-	
+	log.Request(service.Name, "getHostLocalIP", nil)
+
 	var found bool
 	var errmsg string
-	hostLocalIP := "0.0.0.0"		
+	hostLocalIP := "0.0.0.0"
 
 	if service.state.Initialized {
 		switch r.Method {
-			case "GET":
-				switch (service.state.NetworkType) {
-					case "Underlay":
-						if (service.imdsClient != nil) {
-							piface, err := service.imdsClient.GetPrimaryInterfaceInfoFromMemory()
-							if err == nil {
-								hostLocalIP = piface.PrimaryIP
-								found = true;
-							} else {
-								log.Printf("[Azure-CNS] Received error from GetPrimaryInterfaceInfoFromMemory. err: %v", err.Error())
-							}
-						}
-
-					case "Overlay":	
-						errmsg = "[Azure-CNS] Overlay is not yet supported."
+		case "GET":
+			switch service.state.NetworkType {
+			case "Underlay":
+				if service.imdsClient != nil {
+					piface, err := service.imdsClient.GetPrimaryInterfaceInfoFromMemory()
+					if err == nil {
+						hostLocalIP = piface.PrimaryIP
+						found = true
+					} else {
+						log.Printf("[Azure-CNS] Received error from GetPrimaryInterfaceInfoFromMemory. err: %v", err.Error())
+					}
 				}
 
-			default:
-				errmsg = "[Azure-CNS] GetHostLocalIP API expects a GET."
+			case "Overlay":
+				errmsg = "[Azure-CNS] Overlay is not yet supported."
+			}
+
+		default:
+			errmsg = "[Azure-CNS] GetHostLocalIP API expects a GET."
 		}
 	}
 
 	returnCode := 0
 	if !found {
 		returnCode = NotFound
-		if(errmsg == ""){
+		if errmsg == "" {
 			errmsg = "[Azure-CNS] Unable to get host local ip. Check if environment is initialized.."
 		}
 	}
@@ -377,11 +377,11 @@ func (service *httpRestService) getHostLocalIP(w http.ResponseWriter, r *http.Re
 // Handles ip address utilization requests.
 func (service *httpRestService) getIPAddressUtilization(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] getIPAddressUtilization")
-	log.Request(service.Name, "getIPAddressUtilization", nil)	
+	log.Request(service.Name, "getIPAddressUtilization", nil)
 
 	switch r.Method {
-		case "GET":
-		default:
+	case "GET":
+	default:
 	}
 
 	resp := cns.Response{ReturnCode: 0}
@@ -401,8 +401,8 @@ func (service *httpRestService) getAvailableIPAddresses(w http.ResponseWriter, r
 	log.Request(service.Name, "getAvailableIPAddresses", nil)
 
 	switch r.Method {
-		case "GET":
-		default:
+	case "GET":
+	default:
 	}
 
 	resp := cns.Response{ReturnCode: 0}
@@ -418,8 +418,8 @@ func (service *httpRestService) getReservedIPAddresses(w http.ResponseWriter, r 
 	log.Request(service.Name, "getReservedIPAddresses", nil)
 
 	switch r.Method {
-		case "GET":	
-		default:
+	case "GET":
+	default:
 	}
 
 	resp := cns.Response{ReturnCode: 0}
@@ -435,8 +435,8 @@ func (service *httpRestService) getUnhealthyIPAddresses(w http.ResponseWriter, r
 	log.Request(service.Name, "getUnhealthyIPAddresses", nil)
 
 	switch r.Method {
-		case "GET":
-		default:
+	case "GET":
+	default:
 	}
 
 	resp := cns.Response{ReturnCode: 0}
@@ -452,8 +452,8 @@ func (service *httpRestService) getAllIPAddresses(w http.ResponseWriter, r *http
 	log.Request(service.Name, "getAllIPAddresses", nil)
 
 	switch r.Method {
-		case "GET":
-		default:
+	case "GET":
+	default:
 	}
 
 	resp := cns.Response{ReturnCode: 0}
@@ -466,11 +466,11 @@ func (service *httpRestService) getAllIPAddresses(w http.ResponseWriter, r *http
 // Handles health report requests.
 func (service *httpRestService) getHealthReport(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] getHealthReport")
-	log.Request(service.Name, "getHealthReport", nil)	
+	log.Request(service.Name, "getHealthReport", nil)
 
 	switch r.Method {
-		case "GET":
-		default:
+	case "GET":
+	default:
 	}
 
 	resp := &cns.Response{ReturnCode: 0}
@@ -490,7 +490,7 @@ func (service *httpRestService) saveState() error {
 	}
 
 	// Update time stamp.
-	service.state.TimeStamp = time.Now()	
+	service.state.TimeStamp = time.Now()
 	err := service.store.Write(storeKey, &service.state)
 	if err == nil {
 		log.Printf("[Azure CNS]  State saved successfully.\n")
@@ -519,7 +519,7 @@ func (service *httpRestService) restoreState() error {
 			log.Printf("[Azure CNS]  No state to restore.\n")
 			return nil
 		}
-		
+
 		log.Printf("[Azure CNS]  Failed to restore state, err:%v\n", err)
 		return err
 	}

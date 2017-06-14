@@ -18,11 +18,11 @@ type ImdsClient struct {
 
 // InterfaceInfo specifies the information about an interface as returned by Host Agent.
 type InterfaceInfo struct {
-	Subnet string
-	Gateway string
-	IsPrimary bool
-	PrimaryIP string
-	SecondaryIPs[] string	
+	Subnet       string
+	Gateway      string
+	IsPrimary    bool
+	PrimaryIP    string
+	SecondaryIPs []string
 }
 
 // Azure host agent XML document format.

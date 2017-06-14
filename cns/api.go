@@ -4,36 +4,36 @@
 package cns
 
 // Container Network Service remote API Contract
-const (	
+const (
 	SetEnvironmentPath          = "/network/environment"
 	CreateNetworkPath           = "/network/create"
 	DeleteNetworkPath           = "/network/delete"
 	ReserveIPAddressPath        = "/network/ip/Reserve"
-	ReleaseIPAddressPath        = "/network/ip/Release"	
+	ReleaseIPAddressPath        = "/network/ip/Release"
 	GetHostLocalIPPath          = "/network/ip/HostLocal"
 	GetIPAddressUtilizationPath = "/network/ip/Utilization"
-	GetUnhealthyIPAddressesPath	= "/network/ipaddresses/unhealthy"
+	GetUnhealthyIPAddressesPath = "/network/ipaddresses/unhealthy"
 	GetHealthReportPath         = "/network/health"
-	V1Prefix 				    = "/v0.1"
+	V1Prefix                    = "/v0.1"
 )
 
 // SetEnvironmentRequest describes the Request to set the environment in CNS.
 type SetEnvironmentRequest struct {
-	Location string
+	Location    string
 	NetworkType string
 }
 
 // OverlayConfiguration describes configuration for all the nodes that are part of overlay.
 type OverlayConfiguration struct {
-	NodeCount int
-	LocalNodeIP string
+	NodeCount     int
+	LocalNodeIP   string
 	OverlaySubent Subnet
-	NodeConfig []NodeConfiguration
+	NodeConfig    []NodeConfiguration
 }
 
 // CreateNetworkRequest describes request to create the network.
 type CreateNetworkRequest struct {
-	NetworkName string
+	NetworkName          string
 	OverlayConfiguration OverlayConfiguration
 }
 
@@ -49,7 +49,7 @@ type ReserveIPAddressRequest struct {
 
 // ReserveIPAddressResponse describes response to reserve an IP address.
 type ReserveIPAddressResponse struct {
-	Response Response
+	Response  Response
 	IPAddress string
 }
 
@@ -60,47 +60,47 @@ type ReleaseIPAddressRequest struct {
 
 // IPAddressesUtilizationResponse describes response for ip address utilization.
 type IPAddressesUtilizationResponse struct {
-	Response Response
+	Response  Response
 	Available int
-	Reserved int
+	Reserved  int
 	Unhealthy int
 }
 
 // GetIPAddressesResponse describes response containing requested ip addresses.
 type GetIPAddressesResponse struct {
-	Response Response
+	Response    Response
 	IPAddresses []IPAddress
 }
 
 // HostLocalIPAddressResponse describes reponse that returns the host local IP Address.
 type HostLocalIPAddressResponse struct {
-	Response Response
+	Response  Response
 	IPAddress string
 }
 
 // IPAddress Contains information about an ip address.
 type IPAddress struct {
-	IPAddress string
+	IPAddress     string
 	ReservationID string
 }
 
 // Subnet contains the ip address and the number of bits in prefix.
 type Subnet struct {
-	IPAddress string
+	IPAddress    string
 	PrefixLength int
 }
 
 // NodeConfiguration describes confguration for a node in overlay network.
 type NodeConfiguration struct {
-	NodeIP string
-	NodeID string
+	NodeIP     string
+	NodeID     string
 	NodeSubnet Subnet
 }
 
 // Response describes generic response from CNS.
 type Response struct {
 	ReturnCode int
-	Message string
+	Message    string
 }
 
 // OptionMap describes generic options that can be passed to CNS.
