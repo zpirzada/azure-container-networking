@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/store"
+	"github.com/Azure/azure-container-networking/cns/routes"
 )
 
 const (
@@ -26,6 +27,7 @@ type httpRestService struct {
 	*cns.Service
 	dockerClient *dockerclient.DockerClient
 	imdsClient   *imdsclient.ImdsClient
+	routingTable *routes.RoutingTable
 	store store.KeyValueStore
 	state httpRestServiceState	
 }
@@ -51,6 +53,7 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 	}
 
 	imdsClient := &imdsclient.ImdsClient{}
+	routingTable := &routes.RoutingTable{}
 	dc, err := dockerclient.NewDefaultDockerClient(imdsClient)
 	if(err != nil){
 		return nil, err
@@ -61,6 +64,7 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 		store: service.Service.Store,
 		dockerClient: dc,
 		imdsClient: imdsClient,
+		routingTable: routingTable,
 	}, nil
 }
 
@@ -142,6 +146,7 @@ func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Req
 			switch r.Method {
 				case "POST":
 					dc := service.dockerClient
+					rt := service.routingTable
 					err = dc.NetworkExists(req.NetworkName)
 					
 					// Network does not exist.
@@ -151,11 +156,27 @@ func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Req
 								switch service.state.Location {
 									case "Azure":
 										log.Printf("[Azure CNS] Goign to create network with name %v.", req.NetworkName)
+
+										err = rt.GetRoutingTable()
+										if(err != nil) {
+											// We should not fail the call to create network for this.
+											// This is because restoring routes is a fallback mechanism in case 
+											// network driver is not behaving as expected.
+											// The responsibility to restore routes is with network driver.
+											log.Printf("[Azure CNS] Unable to get routing table from node, %+v.", err.Error())
+										}
+
 										err = dc.CreateNetwork(req.NetworkName)
 										if(err != nil) {
 											returnMessage = fmt.Sprintf("[Azure CNS] Error. CreateNetwork failed %v.", err.Error())
 											returnCode = UnexpectedError
 										}
+
+										err = rt.RestoreRoutingTable()
+										if(err != nil) {
+											log.Printf("[Azure CNS] Unable to restore routing table on node, %+v.", err.Error())
+										}
+										
 									case "StandAlone":
 										returnMessage = fmt.Sprintf("[Azure CNS] Error. Underlay network is not supported in StandAlone environment. %v.", err.Error())
 										returnCode = UnsupportedEnvironment
