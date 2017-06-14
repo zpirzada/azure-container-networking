@@ -12,6 +12,7 @@ const (
 	getAddressSpacesPath = "/IpamDriver.GetDefaultAddressSpaces"
 	requestPoolPath      = "/IpamDriver.RequestPool"
 	releasePoolPath      = "/IpamDriver.ReleasePool"
+	getPoolInfoPath      = "/IpamDriver.GetPoolInfo"
 	requestAddressPath   = "/IpamDriver.RequestAddress"
 	releaseAddressPath   = "/IpamDriver.ReleaseAddress"
 
@@ -65,6 +66,18 @@ type releasePoolRequest struct {
 type releasePoolResponse struct {
 }
 
+// Request sent when querying address pool information.
+type getPoolInfoRequest struct {
+	PoolID string
+}
+
+// Response sent by plugin when returning address pool information.
+type getPoolInfoResponse struct {
+	Capacity           int
+	Available          int
+	UnhealthyAddresses []string
+}
+
 // Request sent by libnetwork when reserving an address from a pool.
 type requestAddressRequest struct {
 	PoolID  string
@@ -82,6 +95,7 @@ type requestAddressResponse struct {
 type releaseAddressRequest struct {
 	PoolID  string
 	Address string
+	Options map[string]string
 }
 
 // Response sent by plugin when an address is successfully released.
