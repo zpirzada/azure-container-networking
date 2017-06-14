@@ -95,7 +95,7 @@ func decodeResponse(w *httptest.ResponseRecorder, response interface{}) error {
 	return json.NewDecoder(w.Body).Decode(&response)
 }
 
-// Tests IpamClient GetAddressSpace function to get AddressSpaceID
+// Tests IpamClient GetAddressSpace function to get AddressSpaceID.
 func TestAddressSpaces(t *testing.T) {
 	asID, err := ic.GetAddressSpace()
 	if err != nil {
@@ -108,7 +108,7 @@ func TestAddressSpaces(t *testing.T) {
 	}
 }
 
-// Tests IpamClient GetPoolID function to get PoolID
+// Tests IpamClient GetPoolID function to get PoolID.
 func TestGetPoolID(t *testing.T) {
 	subnet := "10.0.0.0/16"
 
@@ -129,7 +129,7 @@ func TestGetPoolID(t *testing.T) {
 	}
 }
 
-// Tests IpamClient ReserveIPAddress function to request IP for ID
+// Tests IpamClient ReserveIPAddress function to request IP for ID.
 func TestReserveIP(t *testing.T) {
 	subnet := "10.0.0.0/16"
 
@@ -166,7 +166,7 @@ func TestReserveIP(t *testing.T) {
 
 }
 
-// Tests IpamClient ReleaseIPAddress function to release IP associated with ID
+// Tests IpamClient ReleaseIPAddress function to release IP associated with ID.
 func TestReleaseIP(t *testing.T) {
 	subnet := "10.0.0.0/16"
 
@@ -199,7 +199,7 @@ func TestReleaseIP(t *testing.T) {
 	}
 }
 
-// Tests IpamClient GetIPAddressUtilization function to retrieve IP Utilization info
+// Tests IpamClient GetIPAddressUtilization function to retrieve IP Utilization info.
 func TestIPAddressUtilization(t *testing.T) {
 	subnet := "10.0.0.0/16"
 

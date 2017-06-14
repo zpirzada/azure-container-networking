@@ -11,7 +11,6 @@ const (
 	UnsupportedEnvironment  = 3
 	UnreachableHost         = 4
 	ReservationNotFound     = 5
-	InvalidReservationID    = 6
 	MalformedSubnet         = 8
 	UnreachableDockerDaemon = 9
 	UnspecifiedNetworkName  = 10

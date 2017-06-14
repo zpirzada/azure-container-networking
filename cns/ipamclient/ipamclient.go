@@ -134,6 +134,7 @@ func (ic *IpamClient) ReserveIPAddress(poolID string, reservationID string) (str
 
 	if res.StatusCode == 200 {
 		var reserveResp reserveAddrResponse
+		// TODO
 		// var errorResp errorResponse
 
 		// err := json.NewDecoder(res.Body).Decode(&errorResp)
@@ -206,7 +207,7 @@ func (ic *IpamClient) ReleaseIPAddress(poolID string, reservationID string) erro
 
 }
 
-// GetIPAddressUtilization - returns number of available, reserved and unhealthy addresses list
+// GetIPAddressUtilization - returns number of available, reserved and unhealthy addresses list.
 func (ic *IpamClient) GetIPAddressUtilization(poolID string) (int, int, []string, error) {
 	var body bytes.Buffer
 	log.Printf("[Azure CNS] GetIPAddressUtilization")
@@ -237,12 +238,12 @@ func (ic *IpamClient) GetIPAddressUtilization(poolID string) (int, int, []string
 		var poolInfoResp getPoolInfoResponse
 		err := json.NewDecoder(res.Body).Decode(&poolInfoResp)
 		if err != nil {
-			log.Printf("[Azure CNS] Error received while parsing release response :%v err:%v", res.Body, err.Error())
+			log.Printf("[Azure CNS] Error received while parsing GetIPUtilization response :%v err:%v", res.Body, err.Error())
 			return 0, 0, nil, err
 		}
 		return poolInfoResp.Capacity, poolInfoResp.Available, poolInfoResp.UnhealthyAddresses, nil
 	}
-	log.Printf("[Azure CNS] ReleaseIP invalid http status code: %v err:%v", res.StatusCode, err.Error())
+	log.Printf("[Azure CNS] GetIPUtilization invalid http status code: %v err:%v", res.StatusCode, err.Error())
 	return 0, 0, nil, err
 
 }

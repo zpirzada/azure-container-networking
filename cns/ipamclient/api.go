@@ -1,5 +1,6 @@
 package ipamclient
 
+// IPAM Plugin API Contract.
 const (
 	getAddressSpacesPath = "/IpamDriver.GetDefaultAddressSpaces"
 	requestPoolPath      = "/IpamDriver.RequestPool"
@@ -8,17 +9,13 @@ const (
 	getPoolInfoPath      = "/IpamDriver.GetPoolInfo"
 )
 
-// Config describes subnet/gateway for ipam.
-type Config struct {
-	Subnet string
-}
-
+// Response received from IPAM Plugin when request AddressSpace.
 type getAddressSpacesResponse struct {
 	LocalDefaultAddressSpace  string
 	GlobalDefaultAddressSpace string
 }
 
-// Request sent by libnetwork when acquiring a reference to an address pool.
+// Request sent to IPAM plugin to request a pool.
 type requestPoolRequest struct {
 	AddressSpace string
 	Pool         string
@@ -27,41 +24,43 @@ type requestPoolRequest struct {
 	V6           bool
 }
 
-// Response sent by plugin when an address pool is successfully referenced.
+// Response received from IPAM Plugin when requesting a pool.
 type requestPoolResponse struct {
 	PoolID string
 	Pool   string
 	Data   map[string]string
 }
 
-// NetworkConfiguration describes configuration for docker network create.
+// Request sent to IPAM plugin to request IP reservation.
 type reserveAddrRequest struct {
 	PoolID  string
 	Address string
 	Options map[string]string
 }
 
-// DockerErrorResponse defines the error response retunred by docker.
+// Response received from IPAM Plugin when requesting a IP reservation.
 type reserveAddrResponse struct {
 	Address string
 }
 
-// NetworkConfiguration describes configuration for docker network create.
+// Request sent to IPAM plugin to release IP reservation.
 type releaseAddrRequest struct {
 	PoolID  string
 	Address string
 	Options map[string]string
 }
 
+// Response received from IPAM Plugin when requesting IP release.
 type releaseAddrResponse struct {
 	Err string
 }
 
-type errorResponse struct {
-	Err string
-}
+// TODO
+// type errorResponse struct {
+// 	Err string
+// }
 
-// Request sent when querying address pool information.
+// Request sent to IPAM plugin to query address pool information.
 type getPoolInfoRequest struct {
 	PoolID string
 }

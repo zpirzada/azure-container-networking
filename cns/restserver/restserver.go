@@ -13,7 +13,6 @@ import (
 	"github.com/Azure/azure-container-networking/cns/imdsclient"
 	"github.com/Azure/azure-container-networking/cns/ipamclient"
 	"github.com/Azure/azure-container-networking/cns/routes"
-	"github.com/Azure/azure-container-networking/cns/routes"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/store"
@@ -88,16 +87,6 @@ func (service *httpRestService) Start(config *common.ServiceConfig) error {
 
 	// Add handlers.
 	listener := service.Listener
-
-	// default handlers
-	listener.AddHandler(cns.SetEnvironmentPath, service.setEnvironment)
-	listener.AddHandler(cns.CreateNetworkPath, service.createNetwork)
-	listener.AddHandler(cns.DeleteNetworkPath, service.deleteNetwork)
-	listener.AddHandler(cns.ReserveIPAddressPath, service.reserveIPAddress)
-	listener.AddHandler(cns.ReleaseIPAddressPath, service.releaseIPAddress)
-	listener.AddHandler(cns.GetHostLocalIPPath, service.getHostLocalIP)
-	listener.AddHandler(cns.GetIPAddressUtilizationPath, service.getIPAddressUtilization)
-	listener.AddHandler(cns.GetUnhealthyIPAddressesPath, service.getUnhealthyIPAddresses)
 
 	// handlers for v0.1
 	listener.AddHandler(cns.V1Prefix+cns.SetEnvironmentPath, service.setEnvironment)
@@ -300,7 +289,7 @@ func (service *httpRestService) reserveIPAddress(w http.ResponseWriter, r *http.
 	}
 
 	if req.ReservationID == "" {
-		returnCode = InvalidReservationID
+		returnCode = ReservationNotFound
 		returnMessage = fmt.Sprintf("[Azure CNS] Error. ReservationId is empty")
 	}
 
@@ -367,7 +356,7 @@ func (service *httpRestService) releaseIPAddress(w http.ResponseWriter, r *http.
 	}
 
 	if req.ReservationID == "" {
-		returnCode = InvalidReservationID
+		returnCode = ReservationNotFound
 		returnMessage = fmt.Sprintf("[Azure CNS] Error. ReservationId is empty")
 	}
 
@@ -398,7 +387,7 @@ func (service *httpRestService) releaseIPAddress(w http.ResponseWriter, r *http.
 
 		err = ic.ReleaseIPAddress(poolID, req.ReservationID)
 		if err != nil {
-			returnMessage = fmt.Sprintf("ReserveIpAddress failed with %+v", err.Error())
+			returnMessage = fmt.Sprintf("ReleaseIpAddress failed with %+v", err.Error())
 			returnCode = UnexpectedError
 		}
 

@@ -3,8 +3,8 @@
 
 // +build linux
 
-package dockerclient
+package ipamclient
 
 const (
-	ipamPluginURL = ""
+	ipamPluginURL = "unix:///run/docker/plugins/"
 )
