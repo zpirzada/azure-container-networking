@@ -14,6 +14,7 @@ const (
 	GetIPAddressUtilizationPath = "/network/ip/Utilization"
 	GetUnhealthyIPAddressesPath	= "/network/ipaddresses/unhealthy"
 	GetHealthReportPath         = "/network/health"
+	V1Prefix 				    = "/v0.1"
 )
 
 // SetEnvironmentRequest describes the Request to set the environment in CNS.
