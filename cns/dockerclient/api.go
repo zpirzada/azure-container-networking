@@ -3,12 +3,11 @@
 
 package dockerclient
 
-import (
-)
+import ()
 
 const (
-	createNetworkPath	= "/networks/create"
-	inspectNetworkPath	= "/networks/"
+	createNetworkPath  = "/networks/create"
+	inspectNetworkPath = "/networks/"
 )
 
 // Config describes subnet/gateway for ipam.
@@ -19,15 +18,15 @@ type Config struct {
 // IPAM describes ipam details
 type IPAM struct {
 	Driver string
-    Config []Config 
+	Config []Config
 }
 
 // NetworkConfiguration describes configuration for docker network create.
 type NetworkConfiguration struct {
-  Name string
-  Driver string
-  IPAM IPAM
-  Internal bool
+	Name     string
+	Driver   string
+	IPAM     IPAM
+	Internal bool
 }
 
 // DockerErrorResponse defines the error response retunred by docker.

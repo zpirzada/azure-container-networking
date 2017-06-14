@@ -8,8 +8,8 @@ package routes
 import (
 	"fmt"
 	"net"
-	"strings"
 	"os/exec"
+	"strings"
 
 	"github.com/Azure/azure-container-networking/log"
 )
@@ -34,13 +34,13 @@ func getInterfaceByAddress(address string) (int, error) {
 		addrs, _ := ifaces[i].Addrs()
 		for _, addr := range addrs {
 			log.Debugf("[Azure CNS] ipAddress being compared input=%v %v\n",
-						address, addr.String())
+				address, addr.String())
 			ip := strings.Split(addr.String(), "/")
-			if(len(ip) != 2) {
+			if len(ip) != 2 {
 				return -1, fmt.Errorf("Malformed ip: %v", addr.String())
-			} 
-			if  ip[0] == address {
-					return ifaces[i].Index, nil
+			}
+			if ip[0] == address {
+				return ifaces[i].Index, nil
 			}
 		}
 	}
@@ -57,7 +57,6 @@ func getRoutes() ([]Route, error) {
 	var routePrintOutput string
 	var routeCount int
 	bytes, err := c.Output()
-
 	if err == nil {
 		routePrintOutput = string(bytes)
 		log.Debugf("[Azure CNS] Printing Routing table \n %v\n", routePrintOutput)
@@ -71,12 +70,11 @@ func getRoutes() ([]Route, error) {
 	tokens := strings.Split(
 		strings.Split(routeTable[1], "Metric")[1],
 		"=")
-
 	table := tokens[0]
 	routes := strings.Split(table, "\r")
 	routeCount = len(routes)
 	log.Debugf("[Azure CNS] Recevied route count: %d", routeCount)
-	if(routeCount == 0){
+	if routeCount == 0 {
 		return nil, nil
 	}
 
@@ -99,7 +97,7 @@ func getRoutes() ([]Route, error) {
 					metric:      tokens[4],
 				}
 
-				if(rt.gateway == "On-link"){
+				if rt.gateway == "On-link" {
 					rt.gateway = "0.0.0.0"
 				}
 
@@ -116,7 +114,7 @@ func getRoutes() ([]Route, error) {
 		}
 	}
 
-	if(truncated == routeCount) {
+	if truncated == routeCount {
 		localRoutes = nil
 	} else {
 		localRoutes = localRoutes[0 : routeCount-truncated-1]
@@ -125,18 +123,18 @@ func getRoutes() ([]Route, error) {
 	return localRoutes, nil
 }
 
-func containsRoute(routes []Route, route Route) (bool, error){
+func containsRoute(routes []Route, route Route) (bool, error) {
 	log.Printf("[Azure CNS] containsRoute")
-	if(routes == nil){
+	if routes == nil {
 		return false, nil
 	}
 	for _, existingRoute := range routes {
-		if(existingRoute.destination == route.destination &&
-		   existingRoute.gateway == route.gateway &&
-		   existingRoute.ifaceIndex == route.ifaceIndex &&
-		   existingRoute.mask == route.mask) {
-			   return true, nil
-		   }
+		if existingRoute.destination == route.destination &&
+			existingRoute.gateway == route.gateway &&
+			existingRoute.ifaceIndex == route.ifaceIndex &&
+			existingRoute.mask == route.mask {
+			return true, nil
+		}
 	}
 	return false, nil
 }
@@ -147,35 +145,35 @@ func putRoutes(routes []Route) error {
 	var err error
 	log.Printf("[Azure CNS] Going to get current routes")
 	currentRoutes, err := getRoutes()
-	if( err != nil){
+	if err != nil {
 		return err
 	}
 
 	for _, route := range routes {
 		exists, err := containsRoute(currentRoutes, route)
-		if(err == nil && !exists) {
+		if err == nil && !exists {
 			args := []string{"/C", "route", "ADD",
-							 route.destination,
-							 "MASK",
-							 route.mask,
-							 route.gateway,
-							 "METRIC",
-							 route.metric,
-							 "IF",
-							 fmt.Sprintf("%d", route.ifaceIndex)}
+				route.destination,
+				"MASK",
+				route.mask,
+				route.gateway,
+				"METRIC",
+				route.metric,
+				"IF",
+				fmt.Sprintf("%d", route.ifaceIndex)}
 			log.Printf("[Azure CNS] Adding missing route: %v", args)
 
-			c := exec.Command("cmd",  args...)		
+			c := exec.Command("cmd", args...)
 			bytes, err := c.Output()
 			if err == nil {
 				log.Printf("[Azure CNS] Successfully executed add route: %v\n%v", args, string(bytes))
 			} else {
-				log.Printf("[Azure CNS] Failed to execute add route: %v\n%v", args, string(bytes))			
+				log.Printf("[Azure CNS] Failed to execute add route: %v\n%v", args, string(bytes))
 			}
 		} else {
 			log.Printf("[Azure CNS] Route already exists. skipping %+v", route)
 		}
 	}
-	
+
 	return err
 }

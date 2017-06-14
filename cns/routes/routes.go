@@ -10,10 +10,10 @@ import (
 // Route describes a single route in the routing table.
 type Route struct {
 	destination string
-	mask string
-	gateway string
-	metric string
-	ifaceIndex int
+	mask        string
+	gateway     string
+	metric      string
+	ifaceIndex  int
 }
 
 // RoutingTable describes the routing table on the node.
@@ -22,9 +22,9 @@ type RoutingTable struct {
 }
 
 // GetRoutingTable retireves routing table in the node.
-func (rt *RoutingTable) GetRoutingTable() (error) {
+func (rt *RoutingTable) GetRoutingTable() error {
 	routes, err := getRoutes()
-	if(err == nil) {
+	if err == nil {
 		rt.Routes = routes
 	}
 
@@ -32,7 +32,7 @@ func (rt *RoutingTable) GetRoutingTable() (error) {
 }
 
 // RestoreRoutingTable pushes the saved route.
-func (rt *RoutingTable) RestoreRoutingTable () (error) {
+func (rt *RoutingTable) RestoreRoutingTable() error {
 	if rt.Routes == nil {
 		log.Printf("[Azure CNS] Nothing available in routing table to push")
 		return nil

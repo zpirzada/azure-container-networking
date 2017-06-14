@@ -8,7 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	
+
 	"github.com/Azure/azure-container-networking/cns/restserver"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
@@ -75,7 +75,7 @@ func printVersion() {
 func main() {
 	// Initialize and parse command line arguments.
 	common.ParseArgs(&args, printVersion)
-	
+
 	url := common.GetArg(common.OptAPIServerURL).(string)
 	logLevel := common.GetArg(common.OptLogLevel).(int)
 	logTarget := common.GetArg(common.OptLogTarget).(int)
@@ -92,7 +92,7 @@ func main() {
 	config.Name = name
 
 	// Create a channel to receive unhandled errors from CNS.
-	config.ErrChan = make(chan error, 1)	
+	config.ErrChan = make(chan error, 1)
 
 	// Create the key value store.
 	var err error

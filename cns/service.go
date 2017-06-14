@@ -15,7 +15,7 @@ import (
 const (
 	// Default CNS server URL.
 	defaultAPIServerURL = "tcp://localhost:10090"
-	genericData = "com.microsoft.azure.network.generic"
+	genericData         = "com.microsoft.azure.network.generic"
 )
 
 // Service defines Container Networking Service.
@@ -26,7 +26,7 @@ type Service struct {
 }
 
 // NewService creates a new Service object.
-func NewService(name, version string, store store.KeyValueStore) (*Service, error) {	
+func NewService(name, version string, store store.KeyValueStore) (*Service, error) {
 	service, err := common.NewService(name, version, store)
 
 	if err != nil {
@@ -34,7 +34,7 @@ func NewService(name, version string, store store.KeyValueStore) (*Service, erro
 	}
 
 	return &Service{
-		Service:       service,
+		Service: service,
 	}, nil
 }
 
@@ -51,7 +51,7 @@ func (service *Service) getAPIServerURL() string {
 // Initialize initializes the service and starts the listener.
 func (service *Service) Initialize(config *common.ServiceConfig) error {
 	log.Debugf("[Azure CNS] Going to initialize a service with config: %+v", config)
-	
+
 	// Initialize the base service.
 	service.Service.Initialize(config)
 
@@ -80,24 +80,24 @@ func (service *Service) Initialize(config *common.ServiceConfig) error {
 
 	service.Listener = config.Listener
 
-	log.Debugf("[Azure CNS] Successfully initialized a service with config: %+v", config)	
+	log.Debugf("[Azure CNS] Successfully initialized a service with config: %+v", config)
 	return nil
 }
 
 // Uninitialize cleans up the plugin.
-func (service *Service)  Uninitialize() {
+func (service *Service) Uninitialize() {
 	service.Listener.Stop()
 	service.Service.Uninitialize()
 }
 
 // ParseOptions returns generic options from a libnetwork request.
-func (service *Service)  ParseOptions(options OptionMap) OptionMap {
+func (service *Service) ParseOptions(options OptionMap) OptionMap {
 	opt, _ := options[genericData].(OptionMap)
 	return opt
 }
 
 // SendErrorResponse sends and logs an error response.
-func (service *Service)  SendErrorResponse(w http.ResponseWriter, errMsg error) {
+func (service *Service) SendErrorResponse(w http.ResponseWriter, errMsg error) {
 	resp := errorResponse{errMsg.Error()}
 	err := service.Listener.Encode(w, &resp)
 	log.Response(service.Name, &resp, err)
