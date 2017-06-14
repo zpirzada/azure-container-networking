@@ -15,8 +15,7 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 )
 
-const (
-)
+const ()
 
 func getRoutes() ([]Route, error) {
 	return nil, nil
