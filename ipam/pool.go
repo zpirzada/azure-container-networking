@@ -66,18 +66,22 @@ type addressPool struct {
 
 // AddressPoolInfo contains information about an address pool.
 type AddressPoolInfo struct {
-	Subnet     net.IPNet
-	Gateway    net.IP
-	DnsServers []net.IP
-	IsIPv6     bool
+	Subnet         net.IPNet
+	Gateway        net.IP
+	DnsServers     []net.IP
+	UnhealthyAddrs []net.IP
+	IsIPv6         bool
+	Available      int
+	Capacity       int
 }
 
 // Represents an IP address in a pool.
 type addressRecord struct {
-	ID    string
-	Addr  net.IP
-	InUse bool
-	epoch int
+	ID        string
+	Addr      net.IP
+	InUse     bool
+	unhealthy bool
+	epoch     int
 }
 
 //
@@ -199,6 +203,7 @@ func (as *addressSpace) merge(newas *addressSpace) {
 				} else {
 					// This address record already exists.
 					ar.epoch = as.epoch
+					ar.unhealthy = false
 				}
 
 				delete(pv.Addresses, ak)
@@ -216,9 +221,13 @@ func (as *addressSpace) merge(newas *addressSpace) {
 		if pv.epoch < as.epoch {
 			// This pool may have stale addresses.
 			for ak, av := range pv.Addresses {
-				if av.epoch == as.epoch || av.InUse {
+				if av.epoch == as.epoch {
 					// Pool has at least one valid or in-use address.
 					pv.epoch = as.epoch
+				} else if av.InUse {
+					// Address is no longer valid, but still in use.
+					pv.epoch = as.epoch
+					av.unhealthy = true
 				} else {
 					// This address is no longer available.
 					delete(pv.Addresses, ak)
@@ -382,14 +391,28 @@ func (as *addressSpace) releasePool(poolId string) error {
 //
 // AddressPool
 //
-
-// Returns if an address pool is currently in use.
+// Returns address pool information.
 func (ap *addressPool) getInfo() *AddressPoolInfo {
+	var available int
+	var unhealthyAddrs []net.IP
+
+	for _, ar := range ap.Addresses {
+		if !ar.InUse {
+			available++
+		}
+		if ar.unhealthy {
+			unhealthyAddrs = append(unhealthyAddrs, ar.Addr)
+		}
+	}
+
 	info := &AddressPoolInfo{
-		Subnet:     ap.Subnet,
-		Gateway:    ap.Gateway,
-		DnsServers: []net.IP{dnsHostProxyAddress},
-		IsIPv6:     ap.IsIPv6,
+		Subnet:         ap.Subnet,
+		Gateway:        ap.Gateway,
+		DnsServers:     []net.IP{dnsHostProxyAddress},
+		UnhealthyAddrs: unhealthyAddrs,
+		IsIPv6:         ap.IsIPv6,
+		Available:      available,
+		Capacity:       len(ap.Addresses),
 	}
 
 	return info
@@ -489,18 +512,33 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 }
 
 // Releases a previously requested address back to its address pool.
-func (ap *addressPool) releaseAddress(address string) error {
+func (ap *addressPool) releaseAddress(address string, options map[string]string) error {
+	var ar *addressRecord
+	var id string
 	var err error
 
-	log.Printf("[ipam] Releasing address %v.", address)
+	log.Printf("[ipam] Releasing address %v options:%+v.", address, options)
 	defer func() { log.Printf("[ipam] Address release completed with err:%v.", err) }()
 
-	ar := ap.Addresses[address]
-	if ar == nil {
-		// Handle pre-assigned addresses.
-		if address == ap.Gateway.String() {
+	if options != nil {
+		id = options[OptAddressID]
+	}
+
+	if address != "" {
+		// Release the specific address.
+		ar = ap.Addresses[address]
+
+		// Release the pre-assigned gateway address.
+		if ar == nil && address == ap.Gateway.String() {
 			return nil
 		}
+	} else if id != "" {
+		// Release the address with the matching ID.
+		ar = ap.addrsByID[id]
+		log.Printf("[ipam] Releasing address %v.", ar.Addr.String())
+	}
+
+	if ar == nil {
 		err = errAddressNotFound
 		return err
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/dockerclient"
 	"github.com/Azure/azure-container-networking/cns/imdsclient"
 	"github.com/Azure/azure-container-networking/cns/ipamclient"
+	"github.com/Azure/azure-container-networking/cns/routes"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/store"
@@ -28,10 +29,9 @@ type httpRestService struct {
 	dockerClient *dockerclient.DockerClient
 	imdsClient   *imdsclient.ImdsClient
 	ipamClient   *ipamclient.IpamClient
+	routingTable *routes.RoutingTable
 	store        store.KeyValueStore
 	state        httpRestServiceState
-	asID         string
-	poolID       string
 }
 
 // httpRestServiceState contains the state we would like to persist.
@@ -55,6 +55,7 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 	}
 
 	imdsClient := &imdsclient.ImdsClient{}
+	routingTable := &routes.RoutingTable{}
 	dc, err := dockerclient.NewDefaultDockerClient(imdsClient)
 	if err != nil {
 		return nil, err
@@ -71,6 +72,7 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 		dockerClient: dc,
 		imdsClient:   imdsClient,
 		ipamClient:   ic,
+		routingTable: routingTable,
 	}, nil
 }
 
@@ -85,6 +87,8 @@ func (service *httpRestService) Start(config *common.ServiceConfig) error {
 
 	// Add handlers.
 	listener := service.Listener
+
+	// default handlers
 	listener.AddHandler(cns.SetEnvironmentPath, service.setEnvironment)
 	listener.AddHandler(cns.CreateNetworkPath, service.createNetwork)
 	listener.AddHandler(cns.DeleteNetworkPath, service.deleteNetwork)
@@ -93,6 +97,16 @@ func (service *httpRestService) Start(config *common.ServiceConfig) error {
 	listener.AddHandler(cns.GetHostLocalIPPath, service.getHostLocalIP)
 	listener.AddHandler(cns.GetIPAddressUtilizationPath, service.getIPAddressUtilization)
 	listener.AddHandler(cns.GetUnhealthyIPAddressesPath, service.getUnhealthyIPAddresses)
+
+	// handlers for v0.1
+	listener.AddHandler(cns.V1Prefix+cns.SetEnvironmentPath, service.setEnvironment)
+	listener.AddHandler(cns.V1Prefix+cns.CreateNetworkPath, service.createNetwork)
+	listener.AddHandler(cns.V1Prefix+cns.DeleteNetworkPath, service.deleteNetwork)
+	listener.AddHandler(cns.V1Prefix+cns.ReserveIPAddressPath, service.reserveIPAddress)
+	listener.AddHandler(cns.V1Prefix+cns.ReleaseIPAddressPath, service.releaseIPAddress)
+	listener.AddHandler(cns.V1Prefix+cns.GetHostLocalIPPath, service.getHostLocalIP)
+	listener.AddHandler(cns.V1Prefix+cns.GetIPAddressUtilizationPath, service.getIPAddressUtilization)
+	listener.AddHandler(cns.V1Prefix+cns.GetUnhealthyIPAddressesPath, service.getUnhealthyIPAddresses)
 
 	log.Printf("[Azure CNS]  Listening.")
 	return nil
@@ -152,6 +166,7 @@ func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Req
 			switch r.Method {
 			case "POST":
 				dc := service.dockerClient
+				rt := service.routingTable
 				err = dc.NetworkExists(req.NetworkName)
 
 				// Network does not exist.
@@ -161,11 +176,27 @@ func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Req
 						switch service.state.Location {
 						case "Azure":
 							log.Printf("[Azure CNS] Goign to create network with name %v.", req.NetworkName)
+
+							err = rt.GetRoutingTable()
+							if err != nil {
+								// We should not fail the call to create network for this.
+								// This is because restoring routes is a fallback mechanism in case
+								// network driver is not behaving as expected.
+								// The responsibility to restore routes is with network driver.
+								log.Printf("[Azure CNS] Unable to get routing table from node, %+v.", err.Error())
+							}
+
 							err = dc.CreateNetwork(req.NetworkName)
 							if err != nil {
 								returnMessage = fmt.Sprintf("[Azure CNS] Error. CreateNetwork failed %v.", err.Error())
 								returnCode = UnexpectedError
 							}
+
+							err = rt.RestoreRoutingTable()
+							if err != nil {
+								log.Printf("[Azure CNS] Unable to restore routing table on node, %+v.", err.Error())
+							}
+
 						case "StandAlone":
 							returnMessage = fmt.Sprintf("[Azure CNS] Error. Underlay network is not supported in StandAlone environment. %v.", err.Error())
 							returnCode = UnsupportedEnvironment
@@ -322,6 +353,7 @@ func (service *httpRestService) reserveIPAddress(w http.ResponseWriter, r *http.
 // Handles release ip reservation requests.
 func (service *httpRestService) releaseIPAddress(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[Azure CNS] releaseIPAddress")
+
 	var req cns.ReleaseIPAddressRequest
 	returnMessage := ""
 	returnCode := 0
@@ -537,13 +569,63 @@ func (service *httpRestService) getUnhealthyIPAddresses(w http.ResponseWriter, r
 	log.Printf("[Azure CNS] getUnhealthyIPAddresses")
 	log.Request(service.Name, "getUnhealthyIPAddresses", nil)
 
+	returnMessage := ""
+	returnCode := 0
+	capacity := 0
+	available := 0
+	var unhealthyAddrs []string
+
 	switch r.Method {
 	case "GET":
+		ic := service.ipamClient
+
+		ifInfo, err := service.imdsClient.GetPrimaryInterfaceInfoFromMemory()
+		if err != nil {
+			returnMessage = fmt.Sprintf("[Azure CNS] Error. GetPrimaryIfaceInfo failed %v", err.Error())
+			returnCode = UnexpectedError
+			break
+		}
+
+		asID, err := ic.GetAddressSpace()
+		if err != nil {
+			returnMessage = fmt.Sprintf("[Azure CNS] Error. GetAddressSpace failed %v", err.Error())
+			returnCode = UnexpectedError
+			break
+		}
+
+		poolID, err := ic.GetPoolID(asID, ifInfo.Subnet)
+		if err != nil {
+			returnMessage = fmt.Sprintf("[Azure CNS] Error. GetPoolID failed %v", err.Error())
+			returnCode = UnexpectedError
+			break
+		}
+
+		capacity, available, unhealthyAddrs, err = ic.GetIPAddressUtilization(poolID)
+		if err != nil {
+			returnMessage = fmt.Sprintf("[Azure CNS] Error. GetIPUtilization failed %v", err.Error())
+			returnCode = UnexpectedError
+			break
+		}
+		log.Printf("Capacity %v Available %v UnhealthyAddrs %v", capacity, available, unhealthyAddrs)
+
 	default:
 	}
 
-	resp := cns.Response{ReturnCode: 0}
-	ipResp := &cns.GetIPAddressesResponse{Response: resp}
+	resp := cns.Response{
+		ReturnCode: returnCode,
+		Message:    returnMessage,
+	}
+
+	ipResp := &cns.GetIPAddressesResponse{
+		Response: resp,
+	}
+
+	ipResp.IPAddresses = make([]cns.IPAddress, len(unhealthyAddrs))
+
+	for index, addr := range unhealthyAddrs {
+		ipResp.IPAddresses[index].IPAddress = addr
+	}
+
 	err := service.Listener.Encode(w, &ipResp)
 
 	log.Response(service.Name, ipResp, err)

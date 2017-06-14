@@ -57,6 +57,10 @@ type releaseAddrResponse struct {
 	Err string
 }
 
+type errorResponse struct {
+	Err string
+}
+
 // Request sent when querying address pool information.
 type getPoolInfoRequest struct {
 	PoolID string

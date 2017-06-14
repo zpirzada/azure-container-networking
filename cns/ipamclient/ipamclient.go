@@ -134,11 +134,25 @@ func (ic *IpamClient) ReserveIPAddress(poolID string, reservationID string) (str
 
 	if res.StatusCode == 200 {
 		var reserveResp reserveAddrResponse
-		err := json.NewDecoder(res.Body).Decode(&reserveResp)
+		// var errorResp errorResponse
+
+		// err := json.NewDecoder(res.Body).Decode(&errorResp)
+		// if err != nil {
+		// 	log.Printf("[Azure CNS] Error received while parsing reserve response resp:%v err:%v", res.Body, err.Error())
+		// 	return "", err
+		// }
+
+		// if errorResp.Err != "" {
+		// 	log.Printf("[Azure CNS] Received Error Response from IPAM :%v", errorResp.Err)
+		// 	return "", fmt.Errorf(errorResp.Err)
+		// }
+		err = json.NewDecoder(res.Body).Decode(&reserveResp)
 		if err != nil {
 			log.Printf("[Azure CNS] Error received while parsing reserve response resp:%v err:%v", res.Body, err.Error())
 			return "", err
 		}
+
+		return reserveResp.Address, nil
 	}
 	log.Printf("[Azure CNS] ReserveIp invalid http status code: %v err:%v", res.StatusCode, err.Error())
 	return "", err

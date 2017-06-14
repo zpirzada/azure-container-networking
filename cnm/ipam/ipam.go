@@ -76,6 +76,7 @@ func (plugin *ipamPlugin) Start(config *common.PluginConfig) error {
 	listener.AddHandler(getAddressSpacesPath, plugin.getDefaultAddressSpaces)
 	listener.AddHandler(requestPoolPath, plugin.requestPool)
 	listener.AddHandler(releasePoolPath, plugin.releasePool)
+	listener.AddHandler(getPoolInfoPath, plugin.getPoolInfo)
 	listener.AddHandler(requestAddressPath, plugin.requestAddress)
 	listener.AddHandler(releaseAddressPath, plugin.releaseAddress)
 
@@ -197,6 +198,45 @@ func (plugin *ipamPlugin) releasePool(w http.ResponseWriter, r *http.Request) {
 	log.Response(plugin.Name, &resp, err)
 }
 
+// Handles GetPoolInfo requests.
+func (plugin *ipamPlugin) getPoolInfo(w http.ResponseWriter, r *http.Request) {
+	var req getPoolInfoRequest
+
+	// Decode request.
+	err := plugin.Listener.Decode(w, r, &req)
+	log.Request(plugin.Name, &req, err)
+	if err != nil {
+		return
+	}
+
+	// Process request.
+	poolId, err := ipam.NewAddressPoolIdFromString(req.PoolID)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
+	}
+
+	apInfo, err := plugin.am.GetPoolInfo(poolId.AsId, poolId.Subnet)
+	if err != nil {
+		plugin.SendErrorResponse(w, err)
+		return
+	}
+
+	// Encode response.
+	resp := getPoolInfoResponse{
+		Capacity:  apInfo.Capacity,
+		Available: apInfo.Available,
+	}
+
+	for _, addr := range apInfo.UnhealthyAddrs {
+		resp.UnhealthyAddresses = append(resp.UnhealthyAddresses, addr.String())
+	}
+
+	err = plugin.Listener.Encode(w, &resp)
+
+	log.Response(plugin.Name, &resp, err)
+}
+
 // Handles RequestAddress requests.
 func (plugin *ipamPlugin) requestAddress(w http.ResponseWriter, r *http.Request) {
 	var req requestAddressRequest
@@ -220,6 +260,8 @@ func (plugin *ipamPlugin) requestAddress(w http.ResponseWriter, r *http.Request)
 	if req.Options[OptAddressType] == OptAddressTypeGateway {
 		options[ipam.OptAddressType] = ipam.OptAddressTypeGateway
 	}
+
+	options[ipam.OptAddressID] = req.Options[ipam.OptAddressID]
 
 	addr, err := plugin.am.RequestAddress(poolId.AsId, poolId.Subnet, req.Address, options)
 	if err != nil {
@@ -254,7 +296,7 @@ func (plugin *ipamPlugin) releaseAddress(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = plugin.am.ReleaseAddress(poolId.AsId, poolId.Subnet, req.Address)
+	err = plugin.am.ReleaseAddress(poolId.AsId, poolId.Subnet, req.Address, req.Options)
 	if err != nil {
 		plugin.SendErrorResponse(w, err)
 		return

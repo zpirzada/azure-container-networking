@@ -67,6 +67,7 @@ func handlePoolIDQuery(w http.ResponseWriter, r *http.Request) {
 // Handles queries from ReserveIPAddress.
 func handleReserveIPQuery(w http.ResponseWriter, r *http.Request) {
 	var reserveIPResp = "{\"Address\":\"10.0.0.2/16\"}"
+	//var reserveIPResp = "{\"Err\":\"addr not found\"}"
 	w.Write([]byte(reserveIPResp))
 }
 

@@ -12,9 +12,11 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/ipam"
 )
 
 var plugin IpamPlugin
@@ -28,6 +30,10 @@ var ipamQueryResponse = "" +
 	"			<IPAddress Address=\"10.0.0.4\" IsPrimary=\"true\"/>" +
 	"			<IPAddress Address=\"10.0.0.5\" IsPrimary=\"false\"/>" +
 	"			<IPAddress Address=\"10.0.0.6\" IsPrimary=\"false\"/>" +
+	"			<IPAddress Address=\"10.0.0.7\" IsPrimary=\"false\"/>" +
+	"			<IPAddress Address=\"10.0.0.8\" IsPrimary=\"false\"/>" +
+	"			<IPAddress Address=\"10.0.0.9\" IsPrimary=\"false\"/>" +
+	"			<IPAddress Address=\"10.0.0.10\" IsPrimary=\"false\"/>" +
 	"		</IPSubnet>" +
 	"	</Interface>" +
 	"</Interfaces>"
@@ -282,5 +288,148 @@ func TestReleasePool(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("ReleasePool response is invalid %+v", resp)
+	}
+}
+
+// Tests IpamDriver.GetPoolInfo functionality.
+func TestGetPoolInfo(t *testing.T) {
+	var body bytes.Buffer
+	var resp getPoolInfoResponse
+
+	payload := &getPoolInfoRequest{
+		PoolID: poolId1,
+	}
+
+	json.NewEncoder(&body).Encode(payload)
+
+	req, err := http.NewRequest(http.MethodGet, getPoolInfoPath, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil {
+		t.Errorf("GetPoolInfo response is invalid %+v", resp)
+	}
+}
+
+// Utility function to request address from IPAM.
+func reqAddrInternal(payload *requestAddressRequest) (string, error) {
+	var body bytes.Buffer
+	var resp requestAddressResponse
+	json.NewEncoder(&body).Encode(payload)
+
+	req, err := http.NewRequest(http.MethodGet, requestAddressPath, &body)
+	if err != nil {
+		return "", err
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil {
+		return "", err
+	}
+	return resp.Address, nil
+}
+
+// Utility function to release address from IPAM.
+func releaseAddrInternal(payload *releaseAddressRequest) error {
+	var body bytes.Buffer
+	var resp releaseAddressResponse
+
+	json.NewEncoder(&body).Encode(payload)
+
+	req, err := http.NewRequest(http.MethodGet, releaseAddressPath, &body)
+	if err != nil {
+		return err
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Tests IpamDriver.RequestAddress with id.
+func TestRequestAddressWithID(t *testing.T) {
+	var ipList [2]string
+
+	for i := 0; i < 2; i++ {
+
+		payload := &requestAddressRequest{
+			PoolID:  poolId1,
+			Address: "",
+			Options: make(map[string]string),
+		}
+
+		payload.Options[ipam.OptAddressID] = "id" + strconv.Itoa(i)
+
+		addr1, err := reqAddrInternal(payload)
+		if err != nil {
+			t.Errorf("RequestAddress response is invalid %+v", err)
+		}
+
+		addr2, err := reqAddrInternal(payload)
+		if err != nil {
+			t.Errorf("RequestAddress response is invalid %+v", err)
+		}
+
+		if addr1 != addr2 {
+			t.Errorf("RequestAddress with id %+v doesn't match with retrieved addr %+v ", addr1, addr2)
+		}
+
+		address, _, _ := net.ParseCIDR(addr1)
+		ipList[i] = address.String()
+	}
+
+	for i := 0; i < 2; i++ {
+		payload := &releaseAddressRequest{
+			PoolID:  poolId1,
+			Address: ipList[i],
+		}
+		err := releaseAddrInternal(payload)
+		if err != nil {
+			t.Errorf("ReleaseAddress response is invalid %+v", err)
+		}
+	}
+}
+
+// Tests IpamDriver.ReleaseAddress with id.
+func TestReleaseAddressWithID(t *testing.T) {
+	reqPayload := &requestAddressRequest{
+		PoolID:  poolId1,
+		Address: "",
+		Options: make(map[string]string),
+	}
+	reqPayload.Options[ipam.OptAddressID] = "id1"
+
+	_, err := reqAddrInternal(reqPayload)
+	if err != nil {
+		t.Errorf("RequestAddress response is invalid %+v", err)
+	}
+
+	releasePayload := &releaseAddressRequest{
+		PoolID:  poolId1,
+		Address: "",
+		Options: make(map[string]string),
+	}
+	releasePayload.Options[ipam.OptAddressID] = "id1"
+
+	err = releaseAddrInternal(releasePayload)
+
+	if err != nil {
+		t.Errorf("ReleaseAddress response is invalid %+v", err)
 	}
 }
