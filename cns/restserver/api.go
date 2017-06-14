@@ -4,16 +4,17 @@
 package restserver
 
 // Container Network Service remote API Contract.
-const (	
-	Success = 0
-	UnsupportedNetworkType = 1
-	InvalidParameter = 2
-	UnsupportedEnvironment = 3
-	UnreachableHost = 4
-	ReservationNotFound = 5
-	MalformedSubnet = 8
+const (
+	Success                 = 0
+	UnsupportedNetworkType  = 1
+	InvalidParameter        = 2
+	UnsupportedEnvironment  = 3
+	UnreachableHost         = 4
+	ReservationNotFound     = 5
+	InvalidReservationID    = 6
+	MalformedSubnet         = 8
 	UnreachableDockerDaemon = 9
-	UnspecifiedNetworkName = 10
-	NotFound = 14
-	UnexpectedError = 99	
+	UnspecifiedNetworkName  = 10
+	NotFound                = 14
+	UnexpectedError         = 99
 )
