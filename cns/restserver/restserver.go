@@ -401,6 +401,8 @@ func (service *httpRestService) releaseIPAddress(w http.ResponseWriter, r *http.
 		}
 
 	default:
+		returnMessage = "[Azure CNS] Error. ReleaseIP did not receive a POST."
+		returnCode = InvalidParameter
 	}
 
 	resp := cns.Response{
@@ -510,6 +512,8 @@ func (service *httpRestService) getIPAddressUtilization(w http.ResponseWriter, r
 		log.Printf("Capacity %v Available %v UnhealthyAddrs %v", capacity, available, unhealthyAddrs)
 
 	default:
+		returnMessage = "[Azure CNS] Error. GetIPUtilization did not receive a GET."
+		returnCode = InvalidParameter
 	}
 
 	resp := cns.Response{
@@ -608,6 +612,8 @@ func (service *httpRestService) getUnhealthyIPAddresses(w http.ResponseWriter, r
 		log.Printf("Capacity %v Available %v UnhealthyAddrs %v", capacity, available, unhealthyAddrs)
 
 	default:
+		returnMessage = "[Azure CNS] Error. GetUnhealthyIP did not receive a POST."
+		returnCode = InvalidParameter
 	}
 
 	resp := cns.Response{
