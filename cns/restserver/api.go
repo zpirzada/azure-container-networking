@@ -15,5 +15,6 @@ const (
 	UnreachableDockerDaemon = 9
 	UnspecifiedNetworkName  = 10
 	NotFound                = 14
+	AddressUnavailable      = 15
 	UnexpectedError         = 99
 )

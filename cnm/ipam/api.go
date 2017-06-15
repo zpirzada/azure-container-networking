@@ -27,6 +27,7 @@ type getCapabilitiesRequest struct {
 
 // Response sent by plugin when registering its capabilities with libnetwork.
 type getCapabilitiesResponse struct {
+	Err                   string
 	RequiresMACAddress    bool
 	RequiresRequestReplay bool
 }
@@ -37,6 +38,7 @@ type getDefaultAddressSpacesRequest struct {
 
 // Response sent by plugin when returning the default address space names.
 type getDefaultAddressSpacesResponse struct {
+	Err                       string
 	LocalDefaultAddressSpace  string
 	GlobalDefaultAddressSpace string
 }
@@ -52,6 +54,7 @@ type requestPoolRequest struct {
 
 // Response sent by plugin when an address pool is successfully referenced.
 type requestPoolResponse struct {
+	Err    string
 	PoolID string
 	Pool   string
 	Data   map[string]string
@@ -64,6 +67,7 @@ type releasePoolRequest struct {
 
 // Response sent by plugin when an address pool is successfully released.
 type releasePoolResponse struct {
+	Err string
 }
 
 // Request sent when querying address pool information.
@@ -73,6 +77,7 @@ type getPoolInfoRequest struct {
 
 // Response sent by plugin when returning address pool information.
 type getPoolInfoResponse struct {
+	Err                string
 	Capacity           int
 	Available          int
 	UnhealthyAddresses []string
@@ -87,6 +92,7 @@ type requestAddressRequest struct {
 
 // Response sent by plugin when an address is successfully reserved.
 type requestAddressResponse struct {
+	Err     string
 	Address string
 	Data    map[string]string
 }
@@ -100,4 +106,5 @@ type releaseAddressRequest struct {
 
 // Response sent by plugin when an address is successfully released.
 type releaseAddressResponse struct {
+	Err string
 }

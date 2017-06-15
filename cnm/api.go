@@ -27,6 +27,7 @@ type activateRequest struct {
 }
 
 // Response sent by plugin for activation.
-type activateResponse struct {
+type ActivateResponse struct {
+	Err        string
 	Implements []string
 }

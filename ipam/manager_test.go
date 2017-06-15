@@ -356,12 +356,12 @@ func TestAddressRequestsFromTheSamePool(t *testing.T) {
 	}
 
 	// Release addresses and the pool.
-	err = am.ReleaseAddress(LocalDefaultAddressSpaceId, poolId, address1)
+	err = am.ReleaseAddress(LocalDefaultAddressSpaceId, poolId, address1, nil)
 	if err != nil {
 		t.Errorf("ReleaseAddress failed, err:%v", err)
 	}
 
-	err = am.ReleaseAddress(LocalDefaultAddressSpaceId, poolId, address2)
+	err = am.ReleaseAddress(LocalDefaultAddressSpaceId, poolId, address2, nil)
 	if err != nil {
 		t.Errorf("ReleaseAddress failed, err:%v", err)
 	}

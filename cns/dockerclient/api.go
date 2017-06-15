@@ -3,8 +3,6 @@
 
 package dockerclient
 
-import ()
-
 const (
 	createNetworkPath  = "/networks/create"
 	inspectNetworkPath = "/networks/"
