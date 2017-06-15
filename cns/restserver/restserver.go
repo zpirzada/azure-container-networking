@@ -87,16 +87,16 @@ func (service *httpRestService) Start(config *common.ServiceConfig) error {
 
 	// Add handlers.
 	listener := service.Listener
-// default handlers
- 	listener.AddHandler(cns.SetEnvironmentPath, service.setEnvironment)
- 	listener.AddHandler(cns.CreateNetworkPath, service.createNetwork)
+	// default handlers
+	listener.AddHandler(cns.SetEnvironmentPath, service.setEnvironment)
+	listener.AddHandler(cns.CreateNetworkPath, service.createNetwork)
 	listener.AddHandler(cns.DeleteNetworkPath, service.deleteNetwork)
- 	listener.AddHandler(cns.ReserveIPAddressPath, service.reserveIPAddress)
- 	listener.AddHandler(cns.ReleaseIPAddressPath, service.releaseIPAddress)
- 	listener.AddHandler(cns.GetHostLocalIPPath, service.getHostLocalIP)
- 	listener.AddHandler(cns.GetIPAddressUtilizationPath, service.getIPAddressUtilization)
- 	listener.AddHandler(cns.GetUnhealthyIPAddressesPath, service.getUnhealthyIPAddresses)
- 
+	listener.AddHandler(cns.ReserveIPAddressPath, service.reserveIPAddress)
+	listener.AddHandler(cns.ReleaseIPAddressPath, service.releaseIPAddress)
+	listener.AddHandler(cns.GetHostLocalIPPath, service.getHostLocalIP)
+	listener.AddHandler(cns.GetIPAddressUtilizationPath, service.getIPAddressUtilization)
+	listener.AddHandler(cns.GetUnhealthyIPAddressesPath, service.getUnhealthyIPAddresses)
+
 	// handlers for v0.1
 	listener.AddHandler(cns.V1Prefix+cns.SetEnvironmentPath, service.setEnvironment)
 	listener.AddHandler(cns.V1Prefix+cns.CreateNetworkPath, service.createNetwork)
@@ -616,13 +616,8 @@ func (service *httpRestService) getUnhealthyIPAddresses(w http.ResponseWriter, r
 	}
 
 	ipResp := &cns.GetIPAddressesResponse{
-		Response: resp,
-	}
-
-	ipResp.IPAddresses = make([]cns.IPAddress, len(unhealthyAddrs))
-
-	for index, addr := range unhealthyAddrs {
-		ipResp.IPAddresses[index].IPAddress = addr
+		Response:    resp,
+		IPAddresses: unhealthyAddrs,
 	}
 
 	err := service.Listener.Encode(w, &ipResp)

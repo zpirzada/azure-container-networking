@@ -69,19 +69,13 @@ type IPAddressesUtilizationResponse struct {
 // GetIPAddressesResponse describes response containing requested ip addresses.
 type GetIPAddressesResponse struct {
 	Response    Response
-	IPAddresses []IPAddress
+	IPAddresses []string
 }
 
 // HostLocalIPAddressResponse describes reponse that returns the host local IP Address.
 type HostLocalIPAddressResponse struct {
 	Response  Response
 	IPAddress string
-}
-
-// IPAddress Contains information about an ip address.
-type IPAddress struct {
-	IPAddress     string
-	ReservationID string
 }
 
 // Subnet contains the ip address and the number of bits in prefix.
