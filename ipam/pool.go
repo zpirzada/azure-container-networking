@@ -517,8 +517,8 @@ func (ap *addressPool) releaseAddress(address string, options map[string]string)
 	var id string
 	var err error
 
-	log.Printf("[ipam] Releasing address %v options:%+v.", address, options)
-	defer func() { log.Printf("[ipam] Address release completed with err:%v.", err) }()
+	log.Printf("[ipam] Releasing address with address:%v options:%+v.", address, options)
+	defer func() { log.Printf("[ipam] Address release completed with address:%v err:%v.", address, err) }()
 
 	if options != nil {
 		id = options[OptAddressID]
@@ -535,10 +535,13 @@ func (ap *addressPool) releaseAddress(address string, options map[string]string)
 	} else if id != "" {
 		// Release the address with the matching ID.
 		ar = ap.addrsByID[id]
-		log.Printf("[ipam] Releasing address %v.", ar.Addr.String())
+		if ar != nil {
+			address = ar.Addr.String()
+		}
 	}
 
-	if ar == nil {
+	// Fail if an address record with a matching ID is not found.
+	if ar == nil || (id != "" && id != ar.ID) {
 		err = errAddressNotFound
 		return err
 	}

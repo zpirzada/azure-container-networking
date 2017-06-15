@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/Azure/azure-container-networking/cnm"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/ipam"
 )
@@ -33,7 +34,6 @@ var ipamQueryResponse = "" +
 	"			<IPAddress Address=\"10.0.0.7\" IsPrimary=\"false\"/>" +
 	"			<IPAddress Address=\"10.0.0.8\" IsPrimary=\"false\"/>" +
 	"			<IPAddress Address=\"10.0.0.9\" IsPrimary=\"false\"/>" +
-	"			<IPAddress Address=\"10.0.0.10\" IsPrimary=\"false\"/>" +
 	"		</IPSubnet>" +
 	"	</Interface>" +
 	"</Interfaces>"
@@ -118,9 +118,7 @@ func decodeResponse(w *httptest.ResponseRecorder, response interface{}) error {
 
 // Tests Plugin.Activate functionality.
 func TestActivate(t *testing.T) {
-	var resp struct {
-		Implements []string
-	}
+	var resp cnm.ActivateResponse
 
 	req, err := http.NewRequest(http.MethodGet, "/Plugin.Activate", nil)
 	if err != nil {
@@ -132,16 +130,14 @@ func TestActivate(t *testing.T) {
 
 	err = decodeResponse(w, &resp)
 
-	if err != nil || resp.Implements[0] != "IpamDriver" {
+	if err != nil || resp.Err != "" || resp.Implements[0] != "IpamDriver" {
 		t.Errorf("Activate response is invalid %+v", resp)
 	}
 }
 
 // Tests IpamDriver.GetCapabilities functionality.
 func TestGetCapabilities(t *testing.T) {
-	var resp struct {
-		RequiresMACAddress bool
-	}
+	var resp getCapabilitiesResponse
 
 	req, err := http.NewRequest(http.MethodGet, getCapabilitiesPath, nil)
 	if err != nil {
@@ -153,7 +149,7 @@ func TestGetCapabilities(t *testing.T) {
 
 	err = decodeResponse(w, &resp)
 
-	if err != nil {
+	if err != nil || resp.Err != "" {
 		t.Errorf("GetCapabilities response is invalid %+v", resp)
 	}
 }
@@ -172,7 +168,7 @@ func TestGetDefaultAddressSpaces(t *testing.T) {
 
 	err = decodeResponse(w, &resp)
 
-	if err != nil || resp.LocalDefaultAddressSpace == "" {
+	if err != nil || resp.Err != "" || resp.LocalDefaultAddressSpace == "" {
 		t.Errorf("GetDefaultAddressSpaces response is invalid %+v", resp)
 	}
 
@@ -200,7 +196,7 @@ func TestRequestPool(t *testing.T) {
 
 	err = decodeResponse(w, &resp)
 
-	if err != nil {
+	if err != nil || resp.Err != "" {
 		t.Errorf("RequestPool response is invalid %+v", resp)
 	}
 
@@ -230,7 +226,7 @@ func TestRequestAddress(t *testing.T) {
 
 	err = decodeResponse(w, &resp)
 
-	if err != nil {
+	if err != nil || resp.Err != "" {
 		t.Errorf("RequestAddress response is invalid %+v", resp)
 	}
 
@@ -260,7 +256,7 @@ func TestReleaseAddress(t *testing.T) {
 
 	err = decodeResponse(w, &resp)
 
-	if err != nil {
+	if err != nil || resp.Err != "" {
 		t.Errorf("ReleaseAddress response is invalid %+v", resp)
 	}
 }
@@ -286,7 +282,7 @@ func TestReleasePool(t *testing.T) {
 
 	err = decodeResponse(w, &resp)
 
-	if err != nil {
+	if err != nil || resp.Err != "" {
 		t.Errorf("ReleasePool response is invalid %+v", resp)
 	}
 }
@@ -312,7 +308,7 @@ func TestGetPoolInfo(t *testing.T) {
 
 	err = decodeResponse(w, &resp)
 
-	if err != nil {
+	if err != nil || resp.Err != "" {
 		t.Errorf("GetPoolInfo response is invalid %+v", resp)
 	}
 }
@@ -367,7 +363,6 @@ func TestRequestAddressWithID(t *testing.T) {
 	var ipList [2]string
 
 	for i := 0; i < 2; i++ {
-
 		payload := &requestAddressRequest{
 			PoolID:  poolId1,
 			Address: "",

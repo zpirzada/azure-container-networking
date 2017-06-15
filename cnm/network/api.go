@@ -27,6 +27,7 @@ type getCapabilitiesRequest struct {
 
 // Response sent by plugin when registering its capabilities with libnetwork.
 type getCapabilitiesResponse struct {
+	Err   string
 	Scope string
 }
 
@@ -48,6 +49,7 @@ type ipamData struct {
 
 // Response sent by plugin when a network is created.
 type createNetworkResponse struct {
+	Err string
 }
 
 // Request sent by libnetwork when deleting an existing network.
@@ -57,6 +59,7 @@ type deleteNetworkRequest struct {
 
 // Response sent by plugin when a network is deleted.
 type deleteNetworkResponse struct {
+	Err string
 }
 
 // Request sent by libnetwork when creating a new endpoint.
@@ -76,6 +79,7 @@ type endpointInterface struct {
 
 // Response sent by plugin when an endpoint is created.
 type createEndpointResponse struct {
+	Err       string
 	Interface endpointInterface
 }
 
@@ -87,6 +91,7 @@ type deleteEndpointRequest struct {
 
 // Response sent by plugin when an endpoint is deleted.
 type deleteEndpointResponse struct {
+	Err string
 }
 
 // Request sent by libnetwork when joining an endpoint to a sandbox.
@@ -99,6 +104,7 @@ type joinRequest struct {
 
 // Response sent by plugin when an endpoint is joined to a sandbox.
 type joinResponse struct {
+	Err           string
 	InterfaceName interfaceName
 	Gateway       string
 	GatewayIPv6   string
@@ -127,6 +133,7 @@ type leaveRequest struct {
 
 // Response sent by plugin when an endpoint is removed from its sandbox.
 type leaveResponse struct {
+	Err string
 }
 
 // Request sent by libnetwork when querying operational info of an endpoint.
@@ -137,5 +144,6 @@ type endpointOperInfoRequest struct {
 
 // Response sent by plugin when returning operational info of an endpoint.
 type endpointOperInfoResponse struct {
+	Err   string
 	Value map[string]interface{}
 }

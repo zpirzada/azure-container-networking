@@ -193,7 +193,7 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	defer func() {
 		if err != nil && address != "" {
 			log.Printf("[cni-ipam] Releasing address %v.", address)
-			plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, address)
+			plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, address, nil)
 		}
 	}()
 
@@ -274,7 +274,7 @@ func (plugin *ipamPlugin) Delete(args *cniSkel.CmdArgs) error {
 	// If an address is specified, release that address. Otherwise, release the pool.
 	if nwCfg.Ipam.Address != "" {
 		// Release the address.
-		err := plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address)
+		err := plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address, nil)
 		if err != nil {
 			err = plugin.Errorf("Failed to release address: %v", err)
 			return err
