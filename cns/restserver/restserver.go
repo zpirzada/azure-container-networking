@@ -334,9 +334,15 @@ func (service *httpRestService) reserveIPAddress(w http.ResponseWriter, r *http.
 		if err != nil {
 			returnMessage = fmt.Sprintf("ReserveIpAddress failed with %+v", err.Error())
 			returnCode = UnexpectedError
+			break
 		}
 
 		addressIP, _, err := net.ParseCIDR(addr)
+		if err != nil {
+			returnMessage = fmt.Sprintf("ParseCIDR failed with %+v", err.Error())
+			returnCode = UnexpectedError
+			break
+		}
 		address = addressIP.String()
 
 	default:
