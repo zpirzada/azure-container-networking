@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"net"
+
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/dockerclient"
 	"github.com/Azure/azure-container-networking/cns/imdsclient"
@@ -289,6 +291,7 @@ func (service *httpRestService) reserveIPAddress(w http.ResponseWriter, r *http.
 	returnMessage := ""
 	returnCode := 0
 	addr := ""
+	address := ""
 	err := service.Listener.Decode(w, r, &req)
 
 	log.Request(service.Name, &req, err)
@@ -333,6 +336,9 @@ func (service *httpRestService) reserveIPAddress(w http.ResponseWriter, r *http.
 			returnCode = UnexpectedError
 		}
 
+		addressIP, _, err := net.ParseCIDR(addr)
+		address = addressIP.String()
+
 	default:
 		returnMessage = "[Azure CNS] Error. ReserveIP did not receive a POST."
 		returnCode = InvalidParameter
@@ -343,7 +349,7 @@ func (service *httpRestService) reserveIPAddress(w http.ResponseWriter, r *http.
 		ReturnCode: returnCode,
 		Message:    returnMessage,
 	}
-	reserveResp := &cns.ReserveIPAddressResponse{Response: resp, IPAddress: addr}
+	reserveResp := &cns.ReserveIPAddressResponse{Response: resp, IPAddress: address}
 	err = service.Listener.Encode(w, &reserveResp)
 
 	log.Response(service.Name, reserveResp, err)
