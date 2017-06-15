@@ -333,7 +333,7 @@ func (service *httpRestService) reserveIPAddress(w http.ResponseWriter, r *http.
 		addr, err = ic.ReserveIPAddress(poolID, req.ReservationID)
 		if err != nil {
 			returnMessage = fmt.Sprintf("ReserveIpAddress failed with %+v", err.Error())
-			returnCode = UnexpectedError
+			returnCode = AddressUnavailable
 			break
 		}
 
@@ -409,7 +409,7 @@ func (service *httpRestService) releaseIPAddress(w http.ResponseWriter, r *http.
 		err = ic.ReleaseIPAddress(poolID, req.ReservationID)
 		if err != nil {
 			returnMessage = fmt.Sprintf("ReleaseIpAddress failed with %+v", err.Error())
-			returnCode = UnexpectedError
+			returnCode = ReservationNotFound
 		}
 
 	default:
