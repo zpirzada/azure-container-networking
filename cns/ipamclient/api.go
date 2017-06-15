@@ -11,6 +11,7 @@ const (
 
 // Response received from IPAM Plugin when request AddressSpace.
 type getAddressSpacesResponse struct {
+	Err                       string
 	LocalDefaultAddressSpace  string
 	GlobalDefaultAddressSpace string
 }
@@ -26,6 +27,7 @@ type requestPoolRequest struct {
 
 // Response received from IPAM Plugin when requesting a pool.
 type requestPoolResponse struct {
+	Err    string
 	PoolID string
 	Pool   string
 	Data   map[string]string
@@ -40,7 +42,9 @@ type reserveAddrRequest struct {
 
 // Response received from IPAM Plugin when requesting a IP reservation.
 type reserveAddrResponse struct {
+	Err     string
 	Address string
+	Data    map[string]string
 }
 
 // Request sent to IPAM plugin to release IP reservation.
@@ -55,11 +59,6 @@ type releaseAddrResponse struct {
 	Err string
 }
 
-// TODO
-// type errorResponse struct {
-// 	Err string
-// }
-
 // Request sent to IPAM plugin to query address pool information.
 type getPoolInfoRequest struct {
 	PoolID string
@@ -67,6 +66,7 @@ type getPoolInfoRequest struct {
 
 // Response sent by plugin when returning address pool information.
 type getPoolInfoResponse struct {
+	Err                string
 	Capacity           int
 	Available          int
 	UnhealthyAddresses []string
