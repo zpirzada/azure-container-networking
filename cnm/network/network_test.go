@@ -13,6 +13,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/Azure/azure-container-networking/cnm"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/netlink"
 	driverApi "github.com/docker/libnetwork/driverapi"
@@ -48,7 +49,13 @@ func TestMain(m *testing.M) {
 	}
 
 	// Create a dummy test network interface.
-	err = netlink.AddLink(anyInterface, "dummy")
+	err = netlink.AddLink(&netlink.DummyLink{
+		LinkInfo: netlink.LinkInfo{
+			Type: netlink.LINK_TYPE_DUMMY,
+			Name: "dummy",
+		},
+	})
+
 	if err != nil {
 		fmt.Printf("Failed to create test network interface, err:%v.\n", err)
 		os.Exit(3)
@@ -93,11 +100,7 @@ func decodeResponse(w *httptest.ResponseRecorder, response interface{}) error {
 
 // Tests Plugin.Activate functionality.
 func TestActivate(t *testing.T) {
-	fmt.Println("Test: Activate")
-
-	var resp struct {
-		Implements []string
-	}
+	var resp cnm.ActivateResponse
 
 	req, err := http.NewRequest(http.MethodGet, "/Plugin.Activate", nil)
 	if err != nil {
@@ -109,15 +112,13 @@ func TestActivate(t *testing.T) {
 
 	err = decodeResponse(w, &resp)
 
-	if err != nil || resp.Implements[0] != "NetworkDriver" {
+	if err != nil || resp.Err != "" || resp.Implements[0] != "NetworkDriver" {
 		t.Errorf("Activate response is invalid %+v", resp)
 	}
 }
 
 // Tests NetworkDriver.GetCapabilities functionality.
 func TestGetCapabilities(t *testing.T) {
-	fmt.Println("Test: GetCapabilities")
-
 	var resp remoteApi.GetCapabilityResponse
 
 	req, err := http.NewRequest(http.MethodGet, getCapabilitiesPath, nil)
@@ -137,8 +138,6 @@ func TestGetCapabilities(t *testing.T) {
 
 // Tests NetworkDriver.CreateNetwork functionality.
 func TestCreateNetwork(t *testing.T) {
-	fmt.Println("Test: CreateNetwork")
-
 	var body bytes.Buffer
 	var resp remoteApi.CreateNetworkResponse
 
@@ -172,8 +171,6 @@ func TestCreateNetwork(t *testing.T) {
 
 // Tests NetworkDriver.DeleteNetwork functionality.
 func TestDeleteNetwork(t *testing.T) {
-	fmt.Println("Test: DeleteNetwork")
-
 	var body bytes.Buffer
 	var resp remoteApi.DeleteNetworkResponse
 
@@ -200,8 +197,6 @@ func TestDeleteNetwork(t *testing.T) {
 
 // Tests NetworkDriver.EndpointOperInfo functionality.
 func TestEndpointOperInfo(t *testing.T) {
-	fmt.Println("Test: EndpointOperInfo")
-
 	var body bytes.Buffer
 	var resp remoteApi.EndpointInfoResponse
 
@@ -222,7 +217,7 @@ func TestEndpointOperInfo(t *testing.T) {
 
 	err = decodeResponse(w, &resp)
 
-	if err != nil {
+	if err != nil || resp.Err != "" {
 		t.Errorf("EndpointOperInfo response is invalid %+v", resp)
 	}
 }
