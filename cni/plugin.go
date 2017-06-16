@@ -6,6 +6,7 @@ package cni
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
@@ -85,7 +86,25 @@ func (plugin *Plugin) Uninitialize() {
 }
 
 // Execute executes the CNI command.
-func (plugin *Plugin) Execute(api PluginApi) error {
+func (plugin *Plugin) Execute(api PluginApi) (err error) {
+	// Recover from panics and convert them to CNI errors.
+	defer func() {
+		if r := recover(); r != nil {
+			buf := make([]byte, 1<<12)
+			len := runtime.Stack(buf, false)
+
+			cniErr := &cniTypes.Error{
+				Code:    ErrRuntime,
+				Msg:     fmt.Sprintf("%v", r),
+				Details: string(buf[:len]),
+			}
+			cniErr.Print()
+			err = cniErr
+
+			log.Printf("[cni] Recovered panic: %v %v\n", cniErr.Msg, cniErr.Details)
+		}
+	}()
+
 	// Set supported CNI versions.
 	pluginInfo := cniVers.PluginSupports(supportedVersions...)
 

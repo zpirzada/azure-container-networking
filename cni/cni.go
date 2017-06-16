@@ -13,6 +13,9 @@ const (
 	CmdAdd = "ADD"
 	CmdDel = "DEL"
 
+	// CNI errors.
+	ErrRuntime = 100
+
 	// DefaultVersion is the CNI version used when no version is specified in a network config file.
 	defaultVersion = "0.2.0"
 )
