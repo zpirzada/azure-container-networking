@@ -217,10 +217,9 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	result = &cniTypesCurr.Result{
 		IPs: []*cniTypesCurr.IPConfig{
 			{
-				Version:   "4",
-				Interface: 0,
-				Address:   *ipAddress,
-				Gateway:   apInfo.Gateway,
+				Version: "4",
+				Address: *ipAddress,
+				Gateway: apInfo.Gateway,
 			},
 		},
 		Routes: []*cniTypes.Route{
