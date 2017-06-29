@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.8 (2017-06-29)
+- Added Windows libnetwork network and IPAM plugins.
+- Added support for CNI spec versions 0.3.0 and 0.3.1.
+- Updated CNI plugin to recover from panics and convert them to CNI errors.
+- Added log file rotation.
+- Added libnetwork pluginv2 support.
+- Updated Linux build and pluginv2 base images to golang1.8.1 and ubuntu16.04.
+- Renamed libnetwork plugin to azure-vnet-plugin.
+- Updated IPAM to return VNET default gateway and DNS server addresses.
+- Added support for custom API server URLs to libnetwork plugins.
+- Added CNI plugin install scripts for Linux and Windows.
+
 ## v0.7 (2017-03-31)
 - Unified CNI network config file for Linux and Windows containers.
 - Added hairpinning for Linux l2tunnel mode.
