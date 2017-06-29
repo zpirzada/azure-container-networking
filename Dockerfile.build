@@ -1,5 +1,7 @@
 FROM golang:1.8.1
 
+RUN apt-get update && apt-get install -y zip
+
 RUN go get -d golang.org/x/sys/unix
 RUN go get -d github.com/Microsoft/hcsshim
 RUN go get -d github.com/containernetworking/cni/pkg/skel

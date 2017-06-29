@@ -45,9 +45,21 @@ BUILD_CONTAINER_NAME = acn-builder
 BUILD_CONTAINER_REPO_PATH = /go/src/github.com/Azure/azure-container-networking
 BUILD_USER ?= $(shell id -u)
 
-# TAR file names.
-CNM_TAR_NAME = azure-vnet-cnm-$(GOOS)-$(GOARCH)-$(VERSION).tgz
-CNI_TAR_NAME = azure-vnet-cni-$(GOOS)-$(GOARCH)-$(VERSION).tgz
+# Target OS specific parameters.
+ifeq ($(GOOS),linux)
+	# Linux.
+	ARCHIVE_CMD = tar -czvf
+	ARCHIVE_EXT = tgz
+else
+	# Windows.
+	ARCHIVE_CMD = zip -9lq
+	ARCHIVE_EXT = zip
+	EXE_EXT = .exe
+endif
+
+# Archive file names.
+CNM_ARCHIVE_NAME = azure-vnet-cnm-$(GOOS)-$(GOARCH)-$(VERSION).$(ARCHIVE_EXT)
+CNI_ARCHIVE_NAME = azure-vnet-cni-$(GOOS)-$(GOARCH)-$(VERSION).$(ARCHIVE_EXT)
 
 # Docker libnetwork (CNM) plugin v2 image parameters.
 CNM_PLUGIN_IMAGE ?= microsoft/azure-vnet-plugin
@@ -58,10 +70,10 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 ENSURE_OUTPUT_DIR_EXISTS := $(shell mkdir -p $(OUTPUT_DIR))
 
 # Shorthand target names for convenience.
-azure-cnm-plugin: $(CNM_BUILD_DIR)/azure-vnet-plugin cnm-tar
-azure-vnet: $(CNI_BUILD_DIR)/azure-vnet
-azure-vnet-ipam: $(CNI_BUILD_DIR)/azure-vnet-ipam
-azure-cni-plugin: azure-vnet azure-vnet-ipam cni-tar
+azure-cnm-plugin: $(CNM_BUILD_DIR)/azure-vnet-plugin$(EXE_EXT) cnm-archive
+azure-vnet: $(CNI_BUILD_DIR)/azure-vnet$(EXE_EXT)
+azure-vnet-ipam: $(CNI_BUILD_DIR)/azure-vnet-ipam$(EXE_EXT)
+azure-cni-plugin: azure-vnet azure-vnet-ipam cni-archive
 all-binaries: azure-cnm-plugin azure-cni-plugin
 
 # Clean all build artifacts.
@@ -70,16 +82,16 @@ clean:
 	rm -rf $(OUTPUT_DIR)
 
 # Build the Azure CNM plugin.
-$(CNM_BUILD_DIR)/azure-vnet-plugin: $(CNMFILES)
-	go build -v -o $(CNM_BUILD_DIR)/azure-vnet-plugin -ldflags "-X main.version=$(VERSION) -s -w" $(CNM_DIR)/*.go
+$(CNM_BUILD_DIR)/azure-vnet-plugin$(EXE_EXT): $(CNMFILES)
+	go build -v -o $(CNM_BUILD_DIR)/azure-vnet-plugin$(EXE_EXT) -ldflags "-X main.version=$(VERSION) -s -w" $(CNM_DIR)/*.go
 
 # Build the Azure CNI network plugin.
-$(CNI_BUILD_DIR)/azure-vnet: $(CNIFILES)
-	go build -v -o $(CNI_BUILD_DIR)/azure-vnet -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_NET_DIR)/*.go
+$(CNI_BUILD_DIR)/azure-vnet$(EXE_EXT): $(CNIFILES)
+	go build -v -o $(CNI_BUILD_DIR)/azure-vnet$(EXE_EXT) -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_NET_DIR)/*.go
 
 # Build the Azure CNI IPAM plugin.
-$(CNI_BUILD_DIR)/azure-vnet-ipam: $(CNIFILES)
-	go build -v -o $(CNI_BUILD_DIR)/azure-vnet-ipam -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_IPAM_DIR)/*.go
+$(CNI_BUILD_DIR)/azure-vnet-ipam$(EXE_EXT): $(CNIFILES)
+	go build -v -o $(CNI_BUILD_DIR)/azure-vnet-ipam$(EXE_EXT) -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_IPAM_DIR)/*.go
 
 # Build all binaries in a container.
 .PHONY: all-binaries-containerized
@@ -136,17 +148,17 @@ azure-vnet-plugin-image: azure-cnm-plugin
 publish-azure-vnet-plugin-image:
 	docker plugin push $(CNM_PLUGIN_IMAGE):$(VERSION)
 
-# Create a CNI tarball for the current platform.
-.PHONY: cni-tar
-cni-tar:
+# Create a CNI archive for the target platform.
+.PHONY: cni-archive
+cni-archive:
 	cp cni/azure.conf $(CNI_BUILD_DIR)/10-azure.conf
-	chmod 0755 $(CNI_BUILD_DIR)/azure-vnet $(CNI_BUILD_DIR)/azure-vnet-ipam
-	cd $(CNI_BUILD_DIR) && tar -czvf $(CNI_TAR_NAME) azure-vnet azure-vnet-ipam 10-azure.conf
-	chown $(BUILD_USER):$(BUILD_USER) $(CNI_BUILD_DIR)/$(CNI_TAR_NAME)
+	chmod 0755 $(CNI_BUILD_DIR)/azure-vnet$(EXE_EXT) $(CNI_BUILD_DIR)/azure-vnet-ipam$(EXE_EXT)
+	cd $(CNI_BUILD_DIR) && $(ARCHIVE_CMD) $(CNI_ARCHIVE_NAME) azure-vnet$(EXE_EXT) azure-vnet-ipam$(EXE_EXT) 10-azure.conf
+	chown $(BUILD_USER):$(BUILD_USER) $(CNI_BUILD_DIR)/$(CNI_ARCHIVE_NAME)
 
-# Create a CNM tarball for the current platform.
-.PHONY: cnm-tar
-cnm-tar:
-	chmod 0755 $(CNM_BUILD_DIR)/azure-vnet-plugin
-	cd $(CNM_BUILD_DIR) && tar -czvf $(CNM_TAR_NAME) azure-vnet-plugin
-	chown $(BUILD_USER):$(BUILD_USER) $(CNM_BUILD_DIR)/$(CNM_TAR_NAME)
+# Create a CNM archive for the target platform.
+.PHONY: cnm-archive
+cnm-archive:
+	chmod 0755 $(CNM_BUILD_DIR)/azure-vnet-plugin$(EXE_EXT)
+	cd $(CNM_BUILD_DIR) && $(ARCHIVE_CMD) $(CNM_ARCHIVE_NAME) azure-vnet-plugin$(EXE_EXT)
+	chown $(BUILD_USER):$(BUILD_USER) $(CNM_BUILD_DIR)/$(CNM_ARCHIVE_NAME)
