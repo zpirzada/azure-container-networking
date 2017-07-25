@@ -28,7 +28,7 @@ type DockerClient struct {
 }
 
 func executeShellCommand(command string) error {
-	log.Debugf("[ebtables] %s", command)
+	log.Debugf("[Azure-CNS] %s", command)
 	cmd := exec.Command("sh", "-c", command)
 	err := cmd.Start()
 	if err != nil {
