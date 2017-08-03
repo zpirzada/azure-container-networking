@@ -80,9 +80,17 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		goto cleanup
 	}
 
-	// Setup MAC address translation rules for container interface.
-	log.Printf("[net] Setting up MAC address translation rules for endpoint %v.", contIfName)
+	// Setup rules for IP addresses on the container interface.
 	for _, ipAddr := range epInfo.IPAddresses {
+		// Add ARP reply rule.
+		log.Printf("[net] Adding ARP reply rule for IP address %v on %v.", ipAddr.String(), contIfName)
+		err = ebtables.SetArpReply(ipAddr.IP, nw.getArpReplyAddress(containerIf.HardwareAddr), ebtables.Append)
+		if err != nil {
+			goto cleanup
+		}
+
+		// Add MAC address translation rule.
+		log.Printf("[net] Adding MAC DNAT rule for IP address %v on %v.", ipAddr.String(), contIfName)
 		err = ebtables.SetDnatForIPAddress(nw.extIf.Name, ipAddr.IP, containerIf.HardwareAddr, ebtables.Append)
 		if err != nil {
 			goto cleanup
@@ -202,20 +210,43 @@ func (nw *network) deleteEndpointImpl(ep *endpoint) error {
 	log.Printf("[net] Deleting veth pair %v %v.", ep.HostIfName, ep.IfName)
 	err := netlink.DeleteLink(ep.HostIfName)
 	if err != nil {
-		goto cleanup
+		log.Printf("[net] Failed to delete veth pair %v: %v.", ep.HostIfName, err)
+		return err
 	}
 
-	// Delete MAC address translation rule.
-	log.Printf("[net] Deleting MAC address translation rules for endpoint %v.", ep.Id)
+	// Delete rules for IP addresses on the container interface.
 	for _, ipAddr := range ep.IPAddresses {
+		// Delete ARP reply rule.
+		log.Printf("[net] Deleting ARP reply rule for IP address %v on %v.", ipAddr.String(), ep.Id)
+		err = ebtables.SetArpReply(ipAddr.IP, nw.getArpReplyAddress(ep.MacAddress), ebtables.Delete)
+		if err != nil {
+			log.Printf("[net] Failed to delete ARP reply rule for IP address %v: %v.", ipAddr.String(), err)
+		}
+
+		// Delete MAC address translation rule.
+		log.Printf("[net] Deleting MAC DNAT rule for IP address %v on %v.", ipAddr.String(), ep.Id)
 		err = ebtables.SetDnatForIPAddress(nw.extIf.Name, ipAddr.IP, ep.MacAddress, ebtables.Delete)
 		if err != nil {
-			goto cleanup
+			log.Printf("[net] Failed to delete MAC DNAT rule for IP address %v: %v.", ipAddr.String(), err)
 		}
 	}
 
-cleanup:
-	return err
+	return nil
+}
+
+// getArpReplyAddress returns the MAC address to use in ARP replies.
+func (nw *network) getArpReplyAddress(epMacAddress net.HardwareAddr) net.HardwareAddr {
+	var macAddress net.HardwareAddr
+
+	if nw.Mode == opModeTunnel {
+		// In tunnel mode, resolve all IP addresses to the virtual MAC address for hairpinning.
+		macAddress, _ = net.ParseMAC(virtualMacAddress)
+	} else {
+		// Otherwise, resolve to actual MAC address.
+		macAddress = epMacAddress
+	}
+
+	return macAddress
 }
 
 // getInfoImpl returns information about the endpoint.
