@@ -45,16 +45,21 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	var err error
 
 	log.Printf("[net] Creating endpoint %+v in network %v.", epInfo, nw.Id)
+	defer func() {
+		if err != nil {
+			log.Printf("[net] Failed to create endpoint %v, err:%v.", epInfo.Id, err)
+		}
+	}()
 
 	if nw.Endpoints[epInfo.Id] != nil {
 		err = errEndpointExists
-		goto fail
+		return nil, err
 	}
 
 	// Call the platform implementation.
 	ep, err = nw.newEndpointImpl(epInfo)
 	if err != nil {
-		goto fail
+		return nil, err
 	}
 
 	nw.Endpoints[epInfo.Id] = ep
@@ -62,27 +67,29 @@ func (nw *network) newEndpoint(epInfo *EndpointInfo) (*endpoint, error) {
 	log.Printf("[net] Created endpoint %+v.", ep)
 
 	return ep, nil
-
-fail:
-	log.Printf("[net] Creating endpoint %v failed, err:%v.", epInfo.Id, err)
-
-	return nil, err
 }
 
 // DeleteEndpoint deletes an existing endpoint from the network.
 func (nw *network) deleteEndpoint(endpointId string) error {
+	var err error
+
 	log.Printf("[net] Deleting endpoint %v from network %v.", endpointId, nw.Id)
+	defer func() {
+		if err != nil {
+			log.Printf("[net] Failed to delete endpoint %v, err:%v.", endpointId, err)
+		}
+	}()
 
 	// Look up the endpoint.
 	ep, err := nw.getEndpoint(endpointId)
 	if err != nil {
-		goto fail
+		return err
 	}
 
 	// Call the platform implementation.
 	err = nw.deleteEndpointImpl(ep)
 	if err != nil {
-		goto fail
+		return err
 	}
 
 	// Remove the endpoint object.
@@ -91,11 +98,6 @@ func (nw *network) deleteEndpoint(endpointId string) error {
 	log.Printf("[net] Deleted endpoint %+v.", ep)
 
 	return nil
-
-fail:
-	log.Printf("[net] Deleting endpoint %v failed, err:%v.", endpointId, err)
-
-	return err
 }
 
 // GetEndpoint returns the endpoint with the given ID.

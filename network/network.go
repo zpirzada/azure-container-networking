@@ -121,6 +121,11 @@ func (nm *networkManager) newNetwork(nwInfo *NetworkInfo) (*network, error) {
 	var err error
 
 	log.Printf("[net] Creating network %+v.", nwInfo)
+	defer func() {
+		if err != nil {
+			log.Printf("[net] Failed to create network %v, err:%v.", nwInfo.Id, err)
+		}
+	}()
 
 	// Set defaults.
 	if nwInfo.Mode == "" {
@@ -131,19 +136,19 @@ func (nm *networkManager) newNetwork(nwInfo *NetworkInfo) (*network, error) {
 	extIf := nm.findExternalInterfaceBySubnet(nwInfo.Subnets[0].Prefix.String())
 	if extIf == nil {
 		err = errSubnetNotFound
-		goto fail
+		return nil, err
 	}
 
 	// Make sure this network does not already exist.
 	if extIf.Networks[nwInfo.Id] != nil {
 		err = errNetworkExists
-		goto fail
+		return nil, err
 	}
 
 	// Call the OS-specific implementation.
 	nw, err = nm.newNetworkImpl(nwInfo, extIf)
 	if err != nil {
-		goto fail
+		return nil, err
 	}
 
 	// Add the network object.
@@ -152,26 +157,29 @@ func (nm *networkManager) newNetwork(nwInfo *NetworkInfo) (*network, error) {
 
 	log.Printf("[net] Created network %v on interface %v.", nwInfo.Id, extIf.Name)
 	return nw, nil
-
-fail:
-	log.Printf("[net] Failed to create network %v, err:%v.", nwInfo.Id, err)
-	return nil, err
 }
 
 // DeleteNetwork deletes an existing container network.
 func (nm *networkManager) deleteNetwork(networkId string) error {
+	var err error
+
 	log.Printf("[net] Deleting network %v.", networkId)
+	defer func() {
+		if err != nil {
+			log.Printf("[net] Failed to delete network %v, err:%v.", networkId, err)
+		}
+	}()
 
 	// Find the network.
 	nw, err := nm.getNetwork(networkId)
 	if err != nil {
-		goto fail
+		return err
 	}
 
 	// Call the OS-specific implementation.
 	err = nm.deleteNetworkImpl(nw)
 	if err != nil {
-		goto fail
+		return err
 	}
 
 	// Remove the network object.
@@ -179,10 +187,6 @@ func (nm *networkManager) deleteNetwork(networkId string) error {
 
 	log.Printf("[net] Deleted network %+v.", nw)
 	return nil
-
-fail:
-	log.Printf("[net] Failed to delete network %v, err:%v.", networkId, err)
-	return err
 }
 
 // GetNetwork returns the network with the given ID.

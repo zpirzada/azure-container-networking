@@ -188,7 +188,10 @@ func (nm *networkManager) deleteBridgeRules(extIf *externalInterface) {
 
 // ConnectExternalInterface connects the given host interface to a bridge.
 func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwInfo *NetworkInfo) error {
+	var err error
+
 	log.Printf("[net] Connecting interface %v.", extIf.Name)
+	defer func() { log.Printf("[net] Connecting interface %v completed with err:%v.", extIf.Name, err) }()
 
 	// Check whether this interface is already connected.
 	if extIf.BridgeName != "" {
@@ -226,9 +229,16 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 			return err
 		}
 
+		// On failure, delete the bridge.
+		defer func() {
+			if err != nil {
+				netlink.DeleteLink(bridgeName)
+			}
+		}()
+
 		bridge, err = net.InterfaceByName(bridgeName)
 		if err != nil {
-			goto cleanup
+			return err
 		}
 	} else {
 		// Use the existing bridge.
@@ -244,42 +254,42 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 	// Add the bridge rules.
 	err = nm.addBridgeRules(extIf, hostIf, bridgeName, nwInfo.Mode)
 	if err != nil {
-		goto cleanup
+		return err
 	}
 
 	// External interface down.
 	log.Printf("[net] Setting link %v state down.", hostIf.Name)
 	err = netlink.SetLinkState(hostIf.Name, false)
 	if err != nil {
-		goto cleanup
+		return err
 	}
 
 	// Connect the external interface to the bridge.
 	log.Printf("[net] Setting link %v master %v.", hostIf.Name, bridgeName)
 	err = netlink.SetLinkMaster(hostIf.Name, bridgeName)
 	if err != nil {
-		goto cleanup
+		return err
 	}
 
 	// External interface up.
 	log.Printf("[net] Setting link %v state up.", hostIf.Name)
 	err = netlink.SetLinkState(hostIf.Name, true)
 	if err != nil {
-		goto cleanup
+		return err
 	}
 
 	// External interface hairpin on.
 	log.Printf("[net] Setting link %v hairpin on.", hostIf.Name)
 	err = netlink.SetLinkHairpin(hostIf.Name, true)
 	if err != nil {
-		goto cleanup
+		return err
 	}
 
 	// Bridge up.
 	log.Printf("[net] Setting link %v state up.", bridgeName)
 	err = netlink.SetLinkState(bridgeName, true)
 	if err != nil {
-		goto cleanup
+		return err
 	}
 
 	// Apply IP configuration to the bridge for host traffic.
@@ -289,19 +299,11 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 	}
 
 	extIf.BridgeName = bridgeName
+	err = nil
 
 	log.Printf("[net] Connected interface %v to bridge %v.", extIf.Name, extIf.BridgeName)
 
 	return nil
-
-cleanup:
-	log.Printf("[net] Connecting interface %v failed, err:%v.", extIf.Name, err)
-
-	// Roll back the changes for the network.
-	nm.deleteBridgeRules(extIf)
-	netlink.DeleteLink(bridgeName)
-
-	return err
 }
 
 // DisconnectExternalInterface disconnects a host interface from its bridge.

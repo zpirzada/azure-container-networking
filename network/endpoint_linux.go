@@ -52,6 +52,13 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		return nil, err
 	}
 
+	// On failure, delete the veth pair.
+	defer func() {
+		if err != nil {
+			netlink.DeleteLink(contIfName)
+		}
+	}()
+
 	//
 	// Host network interface setup.
 	//
@@ -60,14 +67,14 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	log.Printf("[net] Setting link %v state up.", hostIfName)
 	err = netlink.SetLinkState(hostIfName, true)
 	if err != nil {
-		goto cleanup
+		return nil, err
 	}
 
 	// Connect host interface to the bridge.
 	log.Printf("[net] Setting link %v master %v.", hostIfName, nw.extIf.BridgeName)
 	err = netlink.SetLinkMaster(hostIfName, nw.extIf.BridgeName)
 	if err != nil {
-		goto cleanup
+		return nil, err
 	}
 
 	//
@@ -77,7 +84,7 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	// Query container network interface info.
 	containerIf, err = net.InterfaceByName(contIfName)
 	if err != nil {
-		goto cleanup
+		return nil, err
 	}
 
 	// Setup rules for IP addresses on the container interface.
@@ -86,14 +93,14 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		log.Printf("[net] Adding ARP reply rule for IP address %v on %v.", ipAddr.String(), contIfName)
 		err = ebtables.SetArpReply(ipAddr.IP, nw.getArpReplyAddress(containerIf.HardwareAddr), ebtables.Append)
 		if err != nil {
-			goto cleanup
+			return nil, err
 		}
 
 		// Add MAC address translation rule.
 		log.Printf("[net] Adding MAC DNAT rule for IP address %v on %v.", ipAddr.String(), contIfName)
 		err = ebtables.SetDnatForIPAddress(nw.extIf.Name, ipAddr.IP, containerIf.HardwareAddr, ebtables.Append)
 		if err != nil {
-			goto cleanup
+			return nil, err
 		}
 	}
 
@@ -103,7 +110,7 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		log.Printf("[net] Opening netns %v.", epInfo.NetNsPath)
 		ns, err = OpenNamespace(epInfo.NetNsPath)
 		if err != nil {
-			goto cleanup
+			return nil, err
 		}
 		defer ns.Close()
 
@@ -111,15 +118,24 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		log.Printf("[net] Setting link %v netns %v.", contIfName, epInfo.NetNsPath)
 		err = netlink.SetLinkNetNs(contIfName, ns.GetFd())
 		if err != nil {
-			goto cleanup
+			return nil, err
 		}
 
 		// Enter the container network namespace.
 		log.Printf("[net] Entering netns %v.", epInfo.NetNsPath)
 		err = ns.Enter()
 		if err != nil {
-			goto cleanup
+			return nil, err
 		}
+
+		// Return to host network namespace.
+		defer func() {
+			log.Printf("[net] Exiting netns %v.", epInfo.NetNsPath)
+			err = ns.Exit()
+			if err != nil {
+				log.Printf("[net] Failed to exit netns, err:%v.", err)
+			}
+		}()
 	}
 
 	// If a name for the container interface is specified...
@@ -128,14 +144,14 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		log.Printf("[net] Setting link %v state down.", contIfName)
 		err = netlink.SetLinkState(contIfName, false)
 		if err != nil {
-			goto cleanup
+			return nil, err
 		}
 
 		// Rename the container interface.
 		log.Printf("[net] Setting link %v name %v.", contIfName, epInfo.IfName)
 		err = netlink.SetLinkName(contIfName, epInfo.IfName)
 		if err != nil {
-			goto cleanup
+			return nil, err
 		}
 		contIfName = epInfo.IfName
 
@@ -143,7 +159,7 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		log.Printf("[net] Setting link %v state up.", contIfName)
 		err = netlink.SetLinkState(contIfName, true)
 		if err != nil {
-			goto cleanup
+			return nil, err
 		}
 	}
 
@@ -152,7 +168,7 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		log.Printf("[net] Adding IP address %v to link %v.", ipAddr.String(), contIfName)
 		err = netlink.AddIpAddress(contIfName, ipAddr.IP, &ipAddr)
 		if err != nil {
-			goto cleanup
+			return nil, err
 		}
 	}
 
@@ -169,17 +185,7 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 
 		err = netlink.AddIpRoute(nlRoute)
 		if err != nil {
-			goto cleanup
-		}
-	}
-
-	// If inside the container network namespace...
-	if ns != nil {
-		// Return to host network namespace.
-		log.Printf("[net] Exiting netns %v.", epInfo.NetNsPath)
-		err = ns.Exit()
-		if err != nil {
-			goto cleanup
+			return nil, err
 		}
 	}
 
@@ -194,12 +200,6 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	}
 
 	return ep, nil
-
-cleanup:
-	// Roll back the changes for the endpoint.
-	netlink.DeleteLink(contIfName)
-
-	return nil, err
 }
 
 // deleteEndpointImpl deletes an existing endpoint from the network.
