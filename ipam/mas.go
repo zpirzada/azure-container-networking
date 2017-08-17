@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/log"
 )
 
 const (
@@ -113,13 +114,15 @@ func (s *masSource) refresh() error {
 		}
 
 		ap, err := local.newAddressPool("eth0", 0, &subnet)
-		if err != nil && err != errAddressExists {
-			return err
+		if err != nil {
+			log.Printf("[ipam] Failed to create pool:%v err:%v.", subnet, err)
+			continue
 		}
 
 		_, err = ap.newAddressRecord(&address)
 		if err != nil {
-			return err
+			log.Printf("[ipam] Failed to create address:%v err:%v.", address, err)
+			continue
 		}
 	}
 

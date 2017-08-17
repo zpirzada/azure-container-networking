@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/log"
 )
 
 const (
@@ -143,6 +144,7 @@ func (s *azureSource) refresh() error {
 
 		// Skip if interface is not found.
 		if ifName == "" {
+			log.Printf("[ipam] Failed to find interface with MAC address:%v.", i.MacAddress)
 			continue
 		}
 
@@ -150,12 +152,14 @@ func (s *azureSource) refresh() error {
 		for _, s := range i.IPSubnet {
 			_, subnet, err := net.ParseCIDR(s.Prefix)
 			if err != nil {
-				return err
+				log.Printf("[ipam] Failed to parse subnet:%v err:%v.", s.Prefix, err)
+				continue
 			}
 
 			ap, err := local.newAddressPool(ifName, priority, subnet)
-			if err != nil && err != errAddressExists {
-				return err
+			if err != nil {
+				log.Printf("[ipam] Failed to create pool:%v ifName:%v err:%v.", subnet, ifName, err)
+				continue
 			}
 
 			// For each address in the subnet...
@@ -169,7 +173,8 @@ func (s *azureSource) refresh() error {
 
 				_, err = ap.newAddressRecord(&address)
 				if err != nil {
-					return err
+					log.Printf("[ipam] Failed to create address:%v err:%v.", address, err)
+					continue
 				}
 			}
 		}
