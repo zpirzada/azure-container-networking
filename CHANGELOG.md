@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.9 (2017-08-17)
+- Limit port aggregation to owned interfaces for coexistence with other plugins.
+- Made CNI DEL commands omnipotent for soft failures, required for Kubernetes.
+- Changed CNI default networking mode to bridge.
+- Added ARP reply rules for bridge and tunnel modes to decouple from VNET behavior.
+- Fixed bug in libnetwork option parser.
+- Improved reliability of network failure paths.
+- Added logging for soft failures in IPAM plugin.
+
 ## v0.8 (2017-06-29)
 - Added Windows libnetwork network and IPAM plugins.
 - Added support for CNI spec versions 0.3.0 and 0.3.1.
