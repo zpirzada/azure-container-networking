@@ -542,13 +542,13 @@ func (ap *addressPool) releaseAddress(address string, options map[string]string)
 
 	// Fail if an address record with a matching ID is not found.
 	if ar == nil || (id != "" && id != ar.ID) {
-		err = errAddressNotFound
-		return err
+		log.Printf("Address not found. Not Returning error")
+		return nil
 	}
 
 	if !ar.InUse {
-		err = errAddressNotInUse
-		return err
+		log.Printf("Address not in use. Not Returning error")
+		return nil
 	}
 
 	if ar.ID != "" {

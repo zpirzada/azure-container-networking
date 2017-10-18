@@ -330,7 +330,8 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		nwCfg.Ipam.Address = address.IP.String()
 		err = plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg)
 		if err != nil {
-			log.Printf("Failed to release address: %v", err)
+			plugin.Errorf("Failed to release address: %v", err)
+			return err
 		}
 	}
 
