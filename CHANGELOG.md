@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.91 (2017-10-19)
+- Handled endpoint removal as per CNI spec version 0.3.1. 
+- Endpoint will be deleted successfully and IP address released even if veth is not present.
+
 ## v0.9 (2017-08-17)
 - Limit port aggregation to owned interfaces for coexistence with other plugins.
 - Made CNI DEL commands idempotent for soft failures, required for Kubernetes.
