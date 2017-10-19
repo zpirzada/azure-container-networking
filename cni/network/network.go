@@ -320,8 +320,8 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	// Delete the endpoint.
 	err = plugin.nm.DeleteEndpoint(networkId, endpointId)
 	if err != nil {
-		// Log the error but don't return before releasing address
-		log.Printf("Container Namespace might have been removed. Failed to delete endpoint: %v", err)
+		err = plugin.Errorf("Failed to delete endpoint: %v", err)
+		return err
 	}
 
 	// Call into IPAM plugin to release the endpoint's addresses.
@@ -330,7 +330,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		nwCfg.Ipam.Address = address.IP.String()
 		err = plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg)
 		if err != nil {
-			plugin.Errorf("Failed to release address: %v", err)
+			err = plugin.Errorf("Failed to release address: %v", err)
 			return err
 		}
 	}
