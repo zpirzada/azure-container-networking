@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/Azure/azure-container-networking/log"
 	"golang.org/x/sys/unix"
 )
 
@@ -146,15 +147,17 @@ func AddLink(link Link) error {
 // DeleteLink deletes a network interface.
 func DeleteLink(name string) error {
 	if name == "" {
-		return fmt.Errorf("Invalid link name")
-	}
-
-	s, err := getSocket()
-	if err != nil {
-		return err
+		log.Printf("[net] Invalid link name. Not returning error")
+		return nil
 	}
 
 	iface, err := net.InterfaceByName(name)
+	if err != nil {
+		log.Printf("[net] Interface not found. Not returning error")
+		return nil
+	}
+
+	s, err := getSocket()
 	if err != nil {
 		return err
 	}

@@ -83,7 +83,8 @@ func (nw *network) deleteEndpoint(endpointId string) error {
 	// Look up the endpoint.
 	ep, err := nw.getEndpoint(endpointId)
 	if err != nil {
-		return err
+		log.Printf("[net] Endpoint %v not found. Not Returning error", endpointId)
+		return nil
 	}
 
 	// Call the platform implementation.
