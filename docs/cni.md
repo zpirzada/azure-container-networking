@@ -58,7 +58,7 @@ Network configuration for CNI plugins is described in JSON format. The default l
 The following fields are well-known and have the following meaning:
 
 Network plugin
-* `cniVersion`: Azure plugins currently support versions 0.1.0 and 0.2.0 of the [CNI spec](https://github.com/containernetworking/cni/blob/master/SPEC.md). Support for new spec versions will be added shortly after each CNI release.
+* `cniVersion`: Azure plugins currently support versions 0.3.0 and 0.3.1 of the [CNI spec](https://github.com/containernetworking/cni/blob/master/SPEC.md). Support for new spec versions will be added shortly after each CNI release.
 * `name`: Name of the network. This property can be set to any unique value.
 * `type`: Name of the network plugin. This property should always be set to `azure-vnet`.
 * `mode`: Operational mode. This field is optional. See the [operational modes](https://github.com/Azure/azure-container-networking/blob/master/docs/network.md) for more details.
