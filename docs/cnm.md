@@ -13,9 +13,12 @@ This page describes how to setup the CNM plugin manually on Azure IaaS VMs. If y
 Copy the plugin package from the [release](https://github.com/Azure/azure-container-networking/releases) share to your Azure VM, extract the contents and run the plugin in the background.
 
 ```bash
-$ curl -sSL https://github.com/Azure/azure-container-networking/releases/download/${VERSION}/azure-vnet-cnm-linux-amd64-${VERSION}.tgz
-$ tar xzvf azure-vnet-cnm-linux-amd64-${VERSION}.tar.gz
-$ azure-cnm-plugin&
+# Get the last version from https://github.com/Azure/azure-container-networking/releases
+PLUGIN_VERSION="v1.x.x"
+$ curl -OL https://github.com/Azure/azure-container-networking/releases/download/${PLUGIN_VERSION}/azure-vnet-cnm-linux-amd64-${PLUGIN_VERSION}.tgz
+$ tar xzvf azure-vnet-cnm-linux-amd64-${PLUGIN_VERSION}.tgz
+# Might require sudo if not running as root
+$ ./azure-cnm-plugin&
 ```
 
 The `azure-vnet` plugin also requires the ebtables package when running on Linux. This step is not required on Windows.
