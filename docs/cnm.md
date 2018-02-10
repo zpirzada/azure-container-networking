@@ -14,8 +14,8 @@ Copy the plugin package from the [release](https://github.com/Azure/azure-contai
 
 ```bash
 # Get the last version from https://github.com/Azure/azure-container-networking/releases
-PLUGIN_VERSION="v1.x.x"
-$ curl -OL https://github.com/Azure/azure-container-networking/releases/download/${PLUGIN_VERSION}/azure-vnet-cnm-linux-amd64-${PLUGIN_VERSION}.tgz
+$ PLUGIN_VERSION="v1.x.x"
+$ curl -OsSL https://github.com/Azure/azure-container-networking/releases/download/${PLUGIN_VERSION}/azure-vnet-cnm-linux-amd64-${PLUGIN_VERSION}.tgz
 $ tar xzvf azure-vnet-cnm-linux-amd64-${PLUGIN_VERSION}.tgz
 # Might require sudo if not running as root
 $ ./azure-cnm-plugin&
