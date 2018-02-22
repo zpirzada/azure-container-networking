@@ -75,21 +75,12 @@ func (nm *networkManager) restore() error {
 		return nil
 	}
 
+	rebooted := false
 	// After a reboot, all address resources are implicitly released.
 	// Ignore the persisted state if it is older than the last reboot time.
-	modTime, err := nm.store.GetModificationTime()
-	if err == nil {
-		log.Printf("[net] Store timestamp is %v.", modTime)
-
-		rebootTime, err := platform.GetLastRebootTime()
-		if err == nil && rebootTime.After(modTime) {
-			log.Printf("[net] Ignoring stale state older than last reboot %v.", rebootTime)
-			return nil
-		}
-	}
 
 	// Read any persisted state.
-	err = nm.store.Read(storeKey, nm)
+	err := nm.store.Read(storeKey, nm)
 	if err != nil {
 		if err == store.ErrKeyNotFound {
 			// Considered successful.
@@ -100,6 +91,17 @@ func (nm *networkManager) restore() error {
 		}
 	}
 
+	modTime, err := nm.store.GetModificationTime()
+	if err == nil {
+		log.Printf("[net] Store timestamp is %v.", modTime)
+
+		rebootTime, err := platform.GetLastRebootTime()
+		if err == nil && rebootTime.After(modTime) {
+			log.Printf("[net] reboot time %v mod time %v", rebootTime, modTime)
+			rebooted = true
+		}
+	}
+
 	// Populate pointers.
 	for _, extIf := range nm.ExternalInterfaces {
 		for _, nw := range extIf.Networks {
@@ -107,8 +109,29 @@ func (nm *networkManager) restore() error {
 		}
 	}
 
-	log.Printf("[net] Restored state, %+v\n", nm)
+	// if rebooted recreate the network that existed before reboot.
+	if rebooted {
+		log.Printf("[net] Rehydrating network state from persistent store")
+		for _, extIf := range nm.ExternalInterfaces {
+			for _, nw := range extIf.Networks {
+				nwInfo, err := nm.GetNetworkInfo(nw.Id)
+				if err != nil {
+					log.Printf("[net] Failed to fetch network info for network %v extif %v err %v. This should not happen", nw, extIf, err)
+					return err
+				}
 
+				extIf.BridgeName = ""
+
+				_, err = nm.newNetworkImpl(nwInfo, extIf)
+				if err != nil {
+					log.Printf("[net] Restoring network failed for nwInfo %v extif %v. This should not happen %v", nwInfo, extIf, err)
+					return err
+				}
+			}
+		}
+	}
+
+	log.Printf("[net] Restored state, %+v\n", nm)
 	return nil
 }
 
@@ -204,6 +227,11 @@ func (nm *networkManager) GetNetworkInfo(networkId string) (*NetworkInfo, error)
 	nwInfo := &NetworkInfo{
 		Id:      networkId,
 		Subnets: nw.Subnets,
+		Mode:    nw.Mode,
+	}
+
+	if nw.extIf != nil {
+		nwInfo.BridgeName = nw.extIf.BridgeName
 	}
 
 	return nwInfo, nil
