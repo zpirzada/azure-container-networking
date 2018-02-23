@@ -16,6 +16,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/ipamclient"
 	"github.com/Azure/azure-container-networking/cns/routes"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/store"
 )
 
@@ -32,7 +33,7 @@ type httpRestService struct {
 	ipamClient   *ipamclient.IpamClient
 	routingTable *routes.RoutingTable
 	store        store.KeyValueStore
-	state        httpRestServiceState
+	state        *httpRestServiceState
 }
 
 // httpRestServiceState contains the state we would like to persist.
@@ -40,7 +41,14 @@ type httpRestServiceState struct {
 	Location    string
 	NetworkType string
 	Initialized bool
+	Networks    map[string]*networkInfo
 	TimeStamp   time.Time
+}
+
+type networkInfo struct {
+	NetworkName string
+	NicInfo     *imdsclient.InterfaceInfo
+	Options     map[string]interface{}
 }
 
 // HTTPService describes the min API interface that every service should have.
@@ -67,6 +75,9 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 		return nil, err
 	}
 
+	serviceState := &httpRestServiceState{}
+	serviceState.Networks = make(map[string]*networkInfo)
+
 	return &httpRestService{
 		Service:      service,
 		store:        service.Service.Store,
@@ -74,7 +85,9 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 		imdsClient:   imdsClient,
 		ipamClient:   ic,
 		routingTable: routingTable,
+		state:        serviceState,
 	}, nil
+
 }
 
 // Start starts the CNS listener.
@@ -83,6 +96,18 @@ func (service *httpRestService) Start(config *common.ServiceConfig) error {
 	err := service.Initialize(config)
 	if err != nil {
 		log.Printf("[Azure CNS]  Failed to initialize base service, err:%v.", err)
+		return err
+	}
+
+	err = service.restoreState()
+	if err != nil {
+		log.Printf("[Azure CNS]  Failed to restore state, err:%v.", err)
+		return err
+	}
+
+	err = service.restoreNetworkState()
+	if err != nil {
+		log.Printf("[Azure CNS]  Failed to restore state, err:%v.", err)
 		return err
 	}
 
@@ -186,7 +211,14 @@ func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Req
 								log.Printf("[Azure CNS] Unable to get routing table from node, %+v.", err.Error())
 							}
 
-							err = dc.CreateNetwork(req.NetworkName, req.Options)
+							nicInfo, err := service.imdsClient.GetPrimaryInterfaceInfoFromHost()
+							if err != nil {
+								returnMessage = fmt.Sprintf("[Azure CNS] Error. CreateNetwork failed %v.", err.Error())
+								returnCode = UnexpectedError
+								break
+							}
+
+							err = dc.CreateNetwork(req.NetworkName, nicInfo, req.Options)
 							if err != nil {
 								returnMessage = fmt.Sprintf("[Azure CNS] Error. CreateNetwork failed %v.", err.Error())
 								returnCode = UnexpectedError
@@ -196,6 +228,14 @@ func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Req
 							if err != nil {
 								log.Printf("[Azure CNS] Unable to restore routing table on node, %+v.", err.Error())
 							}
+
+							networkInfo := &networkInfo{
+								NetworkName: req.NetworkName,
+								NicInfo:     nicInfo,
+								Options:     req.Options,
+							}
+
+							service.state.Networks[req.NetworkName] = networkInfo
 
 						case "StandAlone":
 							returnMessage = fmt.Sprintf("[Azure CNS] Error. Underlay network is not supported in StandAlone environment. %v.", err.Error())
@@ -227,6 +267,10 @@ func (service *httpRestService) createNetwork(w http.ResponseWriter, r *http.Req
 	}
 
 	err = service.Listener.Encode(w, &resp)
+
+	if returnCode == 0 {
+		service.saveState()
+	}
 
 	log.Response(service.Name, resp, err)
 }
@@ -278,6 +322,11 @@ func (service *httpRestService) deleteNetwork(w http.ResponseWriter, r *http.Req
 	}
 
 	err = service.Listener.Encode(w, &resp)
+
+	if returnCode == 0 {
+		delete(service.state.Networks, req.NetworkName)
+		service.saveState()
+	}
 
 	log.Response(service.Name, resp, err)
 }
@@ -721,5 +770,47 @@ func (service *httpRestService) restoreState() error {
 	}
 
 	log.Printf("[Azure CNS]  Restored state, %+v\n", service.state)
+	return nil
+}
+
+// restoreNetworkState restores Network state that existed before reboot.
+func (service *httpRestService) restoreNetworkState() error {
+	log.Printf("[Azure CNS] Enter Restoring Network State")
+
+	rebooted := false
+
+	modTime, err := service.store.GetModificationTime()
+	if err == nil {
+		log.Printf("[Azure CNS] Store timestamp is %v.", modTime)
+
+		rebootTime, err := platform.GetLastRebootTime()
+		if err == nil && rebootTime.After(modTime) {
+			log.Printf("[Azure CNS] reboot time %v mod time %v", rebootTime, modTime)
+			rebooted = true
+		}
+	}
+
+	if rebooted {
+		for _, nwInfo := range service.state.Networks {
+			enableSnat := true
+
+			log.Printf("[Azure CNS] Restore nwinfo %v", nwInfo)
+
+			if nwInfo.Options != nil {
+				if _, ok := nwInfo.Options[dockerclient.OptDisableSnat]; ok {
+					enableSnat = false
+				}
+			}
+
+			if enableSnat {
+				err := common.SetOutboundSNAT(nwInfo.NicInfo.Subnet)
+				if err != nil {
+					log.Printf("[Azure CNS] Error setting up SNAT outbound rule %v", err)
+					return err
+				}
+			}
+		}
+	}
+
 	return nil
 }

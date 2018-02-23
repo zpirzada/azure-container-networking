@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os/exec"
 
+	"github.com/Azure/azure-container-networking/cns/common"
 	"github.com/Azure/azure-container-networking/cns/imdsclient"
 	"github.com/Azure/azure-container-networking/log"
 )
@@ -25,16 +25,6 @@ const (
 type DockerClient struct {
 	connectionURL string
 	imdsClient    *imdsclient.ImdsClient
-}
-
-func executeShellCommand(command string) error {
-	log.Debugf("[Azure-CNS] %s", command)
-	cmd := exec.Command("sh", "-c", command)
-	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	return cmd.Wait()
 }
 
 // NewDockerClient create a new docker client.
@@ -81,18 +71,13 @@ func (dockerClient *DockerClient) NetworkExists(networkName string) error {
 }
 
 // CreateNetwork creates a network using docker network create.
-func (dockerClient *DockerClient) CreateNetwork(networkName string, options map[string]interface{}) error {
+func (dockerClient *DockerClient) CreateNetwork(networkName string, nicInfo *imdsclient.InterfaceInfo, options map[string]interface{}) error {
 	log.Printf("[Azure CNS] CreateNetwork")
 
 	enableSnat := true
 
-	primaryNic, err := dockerClient.imdsClient.GetPrimaryInterfaceInfoFromHost()
-	if err != nil {
-		return err
-	}
-
 	config := &Config{
-		Subnet: primaryNic.Subnet,
+		Subnet: nicInfo.Subnet,
 	}
 
 	configs := make([]Config, 1)
@@ -123,7 +108,7 @@ func (dockerClient *DockerClient) CreateNetwork(networkName string, options map[
 	log.Printf("[Azure CNS] Going to create network with config: %+v", netConfig)
 
 	netConfigJSON := new(bytes.Buffer)
-	err = json.NewEncoder(netConfigJSON).Encode(netConfig)
+	err := json.NewEncoder(netConfigJSON).Encode(netConfig)
 	if err != nil {
 		return err
 	}
@@ -150,12 +135,9 @@ func (dockerClient *DockerClient) CreateNetwork(networkName string, options map[
 	}
 
 	if enableSnat {
-		cmd := fmt.Sprintf("iptables -t nat -A POSTROUTING -m iprange ! --dst-range 168.63.129.16 -m addrtype ! --dst-type local ! -d %v -j MASQUERADE",
-			primaryNic.Subnet)
-		err = executeShellCommand(cmd)
+		err = common.SetOutboundSNAT(nicInfo.Subnet)
 		if err != nil {
-			log.Printf("SNAT Iptable rule was not set")
-			return err
+			log.Printf("[Azure CNS] Error setting up SNAT outbound rule %v", err)
 		}
 	}
 
@@ -186,7 +168,11 @@ func (dockerClient *DockerClient) DeleteNetwork(networkName string) error {
 
 		cmd := fmt.Sprintf("iptables -t nat -D POSTROUTING -m iprange ! --dst-range 168.63.129.16 -m addrtype ! --dst-type local ! -d %v -j MASQUERADE",
 			primaryNic.Subnet)
-		executeShellCommand(cmd)
+		err = common.ExecuteShellCommand(cmd)
+		if err != nil {
+			log.Printf("[Azure CNS] Error Removing Outbound SNAT rule %v", err)
+		}
+
 		return nil
 	}
 

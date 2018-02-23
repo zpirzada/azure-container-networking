@@ -29,12 +29,12 @@ CNIFILES = \
 CNSFILES = \
 	$(wildcard cns/*.go) \
 	$(wildcard cns/common/*.go) \
-	$(wildcard cni/dockerclient/*.go) \
-	$(wildcard cni/imdsclient/*.go) \
-	$(wildcard cni/ipamclient/*.go) \
-	$(wildcard cni/restserver/*.go) \
-	$(wildcard cni/routes/*.go) \
-	$(wildcard cni/service/*.go) \
+	$(wildcard cns/dockerclient/*.go) \
+	$(wildcard cns/imdsclient/*.go) \
+	$(wildcard cns/ipamclient/*.go) \
+	$(wildcard cns/restserver/*.go) \
+	$(wildcard cns/routes/*.go) \
+	$(wildcard cns/service/*.go) \
 	$(COREFILES) \
 	$(CNMFILES)
 
