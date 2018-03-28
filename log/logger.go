@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 
 	"github.com/Azure/azure-container-networking/platform"
 )
@@ -50,6 +51,7 @@ type Logger struct {
 	maxFileSize  int
 	maxFileCount int
 	callCount    int
+	directory    string
 }
 
 // NewLogger creates a new Logger.
@@ -62,6 +64,7 @@ func NewLogger(name string, level int, target int) *Logger {
 	logger.SetTarget(target)
 	logger.maxFileSize = maxLogFileSize
 	logger.maxFileCount = maxLogFileCount
+	logger.directory = ""
 
 	return &logger
 }
@@ -89,9 +92,31 @@ func (logger *Logger) Close() {
 	}
 }
 
+// SetLogDirectory sets the directory location where logs should be stored.
+func (logger *Logger) SetLogDirectory(logDirectory string) {
+	logger.directory = logDirectory
+}
+
+// GetLogDirectory gets the directory location where logs should be stored.
+func (logger *Logger) GetLogDirectory() string {
+	if logger.directory != "" {
+		return logger.directory
+	}
+
+	return platform.LogPath
+}
+
 // GetLogFileName returns the full log file name.
 func (logger *Logger) getLogFileName() string {
-	return platform.LogPath + logger.name + logFileExtension
+	var logFileName string
+
+	if logger.directory != "" {
+		logFileName = path.Join(logger.directory, logger.name+logFileExtension)
+	} else {
+		logFileName = platform.LogPath + logger.name + logFileExtension
+	}
+
+	return logFileName
 }
 
 // Rotate checks the active log file size and rotates log files if necessary.

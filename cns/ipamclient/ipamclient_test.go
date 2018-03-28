@@ -84,7 +84,7 @@ func handleIPUtilizationQuery(w http.ResponseWriter, r *http.Request) {
 // Decodes plugin's responses to test requests.
 func decodeResponse(w *httptest.ResponseRecorder, response interface{}) error {
 	if w.Code != http.StatusOK {
-		return fmt.Errorf("Request failed with HTTP error %s", w.Code)
+		return fmt.Errorf("Request failed with HTTP error %d", w.Code)
 	}
 
 	if w.Body == nil {

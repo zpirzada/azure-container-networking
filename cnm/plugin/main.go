@@ -69,6 +69,13 @@ var args = common.ArgumentList{
 		},
 	},
 	{
+		Name:         common.OptLogLocation,
+		Shorthand:    common.OptLogLocationAlias,
+		Description:  "Set the logging directory",
+		Type:         "string",
+		DefaultValue: "",
+	},
+	{
 		Name:         common.OptIpamQueryInterval,
 		Shorthand:    common.OptIpamQueryIntervalAlias,
 		Description:  "Set the IPAM plugin query interval",

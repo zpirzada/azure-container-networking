@@ -62,6 +62,11 @@ func CheckIfFileExists(filepath string) (bool, error) {
 func CreateDirectory(dirPath string) error {
 	var err error
 
+	if dirPath == "" {
+		log.Printf("dirPath is empty, nothing to create.")
+		return nil
+	}
+
 	isExist, _ := CheckIfFileExists(dirPath)
 	if !isExist {
 		err = os.Mkdir(dirPath, os.ModePerm)

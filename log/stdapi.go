@@ -31,6 +31,14 @@ func Close() {
 	stdLog.Close()
 }
 
+func SetLogDirectory(logDirectory string) {
+	stdLog.SetLogDirectory(logDirectory)
+}
+
+func GetLogDirectory() string {
+	return stdLog.GetLogDirectory()
+}
+
 func Request(tag string, request interface{}, err error) {
 	stdLog.Request(tag, request, err)
 }

@@ -41,7 +41,7 @@ func NewService(name, version string, store store.KeyValueStore) (*Service, erro
 
 // GetAPIServerURL returns the API server URL.
 func (service *Service) getAPIServerURL() string {
-	urls, _ := service.GetOption(acn.OptAPIServerURL).(string)
+	urls, _ := service.GetOption(acn.OptCnsURL).(string)
 	if urls == "" {
 		urls = defaultAPIServerURL
 	}

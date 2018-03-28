@@ -14,6 +14,8 @@ const (
 	// API server URL.
 	OptAPIServerURL      = "api-url"
 	OptAPIServerURLAlias = "u"
+	OptCnsURL            = "cns-url"
+	OptCnsURLAlias       = "c"
 
 	// Logging level.
 	OptLogLevel      = "log-level"
@@ -27,6 +29,10 @@ const (
 	OptLogTargetSyslog = "syslog"
 	OptLogTargetStderr = "stderr"
 	OptLogTargetFile   = "logfile"
+
+	// Logging location
+	OptLogLocation      = "log-location"
+	OptLogLocationAlias = "o"
 
 	// IPAM query URL.
 	OptIpamQueryUrl      = "ipam-query-url"

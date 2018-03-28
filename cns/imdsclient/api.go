@@ -8,10 +8,11 @@ import (
 )
 
 const (
-	hostQueryURL = "http://169.254.169.254/machine/plugins?comp=nmagent&type=getinterfaceinfov1"
+	hostQueryURL                     = "http://169.254.169.254/machine/plugins?comp=nmagent&type=getinterfaceinfov1"
+	hostQueryURLForProgrammedVersion = "http://169.254.169.254/machine/plugins/?comp=nmagent&type=NetworkManagement/interfaces/%s/networkContainers/%s/authenticationToken/%s/api-version/%s"
 )
 
-// ImdsClient cna be used to connect to VM Host agent in Azure.
+// ImdsClient can be used to connect to VM Host agent in Azure.
 type ImdsClient struct {
 	primaryInterface *InterfaceInfo
 }
@@ -44,4 +45,26 @@ type xmlDocument struct {
 			}
 		}
 	}
+}
+
+type vnetJsonResponse struct {
+	HTTPResponseCode string `json:"httpResponseCode"`
+	VnetID           string `json:"vnetId"`
+	VnetVersion      string `json:"vnetVersion"`
+	VnetSpace        string `json:"vnetSpace"`
+	CnetSpace        string `json:"cnetSpace"`
+	DnsServers       string `json:"dnsServers"`
+	DefaultGateway   string `json:"defaultGateway"`
+}
+
+type containerVersionJsonResponse struct {
+	HTTPResponseCode   string `json:"httpResponseCode"`
+	NetworkContainerID string `json:"networkContainerId"`
+	ProgrammedVersion  string `json:"Version"`
+}
+
+// InterfaceInfo specifies the information about an interface as returned by Host Agent.
+type ContainerVersion struct {
+	NetworkContainerID string
+	ProgrammedVersion  string
 }
