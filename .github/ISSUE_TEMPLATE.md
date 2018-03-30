@@ -1,4 +1,4 @@
-<!-- Thanks for filing an issue! Before hitting the button, please answer these questions. It's helpful to search the existing GitHub issues first. It's likely that another user has already reported the issue you're facing, or it's a known issue that we're already aware of-->
+)<!-- Thanks for filing an issue! Before hitting the button, please answer these questions. It's helpful to search the existing GitHub issues first. It's likely that another user has already reported the issue you're facing, or it's a known issue that we're already aware of-->
 
 **Is this a request for help?**:
 
@@ -12,7 +12,7 @@
 
 ---
 
-**Which componenet (CNI/IPAM/CNM/CNS, etc.?**:
+**Which componenet (CNI/IPAM/CNM/CNS)**:
 
 ---
 
@@ -30,7 +30,7 @@ might close your issue.  If we're wrong, PLEASE feel free to reopen it and
 explain why.
 -->
 
-**Orchestrator and version (e.g. Kubernetes, DC/OS, Swarm, Docker)**
+**Which Orchestrator and version (e.g. Kubernetes, Docker)**
 
 
 **What happened**:
