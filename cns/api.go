@@ -128,7 +128,7 @@ type CreateNetworkContainerRequest struct {
 // NetworkContainerOrchestratorInfo contains orchestrator type, pod name and pod namespace.
 type NetworkContainerOrchestratorInfo struct {
 	OrchestratorType string
-	Podname          string
+	PodName          string
 	PodNamespace     string
 }
 
