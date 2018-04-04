@@ -1,5 +1,7 @@
 package cns
 
+import "encoding/json"
+
 // Container Network Service DNC Contract
 const (
 	CreateOrUpdateNetworkContainer = "/network/createorupdatenetworkcontainer"
@@ -8,9 +10,14 @@ const (
 	GetInterfaceForContainer       = "/network/getinterfaceforcontainer"
 )
 
-// Orchestrator Types
+// NetworkContainer Types
 const (
 	AzureContainerInstance = "AzureContainerInstance"
+)
+
+// Orchestrator Types
+const (
+	Kubernetes = "Kubernetes"
 )
 
 // CreateNetworkContainerRequest specifies request to create a network container or network isolation boundary.
@@ -30,11 +37,11 @@ type CreateNetworkContainerRequest struct {
 // OrchestratorInfo contains orchestrator type which is used to cast OrchestratorContext.
 type OrchestratorInfo struct {
 	OrchestratorType    string
-	OrchestratorContext interface{}
+	OrchestratorContext json.RawMessage
 }
 
-// AzureContainerInstanceInfo is an OrchestratorContext that holds PodName and PodNamespace.
-type AzureContainerInstanceInfo struct {
+// KubernetesPodInfo is an OrchestratorContext that holds PodName and PodNamespace.
+type KubernetesPodInfo struct {
 	PodName      string
 	PodNamespace string
 }
