@@ -179,7 +179,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	// Initialize values from network config.
 	networkId := nwCfg.Name
-	endpointId := network.GetEndpointID(args)
+	endpointId := GetEndpointID(args)
 
 	nwInfo, nwInfoErr := plugin.nm.GetNetworkInfo(networkId)
 
@@ -365,7 +365,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 
 	// Initialize values from network config.
 	networkId := nwCfg.Name
-	endpointId := network.GetEndpointID(args)
+	endpointId := GetEndpointID(args)
 
 	// Query the network.
 	nwInfo, err := plugin.nm.GetNetworkInfo(networkId)
