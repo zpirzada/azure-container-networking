@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/network/policy"
 	"github.com/Microsoft/hcsshim"
 )
 
@@ -39,45 +40,23 @@ func ConstructEpName(containerID string, netNsPath string, ifName string) (strin
 	return infraEpName, workloadEpName
 }
 
+// HotAttachEndpoint is a wrapper of hcsshim's HotAttachEndpoint.
+func (endpoint *EndpointInfo) HotAttachEndpoint(containerID string) error {
+	return hcsshim.HotAttachEndpoint(containerID, endpoint.Id)
+}
+
 // newEndpointImpl creates a new endpoint in the network.
 func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	// Get Infrastructure containerID. Handle ADD calls for workload container.
-	infraEpName, workloadEpName := ConstructEpName(epInfo.ContainerID, epInfo.NetNsPath, epInfo.IfName)
+	infraEpName, _ := ConstructEpName(epInfo.ContainerID, epInfo.NetNsPath, epInfo.IfName)
 
-	/* Handle consecutive ADD calls for infrastructure containers.
-	 * This is a temporary work around for issue #57253 of Kubernetes.
-	 * We can delete this if statement once they fix it.
-	 * Issue link: https://github.com/kubernetes/kubernetes/issues/57253
-	 */
-	if workloadEpName == "" {
-		if nw.Endpoints[infraEpName] != nil {
-			log.Printf("[net] Found existing endpoint %v, return immediately.", infraEpName)
-			return nw.Endpoints[infraEpName], nil
-		}
-	}
-
-	log.Printf("[net] infraEpName: %v", infraEpName)
-
-	hnsEndpoint, _ := hcsshim.GetHNSEndpointByName(infraEpName)
-	if hnsEndpoint != nil {
-		log.Printf("[net] Found existing endpoint through hcsshim%v", infraEpName)
-		log.Printf("[net] Attaching ep %v to container %v", hnsEndpoint.Id, epInfo.ContainerID)
-		if err := hcsshim.HotAttachEndpoint(epInfo.ContainerID, hnsEndpoint.Id); err != nil {
-			return nil, err
-		}
-		return nw.Endpoints[infraEpName], nil
-	}
-
-	hnsEndpoint = &hcsshim.HNSEndpoint{
+	hnsEndpoint := &hcsshim.HNSEndpoint{
 		Name:           infraEpName,
 		VirtualNetwork: nw.HnsId,
 		DNSSuffix:      epInfo.DNS.Suffix,
 		DNSServerList:  strings.Join(epInfo.DNS.Servers, ","),
+		Policies:       policy.SerializePolicies(policy.EndpointPolicy, epInfo.Policies),
 	}
-
-	//enable outbound NAT
-	var enableOutBoundNat = json.RawMessage(`{"Type":  "OutBoundNAT"}`)
-	hnsEndpoint.Policies = append(hnsEndpoint.Policies, enableOutBoundNat)
 
 	// HNS currently supports only one IP address per endpoint.
 	if epInfo.IPAddresses != nil {

@@ -7,6 +7,7 @@ import (
 	"net"
 
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/network/policy"
 	"github.com/Azure/azure-container-networking/platform"
 )
 
@@ -46,6 +47,7 @@ type NetworkInfo struct {
 	Mode       string
 	Subnets    []SubnetInfo
 	DNS        DNSInfo
+	Policies   []policy.Policy
 	BridgeName string
 	Options    map[string]interface{}
 }
