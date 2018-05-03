@@ -5,10 +5,10 @@ package network
 
 import (
 	"net"
+	"strings"
 
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network/policy"
-	cniSkel "github.com/containernetworking/cni/pkg/skel"
 )
 
 // Endpoint represents a container network interface.
@@ -42,10 +42,29 @@ type RouteInfo struct {
 	Gw  net.IP
 }
 
-// GetEndpointID returns a unique endpoint ID based on the CNI args.
-func GetEndpointID(args *cniSkel.CmdArgs) string {
-	infraEpId, _ := ConstructEpName(args.ContainerID, args.Netns, args.IfName)
-	return infraEpId
+// ConstructEndpointID constructs endpoint name from netNsPath.
+func ConstructEndpointID(containerID string, netNsPath string, ifName string) (string, string) {
+	infraEpName, workloadEpName := "", ""
+
+	if len(containerID) > 8 {
+		containerID = containerID[:8]
+	}
+
+	if netNsPath != "" {
+		splits := strings.Split(netNsPath, ":")
+		// For workload containers, we extract its linking infrastructure container ID.
+		if len(splits) == 2 {
+			if len(splits[1]) > 8 {
+				splits[1] = splits[1][:8]
+			}
+			infraEpName = splits[1] + "-" + ifName
+			workloadEpName = containerID + "-" + ifName
+		} else {
+			// For infrastructure containers, we just use its container ID.
+			infraEpName = containerID + "-" + ifName
+		}
+	}
+	return infraEpName, workloadEpName
 }
 
 // NewEndpoint creates a new endpoint in the network.

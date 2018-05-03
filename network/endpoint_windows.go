@@ -15,31 +15,6 @@ import (
 	"github.com/Microsoft/hcsshim"
 )
 
-// ConstructEpName constructs endpoint name from netNsPath.
-func ConstructEpName(containerID string, netNsPath string, ifName string) (string, string) {
-	infraEpName, workloadEpName := "", ""
-
-	if len(containerID) > 8 {
-		containerID = containerID[:8]
-	}
-
-	if netNsPath != "" {
-		splits := strings.Split(netNsPath, ":")
-		// For workload containers, we extract its linking infrastructure container ID.
-		if len(splits) == 2 {
-			if len(splits[1]) > 8 {
-				splits[1] = splits[1][:8]
-			}
-			infraEpName = splits[1] + "-" + ifName
-			workloadEpName = containerID + "-" + ifName
-		} else {
-			// For infrastructure containers, we just use its container ID.
-			infraEpName = containerID + "-" + ifName
-		}
-	}
-	return infraEpName, workloadEpName
-}
-
 // HotAttachEndpoint is a wrapper of hcsshim's HotAttachEndpoint.
 func (endpoint *EndpointInfo) HotAttachEndpoint(containerID string) error {
 	return hcsshim.HotAttachEndpoint(containerID, endpoint.Id)
@@ -48,7 +23,7 @@ func (endpoint *EndpointInfo) HotAttachEndpoint(containerID string) error {
 // newEndpointImpl creates a new endpoint in the network.
 func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	// Get Infrastructure containerID. Handle ADD calls for workload container.
-	infraEpName, _ := ConstructEpName(epInfo.ContainerID, epInfo.NetNsPath, epInfo.IfName)
+	infraEpName, _ := ConstructEndpointID(epInfo.ContainerID, epInfo.NetNsPath, epInfo.IfName)
 
 	hnsEndpoint := &hcsshim.HNSEndpoint{
 		Name:           infraEpName,

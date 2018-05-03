@@ -117,6 +117,12 @@ func (plugin *netPlugin) findMasterInterface(nwCfg *cni.NetworkConfig, subnetPre
 	return ""
 }
 
+// GetEndpointID returns a unique endpoint ID based on the CNI args.
+func GetEndpointID(args *cniSkel.CmdArgs) string {
+	infraEpId, _ := network.ConstructEndpointID(args.ContainerID, args.Netns, args.IfName)
+	return infraEpId
+}
+
 //
 // CNI implementation
 // https://github.com/containernetworking/cni/blob/master/SPEC.md
