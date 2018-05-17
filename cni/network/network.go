@@ -4,6 +4,7 @@
 package network
 
 import (
+	"fmt"
 	"net"
 	"strings"
 
@@ -162,10 +163,23 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	// Parse Pod arguments.
 	podCfg, err := cni.ParseCniArgs(args.Args)
+	if err != nil {
+		log.Printf("Error while parsing CNI Args %v", err)
+		return err
+	}
+
 	k8sNamespace := string(podCfg.K8S_POD_NAMESPACE)
 	if len(k8sNamespace) == 0 {
-		err = plugin.Errorf("No k8s pod namespace provided.")
-		return err
+		errMsg := "Pod Namespace not specified in CNI Args"
+		log.Printf(errMsg)
+		return plugin.Errorf(errMsg)
+	}
+
+	k8sPodName := string(podCfg.K8S_POD_NAME)
+	if len(k8sPodName) == 0 {
+		errMsg := "Pod Name not specified in CNI Args"
+		log.Printf(errMsg)
+		return plugin.Errorf(errMsg)
 	}
 
 	// Parse network configuration from stdin.
@@ -333,6 +347,9 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	for _, route := range result.Routes {
 		epInfo.Routes = append(epInfo.Routes, network.RouteInfo{Dst: route.Dst, Gw: route.GW})
 	}
+
+	epInfo.Data = make(map[string]interface{})
+	epInfo.Data[network.OptVethName] = fmt.Sprintf("%s.%s", k8sNamespace, k8sPodName)
 
 	// Create the endpoint.
 	log.Printf("[cni-net] Creating endpoint %v.", epInfo.Id)
