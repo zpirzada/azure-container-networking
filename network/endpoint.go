@@ -21,6 +21,8 @@ type endpoint struct {
 	MacAddress  net.HardwareAddr
 	IPAddresses []net.IPNet
 	Gateways    []net.IP
+	DNS         DNSInfo
+	Routes      []RouteInfo
 }
 
 // EndpointInfo contains read-only information about an endpoint.
@@ -29,10 +31,14 @@ type EndpointInfo struct {
 	ContainerID string
 	NetNsPath   string
 	IfName      string
+	SandboxKey  string
+	IfIndex     int
+	MacAddress  net.HardwareAddr
+	DNS         DNSInfo
 	IPAddresses []net.IPNet
 	Routes      []RouteInfo
-	DNS         DNSInfo
 	Policies    []policy.Policy
+	Gateways    []net.IP
 	Data        map[string]interface{}
 }
 
@@ -144,6 +150,18 @@ func (ep *endpoint) getInfo() *EndpointInfo {
 		Id:          ep.Id,
 		IPAddresses: ep.IPAddresses,
 		Data:        make(map[string]interface{}),
+		MacAddress:  ep.MacAddress,
+		SandboxKey:  ep.SandboxKey,
+		IfIndex:     0, // Azure CNI supports only one interface
+		DNS:         ep.DNS,
+	}
+
+	for _, route := range ep.Routes {
+		info.Routes = append(info.Routes, route)
+	}
+
+	for _, gw := range ep.Gateways {
+		info.Gateways = append(info.Gateways, gw)
 	}
 
 	// Call the platform implementation.
