@@ -18,9 +18,13 @@
 
 **Which Operating System (Linux/Windows)**:
 
-For Linux: Include Distro and kernel version using "uname -a"
+---
 
-For windows: provide output of "$(Get-ItemProperty -Path "C:\windows\system32\hal.dll").VersionInfo.FileVersion"
+**For Linux: Include Distro and kernel version using "uname -a"**
+
+---
+
+**For windows: provide output of "$(Get-ItemProperty -Path "C:\windows\system32\hal.dll").VersionInfo.FileVersion"**
 
 ---
 
@@ -40,14 +44,20 @@ explain why.
 
 **Which Orchestrator and version (e.g. Kubernetes, Docker)**
 
+---
 
 **What happened**:
 
+---
 
 **What you expected to happen**:
 
+---
 
 **How to reproduce it** (as minimally and precisely as possible):
 
+---
 
 **Anything else we need to know**:
+
+---
