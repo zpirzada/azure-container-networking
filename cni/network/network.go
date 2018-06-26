@@ -148,6 +148,10 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path)
 
 	defer func() {
+		if result == nil {
+			result = &cniTypesCurr.Result{}
+		}
+		
 		// Add Interfaces to result.
 		iface = &cniTypesCurr.Interface{
 			Name: args.IfName,
