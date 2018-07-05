@@ -72,6 +72,7 @@ func (nm *networkManager) Uninitialize() {
 func (nm *networkManager) restore() error {
 	// Skip if a store is not provided.
 	if nm.store == nil {
+		log.Printf("[net] network store is nil")
 		return nil
 	}
 
@@ -83,6 +84,7 @@ func (nm *networkManager) restore() error {
 	err := nm.store.Read(storeKey, nm)
 	if err != nil {
 		if err == store.ErrKeyNotFound {
+			log.Printf("[net] network store key not found")
 			// Considered successful.
 			return nil
 		} else {

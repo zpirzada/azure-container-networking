@@ -26,10 +26,25 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := ipamPlugin.Plugin.InitializeKeyValueStore(&config); err != nil {
+		fmt.Printf("Failed to initialize key-value store of ipam plugin, err:%v.\n", err)
+		os.Exit(1)
+	}
+
+	defer func() {
+		if errUninit := ipamPlugin.Plugin.UninitializeKeyValueStore(); errUninit != nil {
+			fmt.Printf("Failed to uninitialize key-value store of ipam plugin, err:%v.\n", err)
+		}
+
+		if recover() != nil {
+			os.Exit(1)
+		}
+	}()
+
 	err = ipamPlugin.Start(&config)
 	if err != nil {
 		fmt.Printf("Failed to start IPAM plugin, err:%v.\n", err)
-		os.Exit(1)
+		panic("ipam plugin fatal error")
 	}
 
 	err = ipamPlugin.Execute(cni.PluginApi(ipamPlugin))
@@ -37,6 +52,6 @@ func main() {
 	ipamPlugin.Stop()
 
 	if err != nil {
-		os.Exit(1)
+		panic("ipam plugin fatal error")
 	}
 }

@@ -96,6 +96,7 @@ func (am *addressManager) Uninitialize() {
 func (am *addressManager) restore() error {
 	// Skip if a store is not provided.
 	if am.store == nil {
+		log.Printf("[ipam] ipam store is nil")
 		return nil
 	}
 
@@ -117,6 +118,7 @@ func (am *addressManager) restore() error {
 	err = am.store.Read(storeKey, am)
 	if err != nil {
 		if err == store.ErrKeyNotFound {
+			log.Printf("[ipam] store key not found")
 			return nil
 		} else {
 			log.Printf("[ipam] Failed to restore state, err:%v\n", err)

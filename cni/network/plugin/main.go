@@ -83,6 +83,12 @@ func main() {
 
 	netPlugin.SetReportManager(reportManager)
 
+	if err = netPlugin.Plugin.InitializeKeyValueStore(&config); err != nil {
+		log.Printf("Failed to initialize key-value store of network plugin, err:%v.\n", err)
+		reportPluginError(reportManager, err)
+		os.Exit(1)
+	}
+
 	defer func() {
 		if errUninit := netPlugin.Plugin.UninitializeKeyValueStore(); errUninit != nil {
 			log.Printf("Failed to uninitialize key-value store of network plugin, err:%v.\n", err)
@@ -92,12 +98,6 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-
-	if err = netPlugin.Plugin.InitializeKeyValueStore(&config); err != nil {
-		log.Printf("Failed to initialize key-value store of network plugin, err:%v.\n", err)
-		reportPluginError(reportManager, err)
-		panic("network plugin fatal error")
-	}
 
 	if err = netPlugin.Start(&config); err != nil {
 		log.Printf("Failed to start network plugin, err:%v.\n", err)
