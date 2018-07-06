@@ -26,6 +26,8 @@ const (
 	TargetStderr = iota
 	TargetSyslog
 	TargetLogfile
+	TargetStdout
+	TargetStdOutAndLogFile
 )
 
 const (

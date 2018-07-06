@@ -26,3 +26,11 @@ func GetLastRebootTime() (time.Time, error) {
 	var rebootTime time.Time
 	return rebootTime, nil
 }
+
+func ExecuteCommand(command string) (string, error) {
+	return "", nil
+}
+
+func SetOutboundSNAT(subnet string) error {
+	return nil
+}

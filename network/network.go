@@ -33,23 +33,26 @@ type externalInterface struct {
 
 // A container network is a set of endpoints allowed to communicate with each other.
 type network struct {
-	Id        string
-	HnsId     string `json:",omitempty"`
-	Mode      string
-	Subnets   []SubnetInfo
-	Endpoints map[string]*endpoint
-	extIf     *externalInterface
+	Id               string
+	HnsId            string `json:",omitempty"`
+	Mode             string
+	VlanId           int
+	Subnets          []SubnetInfo
+	Endpoints        map[string]*endpoint
+	extIf            *externalInterface
+	EnableSnatOnHost bool
 }
 
 // NetworkInfo contains read-only information about a container network.
 type NetworkInfo struct {
-	Id         string
-	Mode       string
-	Subnets    []SubnetInfo
-	DNS        DNSInfo
-	Policies   []policy.Policy
-	BridgeName string
-	Options    map[string]interface{}
+	Id               string
+	Mode             string
+	Subnets          []SubnetInfo
+	DNS              DNSInfo
+	Policies         []policy.Policy
+	BridgeName       string
+	EnableSnatOnHost bool
+	Options          map[string]interface{}
 }
 
 // SubnetInfo contains subnet information for a container network.

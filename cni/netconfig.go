@@ -24,15 +24,17 @@ type KVPair struct {
 
 // NetworkConfig represents Azure CNI plugin network configuration.
 type NetworkConfig struct {
-	CNIVersion string `json:"cniVersion"`
-	Name       string `json:"name"`
-	Type       string `json:"type"`
-	Mode       string `json:"mode"`
-	Master     string `json:"master"`
-	Bridge     string `json:"bridge,omitempty"`
-	LogLevel   string `json:"logLevel,omitempty"`
-	LogTarget  string `json:"logTarget,omitempty"`
-	Ipam       struct {
+	CNIVersion       string `json:"cniVersion"`
+	Name             string `json:"name"`
+	Type             string `json:"type"`
+	Mode             string `json:"mode"`
+	Master           string `json:"master"`
+	Bridge           string `json:"bridge,omitempty"`
+	LogLevel         string `json:"logLevel,omitempty"`
+	LogTarget        string `json:"logTarget,omitempty"`
+	MultiTenancy     bool   `json:"multiTenancy,omitempty"`
+	EnableSnatOnHost bool   `json:"enableSnatOnHost,omitempty"`
+	Ipam             struct {
 		Type          string `json:"type"`
 		Environment   string `json:"environment,omitempty"`
 		AddrSpace     string `json:"addressSpace,omitempty"`

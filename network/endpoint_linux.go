@@ -11,9 +11,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/Azure/azure-container-networking/ebtables"
 	"github.com/Azure/azure-container-networking/log"
-	"github.com/Azure/azure-container-networking/netlink"
 )
 
 const (
@@ -41,11 +39,19 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	var err error
 	var hostIfName string
 	var contIfName string
+	var epClient EndpointClient
+	var vlanid int = 0
 
 	if nw.Endpoints[epInfo.Id] != nil {
 		log.Printf("[net] Endpoint alreday exists.")
 		err = errEndpointExists
 		return nil, err
+	}
+
+	if epInfo.Data != nil {
+		if _, ok := epInfo.Data[VlanIDKey]; ok {
+			vlanid = epInfo.Data[VlanIDKey].(int)
+		}
 	}
 
 	if _, ok := epInfo.Data[OptVethName]; ok {
@@ -61,72 +67,53 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		contIfName = fmt.Sprintf("%s%s-2", hostVEthInterfacePrefix, epInfo.Id[:7])
 	}
 
-	log.Printf("[net] Creating veth pair %v %v.", hostIfName, contIfName)
-
-	link := netlink.VEthLink{
-		LinkInfo: netlink.LinkInfo{
-			Type: netlink.LINK_TYPE_VETH,
-			Name: contIfName,
-		},
-		PeerName: hostIfName,
+	if vlanid != 0 {
+		epClient = NewOVSEndpointClient(
+			nw.extIf,
+			epInfo,
+			hostIfName,
+			contIfName,
+			vlanid)
+	} else {
+		epClient = NewLinuxBridgeEndpointClient(nw.extIf, hostIfName, contIfName, nw.Mode)
 	}
 
-	err = netlink.AddLink(&link)
-	if err != nil {
-		log.Printf("[net] Failed to create veth pair, err:%v.", err)
-		return nil, err
-	}
-
-	// On failure, delete the veth pair.
+	// Cleanup on failure.
 	defer func() {
 		if err != nil {
-			netlink.DeleteLink(contIfName)
+			log.Printf("CNI error. Delete Endpoint %v and rules that are created.", contIfName)
+			endpt := &endpoint{
+				Id:               epInfo.Id,
+				IfName:           contIfName,
+				HostIfName:       hostIfName,
+				IPAddresses:      epInfo.IPAddresses,
+				Gateways:         []net.IP{nw.extIf.IPv4Gateway},
+				DNS:              epInfo.DNS,
+				VlanID:           vlanid,
+				EnableSnatOnHost: epInfo.EnableSnatOnHost,
+			}
+
+			if containerIf != nil {
+				endpt.MacAddress = containerIf.HardwareAddr
+				epClient.DeleteEndpointRules(endpt)
+			}
+
+			epClient.DeleteEndpoints(endpt)
 		}
 	}()
 
-	//
-	// Host network interface setup.
-	//
-
-	// Host interface up.
-	log.Printf("[net] Setting link %v state up.", hostIfName)
-	err = netlink.SetLinkState(hostIfName, true)
-	if err != nil {
+	if err = epClient.AddEndpoints(epInfo); err != nil {
 		return nil, err
 	}
 
-	// Connect host interface to the bridge.
-	log.Printf("[net] Setting link %v master %v.", hostIfName, nw.extIf.BridgeName)
-	err = netlink.SetLinkMaster(hostIfName, nw.extIf.BridgeName)
-	if err != nil {
-		return nil, err
-	}
-
-	//
-	// Container network interface setup.
-	//
-
-	// Query container network interface info.
 	containerIf, err = net.InterfaceByName(contIfName)
 	if err != nil {
 		return nil, err
 	}
 
 	// Setup rules for IP addresses on the container interface.
-	for _, ipAddr := range epInfo.IPAddresses {
-		// Add ARP reply rule.
-		log.Printf("[net] Adding ARP reply rule for IP address %v on %v.", ipAddr.String(), contIfName)
-		err = ebtables.SetArpReply(ipAddr.IP, nw.getArpReplyAddress(containerIf.HardwareAddr), ebtables.Append)
-		if err != nil {
-			return nil, err
-		}
-
-		// Add MAC address translation rule.
-		log.Printf("[net] Adding MAC DNAT rule for IP address %v on %v.", ipAddr.String(), contIfName)
-		err = ebtables.SetDnatForIPAddress(nw.extIf.Name, ipAddr.IP, containerIf.HardwareAddr, ebtables.Append)
-		if err != nil {
-			return nil, err
-		}
+	if err = epClient.AddEndpointRules(epInfo); err != nil {
+		return nil, err
 	}
 
 	// If a network namespace for the container interface is specified...
@@ -139,25 +126,20 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		}
 		defer ns.Close()
 
-		// Move the container interface to container's network namespace.
-		log.Printf("[net] Setting link %v netns %v.", contIfName, epInfo.NetNsPath)
-		err = netlink.SetLinkNetNs(contIfName, ns.GetFd())
-		if err != nil {
+		if err := epClient.MoveEndpointsToContainerNS(epInfo, ns.GetFd()); err != nil {
 			return nil, err
 		}
 
 		// Enter the container network namespace.
 		log.Printf("[net] Entering netns %v.", epInfo.NetNsPath)
-		err = ns.Enter()
-		if err != nil {
+		if err = ns.Enter(); err != nil {
 			return nil, err
 		}
 
 		// Return to host network namespace.
 		defer func() {
 			log.Printf("[net] Exiting netns %v.", epInfo.NetNsPath)
-			err = ns.Exit()
-			if err != nil {
+			if err := ns.Exit(); err != nil {
 				log.Printf("[net] Failed to exit netns, err:%v.", err)
 			}
 		}()
@@ -165,64 +147,26 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 
 	// If a name for the container interface is specified...
 	if epInfo.IfName != "" {
-		// Interface needs to be down before renaming.
-		log.Printf("[net] Setting link %v state down.", contIfName)
-		err = netlink.SetLinkState(contIfName, false)
-		if err != nil {
-			return nil, err
-		}
-
-		// Rename the container interface.
-		log.Printf("[net] Setting link %v name %v.", contIfName, epInfo.IfName)
-		err = netlink.SetLinkName(contIfName, epInfo.IfName)
-		if err != nil {
-			return nil, err
-		}
-		contIfName = epInfo.IfName
-
-		// Bring the interface back up.
-		log.Printf("[net] Setting link %v state up.", contIfName)
-		err = netlink.SetLinkState(contIfName, true)
-		if err != nil {
+		if err = epClient.SetupContainerInterfaces(epInfo); err != nil {
 			return nil, err
 		}
 	}
 
-	// Assign IP address to container network interface.
-	for _, ipAddr := range epInfo.IPAddresses {
-		log.Printf("[net] Adding IP address %v to link %v.", ipAddr.String(), contIfName)
-		err = netlink.AddIpAddress(contIfName, ipAddr.IP, &ipAddr)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Add IP routes to container network interface.
-	for _, route := range epInfo.Routes {
-		log.Printf("[net] Adding IP route %+v to link %v.", route, contIfName)
-
-		nlRoute := &netlink.Route{
-			Family:    netlink.GetIpAddressFamily(route.Gw),
-			Dst:       &route.Dst,
-			Gw:        route.Gw,
-			LinkIndex: containerIf.Index,
-		}
-
-		err = netlink.AddIpRoute(nlRoute)
-		if err != nil {
-			return nil, err
-		}
+	if err = epClient.ConfigureContainerInterfacesAndRoutes(epInfo); err != nil {
+		return nil, err
 	}
 
 	// Create the endpoint object.
 	ep = &endpoint{
-		Id:          epInfo.Id,
-		IfName:      contIfName,
-		HostIfName:  hostIfName,
-		MacAddress:  containerIf.HardwareAddr,
-		IPAddresses: epInfo.IPAddresses,
-		Gateways:    []net.IP{nw.extIf.IPv4Gateway},
-		DNS:         epInfo.DNS,
+		Id:               epInfo.Id,
+		IfName:           contIfName,
+		HostIfName:       hostIfName,
+		MacAddress:       containerIf.HardwareAddr,
+		IPAddresses:      epInfo.IPAddresses,
+		Gateways:         []net.IP{nw.extIf.IPv4Gateway},
+		DNS:              epInfo.DNS,
+		VlanID:           vlanid,
+		EnableSnatOnHost: epInfo.EnableSnatOnHost,
 	}
 
 	for _, route := range epInfo.Routes {
@@ -234,49 +178,22 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 
 // deleteEndpointImpl deletes an existing endpoint from the network.
 func (nw *network) deleteEndpointImpl(ep *endpoint) error {
+	var epClient EndpointClient
+
 	// Delete the veth pair by deleting one of the peer interfaces.
 	// Deleting the host interface is more convenient since it does not require
 	// entering the container netns and hence works both for CNI and CNM.
-	log.Printf("[net] Deleting veth pair %v %v.", ep.HostIfName, ep.IfName)
-	err := netlink.DeleteLink(ep.HostIfName)
-	if err != nil {
-		log.Printf("[net] Failed to delete veth pair %v: %v.", ep.HostIfName, err)
-		return err
+	if ep.VlanID != 0 {
+		epInfo := ep.getInfo()
+		epClient = NewOVSEndpointClient(nw.extIf, epInfo, ep.HostIfName, "", ep.VlanID)
+	} else {
+		epClient = NewLinuxBridgeEndpointClient(nw.extIf, ep.HostIfName, "", nw.Mode)
 	}
 
-	// Delete rules for IP addresses on the container interface.
-	for _, ipAddr := range ep.IPAddresses {
-		// Delete ARP reply rule.
-		log.Printf("[net] Deleting ARP reply rule for IP address %v on %v.", ipAddr.String(), ep.Id)
-		err = ebtables.SetArpReply(ipAddr.IP, nw.getArpReplyAddress(ep.MacAddress), ebtables.Delete)
-		if err != nil {
-			log.Printf("[net] Failed to delete ARP reply rule for IP address %v: %v.", ipAddr.String(), err)
-		}
-
-		// Delete MAC address translation rule.
-		log.Printf("[net] Deleting MAC DNAT rule for IP address %v on %v.", ipAddr.String(), ep.Id)
-		err = ebtables.SetDnatForIPAddress(nw.extIf.Name, ipAddr.IP, ep.MacAddress, ebtables.Delete)
-		if err != nil {
-			log.Printf("[net] Failed to delete MAC DNAT rule for IP address %v: %v.", ipAddr.String(), err)
-		}
-	}
+	epClient.DeleteEndpointRules(ep)
+	epClient.DeleteEndpoints(ep)
 
 	return nil
-}
-
-// getArpReplyAddress returns the MAC address to use in ARP replies.
-func (nw *network) getArpReplyAddress(epMacAddress net.HardwareAddr) net.HardwareAddr {
-	var macAddress net.HardwareAddr
-
-	if nw.Mode == opModeTunnel {
-		// In tunnel mode, resolve all IP addresses to the virtual MAC address for hairpinning.
-		macAddress, _ = net.ParseMAC(virtualMacAddress)
-	} else {
-		// Otherwise, resolve to actual MAC address.
-		macAddress = epMacAddress
-	}
-
-	return macAddress
 }
 
 // getInfoImpl returns information about the endpoint.

@@ -70,6 +70,8 @@ var args = acn.ArgumentList{
 			acn.OptLogTargetSyslog: log.TargetSyslog,
 			acn.OptLogTargetStderr: log.TargetStderr,
 			acn.OptLogTargetFile:   log.TargetLogfile,
+			acn.OptLogStdout:       log.TargetStdout,
+			acn.OptLogMultiWrite:   log.TargetStdOutAndLogFile,
 		},
 	},
 	{
@@ -101,6 +103,13 @@ var args = acn.ArgumentList{
 		DefaultValue: "",
 	},
 	{
+		Name:         acn.OptStopAzureVnet,
+		Shorthand:    acn.OptStopAzureVnetAlias,
+		Description:  "Stop Azure-CNM if flag is true",
+		Type:         "bool",
+		DefaultValue: false,
+	},
+	{
 		Name:         acn.OptVersion,
 		Shorthand:    acn.OptVersionAlias,
 		Description:  "Print version information",
@@ -117,6 +126,7 @@ func printVersion() {
 
 // Main is the entry point for CNS.
 func main() {
+	var stopcnm = false
 	// Initialize and parse command line arguments.
 	acn.ParseArgs(&args, printVersion)
 
@@ -128,6 +138,7 @@ func main() {
 	logDirectory := acn.GetArg(acn.OptLogLocation).(string)
 	ipamQueryUrl, _ := acn.GetArg(acn.OptIpamQueryUrl).(string)
 	ipamQueryInterval, _ := acn.GetArg(acn.OptIpamQueryInterval).(int)
+	stopcnm = acn.GetArg(acn.OptStopAzureVnet).(bool)
 	vers := acn.GetArg(acn.OptVersion).(bool)
 
 	if vers {
@@ -143,54 +154,7 @@ func main() {
 	// Create a channel to receive unhandled errors from CNS.
 	config.ErrChan = make(chan error, 1)
 
-	// Create the key value store.
 	var err error
-	config.Store, err = store.NewJsonFileStore(platform.CNMRuntimePath + name + ".json")
-	if err != nil {
-		fmt.Printf("Failed to create store: %v\n", err)
-		return
-	}
-
-	// Create CNS object.
-	httpRestService, err := restserver.NewHTTPRestService(&config)
-	if err != nil {
-		fmt.Printf("Failed to create CNS object, err:%v.\n", err)
-		return
-	}
-
-	var pluginConfig acn.PluginConfig
-	pluginConfig.Version = version
-
-	// Create a channel to receive unhandled errors from the plugins.
-	pluginConfig.ErrChan = make(chan error, 1)
-
-	// Create network plugin.
-	netPlugin, err := network.NewPlugin(&pluginConfig)
-	if err != nil {
-		fmt.Printf("Failed to create network plugin, err:%v.\n", err)
-		return
-	}
-
-	// Create IPAM plugin.
-	ipamPlugin, err := ipam.NewPlugin(&pluginConfig)
-	if err != nil {
-		fmt.Printf("Failed to create IPAM plugin, err:%v.\n", err)
-		return
-	}
-
-	err = acn.CreateDirectory(platform.CNMRuntimePath)
-	if err != nil {
-		fmt.Printf("Failed to create File Store directory Error:%v", err.Error())
-		return
-	}
-
-	// Create the key value store.
-	pluginConfig.Store, err = store.NewJsonFileStore(platform.CNMRuntimePath + pluginName + ".json")
-	if err != nil {
-		fmt.Printf("Failed to create store: %v\n", err)
-		return
-	}
-
 	// Create logging provider.
 	log.SetName(name)
 	log.SetLevel(logLevel)
@@ -207,6 +171,26 @@ func main() {
 	// Log platform information.
 	log.Printf("Running on %v", platform.GetOSInfo())
 
+	err = acn.CreateDirectory(platform.CNMRuntimePath)
+	if err != nil {
+		log.Printf("Failed to create File Store directory Error:%v", err.Error())
+		return
+	}
+
+	// Create the key value store.
+	config.Store, err = store.NewJsonFileStore(platform.CNMRuntimePath + name + ".json")
+	if err != nil {
+		log.Printf("Failed to create store: %v\n", err)
+		return
+	}
+
+	// Create CNS object.
+	httpRestService, err := restserver.NewHTTPRestService(&config)
+	if err != nil {
+		log.Printf("Failed to create CNS object, err:%v.\n", err)
+		return
+	}
+
 	// Set CNS options.
 	httpRestService.SetOption(acn.OptCnsURL, cnsURL)
 
@@ -214,32 +198,56 @@ func main() {
 	if httpRestService != nil {
 		err = httpRestService.Start(&config)
 		if err != nil {
-			fmt.Printf("Failed to start CNS, err:%v.\n", err)
+			log.Printf("Failed to start CNS, err:%v.\n", err)
 			return
 		}
 	}
 
-	// Set plugin options.
-	netPlugin.SetOption(acn.OptAPIServerURL, url)
+	var netPlugin network.NetPlugin
+	var ipamPlugin ipam.IpamPlugin
 
-	ipamPlugin.SetOption(acn.OptEnvironment, environment)
-	ipamPlugin.SetOption(acn.OptAPIServerURL, url)
-	ipamPlugin.SetOption(acn.OptIpamQueryUrl, ipamQueryUrl)
-	ipamPlugin.SetOption(acn.OptIpamQueryInterval, ipamQueryInterval)
+	if !stopcnm {
+		var pluginConfig acn.PluginConfig
+		pluginConfig.Version = version
 
-	if netPlugin != nil {
+		// Create a channel to receive unhandled errors from the plugins.
+		pluginConfig.ErrChan = make(chan error, 1)
+
+		// Create network plugin.
+		netPlugin, err = network.NewPlugin(&pluginConfig)
+		if err != nil {
+			log.Printf("Failed to create network plugin, err:%v.\n", err)
+			return
+		}
+
+		// Create IPAM plugin.
+		ipamPlugin, err = ipam.NewPlugin(&pluginConfig)
+		if err != nil {
+			log.Printf("Failed to create IPAM plugin, err:%v.\n", err)
+			return
+		}
+
+		// Create the key value store.
+		pluginConfig.Store, err = store.NewJsonFileStore(platform.CNMRuntimePath + pluginName + ".json")
+		if err != nil {
+			log.Printf("Failed to create store: %v\n", err)
+			return
+		}
+
+		// Set plugin options.
+		netPlugin.SetOption(acn.OptAPIServerURL, url)
 		log.Printf("Start netplugin\n")
-		err = netPlugin.Start(&pluginConfig)
-		if err != nil {
-			fmt.Printf("Failed to start network plugin, err:%v.\n", err)
+		if err := netPlugin.Start(&pluginConfig); err != nil {
+			log.Printf("Failed to create network plugin, err:%v.\n", err)
 			return
 		}
-	}
 
-	if ipamPlugin != nil {
-		err = ipamPlugin.Start(&pluginConfig)
-		if err != nil {
-			fmt.Printf("Failed to start IPAM plugin, err:%v.\n", err)
+		ipamPlugin.SetOption(acn.OptEnvironment, environment)
+		ipamPlugin.SetOption(acn.OptAPIServerURL, url)
+		ipamPlugin.SetOption(acn.OptIpamQueryUrl, ipamQueryUrl)
+		ipamPlugin.SetOption(acn.OptIpamQueryInterval, ipamQueryInterval)
+		if err := ipamPlugin.Start(&pluginConfig); err != nil {
+			log.Printf("Failed to create IPAM plugin, err:%v.\n", err)
 			return
 		}
 	}
@@ -261,11 +269,15 @@ func main() {
 		httpRestService.Stop()
 	}
 
-	if netPlugin != nil {
-		netPlugin.Stop()
+	if !stopcnm {
+		if netPlugin != nil {
+			netPlugin.Stop()
+		}
+
+		if ipamPlugin != nil {
+			ipamPlugin.Stop()
+		}
 	}
 
-	if ipamPlugin != nil {
-		ipamPlugin.Stop()
-	}
+	log.Close()
 }

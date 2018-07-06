@@ -4,6 +4,7 @@
 package common
 
 import (
+	"encoding/binary"
 	"encoding/xml"
 	"net"
 	"os"
@@ -73,4 +74,32 @@ func CreateDirectory(dirPath string) error {
 	}
 
 	return err
+}
+
+func IpToInt(ip net.IP) uint32 {
+	if len(ip) == 16 {
+		return binary.BigEndian.Uint32(ip[12:16])
+	}
+
+	return binary.BigEndian.Uint32(ip)
+}
+
+func GetInterfaceSubnetWithSpecificIp(ipAddr string) *net.IPNet {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		log.Printf("InterfaceAddrs failed with %+v", err)
+		return nil
+	}
+
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				if ipnet.IP.String() == ipAddr {
+					return ipnet
+				}
+			}
+		}
+	}
+
+	return nil
 }

@@ -4,10 +4,13 @@
 package platform
 
 import (
+	"bytes"
+	"fmt"
 	"io/ioutil"
-	"log"
 	"os/exec"
 	"time"
+
+	"github.com/Azure/azure-container-networking/log"
 )
 
 const (
@@ -49,13 +52,30 @@ func GetLastRebootTime() (time.Time, error) {
 	return rebootTime.UTC(), nil
 }
 
-// ExecuteShellCommand executes a shell command.
-func ExecuteShellCommand(command string) error {
-	//log.Debugf("[shell] %s", command)
+func ExecuteCommand(command string) (string, error) {
+	log.Printf("[Azure-Utils] %s", command)
+
+	var stderr bytes.Buffer
+	var out bytes.Buffer
 	cmd := exec.Command("sh", "-c", command)
-	err := cmd.Start()
+	cmd.Stderr = &stderr
+	cmd.Stdout = &out
+
+	err := cmd.Run()
 	if err != nil {
+		return "", fmt.Errorf("%s:%s", err.Error(), stderr.String())
+	}
+
+	return out.String(), nil
+}
+
+func SetOutboundSNAT(subnet string) error {
+	cmd := fmt.Sprintf("iptables -t nat -A POSTROUTING -m iprange ! --dst-range 168.63.129.16 -m addrtype ! --dst-type local ! -d %v -j MASQUERADE",
+		subnet)
+	_, err := ExecuteCommand(cmd)
+	if err != nil {
+		log.Printf("SNAT Iptable rule was not set")
 		return err
 	}
-	return cmd.Wait()
+	return nil
 }
