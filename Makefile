@@ -153,6 +153,7 @@ all-containerized:
 	pwd && ls -l
 	docker build -f Dockerfile.build -t $(BUILD_CONTAINER_IMAGE):$(VERSION) .
 	docker run --name $(BUILD_CONTAINER_NAME) \
+		-v /usr/bin/docker:/usr/bin/docker \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		$(BUILD_CONTAINER_IMAGE):$(VERSION) \
 		bash -c '\
