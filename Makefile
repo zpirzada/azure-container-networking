@@ -148,8 +148,8 @@ $(NPM_BUILD_DIR)/azure-npm$(EXE_EXT): $(NPMFILES)
 	go build -v -o $(NPM_BUILD_DIR)/azure-npm$(EXE_EXT) -ldflags "-X main.version=$(VERSION) -s -w" $(NPM_DIR)/*.go
 
 # Build all binaries in a container.
-.PHONY: all-binaries-containerized
-all-binaries-containerized:
+.PHONY: all-containerized
+all-containerized:
 	pwd && ls -l
 	docker build -f Dockerfile.build -t $(BUILD_CONTAINER_IMAGE):$(VERSION) .
 	docker run --name $(BUILD_CONTAINER_NAME) \
