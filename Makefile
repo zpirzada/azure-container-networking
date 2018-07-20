@@ -120,6 +120,8 @@ else
 all-binaries: azure-cnm-plugin azure-cni-plugin azure-cns
 endif
 
+all-images: azure-npm-image
+
 # Clean all build artifacts.
 .PHONY: clean
 clean:
@@ -157,6 +159,7 @@ all-binaries-containerized:
 			export GOOS=$(GOOS) && \
 			export GOARCH=$(GOARCH) && \
 			make all-binaries && \
+			make all-images && \
 			chown -R $(BUILD_USER):$(BUILD_USER) $(BUILD_DIR) \
 		'
 	docker cp $(BUILD_CONTAINER_NAME):$(BUILD_CONTAINER_REPO_PATH)/$(BUILD_DIR) $(OUTPUT_DIR)
