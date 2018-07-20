@@ -99,7 +99,7 @@ CNM_PLUGIN_ROOTFS = azure-vnet-plugin-rootfs
 AZURE_NPM_IMAGE = containernetworking/azure-npm
 
 VERSION ?= $(shell git describe --tags --always --dirty)
-AZURE_NPM_VERSION = VERSION
+AZURE_NPM_VERSION = $(VERSION)
 
 ENSURE_OUTPUT_DIR_EXISTS := $(shell mkdir -p $(OUTPUT_DIR))
 
