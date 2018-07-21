@@ -120,7 +120,12 @@ else
 all-binaries: azure-cnm-plugin azure-cni-plugin azure-cns
 endif
 
+ifeq ($(GOOS),linux)
 all-images: azure-npm-image
+else 
+all-images: 
+	@echo "Nothing to build. Skip."
+endif
 
 # Clean all build artifacts.
 .PHONY: clean
