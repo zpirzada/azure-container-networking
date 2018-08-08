@@ -99,16 +99,6 @@ func createOrUpdateWithOperation(createNetworkContainerRequest cns.CreateNetwork
 		return errors.New("[Azure CNS] IPAddress in IPConfiguration of createNetworkContainerRequest is nil")
 	}
 
-	var dnsServers string
-
-	for _, element := range createNetworkContainerRequest.IPConfiguration.DNSServers {
-		dnsServers += element + ","
-	}
-
-	if dnsServers != "" && dnsServers[len(dnsServers)-1] == ',' {
-		dnsServers = dnsServers[:len(dnsServers)-1]
-	}
-
 	ipv4AddrCidr := fmt.Sprintf("%v/%d", createNetworkContainerRequest.IPConfiguration.IPSubnet.IPAddress, createNetworkContainerRequest.IPConfiguration.IPSubnet.PrefixLength)
 	log.Printf("[Azure CNS] Created ipv4Cidr as %v", ipv4AddrCidr)
 	ipv4Addr, _, err := net.ParseCIDR(ipv4AddrCidr)
@@ -128,8 +118,6 @@ func createOrUpdateWithOperation(createNetworkContainerRequest cns.CreateNetwork
 		ipv4NetStr,
 		"/gateway",
 		createNetworkContainerRequest.IPConfiguration.GatewayIPAddress,
-		"/dns",
-		dnsServers,
 		"/weakhostsend",
 		"true",
 		"/weakhostreceive",
