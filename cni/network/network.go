@@ -151,10 +151,6 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path)
 
 	defer func() {
-		if result == nil {
-			result = &cniTypesCurr.Result{}
-		}
-		
 		// Add Interfaces to result.
 		if result == nil {
 			result = &cniTypesCurr.Result{}
@@ -169,13 +165,17 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		addSnatInterface(nwCfg, result)
 
 		// Convert result to the requested CNI version.
-		res, err := result.GetAsVersion(nwCfg.CNIVersion)
-		if err != nil {
-			err = plugin.Error(err)
+		res, vererr := result.GetAsVersion(nwCfg.CNIVersion)
+		if vererr != nil {
+			log.Printf("GetAsVersion failed with error %v", vererr)
+			plugin.Error(vererr)
 		}
 
-		// Output the result to stdout.
-		res.Print()
+		if err == nil && res != nil {
+			// Output the result to stdout.
+			res.Print()
+		}
+
 		log.Printf("[cni-net] ADD command completed with result:%+v err:%v.", result, err)
 	}()
 
