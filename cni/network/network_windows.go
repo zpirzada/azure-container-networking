@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/Azure/azure-container-networking/cni"
@@ -19,7 +20,7 @@ import (
  * Issue link: https://github.com/kubernetes/kubernetes/issues/57253
  */
 func handleConsecutiveAdd(containerId, endpointId string, nwInfo *network.NetworkInfo, nwCfg *cni.NetworkConfig) (*cniTypesCurr.Result, error) {
-	hnsEndpoint, _ := hcsshim.GetHNSEndpointByName(endpointId)
+	hnsEndpoint, err := hcsshim.GetHNSEndpointByName(endpointId)
 	if hnsEndpoint != nil {
 		log.Printf("[net] Found existing endpoint through hcsshim: %+v", hnsEndpoint)
 		log.Printf("[net] Attaching ep %v to container %v", hnsEndpoint.Id, containerId)
@@ -55,7 +56,8 @@ func handleConsecutiveAdd(containerId, endpointId string, nwInfo *network.Networ
 		return result, nil
 	}
 
-	return nil, nil
+	err = fmt.Errorf("GetHNSEndpointByName for %v returned nil with err %v", endpointId, err)
+	return nil, err
 }
 
 func addDefaultRoute(gwIPString string, epInfo *network.EndpointInfo, result *cniTypesCurr.Result) {
