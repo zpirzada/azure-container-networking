@@ -135,9 +135,11 @@ type GetInterfaceForContainerRequest struct {
 
 // GetInterfaceForContainerResponse specifies the interface for a given container ID.
 type GetInterfaceForContainerResponse struct {
-	NetworkInterface NetworkInterface
-	CnetAddressSpace []IPSubnet
-	Response         Response
+	NetworkContainerVersion string
+	NetworkInterface        NetworkInterface
+	CnetAddressSpace        []IPSubnet
+	DNSServers              []string
+	Response                Response
 }
 
 // NetworkInterface specifies the information that can be used to unquely identify an interface.
