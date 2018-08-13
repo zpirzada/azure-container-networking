@@ -47,6 +47,7 @@ func ConstructEndpointID(containerID string, netNsPath string, ifName string) (s
 // newEndpointImpl creates a new endpoint in the network.
 func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	// Get Infrastructure containerID. Handle ADD calls for workload container.
+	var err error
 	infraEpName, _ := ConstructEndpointID(epInfo.ContainerID, epInfo.NetNsPath, epInfo.IfName)
 
 	hnsEndpoint := &hcsshim.HNSEndpoint{
@@ -79,11 +80,20 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		return nil, err
 	}
 
+	defer func() {
+		if err != nil {
+			log.Printf("[net] HNSEndpointRequest DELETE id:%v", hnsResponse.Id)
+			hnsResponse, err := hcsshim.HNSEndpointRequest("DELETE", hnsResponse.Id, "")
+			log.Printf("[net] HNSEndpointRequest DELETE response:%+v err:%v.", hnsResponse, err)
+		}
+	}()
+
 	// Attach the endpoint.
 	log.Printf("[net] Attaching endpoint %v to container %v.", hnsResponse.Id, epInfo.ContainerID)
 	err = hcsshim.HotAttachEndpoint(epInfo.ContainerID, hnsResponse.Id)
 	if err != nil {
 		log.Printf("[net] Failed to attach endpoint: %v.", err)
+		return nil, err
 	}
 
 	// Create the endpoint object.
