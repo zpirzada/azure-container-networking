@@ -200,6 +200,20 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		return plugin.Errorf(errMsg)
 	}
 
+	k8sContainerID := args.ContainerID
+	if len(k8sContainerID) == 0 {
+		errMsg := "Container ID not specified in CNI Args"
+		log.Printf(errMsg)
+		return plugin.Errorf(errMsg)
+	}
+
+	k8sIfName := args.IfName
+	if len(k8sIfName) == 0 {
+		errMsg := "Interfacename not specified in CNI Args"
+		log.Printf(errMsg)
+		return plugin.Errorf(errMsg)
+	}
+
 	// Parse network configuration from stdin.
 	nwCfg, err = cni.ParseNetworkConfig(args.StdinData)
 	if err != nil {
@@ -359,7 +373,9 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	}
 	epInfo.Data = make(map[string]interface{})
 
-	vethName := fmt.Sprintf("%s.%s", k8sNamespace, k8sPodName)
+	// A runtime must not call ADD twice (without a corresponding DEL) for the same
+	// (network name, container id, name of the interface inside the container)
+	vethName := fmt.Sprintf("%s%s%s", networkId, k8sContainerID, k8sIfName)
 	setEndpointOptions(cnsNetworkConfig, epInfo, vethName)
 
 	var dns network.DNSInfo
