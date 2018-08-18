@@ -29,6 +29,8 @@ const (
 
 	LocalIPKey = "localIP"
 
+	InfraVnetIPKey = "infraVnetIP"
+
 	OptVethName = "vethname"
 )
 
@@ -66,6 +68,7 @@ func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInt
 		Endpoints:        make(map[string]*endpoint),
 		extIf:            extIf,
 		VlanId:           vlanid,
+		DNS:              nwInfo.DNS,
 		EnableSnatOnHost: nwInfo.EnableSnatOnHost,
 	}
 
@@ -77,7 +80,7 @@ func (nm *networkManager) deleteNetworkImpl(nw *network) error {
 	var networkClient NetworkClient
 
 	if nw.VlanId != 0 {
-		networkClient = NewOVSClient(nw.extIf.BridgeName, nw.extIf.Name, "", nw.EnableSnatOnHost)
+		networkClient = NewOVSClient(nw.extIf.BridgeName, nw.extIf.Name, "", nw.DNS.Servers, nw.EnableSnatOnHost)
 	} else {
 		networkClient = NewLinuxBridgeClient(nw.extIf.BridgeName, nw.extIf.Name, nw.Mode)
 	}
@@ -201,7 +204,7 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 			snatBridgeIP, _ = opt[SnatBridgeIPKey].(string)
 		}
 
-		networkClient = NewOVSClient(bridgeName, extIf.Name, snatBridgeIP, nwInfo.EnableSnatOnHost)
+		networkClient = NewOVSClient(bridgeName, extIf.Name, snatBridgeIP, nwInfo.DNS.Servers, nwInfo.EnableSnatOnHost)
 	} else {
 		networkClient = NewLinuxBridgeClient(bridgeName, extIf.Name, nwInfo.Mode)
 	}
@@ -324,4 +327,21 @@ func getNetworkInfoImpl(nwInfo *NetworkInfo, nw *network) {
 		vlanMap[VlanIDKey] = strconv.Itoa(nw.VlanId)
 		nwInfo.Options[genericData] = vlanMap
 	}
+}
+
+func AddStaticRoute(ip string, interfaceName string) error {
+	log.Printf("[ovs] Adding %v static route", ip)
+	var routes []RouteInfo
+	_, ipNet, _ := net.ParseCIDR(ip)
+	gwIP := net.ParseIP("0.0.0.0")
+	route := RouteInfo{Dst: *ipNet, Gw: gwIP}
+	routes = append(routes, route)
+	if err := addRoutes(interfaceName, routes); err != nil {
+		if err != nil && !strings.Contains(strings.ToLower(err.Error()), "file exists") {
+			log.Printf("addroutes failed with error %v", err)
+			return err
+		}
+	}
+
+	return nil
 }

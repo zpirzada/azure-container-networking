@@ -10,8 +10,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/netlink"
 )
 
 const (
@@ -175,11 +177,13 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		IfName:           epInfo.IfName,
 		HostIfName:       hostIfName,
 		MacAddress:       containerIf.HardwareAddr,
+		InfraVnetIP:      epInfo.InfraVnetIP,
 		IPAddresses:      epInfo.IPAddresses,
 		Gateways:         []net.IP{nw.extIf.IPv4Gateway},
 		DNS:              epInfo.DNS,
 		VlanID:           vlanid,
 		EnableSnatOnHost: epInfo.EnableSnatOnHost,
+		EnableInfraVnet:  epInfo.EnableInfraVnet,
 	}
 
 	for _, route := range epInfo.Routes {
@@ -211,4 +215,66 @@ func (nw *network) deleteEndpointImpl(ep *endpoint) error {
 
 // getInfoImpl returns information about the endpoint.
 func (ep *endpoint) getInfoImpl(epInfo *EndpointInfo) {
+}
+
+func addRoutes(interfaceName string, routes []RouteInfo) error {
+	ifIndex := 0
+	interfaceIf, _ := net.InterfaceByName(interfaceName)
+
+	for _, route := range routes {
+		log.Printf("[ovs] Adding IP route %+v to link %v.", route, interfaceName)
+
+		if route.DevName != "" {
+			devIf, _ := net.InterfaceByName(route.DevName)
+			ifIndex = devIf.Index
+		} else {
+			ifIndex = interfaceIf.Index
+		}
+
+		nlRoute := &netlink.Route{
+			Family:    netlink.GetIpAddressFamily(route.Gw),
+			Dst:       &route.Dst,
+			Gw:        route.Gw,
+			LinkIndex: ifIndex,
+		}
+
+		if err := netlink.AddIpRoute(nlRoute); err != nil {
+			if !strings.Contains(strings.ToLower(err.Error()), "file exists") {
+				return err
+			} else {
+				log.Printf("route already exists")
+			}
+		}
+	}
+
+	return nil
+}
+
+func deleteRoutes(interfaceName string, routes []RouteInfo) error {
+	ifIndex := 0
+	interfaceIf, _ := net.InterfaceByName(interfaceName)
+
+	for _, route := range routes {
+		log.Printf("[ovs] Adding IP route %+v to link %v.", route, interfaceName)
+
+		if route.DevName != "" {
+			devIf, _ := net.InterfaceByName(route.DevName)
+			ifIndex = devIf.Index
+		} else {
+			ifIndex = interfaceIf.Index
+		}
+
+		nlRoute := &netlink.Route{
+			Family:    netlink.GetIpAddressFamily(route.Gw),
+			Dst:       &route.Dst,
+			Gw:        route.Gw,
+			LinkIndex: ifIndex,
+		}
+
+		if err := netlink.DeleteIpRoute(nlRoute); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

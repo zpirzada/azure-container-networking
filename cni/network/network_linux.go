@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	snatInterface = "eth1"
+	snatInterface  = "eth1"
+	infraInterface = "eth2"
 )
 
 // handleConsecutiveAdd is a dummy function for Linux platform.
@@ -27,6 +28,13 @@ func addDefaultRoute(gwIPString string, epInfo *network.EndpointInfo, result *cn
 	gwIP := net.ParseIP(gwIPString)
 	epInfo.Routes = append(epInfo.Routes, network.RouteInfo{Dst: dstIP, Gw: gwIP, DevName: snatInterface})
 	result.Routes = append(result.Routes, &cniTypes.Route{Dst: dstIP, GW: gwIP})
+}
+
+func addInfraRoutes(azIpamResult *cniTypesCurr.Result, result *cniTypesCurr.Result, epInfo *network.EndpointInfo) {
+	for _, route := range azIpamResult.Routes {
+		epInfo.Routes = append(epInfo.Routes, network.RouteInfo{Dst: route.Dst, Gw: route.GW, DevName: infraInterface})
+		result.Routes = append(result.Routes, &cniTypes.Route{Dst: route.Dst, GW: route.GW})
+	}
 }
 
 func setNetworkOptions(cnsNwConfig *cns.GetNetworkContainerResponse, nwInfo *network.NetworkInfo) {
@@ -58,4 +66,34 @@ func addSnatInterface(nwCfg *cni.NetworkConfig, result *cniTypesCurr.Result) {
 
 		result.Interfaces = append(result.Interfaces, snatIface)
 	}
+}
+
+func setupInfraVnetRoutingForMultitenancy(
+	nwCfg *cni.NetworkConfig,
+	azIpamResult *cniTypesCurr.Result,
+	epInfo *network.EndpointInfo,
+	result *cniTypesCurr.Result) {
+
+	if epInfo.EnableInfraVnet {
+		_, ipNet, _ := net.ParseCIDR(nwCfg.InfraVnetAddressSpace)
+		epInfo.Routes = append(epInfo.Routes, network.RouteInfo{Dst: *ipNet, Gw: azIpamResult.IPs[0].Gateway, DevName: infraInterface})
+	}
+}
+
+func getDNSSettings(nwCfg *cni.NetworkConfig, result *cniTypesCurr.Result, namespace string) (network.DNSInfo, error) {
+	var dns network.DNSInfo
+
+	if len(nwCfg.DNS.Nameservers) > 0 {
+		dns = network.DNSInfo{
+			Servers: nwCfg.DNS.Nameservers,
+			Suffix:  nwCfg.DNS.Domain,
+		}
+	} else {
+		dns = network.DNSInfo{
+			Suffix:  result.DNS.Domain,
+			Servers: result.DNS.Nameservers,
+		}
+	}
+
+	return dns, nil
 }
