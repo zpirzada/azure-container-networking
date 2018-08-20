@@ -112,7 +112,6 @@ func convertToCniResult(networkConfig *cns.GetNetworkContainerResponse, ifName s
 
 	resultIpconfig.Gateway = net.ParseIP(ipconfig.GatewayIPAddress)
 	result.IPs = append(result.IPs, resultIpconfig)
-	result.DNS.Nameservers = ipconfig.DNSServers
 
 	if networkConfig.Routes != nil && len(networkConfig.Routes) > 0 {
 		for _, route := range networkConfig.Routes {

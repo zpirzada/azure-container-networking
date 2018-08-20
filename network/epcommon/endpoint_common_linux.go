@@ -9,8 +9,23 @@ import (
 	"github.com/Azure/azure-container-networking/platform"
 )
 
+/*RFC For Private Address Space: https://tools.ietf.org/html/rfc1918
+   The Internet Assigned Numbers Authority (IANA) has reserved the
+   following three blocks of the IP address space for private internets:
+
+     10.0.0.0        -   10.255.255.255  (10/8 prefix)
+     172.16.0.0      -   172.31.255.255  (172.16/12 prefix)
+     192.168.0.0     -   192.168.255.255 (192.168/16 prefix)
+
+RFC for Link Local Addresses: https://tools.ietf.org/html/rfc3927
+   This document describes how a host may
+   automatically configure an interface with an IPv4 address within the
+   169.254/16 prefix that is valid for communication with other devices
+   connected to the same physical (or logical) link.
+*/
+
 func getPrivateIPSpace() []string {
-	privateIPAddresses := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
+	privateIPAddresses := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16"}
 	return privateIPAddresses
 }
 
@@ -82,6 +97,7 @@ func AssignIPToInterface(interfaceName string, ipAddresses []net.IPNet) error {
 }
 
 func addOrDeleteFilterRule(bridgeName string, action string, ipAddress string, chainName string, target string) error {
+	var cmd string
 	option := "i"
 
 	if chainName == "OUTPUT" {
@@ -89,7 +105,7 @@ func addOrDeleteFilterRule(bridgeName string, action string, ipAddress string, c
 	}
 
 	if action != "D" {
-		cmd := fmt.Sprintf("iptables -t filter -C %v -%v %v -d %v -j %v", chainName, option, bridgeName, ipAddress, target)
+		cmd = fmt.Sprintf("iptables -t filter -C %v -%v %v -d %v -j %v", chainName, option, bridgeName, ipAddress, target)
 		_, err := platform.ExecuteCommand(cmd)
 		if err == nil {
 			log.Printf("Iptable filter for private ipaddr %v on %v chain %v target rule already exists", ipAddress, chainName, target)
@@ -97,7 +113,13 @@ func addOrDeleteFilterRule(bridgeName string, action string, ipAddress string, c
 		}
 	}
 
-	cmd := fmt.Sprintf("iptables -t filter -%v %v -%v %v -d %v -j %v", action, chainName, option, bridgeName, ipAddress, target)
+	if target != "ACCEPT" {
+		cmd = fmt.Sprintf("iptables -t filter -%v %v -%v %v -d %v -j %v", action, chainName, option, bridgeName, ipAddress, target)
+	} else {
+		action = "I"
+		cmd = fmt.Sprintf("iptables -t filter -%v %v 1 -%v %v -d %v -j %v", action, chainName, option, bridgeName, ipAddress, target)
+	}
+
 	_, err := platform.ExecuteCommand(cmd)
 	if err != nil {
 		log.Printf("Iptable filter %v action for private ipaddr %v on %v chain %v target failed with %v", action, ipAddress, chainName, target, err)
