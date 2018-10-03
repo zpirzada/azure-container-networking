@@ -220,7 +220,7 @@ func addRoutes(interfaceName string, routes []RouteInfo) error {
 	interfaceIf, _ := net.InterfaceByName(interfaceName)
 
 	for _, route := range routes {
-		log.Printf("[ovs] Adding IP route %+v to link %v.", route, interfaceName)
+		log.Printf("[net] Adding IP route %+v to link %v.", route, interfaceName)
 
 		if route.DevName != "" {
 			devIf, _ := net.InterfaceByName(route.DevName)
