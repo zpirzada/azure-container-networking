@@ -6,7 +6,6 @@ package network
 import (
 	"fmt"
 	"net"
-	"strings"
 
 	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/cns"
@@ -327,6 +326,14 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 			return err
 		}
 
+		nwDNSInfo, err := getNetworkDNSSettings(nwCfg, result, k8sNamespace)
+		if err != nil {
+			err = plugin.Errorf("Failed to getDNSSettings: %v", err)
+			return err
+		}
+
+		log.Printf("[cni-net] nwDNSInfo: %v", nwDNSInfo)
+
 		// Create the network.
 		nwInfo := network.NetworkInfo{
 			Id:   networkId,
@@ -340,11 +347,8 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 			},
 			BridgeName:       nwCfg.Bridge,
 			EnableSnatOnHost: nwCfg.EnableSnatOnHost,
-			DNS: network.DNSInfo{
-				Servers: nwCfg.DNS.Nameservers,
-				Suffix:  k8sNamespace + "." + strings.Join(nwCfg.DNS.Search, ","),
-			},
-			Policies: policies,
+			DNS:              nwDNSInfo,
+			Policies:         policies,
 		}
 
 		nwInfo.Options = make(map[string]interface{})
@@ -386,6 +390,12 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		}
 	}
 
+	epDNSInfo, err := getEndpointDNSSettings(nwCfg, result, k8sNamespace)
+	if err != nil {
+		err = plugin.Errorf("Failed to getEndpointDNSSettings: %v", err)
+		return err
+	}
+
 	epInfo = &network.EndpointInfo{
 		Id:               endpointId,
 		ContainerID:      args.ContainerID,
@@ -393,17 +403,10 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		IfName:           args.IfName,
 		EnableSnatOnHost: nwCfg.EnableSnatOnHost,
 		EnableInfraVnet:  enableInfraVnet,
+		Data:             make(map[string]interface{}),
+		DNS:              epDNSInfo,
+		Policies:         policies,
 	}
-	epInfo.Data = make(map[string]interface{})
-
-	dns, err := getDNSSettings(nwCfg, result, k8sNamespace)
-	if err != nil {
-		log.Printf("Error retrieving dns settings %v", err)
-		return err
-	}
-
-	epInfo.DNS = dns
-	epInfo.Policies = policies
 
 	// Populate addresses.
 	for _, ipconfig := range result.IPs {
