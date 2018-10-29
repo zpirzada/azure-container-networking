@@ -128,3 +128,8 @@ func (nw *network) deleteEndpointImpl(ep *endpoint) error {
 func (ep *endpoint) getInfoImpl(epInfo *EndpointInfo) {
 	epInfo.Data["hnsid"] = ep.HnsId
 }
+
+// updateEndpointImpl in windows does nothing for now
+func (nw *network) updateEndpointImpl(existingEpInfo *EndpointInfo, targetEpInfo *EndpointInfo) (*endpoint, error) {
+	return nil, nil
+}
