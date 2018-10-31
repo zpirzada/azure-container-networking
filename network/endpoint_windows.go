@@ -44,6 +44,14 @@ func ConstructEndpointID(containerID string, netNsPath string, ifName string) (s
 
 // newEndpointImpl creates a new endpoint in the network.
 func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
+	var vlanid int
+
+	if epInfo.Data != nil {
+		if _, ok := epInfo.Data[VlanIDKey]; ok {
+			vlanid = epInfo.Data[VlanIDKey].(int)
+		}
+	}
+
 	// Get Infrastructure containerID. Handle ADD calls for workload container.
 	var err error
 	infraEpName, _ := ConstructEndpointID(epInfo.ContainerID, epInfo.NetNsPath, epInfo.IfName)
@@ -53,7 +61,35 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		VirtualNetwork: nw.HnsId,
 		DNSSuffix:      epInfo.DNS.Suffix,
 		DNSServerList:  strings.Join(epInfo.DNS.Servers, ","),
-		Policies:       policy.SerializePolicies(policy.EndpointPolicy, epInfo.Policies),
+	}
+
+	// Set outbound NAT policy
+	outBoundNatPolicy := hcsshim.OutboundNatPolicy{}
+	outBoundNatPolicy.Policy.Type = hcsshim.OutboundNat
+
+	exceptionList, err := policy.GetOutBoundNatExceptionList(epInfo.Policies)
+	if err != nil {
+		log.Printf("[net] Failed to parse outbound NAT policy %v", err)
+		return nil, err
+	}
+
+	if exceptionList != nil {
+		for _, ipAddress := range exceptionList {
+			outBoundNatPolicy.Exceptions = append(outBoundNatPolicy.Exceptions, ipAddress)
+		}
+	}
+
+	if epInfo.Data[CnetAddressSpace] != nil {
+		if cnetAddressSpace := epInfo.Data[CnetAddressSpace].([]string); cnetAddressSpace != nil {
+			for _, ipAddress := range cnetAddressSpace {
+				outBoundNatPolicy.Exceptions = append(outBoundNatPolicy.Exceptions, ipAddress)
+			}
+		}
+	}
+
+	if outBoundNatPolicy.Exceptions != nil {
+		serializedOutboundNatPolicy, _ := json.Marshal(outBoundNatPolicy)
+		hnsEndpoint.Policies = append(hnsEndpoint.Policies, serializedOutboundNatPolicy)
 	}
 
 	// HNS currently supports only one IP address per endpoint.
@@ -96,13 +132,15 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 
 	// Create the endpoint object.
 	ep := &endpoint{
-		Id:          infraEpName,
-		HnsId:       hnsResponse.Id,
-		SandboxKey:  epInfo.ContainerID,
-		IfName:      epInfo.IfName,
-		IPAddresses: epInfo.IPAddresses,
-		Gateways:    []net.IP{net.ParseIP(hnsResponse.GatewayAddress)},
-		DNS:         epInfo.DNS,
+		Id:               infraEpName,
+		HnsId:            hnsResponse.Id,
+		SandboxKey:       epInfo.ContainerID,
+		IfName:           epInfo.IfName,
+		IPAddresses:      epInfo.IPAddresses,
+		Gateways:         []net.IP{net.ParseIP(hnsResponse.GatewayAddress)},
+		DNS:              epInfo.DNS,
+		VlanID:           vlanid,
+		EnableSnatOnHost: epInfo.EnableSnatOnHost,
 	}
 
 	for _, route := range epInfo.Routes {

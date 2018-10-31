@@ -15,8 +15,9 @@ import (
 
 const (
 	// Network store key.
-	storeKey  = "Network"
-	VlanIDKey = "VlanID"
+	storeKey    = "Network"
+	VlanIDKey   = "VlanID"
+	genericData = "com.docker.network.generic"
 )
 
 type NetworkClient interface {
