@@ -1,12 +1,14 @@
 package network
 
 import (
+	"fmt"
 	"net"
 
 	"github.com/Azure/azure-container-networking/ebtables"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/netlink"
 	"github.com/Azure/azure-container-networking/network/epcommon"
+	"github.com/Azure/azure-container-networking/platform"
 )
 
 type LinuxBridgeEndpointClient struct {
@@ -72,6 +74,14 @@ func (client *LinuxBridgeEndpointClient) AddEndpointRules(epInfo *EndpointInfo) 
 		if err := ebtables.SetDnatForIPAddress(client.hostPrimaryIfName, ipAddr.IP, client.containerMac, ebtables.Append); err != nil {
 			return err
 		}
+
+		log.Printf("[net] Adding static arp for IP address %v and MAC %v in VM", ipAddr.String(), client.containerMac.String())
+		arpCmd := fmt.Sprintf("arp -s %s %s", ipAddr.IP.String(), client.containerMac.String())
+		_, err := platform.ExecuteCommand(arpCmd)
+		if err != nil {
+			log.Printf("Failed setting arp in vm: %v", err)
+			return err
+		}
 	}
 
 	log.Printf("[net] Setting hairpin for hostveth %v", client.hostVethName)
@@ -98,6 +108,13 @@ func (client *LinuxBridgeEndpointClient) DeleteEndpointRules(ep *endpoint) {
 		err = ebtables.SetDnatForIPAddress(client.hostPrimaryIfName, ipAddr.IP, ep.MacAddress, ebtables.Delete)
 		if err != nil {
 			log.Printf("[net] Failed to delete MAC DNAT rule for IP address %v: %v.", ipAddr.String(), err)
+		}
+
+		log.Printf("[net] Removing static arp for IP address %v from VM", ipAddr.String())
+		arpCmd := fmt.Sprintf("arp -d %s", ipAddr.IP.String())
+		_, err = platform.ExecuteCommand(arpCmd)
+		if err != nil {
+			log.Printf("Failed removing arp from vm: %v", err)
 		}
 	}
 }
