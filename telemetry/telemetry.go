@@ -120,6 +120,20 @@ type CNIReport struct {
 	Metadata            Metadata `json:"compute"`
 }
 
+// Azure CNS Telemetry Report structure.
+type CNSReport struct {
+	IsNewInstance   bool
+	CPUUsage        string
+	MemoryUsage     string
+	Processes       string
+	EventMessage    string
+	DncPartitionKey string
+	Timestamp       string
+	UUID            string
+	Errorcode       string
+	Metadata        Metadata `json:"compute"`
+}
+
 // ClusterState contains the current kubernetes cluster state.
 type ClusterState struct {
 	PodCount      int
@@ -476,6 +490,7 @@ func (reportMgr *ReportManager) ReportToBytes() (report []byte, err error) {
 	case *CNIReport:
 	case *NPMReport:
 	case *DNCReport:
+	case *CNSReport:
 	default:
 		err = fmt.Errorf("[Telemetry] Invalid report type")
 	}

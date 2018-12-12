@@ -45,6 +45,7 @@ type Payload struct {
 	DNCReports []DNCReport
 	CNIReports []CNIReport
 	NPMReports []NPMReport
+	CNSReports []CNSReport
 }
 
 // NewTelemetryBuffer - create a new TelemetryBuffer
@@ -82,6 +83,10 @@ func NewTelemetryBuffer() (*TelemetryBuffer, error) {
 									var dncReport DNCReport
 									json.Unmarshal([]byte(reportStr), &dncReport)
 									tb.data <- dncReport
+								} else if _, ok := tmp["DncPartitionKey"]; ok {
+									var cnsReport CNSReport
+									json.Unmarshal([]byte(reportStr), &cnsReport)
+									tb.data <- cnsReport
 								}
 							}
 						}
@@ -97,6 +102,7 @@ func NewTelemetryBuffer() (*TelemetryBuffer, error) {
 		tb.payload.DNCReports = make([]DNCReport, 0)
 		tb.payload.CNIReports = make([]CNIReport, 0)
 		tb.payload.NPMReports = make([]NPMReport, 0)
+		tb.payload.CNSReports = make([]CNSReport, 0)
 	} else if tb.fdExists {
 		tb.cleanup(FdName)
 	}
@@ -150,7 +156,7 @@ func (tb *TelemetryBuffer) Write(b []byte) (c int, err error) {
 	w := bufio.NewWriter(tb.client)
 	c, err = w.Write(b)
 	if err == nil {
-		w.Flush()
+		err = w.Flush()
 	}
 
 	return
@@ -206,6 +212,8 @@ func (pl *Payload) push(x interface{}) {
 		pl.CNIReports = append(pl.CNIReports, x.(CNIReport))
 	case NPMReport:
 		pl.NPMReports = append(pl.NPMReports, x.(NPMReport))
+	case CNSReport:
+		pl.CNSReports = append(pl.CNSReports, x.(CNSReport))
 	}
 }
 
@@ -217,4 +225,6 @@ func (pl *Payload) reset() {
 	pl.CNIReports = make([]CNIReport, 0)
 	pl.NPMReports = nil
 	pl.NPMReports = make([]NPMReport, 0)
+	pl.CNSReports = nil
+	pl.CNSReports = make([]CNSReport, 0)
 }
