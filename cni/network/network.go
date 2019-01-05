@@ -167,6 +167,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		result           *cniTypesCurr.Result
 		azIpamResult     *cniTypesCurr.Result
 		err              error
+		vethName         string
 		nwCfg            *cni.NetworkConfig
 		epInfo           *network.EndpointInfo
 		iface            *cniTypesCurr.Interface
@@ -388,9 +389,9 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 			// Network already exists.
 			subnetPrefix := nwInfo.Subnets[0].Prefix.String()
 			log.Printf("[cni-net] Found network %v with subnet %v.", networkId, subnetPrefix)
+			nwCfg.Ipam.Subnet = subnetPrefix
 
 			// Call into IPAM plugin to allocate an address for the endpoint.
-			nwCfg.Ipam.Subnet = subnetPrefix
 			result, err = plugin.DelegateAdd(nwCfg.Ipam.Type, nwCfg)
 			if err != nil {
 				err = plugin.Errorf("Failed to allocate address: %v", err)
@@ -398,7 +399,6 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 			}
 
 			ipconfig := result.IPs[0]
-
 			iface := &cniTypesCurr.Interface{Name: args.IfName}
 			result.Interfaces = append(result.Interfaces, iface)
 
@@ -456,7 +456,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	// A runtime must not call ADD twice (without a corresponding DEL) for the same
 	// (network name, container id, name of the interface inside the container)
-	vethName := fmt.Sprintf("%s%s%s", networkId, k8sContainerID, k8sIfName)
+	vethName = fmt.Sprintf("%s%s%s", networkId, k8sContainerID, k8sIfName)
 	setEndpointOptions(cnsNetworkConfig, epInfo, vethName)
 
 	// Create the endpoint.
