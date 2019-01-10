@@ -25,7 +25,7 @@ const (
 	// Plugin name.
 	name                = "azure-vnet"
 	dockerNetworkOption = "com.docker.network.generic"
-
+	opModeTransparent   = "transparent"
 	// Supported IP version. Currently support only IPv4
 	ipVersion = "4"
 )
@@ -454,9 +454,16 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	SetupRoutingForMultitenancy(nwCfg, cnsNetworkConfig, azIpamResult, epInfo, result)
 
-	// A runtime must not call ADD twice (without a corresponding DEL) for the same
-	// (network name, container id, name of the interface inside the container)
-	vethName = fmt.Sprintf("%s%s%s", networkId, k8sContainerID, k8sIfName)
+	if nwCfg.Mode == opModeTransparent {
+		// this mechanism of using only namespace and name is not unique for different incarnations of POD/container.
+		// IT will result in unpredictable behavior if API server decides to
+		// reorder DELETE and ADD call for new incarnation of same POD.
+		vethName = fmt.Sprintf("%s.%s", k8sNamespace, k8sPodName)
+	} else {
+		// A runtime must not call ADD twice (without a corresponding DEL) for the same
+		// (network name, container id, name of the interface inside the container)
+		vethName = fmt.Sprintf("%s%s%s", networkId, k8sContainerID, k8sIfName)
+	}
 	setEndpointOptions(cnsNetworkConfig, epInfo, vethName)
 
 	// Create the endpoint.

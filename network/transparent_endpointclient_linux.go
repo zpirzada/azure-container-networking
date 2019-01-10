@@ -52,6 +52,15 @@ func setArpProxy(ifName string) error {
 }
 
 func (client *TransparentEndpointClient) AddEndpoints(epInfo *EndpointInfo) error {
+
+	if _, err := net.InterfaceByName(client.hostVethName); err == nil {
+		log.Printf("Deleting old host veth %v", client.hostVethName)
+		if err = netlink.DeleteLink(client.hostVethName); err != nil {
+			log.Printf("[net] Failed to delete old hostveth %v: %v.", client.hostVethName, err)
+			return err
+		}
+	}
+
 	if err := epcommon.CreateEndpoint(client.hostVethName, client.containerVethName); err != nil {
 		return err
 	}
