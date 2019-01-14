@@ -4,7 +4,6 @@
 package telemetry
 
 import (
-	"fmt"
 	"reflect"
 	"regexp"
 	"time"
@@ -23,10 +22,9 @@ const (
 
 // SendCnsTelemetry - handles cns telemetry reports
 func SendCnsTelemetry(interval int, reports chan interface{}, service *restserver.HTTPRestService, telemetryStopProcessing chan bool) {
-	retrieveMetadata := true
 
 CONNECT:
-	telemetryBuffer, err := NewTelemetryBuffer()
+	telemetryBuffer, err := NewTelemetryBuffer(false)
 	if err == nil {
 		go telemetryBuffer.Start(time.Duration(interval))
 
@@ -40,15 +38,6 @@ CONNECT:
 		reportMgr.GetKernelVersion()
 
 		for {
-			// Try to retrieve metadata until successful
-			if retrieveMetadata {
-				if err := reportMgr.GetHostMetadata(); err != nil {
-					reports <- CNSReport{EventMessage: fmt.Sprintf("Failed to retrieve host metadata with error: %s", err.Error())}
-				} else {
-					retrieveMetadata = false
-				}
-			}
-
 			// Try to set partition key from DNC
 			if reportMgr.Report.(*CNSReport).DncPartitionKey == "" {
 				reflect.ValueOf(reportMgr.Report).Elem().FieldByName("DncPartitionKey").SetString(service.GetPartitionKey())

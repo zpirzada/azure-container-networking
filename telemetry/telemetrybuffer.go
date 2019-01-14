@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -49,7 +50,7 @@ type Payload struct {
 }
 
 // NewTelemetryBuffer - create a new TelemetryBuffer
-func NewTelemetryBuffer() (*TelemetryBuffer, error) {
+func NewTelemetryBuffer(serverOnly bool) (*TelemetryBuffer, error) {
 	var tb TelemetryBuffer
 	tb.data = make(chan interface{})
 	tb.cancel = make(chan bool, 1)
@@ -96,15 +97,17 @@ func NewTelemetryBuffer() (*TelemetryBuffer, error) {
 		}()
 	}
 
-	err = tb.Dial(FdName)
-	if err == nil {
-		tb.connected = true
-		tb.payload.DNCReports = make([]DNCReport, 0)
-		tb.payload.CNIReports = make([]CNIReport, 0)
-		tb.payload.NPMReports = make([]NPMReport, 0)
-		tb.payload.CNSReports = make([]CNSReport, 0)
-	} else if tb.fdExists {
-		tb.cleanup(FdName)
+	if !serverOnly {
+		err = tb.Dial(FdName)
+		if err == nil {
+			tb.connected = true
+			tb.payload.DNCReports = make([]DNCReport, 0)
+			tb.payload.CNIReports = make([]CNIReport, 0)
+			tb.payload.NPMReports = make([]NPMReport, 0)
+			tb.payload.CNSReports = make([]CNSReport, 0)
+		} else if tb.fdExists {
+			tb.cleanup(FdName)
+		}
 	}
 
 	return &tb, err
@@ -205,6 +208,8 @@ func (tb *TelemetryBuffer) sendToHost() error {
 
 // push - push the report (x) to corresponding slice
 func (pl *Payload) push(x interface{}) {
+
+	getHostMetadata(x)
 	switch x.(type) {
 	case DNCReport:
 		pl.DNCReports = append(pl.DNCReports, x.(DNCReport))
@@ -227,4 +232,57 @@ func (pl *Payload) reset() {
 	pl.NPMReports = make([]NPMReport, 0)
 	pl.CNSReports = nil
 	pl.CNSReports = make([]CNSReport, 0)
+}
+
+// GetHostMetadata - retrieve metadata from host
+func getHostMetadata(report interface{}) error {
+	req, err := http.NewRequest("GET", metadataURL, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Metadata", "True")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("[Telemetry] Request failed with HTTP error %d", resp.StatusCode)
+	} else if resp.Body != nil {
+		metareport := metadataWrapper{}
+		err = json.NewDecoder(resp.Body).Decode(&metareport)
+		if err == nil {
+			// Find Metadata struct in report and try to set values
+			v := reflect.ValueOf(report).Elem().FieldByName("Metadata")
+			if v.CanSet() {
+				v.FieldByName("Location").SetString(metareport.Metadata.Location)
+				v.FieldByName("VMName").SetString(metareport.Metadata.VMName)
+				v.FieldByName("Offer").SetString(metareport.Metadata.Offer)
+				v.FieldByName("OsType").SetString(metareport.Metadata.OsType)
+				v.FieldByName("PlacementGroupID").SetString(metareport.Metadata.PlacementGroupID)
+				v.FieldByName("PlatformFaultDomain").SetString(metareport.Metadata.PlatformFaultDomain)
+				v.FieldByName("PlatformUpdateDomain").SetString(metareport.Metadata.PlatformUpdateDomain)
+				v.FieldByName("Publisher").SetString(metareport.Metadata.Publisher)
+				v.FieldByName("ResourceGroupName").SetString(metareport.Metadata.ResourceGroupName)
+				v.FieldByName("Sku").SetString(metareport.Metadata.Sku)
+				v.FieldByName("SubscriptionID").SetString(metareport.Metadata.SubscriptionID)
+				v.FieldByName("Tags").SetString(metareport.Metadata.Tags)
+				v.FieldByName("OSVersion").SetString(metareport.Metadata.OSVersion)
+				v.FieldByName("VMID").SetString(metareport.Metadata.VMID)
+				v.FieldByName("VMSize").SetString(metareport.Metadata.VMSize)
+			} else {
+				err = fmt.Errorf("[Telemetry] Unable to set metadata values")
+			}
+		} else {
+			err = fmt.Errorf("[Telemetry] Unable to decode response body due to error: %s", err.Error())
+		}
+	} else {
+		err = fmt.Errorf("[Telemetry] Response body is empty")
+	}
+
+	return err
 }

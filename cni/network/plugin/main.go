@@ -45,19 +45,27 @@ func printVersion() {
 }
 
 // If report write succeeded, mark the report flag state to false.
-func markSendReport(reportManager *telemetry.ReportManager) {
+func markSendReport(reportManager *telemetry.ReportManager, tb *telemetry.TelemetryBuffer) {
 	if err := reportManager.SetReportState(telemetry.CNITelemetryFile); err != nil {
 		log.Printf("SetReportState failed due to %v", err)
 		reflect.ValueOf(reportManager.Report).Elem().FieldByName("ErrorMessage").SetString(err.Error())
 
-		if reportManager.SendReport() != nil {
-			log.Printf("SendReport failed due to %v", err)
+		report, err := reportManager.ReportToBytes()
+		if err == nil {
+			// If write fails, try to re-establish connections as server/client
+			if _, err = tb.Write(report); err != nil {
+				tb.Cancel()
+			}
 		}
+
+		// if reportManager.SendReport() != nil {
+		//   log.Printf("SendReport failed due to %v", err)
+		// }
 	}
 }
 
 // send error report to hostnetagent if CNI encounters any error.
-func reportPluginError(reportManager *telemetry.ReportManager, err error) {
+func reportPluginError(reportManager *telemetry.ReportManager, tb *telemetry.TelemetryBuffer, err error) {
 	log.Printf("Report plugin error")
 	reportManager.Report.(*telemetry.CNIReport).GetReport(pluginName, version, ipamQueryURL)
 	reflect.ValueOf(reportManager.Report).Elem().FieldByName("ErrorMessage").SetString(err.Error())
@@ -65,7 +73,13 @@ func reportPluginError(reportManager *telemetry.ReportManager, err error) {
 	if err = reportManager.SendReport(); err != nil {
 		log.Printf("SendReport failed due to %v", err)
 	} else {
-		markSendReport(reportManager)
+		report, err := reportManager.ReportToBytes()
+		if err == nil {
+			// If write fails, try to re-establish connections as server/client
+			if _, err = tb.Write(report); err != nil {
+				tb.Cancel()
+			}
+		}
 	}
 }
 
@@ -133,6 +147,10 @@ func handleIfCniUpdate(update func(*skel.CmdArgs) error) (bool, error) {
 	return isupdate, nil
 }
 
+func startTelemetryBufferProcess() error {
+
+}
+
 // Main is the entry point for CNI network plugin.
 func main() {
 
@@ -159,7 +177,18 @@ func main() {
 		},
 	}
 
-	reportManager.GetHostMetadata()
+	err = tb.Dial(telemetry.FdName)
+	if err == nil {
+		tb.connected = true
+		tb.payload.DNCReports = make([]DNCReport, 0)
+		tb.payload.CNIReports = make([]CNIReport, 0)
+		tb.payload.NPMReports = make([]NPMReport, 0)
+		tb.payload.CNSReports = make([]CNSReport, 0)
+	} else {
+		tb.cleanup(telemetry.FdName)
+		StartTelemetryBufferProcess()
+	}
+
 	reportManager.Report.(*telemetry.CNIReport).GetReport(pluginName, config.Version, ipamQueryURL)
 
 	if !reportManager.GetReportState(telemetry.CNITelemetryFile) {
@@ -169,14 +198,14 @@ func main() {
 		if err != nil {
 			log.Printf("SendReport failed due to %v", err)
 		} else {
-			markSendReport(reportManager)
+			markSendReport(reportManager, tb)
 		}
 	}
 
 	netPlugin, err := network.NewPlugin(&config)
 	if err != nil {
 		log.Printf("Failed to create network plugin, err:%v.\n", err)
-		reportPluginError(reportManager, err)
+		reportPluginError(reportManager, tb, err)
 		os.Exit(1)
 	}
 
@@ -184,7 +213,7 @@ func main() {
 
 	if err = netPlugin.Plugin.InitializeKeyValueStore(&config); err != nil {
 		log.Printf("Failed to initialize key-value store of network plugin, err:%v.\n", err)
-		reportPluginError(reportManager, err)
+		reportPluginError(reportManager, tb, err)
 		os.Exit(1)
 	}
 
@@ -200,7 +229,7 @@ func main() {
 
 	if err = netPlugin.Start(&config); err != nil {
 		log.Printf("Failed to start network plugin, err:%v.\n", err)
-		reportPluginError(reportManager, err)
+		reportPluginError(reportManager, tb, err)
 		panic("network plugin fatal error")
 	}
 
@@ -209,7 +238,7 @@ func main() {
 		log.Printf("CNI UPDATE finished.")
 	} else if err = netPlugin.Execute(cni.PluginApi(netPlugin)); err != nil {
 		log.Printf("Failed to execute network plugin, err:%v.\n", err)
-		reportPluginError(reportManager, err)
+		reportPluginError(reportManager, tb, err)
 	}
 
 	netPlugin.Stop()
@@ -224,6 +253,6 @@ func main() {
 	if err = reportManager.SendReport(); err != nil {
 		log.Printf("SendReport failed due to %v", err)
 	} else {
-		markSendReport(reportManager)
+		markSendReport(reportManager, tb)
 	}
 }

@@ -257,8 +257,8 @@ func (reportMgr *ReportManager) SendReport() error {
 
 	if resp.StatusCode != 200 {
 		if resp.StatusCode == 400 {
-			return fmt.Errorf(`"[Telemetry] HTTP Post returned statuscode %d. 
-				This error happens because telemetry service is not yet activated. 
+			return fmt.Errorf(`"[Telemetry] HTTP Post returned statuscode %d.
+				This error happens because telemetry service is not yet activated.
 				The error can be ignored as it won't affect functionality"`, resp.StatusCode)
 		}
 
@@ -342,6 +342,14 @@ func (report *CNIReport) GetInterfaceDetails(queryUrl string) {
 	}
 
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		report.InterfaceDetails = &InterfaceInfo{}
+		errMsg := fmt.Sprintf("Error while getting interface details. http code :%d", resp.StatusCode)
+		report.InterfaceDetails.ErrorMessage = errMsg
+		log.Printf(errMsg)
+		return
+	}
 
 	// Decode XML document.
 	var doc common.XmlDocument
@@ -429,59 +437,6 @@ func (report *CNIReport) GetOrchestratorDetails() {
 			report.OrchestratorDetails.ErrorMessage = "Length of array is less than 2"
 		}
 	}
-}
-
-// GetHostMetadata - retrieve metadata from host
-func (reportMgr *ReportManager) GetHostMetadata() error {
-	req, err := http.NewRequest("GET", metadataURL, nil)
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Metadata", "True")
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("[Telemetry] Request failed with HTTP error %d", resp.StatusCode)
-	} else if resp.Body != nil {
-		report := metadataWrapper{}
-		err = json.NewDecoder(resp.Body).Decode(&report)
-		if err == nil {
-			// Find Metadata struct in report and try to set values
-			v := reflect.ValueOf(reportMgr.Report).Elem().FieldByName("Metadata")
-			if v.CanSet() {
-				v.FieldByName("Location").SetString(report.Metadata.Location)
-				v.FieldByName("VMName").SetString(report.Metadata.VMName)
-				v.FieldByName("Offer").SetString(report.Metadata.Offer)
-				v.FieldByName("OsType").SetString(report.Metadata.OsType)
-				v.FieldByName("PlacementGroupID").SetString(report.Metadata.PlacementGroupID)
-				v.FieldByName("PlatformFaultDomain").SetString(report.Metadata.PlatformFaultDomain)
-				v.FieldByName("PlatformUpdateDomain").SetString(report.Metadata.PlatformUpdateDomain)
-				v.FieldByName("Publisher").SetString(report.Metadata.Publisher)
-				v.FieldByName("ResourceGroupName").SetString(report.Metadata.ResourceGroupName)
-				v.FieldByName("Sku").SetString(report.Metadata.Sku)
-				v.FieldByName("SubscriptionID").SetString(report.Metadata.SubscriptionID)
-				v.FieldByName("Tags").SetString(report.Metadata.Tags)
-				v.FieldByName("OSVersion").SetString(report.Metadata.OSVersion)
-				v.FieldByName("VMID").SetString(report.Metadata.VMID)
-				v.FieldByName("VMSize").SetString(report.Metadata.VMSize)
-			} else {
-				err = fmt.Errorf("[Telemetry] Unable to set metadata values")
-			}
-		} else {
-			err = fmt.Errorf("[Telemetry] Unable to decode response body due to error: %s", err.Error())
-		}
-	} else {
-		err = fmt.Errorf("[Telemetry] Response body is empty")
-	}
-
-	return err
 }
 
 // ReportToBytes - returns the report bytes
