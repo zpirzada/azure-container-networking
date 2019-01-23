@@ -24,11 +24,18 @@ const (
 func SendCnsTelemetry(interval int, reports chan interface{}, service *restserver.HTTPRestService, telemetryStopProcessing chan bool) {
 
 CONNECT:
-	telemetryBuffer, err := NewTelemetryBuffer(false)
-	if err == nil {
-		go telemetryBuffer.Start(time.Duration(interval))
+	telemetryBuffer := NewTelemetryBuffer()
+	err := telemetryBuffer.StartServer()
+	if err == nil || telemetryBuffer.FdExists {
+		if err := telemetryBuffer.Connect(); err != nil {
+			log.Printf("[Telemetry] Failed to establish telemetry manager connection.")
+			time.Sleep(time.Minute * 1)
+			goto CONNECT
+		}
 
-		heartbeat := time.NewTicker(time.Minute * 30).C
+		go telemetryBuffer.BufferAndPushData(time.Duration(0))
+
+		heartbeat := time.NewTicker(time.Minute * 1).C
 		reportMgr := ReportManager{
 			ContentType: ContentType,
 			Report:      &CNSReport{},
@@ -77,7 +84,7 @@ CONNECT:
 			}
 		}
 	} else {
-		log.Printf("[Telemetry] Failed to establish telemetry buffer connection.")
+		log.Printf("[Telemetry] Failed to start telemetry manager server.")
 		time.Sleep(time.Minute * 1)
 		goto CONNECT
 	}

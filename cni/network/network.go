@@ -188,6 +188,12 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	log.Printf("[cni-net] Read network configuration %+v.", nwCfg)
 
+	report := plugin.reportManager.Report.(*telemetry.CNIReport)
+	report.Context = "CNI ADD"
+	if nwCfg.MultiTenancy {
+		report.SubContext = "Multitenancy"
+	}
+
 	defer func() {
 		// Add Interfaces to result.
 		if result == nil {
@@ -474,6 +480,8 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		return err
 	}
 
+	msg := fmt.Sprintf("CNI ADD succeeded : allocated ipaddress %v podname %v namespace %v", epInfo.IPAddresses[0].IP.String(), k8sPodName, k8sNamespace)
+	report.EventMessage = msg
 	return nil
 }
 
@@ -589,6 +597,12 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 
 	log.Printf("[cni-net] Read network configuration %+v.", nwCfg)
 
+	report := plugin.reportManager.Report.(*telemetry.CNIReport)
+	report.Context = "CNI DEL"
+	if nwCfg.MultiTenancy {
+		report.SubContext = "Multitenancy"
+	}
+
 	// Parse Pod arguments.
 	k8sPodName, k8sNamespace, err := plugin.getPodInfo(args.Args)
 	if err != nil {
@@ -649,6 +663,8 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		}
 	}
 
+	msg := fmt.Sprintf("CNI DEL succeeded : Released ip %+v podname %v namespace %v", nwCfg.Ipam.Address, k8sPodName, k8sNamespace)
+	report.EventMessage = msg
 	return nil
 }
 

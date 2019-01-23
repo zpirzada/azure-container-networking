@@ -5,7 +5,6 @@ package telemetry
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -107,16 +106,19 @@ type CNIReport struct {
 	IsNewInstance       bool
 	CniSucceeded        bool
 	Name                string
-	OSVersion           string
+	Version             string
 	ErrorMessage        string
+	EventMessage        string
 	Context             string
 	SubContext          string
+	VMUptime            string
+	ContainerName       string
 	VnetAddressSpace    []string
-	OrchestratorDetails *OrchestratorInfo
-	OSDetails           *OSInfo
-	SystemDetails       *SystemInfo
-	InterfaceDetails    *InterfaceInfo
-	BridgeDetails       *BridgeInfo
+	OrchestratorDetails OrchestratorInfo
+	OSDetails           OSInfo
+	SystemDetails       SystemInfo
+	InterfaceDetails    InterfaceInfo
+	BridgeDetails       BridgeInfo
 	Metadata            Metadata `json:"compute"`
 }
 
@@ -213,9 +215,9 @@ func ReadFileByLines(filename string) ([]string, error) {
 // GetReport retrieves orchestrator, system, OS and Interface details and create a report structure.
 func (report *CNIReport) GetReport(name string, version string, ipamQueryURL string) {
 	report.Name = name
-	report.OSVersion = version
+	report.Version = version
 
-	report.GetOrchestratorDetails()
+	// report.GetOrchestratorDetails()
 	report.GetSystemDetails()
 	report.GetOSDetails()
 	report.GetInterfaceDetails(ipamQueryURL)
@@ -231,41 +233,29 @@ func (report *NPMReport) GetReport(clusterID, nodeName, npmVersion, kubernetesVe
 }
 
 // SendReport will send telemetry report to HostNetAgent.
-func (reportMgr *ReportManager) SendReport() error {
-	log.Printf("[Telemetry] Going to send Telemetry report to hostnetagent %v", reportMgr.HostNetAgentURL)
+func (reportMgr *ReportManager) SendReport(tb *TelemetryBuffer) error {
+	if tb.Connected {
+		log.Printf("[Telemetry] Going to send Telemetry report to hostnetagent %v", reportMgr.HostNetAgentURL)
 
-	switch reportMgr.Report.(type) {
-	case *CNIReport:
-		log.Printf("[Telemetry] %+v", reportMgr.Report.(*CNIReport))
-	case *NPMReport:
-		log.Printf("[Telemetry] %+v", reportMgr.Report.(*NPMReport))
-	case *DNCReport:
-		log.Printf("[Telemetry] %+v", reportMgr.Report.(*DNCReport))
-	default:
-		log.Printf("[Telemetry] Invalid report type")
-	}
-
-	httpc := &http.Client{}
-	var body bytes.Buffer
-	json.NewEncoder(&body).Encode(reportMgr.Report)
-	resp, err := httpc.Post(reportMgr.HostNetAgentURL, reportMgr.ContentType, &body)
-	if err != nil {
-		return fmt.Errorf("[Telemetry] HTTP Post returned error %v", err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		if resp.StatusCode == 400 {
-			return fmt.Errorf(`"[Telemetry] HTTP Post returned statuscode %d.
-				This error happens because telemetry service is not yet activated.
-				The error can be ignored as it won't affect functionality"`, resp.StatusCode)
+		switch reportMgr.Report.(type) {
+		case *CNIReport:
+			log.Printf("[Telemetry] %+v", reportMgr.Report.(*CNIReport))
+		case *NPMReport:
+			log.Printf("[Telemetry] %+v", reportMgr.Report.(*NPMReport))
+		case *DNCReport:
+			log.Printf("[Telemetry] %+v", reportMgr.Report.(*DNCReport))
+		default:
+			log.Printf("[Telemetry] Invalid report type")
 		}
 
-		return fmt.Errorf("[Telemetry] HTTP Post returned statuscode %d", resp.StatusCode)
+		report, err := reportMgr.ReportToBytes()
+		if err == nil {
+			// If write fails, try to re-establish connections as server/client
+			if _, err = tb.Write(report); err != nil {
+				tb.Cancel()
+			}
+		}
 	}
-
-	log.Printf("[Telemetry] Telemetry sent with status code %d\n", resp.StatusCode)
 
 	return nil
 }
@@ -329,14 +319,14 @@ func (report *CNIReport) GetInterfaceDetails(queryUrl string) {
 
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		report.InterfaceDetails = &InterfaceInfo{}
+		report.InterfaceDetails = InterfaceInfo{}
 		report.InterfaceDetails.ErrorMessage = "Getting all interfaces failed due to " + err.Error()
 		return
 	}
 
 	resp, err := http.Get(queryUrl)
 	if err != nil {
-		report.InterfaceDetails = &InterfaceInfo{}
+		report.InterfaceDetails = InterfaceInfo{}
 		report.InterfaceDetails.ErrorMessage = "Http get failed in getting interface details " + err.Error()
 		return
 	}
@@ -344,7 +334,7 @@ func (report *CNIReport) GetInterfaceDetails(queryUrl string) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		report.InterfaceDetails = &InterfaceInfo{}
+		report.InterfaceDetails = InterfaceInfo{}
 		errMsg := fmt.Sprintf("Error while getting interface details. http code :%d", resp.StatusCode)
 		report.InterfaceDetails.ErrorMessage = errMsg
 		log.Printf(errMsg)
@@ -356,7 +346,7 @@ func (report *CNIReport) GetInterfaceDetails(queryUrl string) {
 	decoder := xml.NewDecoder(resp.Body)
 	err = decoder.Decode(&doc)
 	if err != nil {
-		report.InterfaceDetails = &InterfaceInfo{}
+		report.InterfaceDetails = InterfaceInfo{}
 		report.InterfaceDetails.ErrorMessage = "xml decode failed due to " + err.Error()
 		return
 	}
@@ -391,7 +381,7 @@ func (report *CNIReport) GetInterfaceDetails(queryUrl string) {
 		}
 	}
 
-	report.InterfaceDetails = &InterfaceInfo{
+	report.InterfaceDetails = InterfaceInfo{
 		InterfaceType:         "Primary",
 		MAC:                   macAddress,
 		Subnet:                subnet,
@@ -405,7 +395,7 @@ func (report *CNIReport) GetInterfaceDetails(queryUrl string) {
 func (report *CNIReport) GetOrchestratorDetails() {
 	// to-do: GetOrchestratorDetails for all report types and for all k8s environments
 	// current implementation works for clusters created via acs-engine and on master nodes
-	report.OrchestratorDetails = &OrchestratorInfo{}
+	report.OrchestratorDetails = OrchestratorInfo{}
 
 	// Check for orchestrator tag first
 	for _, tag := range strings.Split(report.Metadata.Tags, ";") {

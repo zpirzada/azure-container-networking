@@ -70,16 +70,8 @@ func reportPluginError(reportManager *telemetry.ReportManager, tb *telemetry.Tel
 	reportManager.Report.(*telemetry.CNIReport).GetReport(pluginName, version, ipamQueryURL)
 	reflect.ValueOf(reportManager.Report).Elem().FieldByName("ErrorMessage").SetString(err.Error())
 
-	if err = reportManager.SendReport(); err != nil {
+	if err := reportManager.SendReport(tb); err != nil {
 		log.Printf("SendReport failed due to %v", err)
-	} else {
-		report, err := reportManager.ReportToBytes()
-		if err == nil {
-			// If write fails, try to re-establish connections as server/client
-			if _, err = tb.Write(report); err != nil {
-				tb.Cancel()
-			}
-		}
 	}
 }
 
@@ -147,10 +139,6 @@ func handleIfCniUpdate(update func(*skel.CmdArgs) error) (bool, error) {
 	return isupdate, nil
 }
 
-func startTelemetryBufferProcess() error {
-
-}
-
 // Main is the entry point for CNI network plugin.
 func main() {
 
@@ -173,28 +161,31 @@ func main() {
 		HostNetAgentURL: hostNetAgentURL,
 		ContentType:     telemetry.ContentType,
 		Report: &telemetry.CNIReport{
-			Context: "AzureCNI",
+			Context:          "AzureCNI",
+			SystemDetails:    telemetry.SystemInfo{},
+			InterfaceDetails: telemetry.InterfaceInfo{},
+			BridgeDetails:    telemetry.BridgeInfo{},
 		},
 	}
 
-	err = tb.Dial(telemetry.FdName)
-	if err == nil {
-		tb.connected = true
-		tb.payload.DNCReports = make([]DNCReport, 0)
-		tb.payload.CNIReports = make([]CNIReport, 0)
-		tb.payload.NPMReports = make([]NPMReport, 0)
-		tb.payload.CNSReports = make([]CNSReport, 0)
+	telemetry.StartTelemetryManagerProcess()
+	tb := telemetry.NewTelemetryBuffer()
+
+	err = tb.Connect()
+	if err != nil {
+		log.Printf("Connection to telemetry socket failed: %v", err)
+		tb.Cleanup(telemetry.FdName)
 	} else {
-		tb.cleanup(telemetry.FdName)
-		StartTelemetryBufferProcess()
+		tb.Connected = true
+		log.Printf("Connected to telemetry service")
 	}
 
-	reportManager.Report.(*telemetry.CNIReport).GetReport(pluginName, config.Version, ipamQueryURL)
+	reportManager.Report.(*telemetry.CNIReport).GetReport(pluginName, version, ipamQueryURL)
 
 	if !reportManager.GetReportState(telemetry.CNITelemetryFile) {
 		log.Printf("GetReport state file didn't exist. Setting flag to true")
 
-		err = reportManager.SendReport()
+		err = reportManager.SendReport(tb)
 		if err != nil {
 			log.Printf("SendReport failed due to %v", err)
 		} else {
@@ -250,9 +241,10 @@ func main() {
 	// Report CNI successfully finished execution.
 	reflect.ValueOf(reportManager.Report).Elem().FieldByName("CniSucceeded").SetBool(true)
 
-	if err = reportManager.SendReport(); err != nil {
+	if err = reportManager.SendReport(tb); err != nil {
 		log.Printf("SendReport failed due to %v", err)
 	} else {
+		log.Printf("Sending report succeeded")
 		markSendReport(reportManager, tb)
 	}
 }

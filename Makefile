@@ -6,6 +6,7 @@ COREFILES = \
 	$(wildcard log/*.go) \
 	$(wildcard netlink/*.go) \
 	$(wildcard network/*.go) \
+	$(wildcard telemetry/*.go) \
 	$(wildcard network/epcommon/*.go) \
 	$(wildcard network/ovsnfravnet/*.go) \
 	$(wildcard network/ovssnat/*.go) \
@@ -126,8 +127,8 @@ endif
 
 ifeq ($(GOOS),linux)
 all-images: azure-npm-image
-else 
-all-images: 
+else
+all-images:
 	@echo "Nothing to build. Skip."
 endif
 

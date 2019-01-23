@@ -5,12 +5,16 @@ package telemetry
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 
 	"github.com/Microsoft/go-winio"
 )
 
 const (
-	fdTemplate = "\\\\.\\pipe\\%s"
+	fdTemplate    = "\\\\.\\pipe\\%s"
+	PidFile       = "azuretelemetry.pid"
+	MetadatatFile = "azuremetadata.json"
 )
 
 // Dial - try to connect to a named pipe with 'name'
@@ -34,6 +38,24 @@ func (tb *TelemetryBuffer) Listen(name string) (err error) {
 }
 
 // cleanup - stub
-func (tb *TelemetryBuffer) cleanup(name string) error {
+func (tb *TelemetryBuffer) Cleanup(name string) error {
 	return nil
+}
+
+func checkIfSockExists() bool {
+	if _, err := os.Stat(fmt.Sprintf(fdTemplate, FdName)); !os.IsNotExist(err) {
+		return true
+	}
+
+	return false
+}
+
+func startTelemetryManager(name string) (int, error) {
+	cmd := fmt.Sprintf("/opt/cni/bin/%s", name)
+	startCmd := exec.Command("sh", "-c", cmd)
+	if err := startCmd.Start(); err != nil {
+		return -1, err
+	}
+
+	return startCmd.Process.Pid, nil
 }
