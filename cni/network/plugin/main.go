@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"time"
 
 	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/cni/network"
@@ -181,6 +182,9 @@ func main() {
 	}
 
 	reportManager.Report.(*telemetry.CNIReport).GetReport(pluginName, version, ipamQueryURL)
+
+	t := time.Now()
+	reportManager.Report.(*telemetry.CNIReport).Timestamp = t.String()
 
 	if !reportManager.GetReportState(telemetry.CNITelemetryFile) {
 		log.Printf("GetReport state file didn't exist. Setting flag to true")

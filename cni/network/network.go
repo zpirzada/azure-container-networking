@@ -189,9 +189,9 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	log.Printf("[cni-net] Read network configuration %+v.", nwCfg)
 
 	report := plugin.reportManager.Report.(*telemetry.CNIReport)
-	report.Context = "CNI ADD"
+	report.OperationType = "CNI ADD"
 	if nwCfg.MultiTenancy {
-		report.SubContext = "Multitenancy"
+		report.Context = "Multitenancy"
 	}
 
 	defer func() {
@@ -480,7 +480,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		return err
 	}
 
-	msg := fmt.Sprintf("CNI ADD succeeded : allocated ipaddress %v podname %v namespace %v", epInfo.IPAddresses[0].IP.String(), k8sPodName, k8sNamespace)
+	msg := fmt.Sprintf("CNI ADD succeeded : allocated ipaddress %+v podname %v namespace %v", result, k8sPodName, k8sNamespace)
 	report.EventMessage = msg
 	return nil
 }
@@ -598,9 +598,9 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	log.Printf("[cni-net] Read network configuration %+v.", nwCfg)
 
 	report := plugin.reportManager.Report.(*telemetry.CNIReport)
-	report.Context = "CNI DEL"
+	report.OperationType = "CNI DEL"
 	if nwCfg.MultiTenancy {
-		report.SubContext = "Multitenancy"
+		report.Context = "Multitenancy"
 	}
 
 	// Parse Pod arguments.

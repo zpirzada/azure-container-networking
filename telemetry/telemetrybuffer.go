@@ -28,10 +28,9 @@ import (
 // DefaultNpmReportsSize - default NPM report slice size
 // DefaultInterval - default interval for sending payload to host
 const (
-	FdName    = "azure-telemetry"
-	Delimiter = '\n'
-	//HostNetAgentURL         = "http://169.254.169.254/machine/plugins?comp=netagent&type=payload"
-	HostNetAgentURL         = "http://localhost:8019/hostnetagent?container/1234/payload"
+	FdName                  = "azure-telemetry"
+	Delimiter               = '\n'
+	HostNetAgentURL         = "http://169.254.169.254/machine/plugins?comp=netagent&type=payload"
 	telemetryMgrProcessName = "azuretelemetrymgr"
 	DefaultInterval         = 1 * time.Minute
 )
@@ -245,7 +244,7 @@ func (pl *Payload) push(x interface{}) {
 	case DNCReport:
 		dncReport := x.(DNCReport)
 		dncReport.Metadata = metadata
-		pl.DNCReports = append(pl.DNCReports, x.(DNCReport))
+		pl.DNCReports = append(pl.DNCReports, dncReport)
 	case CNIReport:
 		cniReport := x.(CNIReport)
 		metadata.Tags = metadata.Tags + ";" + cniReport.Version
@@ -255,11 +254,11 @@ func (pl *Payload) push(x interface{}) {
 	case NPMReport:
 		npmReport := x.(NPMReport)
 		npmReport.Metadata = metadata
-		pl.NPMReports = append(pl.NPMReports, x.(NPMReport))
+		pl.NPMReports = append(pl.NPMReports, npmReport)
 	case CNSReport:
 		cnsReport := x.(CNSReport)
 		cnsReport.Metadata = metadata
-		pl.CNSReports = append(pl.CNSReports, x.(CNSReport))
+		pl.CNSReports = append(pl.CNSReports, cnsReport)
 	}
 }
 

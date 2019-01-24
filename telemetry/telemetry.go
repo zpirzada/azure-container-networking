@@ -109,10 +109,14 @@ type CNIReport struct {
 	Version             string
 	ErrorMessage        string
 	EventMessage        string
+	OperationType       string
+	OperationDuration   int
 	Context             string
 	SubContext          string
 	VMUptime            string
+	Timestamp           string
 	ContainerName       string
+	InfraVnetID         string
 	VnetAddressSpace    []string
 	OrchestratorDetails OrchestratorInfo
 	OSDetails           OSInfo
