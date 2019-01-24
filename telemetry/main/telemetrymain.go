@@ -36,7 +36,7 @@ func main() {
 		tb.Cleanup(telemetry.FdName)
 
 		log.Printf("[Telemetry] Failed to establish telemetry buffer connection.")
-		time.Sleep(time.Minute * 1)
+		time.Sleep(time.Millisecond * 200)
 	}
 
 	tb.BufferAndPushData(reportToHostInterval)

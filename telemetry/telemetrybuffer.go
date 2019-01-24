@@ -28,7 +28,7 @@ import (
 // DefaultNpmReportsSize - default NPM report slice size
 // DefaultInterval - default interval for sending payload to host
 const (
-	FdName                  = "azure-telemetry"
+	FdName                  = "azure-cni-telemetry"
 	Delimiter               = '\n'
 	HostNetAgentURL         = "http://169.254.169.254/machine/plugins?comp=netagent&type=payload"
 	telemetryMgrProcessName = "azuretelemetrymgr"
@@ -379,7 +379,7 @@ func StartTelemetryManagerProcess() error {
 	}
 
 	log.Printf("[Telemetry] Telemetry manager process started with pid %d", pid)
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	if err := os.Truncate(PidFile, 0); err != nil {
 		log.Printf("[Telemetry] Truncating pid file failed %v", err)
