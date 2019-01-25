@@ -184,7 +184,7 @@ func main() {
 	reportManager.Report.(*telemetry.CNIReport).GetReport(pluginName, version, ipamQueryURL)
 
 	t := time.Now()
-	reportManager.Report.(*telemetry.CNIReport).Timestamp = t.String()
+	reportManager.Report.(*telemetry.CNIReport).Timestamp = t.Format("2006-01-02 15:04:05")
 
 	if !reportManager.GetReportState(telemetry.CNITelemetryFile) {
 		log.Printf("GetReport state file didn't exist. Setting flag to true")
