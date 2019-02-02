@@ -246,7 +246,6 @@ func (pl *Payload) push(x interface{}) {
 		pl.DNCReports = append(pl.DNCReports, dncReport)
 	case CNIReport:
 		cniReport := x.(CNIReport)
-		metadata.Tags = metadata.Tags + ";" + cniReport.Version
 		cniReport.Metadata = metadata
 		pl.CNIReports = append(pl.CNIReports, cniReport)
 	case NPMReport:
