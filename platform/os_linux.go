@@ -94,3 +94,8 @@ func SetOutboundSNAT(subnet string) error {
 func ClearNetworkConfiguration() (bool, error) {
 	return false, nil
 }
+
+func KillProcessByName(processName string) {
+	cmd := fmt.Sprintf("pkill -f %v", processName)
+	ExecuteCommand(cmd)
+}

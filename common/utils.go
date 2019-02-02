@@ -103,3 +103,27 @@ func GetInterfaceSubnetWithSpecificIp(ipAddr string) *net.IPNet {
 
 	return nil
 }
+
+func StartProcess(path string) error {
+	var attr = os.ProcAttr{
+		Env: os.Environ(),
+		Files: []*os.File{
+			os.Stdin,
+			nil,
+			nil,
+		},
+	}
+
+	args := []string{path}
+	process, err := os.StartProcess(path, args, &attr)
+	if err == nil {
+
+		// It is not clear from docs, but Realease actually detaches the process
+		if err = process.Release(); err != nil {
+			return err
+		}
+
+	}
+
+	return err
+}

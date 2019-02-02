@@ -51,17 +51,9 @@ func markSendReport(reportManager *telemetry.ReportManager, tb *telemetry.Teleme
 		log.Printf("SetReportState failed due to %v", err)
 		reflect.ValueOf(reportManager.Report).Elem().FieldByName("ErrorMessage").SetString(err.Error())
 
-		report, err := reportManager.ReportToBytes()
-		if err == nil {
-			// If write fails, try to re-establish connections as server/client
-			if _, err = tb.Write(report); err != nil {
-				tb.Cancel()
-			}
+		if err := reportManager.SendReport(tb); err != nil {
+			log.Printf("SendReport failed due to %v", err)
 		}
-
-		// if reportManager.SendReport() != nil {
-		//   log.Printf("SendReport failed due to %v", err)
-		// }
 	}
 }
 
@@ -169,22 +161,28 @@ func main() {
 		},
 	}
 
-	telemetry.StartTelemetryManagerProcess()
 	tb := telemetry.NewTelemetryBuffer()
+	attempt := 0
 
-	err = tb.Connect()
-	if err != nil {
-		log.Printf("Connection to telemetry socket failed: %v", err)
-		tb.Cleanup(telemetry.FdName)
-	} else {
-		tb.Connected = true
-		log.Printf("Connected to telemetry service")
+	for attempt < 2 {
+		err = tb.Connect()
+		if err != nil {
+			log.Printf("Connection to telemetry socket failed: %v", err)
+			tb.Cleanup(telemetry.FdName)
+			telemetry.StartTelemetryService()
+		} else {
+			tb.Connected = true
+			log.Printf("Connected to telemetry service")
+			break
+		}
+
+		attempt++
 	}
-
-	reportManager.Report.(*telemetry.CNIReport).GetReport(pluginName, version, ipamQueryURL)
 
 	t := time.Now()
 	reportManager.Report.(*telemetry.CNIReport).Timestamp = t.Format("2006-01-02 15:04:05")
+
+	reportManager.Report.(*telemetry.CNIReport).GetReport(pluginName, version, ipamQueryURL)
 
 	if !reportManager.GetReportState(telemetry.CNITelemetryFile) {
 		log.Printf("GetReport state file didn't exist. Setting flag to true")
@@ -197,6 +195,8 @@ func main() {
 		}
 	}
 
+	startTime := time.Now().UnixNano() / int64(time.Millisecond)
+
 	netPlugin, err := network.NewPlugin(&config)
 	if err != nil {
 		log.Printf("Failed to create network plugin, err:%v.\n", err)
@@ -204,7 +204,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	netPlugin.SetReportManager(reportManager)
+	netPlugin.SetCNIReport(reportManager.Report.(*telemetry.CNIReport))
 
 	if err = netPlugin.Plugin.InitializeKeyValueStore(&config); err != nil {
 		log.Printf("Failed to initialize key-value store of network plugin, err:%v.\n", err)
@@ -225,7 +225,7 @@ func main() {
 	if err = netPlugin.Start(&config); err != nil {
 		log.Printf("Failed to start network plugin, err:%v.\n", err)
 		reportPluginError(reportManager, tb, err)
-		panic("network plugin fatal error")
+		panic("network plugin start fatal error")
 	}
 
 	handled, err := handleIfCniUpdate(netPlugin.Update)
@@ -233,13 +233,16 @@ func main() {
 		log.Printf("CNI UPDATE finished.")
 	} else if err = netPlugin.Execute(cni.PluginApi(netPlugin)); err != nil {
 		log.Printf("Failed to execute network plugin, err:%v.\n", err)
-		reportPluginError(reportManager, tb, err)
 	}
+
+	endTime := time.Now().UnixNano() / int64(time.Millisecond)
+	reflect.ValueOf(reportManager.Report).Elem().FieldByName("OperationDuration").SetInt(int64(endTime - startTime))
 
 	netPlugin.Stop()
 
 	if err != nil {
-		panic("network plugin fatal error")
+		reportPluginError(reportManager, tb, err)
+		panic("network plugin execute fatal error")
 	}
 
 	// Report CNI successfully finished execution.

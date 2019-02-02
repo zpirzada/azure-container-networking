@@ -221,10 +221,8 @@ func (report *CNIReport) GetReport(name string, version string, ipamQueryURL str
 	report.Name = name
 	report.Version = version
 
-	// report.GetOrchestratorDetails()
 	report.GetSystemDetails()
 	report.GetOSDetails()
-	report.GetInterfaceDetails(ipamQueryURL)
 }
 
 // GetReport retrives npm and kubernetes cluster related info and create a report structure.

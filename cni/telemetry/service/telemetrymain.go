@@ -10,14 +10,14 @@ import (
 
 const (
 	reportToHostInterval = 10000
-	azuretelemetry       = "azuretelemetry"
+	azurecnitelemetry    = "azure-vnet-telemetry"
 )
 
 func main() {
 	var tb *telemetry.TelemetryBuffer
 	var err error
 
-	log.SetName(azuretelemetry)
+	log.SetName(azurecnitelemetry)
 	log.SetLevel(log.LevelInfo)
 	err = log.SetTarget(log.TargetLogfile)
 	if err != nil {

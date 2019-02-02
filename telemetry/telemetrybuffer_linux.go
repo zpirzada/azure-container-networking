@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 )
 
 const (
-	fdTemplate    = "/tmp/%s.sock"
-	PidFile       = "tmp/azuretelemetry.pid"
-	MetadatatFile = "/tmp/azuremetadata.json"
+	fdTemplate                  = "/tmp/%s.sock"
+	telemetryServiceProcessName = "azure-vnet-telemetry"
+	cniInstallDir               = "/opt/cni/bin"
+	metadataFile                = "/tmp/azuremetadata.json"
 )
 
 // Dial - try to connect to/create a socket with 'name'
@@ -47,14 +47,4 @@ func checkIfSockExists() bool {
 	}
 
 	return false
-}
-
-func startTelemetryManager(name string) (int, error) {
-	cmd := fmt.Sprintf("/opt/cni/bin/%s", name)
-	startCmd := exec.Command("sh", "-c", cmd)
-	if err := startCmd.Start(); err != nil {
-		return -1, err
-	}
-
-	return startCmd.Process.Pid, nil
 }

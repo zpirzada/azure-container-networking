@@ -11,13 +11,12 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
+	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 )
 
 // FdName - file descriptor name
@@ -28,11 +27,10 @@ import (
 // DefaultNpmReportsSize - default NPM report slice size
 // DefaultInterval - default interval for sending payload to host
 const (
-	FdName                  = "azure-cni-telemetry"
-	Delimiter               = '\n'
-	HostNetAgentURL         = "http://169.254.169.254/machine/plugins?comp=netagent&type=payload"
-	telemetryMgrProcessName = "azuretelemetrymgr"
-	DefaultInterval         = 1 * time.Minute
+	FdName          = "azure-vnet-telemetry"
+	Delimiter       = '\n'
+	HostNetAgentURL = "http://169.254.169.254/machine/plugins?comp=netagent&type=payload"
+	DefaultInterval = 1 * time.Minute
 )
 
 // TelemetryBuffer object
@@ -68,6 +66,7 @@ func NewTelemetryBuffer() *TelemetryBuffer {
 	return &tb
 }
 
+// Starts Telemetry server listening on unix domain socket
 func (tb *TelemetryBuffer) StartServer() error {
 	err := tb.Listen(FdName)
 	if err != nil {
@@ -131,7 +130,7 @@ func (tb *TelemetryBuffer) Connect() error {
 func (tb *TelemetryBuffer) BufferAndPushData(intervalms time.Duration) {
 	defer tb.close()
 	if !tb.FdExists {
-		log.Printf("Buffer telemetry data and send it to host")
+		log.Printf("[Telemetry] Buffer telemetry data and send it to host")
 		if intervalms < DefaultInterval {
 			intervalms = DefaultInterval
 		}
@@ -142,14 +141,14 @@ func (tb *TelemetryBuffer) BufferAndPushData(intervalms time.Duration) {
 			case <-interval:
 				// Send payload to host and clear cache when sent successfully
 				// To-do : if we hit max slice size in payload, write to disk and process the logs on disk on future sends
-				log.Printf("send data to host")
+				log.Printf("[Telemetry] send data to host")
 				if err := tb.sendToHost(); err == nil {
 					tb.payload.reset()
 				} else {
-					log.Printf("sending to host failed with error %+v", err)
+					log.Printf("[Telemetry] sending to host failed with error %+v", err)
 				}
 			case report := <-tb.data:
-				log.Printf("Got data..buffer it")
+				log.Printf("[Telemetry] Got data..Append it to buffer")
 				tb.payload.push(report)
 			case <-tb.cancel:
 				goto EXIT
@@ -249,7 +248,6 @@ func (pl *Payload) push(x interface{}) {
 		cniReport := x.(CNIReport)
 		metadata.Tags = metadata.Tags + ";" + cniReport.Version
 		cniReport.Metadata = metadata
-		log.Printf("cni report : %+v", cniReport)
 		pl.CNIReports = append(pl.CNIReports, cniReport)
 	case NPMReport:
 		npmReport := x.(NPMReport)
@@ -274,26 +272,27 @@ func (pl *Payload) reset() {
 	pl.CNSReports = make([]CNSReport, 0)
 }
 
+// saveHostMetadata - save metadata got from wireserver to json file
 func saveHostMetadata(metadata Metadata) error {
 	dataBytes, err := json.Marshal(metadata)
 	if err != nil {
 		return fmt.Errorf("[Telemetry] marshal data failed with err %+v", err)
 	}
 
-	if err = ioutil.WriteFile(MetadatatFile, dataBytes, 0644); err != nil {
-		log.Printf("[telemetry] Writing metadata to file failed: %v", err)
+	if err = ioutil.WriteFile(metadataFile, dataBytes, 0644); err != nil {
+		log.Printf("[Telemetry] Writing metadata to file failed: %v", err)
 	}
 
 	return err
 }
 
-// GetHostMetadata - retrieve metadata from host
+// getHostMetadata - retrieve metadata from host
 func getHostMetadata() (Metadata, error) {
-	content, err := ioutil.ReadFile(MetadatatFile)
+	content, err := ioutil.ReadFile(metadataFile)
 	if err == nil {
 		var metadata Metadata
 		if err = json.Unmarshal(content, &metadata); err == nil {
-			log.Printf("Returning hostmetadata saved in state")
+			log.Printf("[Telemetry] Returning hostmetadata from state")
 			return metadata, nil
 		}
 	}
@@ -318,32 +317,7 @@ func getHostMetadata() (Metadata, error) {
 		err = fmt.Errorf("[Telemetry] Request failed with HTTP error %d", resp.StatusCode)
 	} else if resp.Body != nil {
 		err = json.NewDecoder(resp.Body).Decode(&metareport)
-		if err == nil {
-			// // Find Metadata struct in report and try to set values
-			// v := reflect.ValueOf(report).Elem().FieldByName("Metadata")
-			// log.Printf("populate metadata %v", v)
-			// if v.CanSet() {
-			// 	v.FieldByName("Location").SetString(metareport.Metadata.Location)
-			// 	v.FieldByName("VMName").SetString(metareport.Metadata.VMName)
-			// 	v.FieldByName("Offer").SetString(metareport.Metadata.Offer)
-			// 	v.FieldByName("OsType").SetString(metareport.Metadata.OsType)
-			// 	v.FieldByName("PlacementGroupID").SetString(metareport.Metadata.PlacementGroupID)
-			// 	v.FieldByName("PlatformFaultDomain").SetString(metareport.Metadata.PlatformFaultDomain)
-			// 	v.FieldByName("PlatformUpdateDomain").SetString(metareport.Metadata.PlatformUpdateDomain)
-			// 	v.FieldByName("Publisher").SetString(metareport.Metadata.Publisher)
-			// 	v.FieldByName("ResourceGroupName").SetString(metareport.Metadata.ResourceGroupName)
-			// 	v.FieldByName("Sku").SetString(metareport.Metadata.Sku)
-			// 	v.FieldByName("SubscriptionID").SetString(metareport.Metadata.SubscriptionID)
-			// 	v.FieldByName("Tags").SetString(metareport.Metadata.Tags)
-			// 	v.FieldByName("OSVersion").SetString(metareport.Metadata.OSVersion)
-			// 	v.FieldByName("VMID").SetString(metareport.Metadata.VMID)
-			// 	v.FieldByName("VMSize").SetString(metareport.Metadata.VMSize)
-			// 	log.Printf("done metadata")
-			// } else {
-			// 	log.Printf("not able to set")
-			// 	err = fmt.Errorf("[Telemetry] Unable to set metadata values")
-			// }
-		} else {
+		if err != nil {
 			err = fmt.Errorf("[Telemetry] Unable to decode response body due to error: %s", err.Error())
 		}
 	} else {
@@ -353,45 +327,27 @@ func getHostMetadata() (Metadata, error) {
 	return metareport.Metadata, err
 }
 
-func StartTelemetryManagerProcess() error {
-	content, err := ioutil.ReadFile(PidFile)
-	if err == nil {
-		pidStr := strings.TrimSpace(string(content))
-		log.Printf("telemetry pid %v. check if its running", pidStr)
-		pid, _ := strconv.Atoi(pidStr)
-		process, err := os.FindProcess(pid)
-		if err == nil {
-			err := process.Signal(syscall.Signal(0))
-			if err == nil && checkIfSockExists() {
-				log.Printf("azure telemetry process already running with pid %v", pid)
-				return nil
-			} else if err == nil {
-				process.Kill()
-			}
-		}
-	}
+// StartTelemetryService - Kills if any telemetry service runs and start new telemetry service
+func StartTelemetryService() error {
+	platform.KillProcessByName(telemetryServiceProcessName)
 
-	log.Printf("[telemetry] Starting telemetry manager process")
-	pid, err := startTelemetryManager(telemetryMgrProcessName)
-	if err != nil {
-		log.Printf("Failed to start telemetry manager process :%v", err)
+	log.Printf("[Telemetry] Starting telemetry service process")
+	path := fmt.Sprintf("%v/%v", cniInstallDir, telemetryServiceProcessName)
+	if err := common.StartProcess(path); err != nil {
+		log.Printf("[Telemetry] Failed to start telemetry service process :%v", err)
 		return err
 	}
 
-	log.Printf("[Telemetry] Telemetry manager process started with pid %d", pid)
-	time.Sleep(1 * time.Second)
+	log.Printf("[Telemetry] Telemetry service started")
 
-	if err := os.Truncate(PidFile, 0); err != nil {
-		log.Printf("[Telemetry] Truncating pid file failed %v", err)
+	attempt := 0
+	for attempt < 5 {
+		if checkIfSockExists() {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+		attempt++
 	}
 
-	buf := []byte(strconv.Itoa(pid))
-
-	if err := ioutil.WriteFile(PidFile, buf, 0644); err != nil {
-		log.Printf("[telemetry] Writing pid to file failed: %v", err)
-		return nil
-	}
-
-	log.Printf("saved pid %v", pid)
 	return nil
 }
