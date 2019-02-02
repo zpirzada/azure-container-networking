@@ -121,7 +121,7 @@ func TestGetReportState(t *testing.T) {
 }
 
 func TestSendTelemetry(t *testing.T) {
-	err := reportManager.SendReport()
+	err := reportManager.SendReport(nil)
 	if err != nil {
 		t.Errorf("SendTelemetry failed due to %v", err)
 	}

@@ -236,7 +236,7 @@ func (report *NPMReport) GetReport(clusterID, nodeName, npmVersion, kubernetesVe
 
 // SendReport will send telemetry report to HostNetAgent.
 func (reportMgr *ReportManager) SendReport(tb *TelemetryBuffer) error {
-	if tb.Connected {
+	if tb != nil && tb.Connected {
 		log.Printf("[Telemetry] Going to send Telemetry report to hostnetagent %v", reportMgr.HostNetAgentURL)
 
 		switch reportMgr.Report.(type) {
