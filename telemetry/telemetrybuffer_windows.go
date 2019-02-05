@@ -37,7 +37,7 @@ func (tb *TelemetryBuffer) Listen(name string) (err error) {
 	return err
 }
 
-// Cleanup - cleanup telemetry unux domain socket
+// Cleanup - cleanup named pipe
 func (tb *TelemetryBuffer) Cleanup(name string) error {
 	return nil
 }

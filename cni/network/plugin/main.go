@@ -161,10 +161,9 @@ func main() {
 		},
 	}
 
-	tb := telemetry.NewTelemetryBuffer()
-	attempt := 0
+	tb := telemetry.NewTelemetryBuffer("")
 
-	for attempt < 2 {
+	for attempt := 0; attempt < 2; attempt++ {
 		err = tb.Connect()
 		if err != nil {
 			log.Printf("Connection to telemetry socket failed: %v", err)
@@ -175,13 +174,10 @@ func main() {
 			log.Printf("Connected to telemetry service")
 			break
 		}
-
-		attempt++
 	}
 
 	t := time.Now()
 	reportManager.Report.(*telemetry.CNIReport).Timestamp = t.Format("2006-01-02 15:04:05")
-
 	reportManager.Report.(*telemetry.CNIReport).GetReport(pluginName, version, ipamQueryURL)
 
 	if !reportManager.GetReportState(telemetry.CNITelemetryFile) {

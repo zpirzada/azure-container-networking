@@ -24,7 +24,7 @@ const (
 func SendCnsTelemetry(interval int, reports chan interface{}, service *restserver.HTTPRestService, telemetryStopProcessing chan bool) {
 
 CONNECT:
-	telemetryBuffer := NewTelemetryBuffer()
+	telemetryBuffer := NewTelemetryBuffer("")
 	err := telemetryBuffer.StartServer()
 	if err == nil || telemetryBuffer.FdExists {
 		if err := telemetryBuffer.Connect(); err != nil {
@@ -35,7 +35,7 @@ CONNECT:
 
 		go telemetryBuffer.BufferAndPushData(time.Duration(0))
 
-		heartbeat := time.NewTicker(time.Minute * 1).C
+		heartbeat := time.NewTicker(time.Second * 30).C
 		reportMgr := ReportManager{
 			ContentType: ContentType,
 			Report:      &CNSReport{},

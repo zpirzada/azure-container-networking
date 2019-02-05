@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	reportToHostInterval = 10000
+	reportToHostInterval = 60 * time.Second
 	azurecnitelemetry    = "azure-vnet-telemetry"
 )
 
@@ -26,7 +26,7 @@ func main() {
 
 	log.Printf("[Telemetry] TelemetryBuffer process started")
 	for {
-		tb = telemetry.NewTelemetryBuffer()
+		tb = telemetry.NewTelemetryBuffer("")
 		err = tb.StartServer()
 		if err == nil || tb.FdExists {
 			log.Printf("[Telemetry] Server started")

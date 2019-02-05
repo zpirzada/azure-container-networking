@@ -236,6 +236,7 @@ func (report *NPMReport) GetReport(clusterID, nodeName, npmVersion, kubernetesVe
 
 // SendReport will send telemetry report to HostNetAgent.
 func (reportMgr *ReportManager) SendReport(tb *TelemetryBuffer) error {
+	var err error
 	if tb != nil && tb.Connected {
 		log.Printf("[Telemetry] Going to send Telemetry report to hostnetagent %v", reportMgr.HostNetAgentURL)
 
@@ -257,9 +258,11 @@ func (reportMgr *ReportManager) SendReport(tb *TelemetryBuffer) error {
 				tb.Cancel()
 			}
 		}
+	} else {
+		err = fmt.Errorf("Not connected to telemetry server or tb is nil")
 	}
 
-	return nil
+	return err
 }
 
 // SetReportState will save the state in file if telemetry report sent successfully.

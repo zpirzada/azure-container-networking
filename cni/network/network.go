@@ -30,6 +30,13 @@ const (
 	ipVersion = "4"
 )
 
+// CNI Operation Types
+const (
+	CNI_ADD    = "ADD"
+	CNI_DEL    = "DEL"
+	CNI_UPDATE = "UPDATE"
+)
+
 // NetPlugin represents the CNI network plugin.
 type netPlugin struct {
 	*cni.Plugin
@@ -156,6 +163,19 @@ func (plugin *netPlugin) getPodInfo(args string) (string, string, error) {
 	return k8sPodName, k8sNamespace, nil
 }
 
+func (plugin *netPlugin) setCNIReportDetails(nwCfg *cni.NetworkConfig, opType string, msg string) {
+	plugin.report.OperationType = opType
+
+	if nwCfg.MultiTenancy {
+		plugin.report.Context = "AzureCNIMultitenancy"
+	}
+
+	plugin.report.SubContext = fmt.Sprintf("%+v", nwCfg)
+	plugin.report.EventMessage = msg
+	plugin.report.BridgeDetails.NetworkMode = nwCfg.Mode
+	plugin.report.InterfaceDetails.SecondaryCAUsedCount = plugin.nm.GetNumberOfEndpoints("", nwCfg.Name)
+}
+
 //
 // CNI implementation
 // https://github.com/containernetworking/cni/blob/master/SPEC.md
@@ -188,13 +208,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	log.Printf("[cni-net] Read network configuration %+v.", nwCfg)
 
-	plugin.report.OperationType = "ADD"
-	if nwCfg.MultiTenancy {
-		plugin.report.Context = "AzureCNIMultitenancy"
-	}
-	plugin.report.SubContext = fmt.Sprintf("%+v", nwCfg)
-	plugin.report.BridgeDetails.NetworkMode = nwCfg.Mode
-	plugin.report.InterfaceDetails.SecondaryCAUsedCount = plugin.nm.GetNumberOfEndpoints("", nwCfg.Name)
+	plugin.setCNIReportDetails(nwCfg, CNI_ADD, "")
 
 	defer func() {
 		// Add Interfaces to result.
@@ -483,8 +497,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	}
 
 	msg := fmt.Sprintf("CNI ADD succeeded : allocated ipaddress %+v podname %v namespace %v", result, k8sPodName, k8sNamespace)
-	plugin.report.EventMessage = msg
-	plugin.report.InterfaceDetails.SecondaryCAUsedCount = plugin.nm.GetNumberOfEndpoints("", networkId)
+	plugin.setCNIReportDetails(nwCfg, CNI_ADD, msg)
 
 	return nil
 }
@@ -601,13 +614,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 
 	log.Printf("[cni-net] Read network configuration %+v.", nwCfg)
 
-	plugin.report.OperationType = "DEL"
-	if nwCfg.MultiTenancy {
-		plugin.report.Context = "AzureCNIMultitenancy"
-	}
-	plugin.report.SubContext = fmt.Sprintf("%+v", nwCfg)
-	plugin.report.BridgeDetails.NetworkMode = nwCfg.Mode
-	plugin.report.InterfaceDetails.SecondaryCAUsedCount = plugin.nm.GetNumberOfEndpoints("", nwCfg.Name)
+	plugin.setCNIReportDetails(nwCfg, CNI_DEL, "")
 
 	// Parse Pod arguments.
 	k8sPodName, k8sNamespace, err := plugin.getPodInfo(args.Args)
@@ -670,8 +677,8 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	}
 
 	msg := fmt.Sprintf("CNI DEL succeeded : Released ip %+v podname %v namespace %v", nwCfg.Ipam.Address, k8sPodName, k8sNamespace)
-	plugin.report.EventMessage = msg
-	plugin.report.InterfaceDetails.SecondaryCAUsedCount = plugin.nm.GetNumberOfEndpoints("", networkId)
+	plugin.setCNIReportDetails(nwCfg, CNI_DEL, msg)
+
 	return nil
 }
 
@@ -697,13 +704,7 @@ func (plugin *netPlugin) Update(args *cniSkel.CmdArgs) error {
 
 	log.Printf("[cni-net] Read network configuration %+v.", nwCfg)
 
-	plugin.report.OperationType = "UPDATE"
-	if nwCfg.MultiTenancy {
-		plugin.report.Context = "AzureCNIMultitenancy"
-	}
-	plugin.report.SubContext = fmt.Sprintf("%+v", nwCfg)
-	plugin.report.BridgeDetails.NetworkMode = nwCfg.Mode
-	plugin.report.InterfaceDetails.SecondaryCAUsedCount = plugin.nm.GetNumberOfEndpoints("", nwCfg.Name)
+	plugin.setCNIReportDetails(nwCfg, CNI_UPDATE, "")
 
 	defer func() {
 		if result == nil {
@@ -837,8 +838,7 @@ func (plugin *netPlugin) Update(args *cniSkel.CmdArgs) error {
 	}
 
 	msg := fmt.Sprintf("CNI UPDATE succeeded : Updated %+v podname %v namespace %v", targetNetworkConfig, k8sPodName, k8sNamespace)
-	plugin.report.EventMessage = msg
-	plugin.report.InterfaceDetails.SecondaryCAUsedCount = plugin.nm.GetNumberOfEndpoints("", networkID)
+	plugin.setCNIReportDetails(nwCfg, CNI_UPDATE, msg)
 
 	return nil
 }

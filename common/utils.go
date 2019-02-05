@@ -118,11 +118,8 @@ func StartProcess(path string) error {
 	process, err := os.StartProcess(path, args, &attr)
 	if err == nil {
 
-		// It is not clear from docs, but Realease actually detaches the process
-		if err = process.Release(); err != nil {
-			return err
-		}
-
+		// Release detaches the process
+		return process.Release()
 	}
 
 	return err

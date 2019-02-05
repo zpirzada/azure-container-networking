@@ -21,28 +21,29 @@ import (
 
 // FdName - file descriptor name
 // Delimiter - delimiter for socket reads/writes
-// HostNetAgentURL - host net agent url of type payload
+// azureHostReportURL - host net agent url of type payload
 // DefaultDncReportsSize - default DNC report slice size
 // DefaultCniReportsSize - default CNI report slice size
 // DefaultNpmReportsSize - default NPM report slice size
 // DefaultInterval - default interval for sending payload to host
 const (
-	FdName          = "azure-vnet-telemetry"
-	Delimiter       = '\n'
-	HostNetAgentURL = "http://169.254.169.254/machine/plugins?comp=netagent&type=payload"
-	DefaultInterval = 1 * time.Minute
+	FdName             = "azure-vnet-telemetry"
+	Delimiter          = '\n'
+	azureHostReportURL = "http://169.254.169.254/machine/plugins?comp=netagent&type=payload"
+	DefaultInterval    = 60 * time.Second
 )
 
 // TelemetryBuffer object
 type TelemetryBuffer struct {
-	client      net.Conn
-	listener    net.Listener
-	connections []net.Conn
-	payload     Payload
-	FdExists    bool
-	Connected   bool
-	data        chan interface{}
-	cancel      chan bool
+	client             net.Conn
+	listener           net.Listener
+	connections        []net.Conn
+	azureHostReportURL string
+	payload            Payload
+	FdExists           bool
+	Connected          bool
+	data               chan interface{}
+	cancel             chan bool
 }
 
 // Payload object holds the different types of reports
@@ -54,8 +55,13 @@ type Payload struct {
 }
 
 // NewTelemetryBuffer - create a new TelemetryBuffer
-func NewTelemetryBuffer() *TelemetryBuffer {
+func NewTelemetryBuffer(hostReportURL string) *TelemetryBuffer {
 	var tb TelemetryBuffer
+
+	if hostReportURL == "" {
+		tb.azureHostReportURL = azureHostReportURL
+	}
+
 	tb.data = make(chan interface{})
 	tb.cancel = make(chan bool, 1)
 	tb.connections = make([]net.Conn, 1)
@@ -92,7 +98,7 @@ func (tb *TelemetryBuffer) StartServer() error {
 								json.Unmarshal([]byte(reportStr), &npmReport)
 								tb.data <- npmReport
 							} else if _, ok := tmp["CniSucceeded"]; ok {
-								log.Printf("Got cni report")
+								log.Printf("[Telemetry] Got cni report")
 								var cniReport CNIReport
 								json.Unmarshal([]byte(reportStr), &cniReport)
 								tb.data <- cniReport
@@ -211,7 +217,7 @@ func (tb *TelemetryBuffer) sendToHost() error {
 	var body bytes.Buffer
 	log.Printf("Sending payload %+v", tb.payload)
 	json.NewEncoder(&body).Encode(tb.payload)
-	resp, err := httpc.Post(HostNetAgentURL, ContentType, &body)
+	resp, err := httpc.Post(tb.azureHostReportURL, ContentType, &body)
 	if err != nil {
 		return fmt.Errorf("[Telemetry] HTTP Post returned error %v", err)
 	}
@@ -227,16 +233,14 @@ func (tb *TelemetryBuffer) sendToHost() error {
 
 // push - push the report (x) to corresponding slice
 func (pl *Payload) push(x interface{}) {
-
 	metadata, err := getHostMetadata()
 	if err != nil {
 		log.Printf("Error getting metadata %v", err)
-		return
-	}
-
-	err = saveHostMetadata(metadata)
-	if err != nil {
-		log.Printf("saving host metadata failed with :%v", err)
+	} else {
+		err = saveHostMetadata(metadata)
+		if err != nil {
+			log.Printf("saving host metadata failed with :%v", err)
+		}
 	}
 
 	switch x.(type) {
@@ -339,13 +343,12 @@ func StartTelemetryService() error {
 
 	log.Printf("[Telemetry] Telemetry service started")
 
-	attempt := 0
-	for attempt < 5 {
+	for attempt := 0; attempt < 5; attempt++ {
 		if checkIfSockExists() {
 			break
 		}
+
 		time.Sleep(200 * time.Millisecond)
-		attempt++
 	}
 
 	return nil

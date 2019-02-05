@@ -95,7 +95,8 @@ func ClearNetworkConfiguration() (bool, error) {
 	return false, nil
 }
 
-func KillProcessByName(processName string) {
+func KillProcessByName(processName string) error {
 	cmd := fmt.Sprintf("pkill -f %v", processName)
-	ExecuteCommand(cmd)
+	_, err := ExecuteCommand(cmd)
+	return err
 }
