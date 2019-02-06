@@ -164,12 +164,11 @@ func (plugin *netPlugin) getPodInfo(args string) (string, string, error) {
 }
 
 func (plugin *netPlugin) setCNIReportDetails(nwCfg *cni.NetworkConfig, opType string, msg string) {
-	plugin.report.OperationType = opType
-
 	if nwCfg.MultiTenancy {
 		plugin.report.Context = "AzureCNIMultitenancy"
 	}
 
+	plugin.report.OperationType = opType
 	plugin.report.SubContext = fmt.Sprintf("%+v", nwCfg)
 	plugin.report.EventMessage = msg
 	plugin.report.BridgeDetails.NetworkMode = nwCfg.Mode
