@@ -1,5 +1,7 @@
 package main
 
+// Entry point of the telemetry service if started by CNI
+
 import (
 	"fmt"
 	"time"
@@ -9,8 +11,8 @@ import (
 )
 
 const (
-	reportToHostInterval = 60 * time.Second
-	azurecnitelemetry    = "azure-vnet-telemetry"
+	reportToHostIntervalInSeconds = 60 * time.Second
+	azurecnitelemetry             = "azure-vnet-telemetry"
 )
 
 func main() {
@@ -39,6 +41,6 @@ func main() {
 		time.Sleep(time.Millisecond * 200)
 	}
 
-	tb.BufferAndPushData(reportToHostInterval)
-	log.Printf("TelemetryBuffer process exiting")
+	tb.BufferAndPushData(reportToHostIntervalInSeconds)
+	log.Printf("[Telemetry] TelemetryBuffer process exiting")
 }

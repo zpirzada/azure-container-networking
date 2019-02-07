@@ -31,7 +31,10 @@ const (
 	Delimiter          = '\n'
 	azureHostReportURL = "http://169.254.169.254/machine/plugins?comp=netagent&type=payload"
 	DefaultInterval    = 60 * time.Second
+	logName            = "azure-vnet-telemetry"
 )
+
+var telemetryLogger = log.NewLogger(logName, log.LevelInfo, log.TargetStderr)
 
 // TelemetryBuffer object
 type TelemetryBuffer struct {
@@ -69,6 +72,12 @@ func NewTelemetryBuffer(hostReportURL string) *TelemetryBuffer {
 	tb.payload.CNIReports = make([]CNIReport, 0)
 	tb.payload.NPMReports = make([]NPMReport, 0)
 	tb.payload.CNSReports = make([]CNSReport, 0)
+
+	err := telemetryLogger.SetTarget(log.TargetLogfile)
+	if err != nil {
+		fmt.Printf("Failed to configure logging: %v\n", err)
+	}
+
 	return &tb
 }
 
@@ -98,7 +107,7 @@ func (tb *TelemetryBuffer) StartServer() error {
 								json.Unmarshal([]byte(reportStr), &npmReport)
 								tb.data <- npmReport
 							} else if _, ok := tmp["CniSucceeded"]; ok {
-								log.Printf("[Telemetry] Got cni report")
+								telemetryLogger.Printf("[Telemetry] Got cni report")
 								var cniReport CNIReport
 								json.Unmarshal([]byte(reportStr), &cniReport)
 								tb.data <- cniReport
@@ -136,7 +145,7 @@ func (tb *TelemetryBuffer) Connect() error {
 func (tb *TelemetryBuffer) BufferAndPushData(intervalms time.Duration) {
 	defer tb.close()
 	if !tb.FdExists {
-		log.Printf("[Telemetry] Buffer telemetry data and send it to host")
+		telemetryLogger.Printf("[Telemetry] Buffer telemetry data and send it to host")
 		if intervalms < DefaultInterval {
 			intervalms = DefaultInterval
 		}
@@ -147,14 +156,14 @@ func (tb *TelemetryBuffer) BufferAndPushData(intervalms time.Duration) {
 			case <-interval:
 				// Send payload to host and clear cache when sent successfully
 				// To-do : if we hit max slice size in payload, write to disk and process the logs on disk on future sends
-				log.Printf("[Telemetry] send data to host")
+				telemetryLogger.Printf("[Telemetry] send data to host")
 				if err := tb.sendToHost(); err == nil {
 					tb.payload.reset()
 				} else {
-					log.Printf("[Telemetry] sending to host failed with error %+v", err)
+					telemetryLogger.Printf("[Telemetry] sending to host failed with error %+v", err)
 				}
 			case report := <-tb.data:
-				log.Printf("[Telemetry] Got data..Append it to buffer")
+				telemetryLogger.Printf("[Telemetry] Got data..Append it to buffer")
 				tb.payload.push(report)
 			case <-tb.cancel:
 				goto EXIT
@@ -215,7 +224,7 @@ func (tb *TelemetryBuffer) close() {
 func (tb *TelemetryBuffer) sendToHost() error {
 	httpc := &http.Client{}
 	var body bytes.Buffer
-	log.Printf("Sending payload %+v", tb.payload)
+	telemetryLogger.Printf("Sending payload %+v", tb.payload)
 	json.NewEncoder(&body).Encode(tb.payload)
 	resp, err := httpc.Post(tb.azureHostReportURL, ContentType, &body)
 	if err != nil {
@@ -235,11 +244,11 @@ func (tb *TelemetryBuffer) sendToHost() error {
 func (pl *Payload) push(x interface{}) {
 	metadata, err := getHostMetadata()
 	if err != nil {
-		log.Printf("Error getting metadata %v", err)
+		telemetryLogger.Printf("Error getting metadata %v", err)
 	} else {
 		err = saveHostMetadata(metadata)
 		if err != nil {
-			log.Printf("saving host metadata failed with :%v", err)
+			telemetryLogger.Printf("saving host metadata failed with :%v", err)
 		}
 	}
 
@@ -283,7 +292,7 @@ func saveHostMetadata(metadata Metadata) error {
 	}
 
 	if err = ioutil.WriteFile(metadataFile, dataBytes, 0644); err != nil {
-		log.Printf("[Telemetry] Writing metadata to file failed: %v", err)
+		telemetryLogger.Printf("[Telemetry] Writing metadata to file failed: %v", err)
 	}
 
 	return err
@@ -295,7 +304,7 @@ func getHostMetadata() (Metadata, error) {
 	if err == nil {
 		var metadata Metadata
 		if err = json.Unmarshal(content, &metadata); err == nil {
-			log.Printf("[Telemetry] Returning hostmetadata from state")
+			telemetryLogger.Printf("[Telemetry] Returning hostmetadata from state")
 			return metadata, nil
 		}
 	}
@@ -334,14 +343,14 @@ func getHostMetadata() (Metadata, error) {
 func StartTelemetryService() error {
 	platform.KillProcessByName(telemetryServiceProcessName)
 
-	log.Printf("[Telemetry] Starting telemetry service process")
+	telemetryLogger.Printf("[Telemetry] Starting telemetry service process")
 	path := fmt.Sprintf("%v/%v", cniInstallDir, telemetryServiceProcessName)
 	if err := common.StartProcess(path); err != nil {
-		log.Printf("[Telemetry] Failed to start telemetry service process :%v", err)
+		telemetryLogger.Printf("[Telemetry] Failed to start telemetry service process :%v", err)
 		return err
 	}
 
-	log.Printf("[Telemetry] Telemetry service started")
+	telemetryLogger.Printf("[Telemetry] Telemetry service started")
 
 	for attempt := 0; attempt < 5; attempt++ {
 		if checkIfSockExists() {

@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-container-networking/common"
-	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/platform"
 )
 
@@ -238,17 +237,17 @@ func (report *NPMReport) GetReport(clusterID, nodeName, npmVersion, kubernetesVe
 func (reportMgr *ReportManager) SendReport(tb *TelemetryBuffer) error {
 	var err error
 	if tb != nil && tb.Connected {
-		log.Printf("[Telemetry] Going to send Telemetry report to hostnetagent %v", reportMgr.HostNetAgentURL)
+		telemetryLogger.Printf("[Telemetry] Going to send Telemetry report to hostnetagent")
 
 		switch reportMgr.Report.(type) {
 		case *CNIReport:
-			log.Printf("[Telemetry] %+v", reportMgr.Report.(*CNIReport))
+			telemetryLogger.Printf("[Telemetry] %+v", reportMgr.Report.(*CNIReport))
 		case *NPMReport:
-			log.Printf("[Telemetry] %+v", reportMgr.Report.(*NPMReport))
+			telemetryLogger.Printf("[Telemetry] %+v", reportMgr.Report.(*NPMReport))
 		case *DNCReport:
-			log.Printf("[Telemetry] %+v", reportMgr.Report.(*DNCReport))
+			telemetryLogger.Printf("[Telemetry] %+v", reportMgr.Report.(*DNCReport))
 		default:
-			log.Printf("[Telemetry] Invalid report type")
+			telemetryLogger.Printf("[Telemetry] Invalid report type")
 		}
 
 		report, err := reportMgr.ReportToBytes()
@@ -285,13 +284,13 @@ func (reportMgr *ReportManager) SetReportState(telemetryFile string) error {
 
 	_, err = f.Write(reportBytes)
 	if err != nil {
-		log.Printf("[Telemetry] Error while writing to file %v", err)
+		telemetryLogger.Printf("[Telemetry] Error while writing to file %v", err)
 		return fmt.Errorf("[Telemetry] Error while writing to file %v", err)
 	}
 
 	// set IsNewInstance in report
 	reflect.ValueOf(reportMgr.Report).Elem().FieldByName("IsNewInstance").SetBool(false)
-	log.Printf("[Telemetry] SetReportState succeeded")
+	telemetryLogger.Printf("[Telemetry] SetReportState succeeded")
 	return nil
 }
 
@@ -299,7 +298,7 @@ func (reportMgr *ReportManager) SetReportState(telemetryFile string) error {
 func (reportMgr *ReportManager) GetReportState(telemetryFile string) bool {
 	// try to set IsNewInstance in report
 	if _, err := os.Stat(telemetryFile); os.IsNotExist(err) {
-		log.Printf("[Telemetry] File not exist %v", telemetryFile)
+		telemetryLogger.Printf("[Telemetry] File not exist %v", telemetryFile)
 		reflect.ValueOf(reportMgr.Report).Elem().FieldByName("IsNewInstance").SetBool(true)
 		return false
 	}
@@ -324,14 +323,12 @@ func (report *CNIReport) GetInterfaceDetails(queryUrl string) {
 
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		report.InterfaceDetails = InterfaceInfo{}
 		report.InterfaceDetails.ErrorMessage = "Getting all interfaces failed due to " + err.Error()
 		return
 	}
 
 	resp, err := http.Get(queryUrl)
 	if err != nil {
-		report.InterfaceDetails = InterfaceInfo{}
 		report.InterfaceDetails.ErrorMessage = "Http get failed in getting interface details " + err.Error()
 		return
 	}
@@ -339,10 +336,9 @@ func (report *CNIReport) GetInterfaceDetails(queryUrl string) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		report.InterfaceDetails = InterfaceInfo{}
 		errMsg := fmt.Sprintf("Error while getting interface details. http code :%d", resp.StatusCode)
 		report.InterfaceDetails.ErrorMessage = errMsg
-		log.Printf(errMsg)
+		telemetryLogger.Printf(errMsg)
 		return
 	}
 
@@ -351,7 +347,6 @@ func (report *CNIReport) GetInterfaceDetails(queryUrl string) {
 	decoder := xml.NewDecoder(resp.Body)
 	err = decoder.Decode(&doc)
 	if err != nil {
-		report.InterfaceDetails = InterfaceInfo{}
 		report.InterfaceDetails.ErrorMessage = "xml decode failed due to " + err.Error()
 		return
 	}
