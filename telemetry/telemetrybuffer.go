@@ -26,12 +26,14 @@ import (
 // DefaultCniReportsSize - default CNI report slice size
 // DefaultNpmReportsSize - default NPM report slice size
 // DefaultInterval - default interval for sending payload to host
+// MaxPayloadSize - max payload size (~2MB)
 const (
 	FdName             = "azure-vnet-telemetry"
 	Delimiter          = '\n'
 	azureHostReportURL = "http://169.254.169.254/machine/plugins?comp=netagent&type=payload"
 	DefaultInterval    = 60 * time.Second
 	logName            = "azure-vnet-telemetry"
+  MaxPayloadSize     = 2097
 )
 
 var telemetryLogger = log.NewLogger(logName, log.LevelInfo, log.TargetStderr)
@@ -252,24 +254,26 @@ func (pl *Payload) push(x interface{}) {
 		}
 	}
 
-	switch x.(type) {
-	case DNCReport:
-		dncReport := x.(DNCReport)
-		dncReport.Metadata = metadata
-		pl.DNCReports = append(pl.DNCReports, dncReport)
-	case CNIReport:
-		cniReport := x.(CNIReport)
-		cniReport.Metadata = metadata
-		pl.CNIReports = append(pl.CNIReports, cniReport)
-	case NPMReport:
-		npmReport := x.(NPMReport)
-		npmReport.Metadata = metadata
-		pl.NPMReports = append(pl.NPMReports, npmReport)
-	case CNSReport:
-		cnsReport := x.(CNSReport)
-		cnsReport.Metadata = metadata
-		pl.CNSReports = append(pl.CNSReports, cnsReport)
-	}
+  if pl.len() < MaxPayloadSize {
+    switch x.(type) {
+    case DNCReport:
+      dncReport := x.(DNCReport)
+      dncReport.Metadata = metadata
+      pl.DNCReports = append(pl.DNCReports, dncReport)
+    case CNIReport:
+      cniReport := x.(CNIReport)
+      cniReport.Metadata = metadata
+      pl.CNIReports = append(pl.CNIReports, cniReport)
+    case NPMReport:
+      npmReport := x.(NPMReport)
+      npmReport.Metadata = metadata
+      pl.NPMReports = append(pl.NPMReports, npmReport)
+    case CNSReport:
+      cnsReport := x.(CNSReport)
+      cnsReport.Metadata = metadata
+      pl.CNSReports = append(pl.CNSReports, cnsReport)
+    }
+  }
 }
 
 // reset - reset payload slices
@@ -282,6 +286,11 @@ func (pl *Payload) reset() {
 	pl.NPMReports = make([]NPMReport, 0)
 	pl.CNSReports = nil
 	pl.CNSReports = make([]CNSReport, 0)
+}
+
+// len - get number of payload items
+func (pl *Payload) len() int {
+	return len(pl.CNIReports) + len(pl.CNSReports) + len(pl.DNCReports) + len(pl.NPMReports)
 }
 
 // saveHostMetadata - save metadata got from wireserver to json file
