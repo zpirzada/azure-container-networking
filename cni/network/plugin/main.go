@@ -16,6 +16,7 @@ import (
 	"github.com/Azure/azure-container-networking/common"
 	acn "github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/telemetry"
 	"github.com/containernetworking/cni/pkg/skel"
 )
@@ -161,6 +162,13 @@ func main() {
 		},
 	}
 
+	cniReport := reportManager.Report.(*telemetry.CNIReport)
+
+	upTime, err := platform.GetLastRebootTime()
+	if err == nil {
+		cniReport.VMUptime = upTime.Format("2006-01-02 15:04:05")
+	}
+
 	tb := telemetry.NewTelemetryBuffer("")
 
 	for attempt := 0; attempt < 2; attempt++ {
@@ -177,8 +185,8 @@ func main() {
 	}
 
 	t := time.Now()
-	reportManager.Report.(*telemetry.CNIReport).Timestamp = t.Format("2006-01-02 15:04:05")
-	reportManager.Report.(*telemetry.CNIReport).GetReport(pluginName, version, ipamQueryURL)
+	cniReport.Timestamp = t.Format("2006-01-02 15:04:05")
+	cniReport.GetReport(pluginName, version, ipamQueryURL)
 
 	if !reportManager.GetReportState(telemetry.CNITelemetryFile) {
 		log.Printf("GetReport state file didn't exist. Setting flag to true")
@@ -200,7 +208,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	netPlugin.SetCNIReport(reportManager.Report.(*telemetry.CNIReport))
+	netPlugin.SetCNIReport(cniReport)
 
 	if err = netPlugin.Plugin.InitializeKeyValueStore(&config); err != nil {
 		log.Printf("Failed to initialize key-value store of network plugin, err:%v.\n", err)
