@@ -26,7 +26,6 @@ import (
 // DefaultCniReportsSize - default CNI report slice size
 // DefaultNpmReportsSize - default NPM report slice size
 // DefaultInterval - default interval for sending payload to host
-// MaxPayloadSize - max payload size (~2MB)
 const (
 	FdName             = "azure-vnet-telemetry"
 	Delimiter          = '\n'
