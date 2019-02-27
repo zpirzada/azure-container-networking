@@ -30,10 +30,10 @@ import (
 const (
 	FdName             = "azure-vnet-telemetry"
 	Delimiter          = '\n'
-	azureHostReportURL = "http://169.254.169.254/machine/plugins?comp=netagent&type=payload"
+	azureHostReportURL = "http://168.63.129.16/machine/plugins?comp=netagent&type=payload"
 	DefaultInterval    = 60 * time.Second
 	logName            = "azure-vnet-telemetry"
-  MaxPayloadSize     = 2097
+	MaxPayloadSize     = 2097
 )
 
 var telemetryLogger = log.NewLogger(logName, log.LevelInfo, log.TargetStderr)
@@ -254,26 +254,26 @@ func (pl *Payload) push(x interface{}) {
 		}
 	}
 
-  if pl.len() < MaxPayloadSize {
-    switch x.(type) {
-    case DNCReport:
-      dncReport := x.(DNCReport)
-      dncReport.Metadata = metadata
-      pl.DNCReports = append(pl.DNCReports, dncReport)
-    case CNIReport:
-      cniReport := x.(CNIReport)
-      cniReport.Metadata = metadata
-      pl.CNIReports = append(pl.CNIReports, cniReport)
-    case NPMReport:
-      npmReport := x.(NPMReport)
-      npmReport.Metadata = metadata
-      pl.NPMReports = append(pl.NPMReports, npmReport)
-    case CNSReport:
-      cnsReport := x.(CNSReport)
-      cnsReport.Metadata = metadata
-      pl.CNSReports = append(pl.CNSReports, cnsReport)
-    }
-  }
+	if pl.len() < MaxPayloadSize {
+		switch x.(type) {
+		case DNCReport:
+			dncReport := x.(DNCReport)
+			dncReport.Metadata = metadata
+			pl.DNCReports = append(pl.DNCReports, dncReport)
+		case CNIReport:
+			cniReport := x.(CNIReport)
+			cniReport.Metadata = metadata
+			pl.CNIReports = append(pl.CNIReports, cniReport)
+		case NPMReport:
+			npmReport := x.(NPMReport)
+			npmReport.Metadata = metadata
+			pl.NPMReports = append(pl.NPMReports, npmReport)
+		case CNSReport:
+			cnsReport := x.(CNSReport)
+			cnsReport.Metadata = metadata
+			pl.CNSReports = append(pl.CNSReports, cnsReport)
+		}
+	}
 }
 
 // reset - reset payload slices
