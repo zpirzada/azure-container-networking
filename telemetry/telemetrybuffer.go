@@ -72,7 +72,7 @@ func NewTelemetryBuffer(hostReportURL string) *TelemetryBuffer {
 
 	tb.data = make(chan interface{})
 	tb.cancel = make(chan bool, 1)
-	tb.connections = make([]net.Conn, 1)
+	tb.connections = make([]net.Conn, 0)
 	tb.payload.DNCReports = make([]DNCReport, 0)
 	tb.payload.CNIReports = make([]CNIReport, 0)
 	tb.payload.NPMReports = make([]NPMReport, 0)
@@ -86,14 +86,21 @@ func NewTelemetryBuffer(hostReportURL string) *TelemetryBuffer {
 	return &tb
 }
 
+func remove(s []net.Conn, i int) []net.Conn {
+	s[i] = s[len(s)-1]
+	return s[:len(s)-1]
+}
+
 // Starts Telemetry server listening on unix domain socket
 func (tb *TelemetryBuffer) StartServer() error {
 	err := tb.Listen(FdName)
 	if err != nil {
 		tb.FdExists = strings.Contains(err.Error(), "in use") || strings.Contains(err.Error(), "Access is denied")
+		telemetryLogger.Printf("Listen returns: %v", err.Error())
 		return err
 	}
 
+	telemetryLogger.Printf("Telemetry service started")
 	// Spawn server goroutine to handle incoming connections
 	go func() {
 		for {
@@ -124,9 +131,20 @@ func (tb *TelemetryBuffer) StartServer() error {
 								json.Unmarshal([]byte(reportStr), &cnsReport)
 								tb.data <- cnsReport
 							}
+						} else {
+							telemetryLogger.Printf("Server closing client connection")
+							for index, value := range tb.connections {
+								if value == conn {
+									conn.Close()
+									tb.connections = remove(tb.connections, index)
+									return
+								}
+							}
 						}
 					}
 				}()
+			} else {
+				return
 			}
 		}
 	}()
@@ -147,7 +165,7 @@ func (tb *TelemetryBuffer) Connect() error {
 
 // BufferAndPushData - BufferAndPushData running an instance if it isn't already being run elsewhere
 func (tb *TelemetryBuffer) BufferAndPushData(intervalms time.Duration) {
-	defer tb.close()
+	defer tb.Close()
 	if !tb.FdExists {
 		telemetryLogger.Printf("[Telemetry] Buffer telemetry data and send it to host")
 		if intervalms < DefaultInterval {
@@ -168,11 +186,13 @@ func (tb *TelemetryBuffer) BufferAndPushData(intervalms time.Duration) {
 			case report := <-tb.data:
 				tb.payload.push(report)
 			case <-tb.cancel:
+				telemetryLogger.Printf("server cancel event")
 				goto EXIT
 			}
 		}
 	} else {
 		<-tb.cancel
+		telemetryLogger.Printf("Received cancel event")
 	}
 
 EXIT:
@@ -205,19 +225,25 @@ func (tb *TelemetryBuffer) Cancel() {
 	tb.cancel <- true
 }
 
-// close - close all connections
-func (tb *TelemetryBuffer) close() {
+// Close - close all connections
+func (tb *TelemetryBuffer) Close() {
 	if tb.client != nil {
+		telemetryLogger.Printf("client close")
 		tb.client.Close()
+		tb.client = nil
 	}
 
 	if tb.listener != nil {
+		telemetryLogger.Printf("server close")
 		tb.listener.Close()
+		tb.listener = nil
 	}
 
-	for _, conn := range tb.connections {
+	for index, conn := range tb.connections {
 		if conn != nil {
+			telemetryLogger.Printf("connection close")
 			conn.Close()
+			remove(tb.connections, index)
 		}
 	}
 }
