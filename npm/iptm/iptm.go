@@ -66,7 +66,7 @@ func (iptMgr *IptablesManager) InitNpmChains() error {
 	entry.Specs = []string{
 		util.IptablesMatchFlag,
 		util.IptablesStateFlag,
-		util.IPtablesMatchStateFlag,
+		util.IptablesMatchStateFlag,
 		util.IptablesRelatedState + "," + util.IptablesEstablishedState,
 		util.IptablesJumpFlag,
 		util.IptablesAccept,
@@ -84,50 +84,6 @@ func (iptMgr *IptablesManager) InitNpmChains() error {
 		}
 	}
 
-	// Add default allow kube-system rules to AZURE-NPM chain.
-	entry.Specs = []string{
-		util.IptablesMatchFlag,
-		util.IptablesSetFlag,
-		util.IptablesMatchSetFlag,
-		util.GetHashedName(util.KubeSystemFlag),
-		util.IptablesDstFlag,
-		util.IptablesJumpFlag,
-		util.IptablesAccept,
-	}
-	exists, err = iptMgr.Exists(entry)
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		iptMgr.OperationFlag = util.IptablesAppendFlag
-		if _, err := iptMgr.Run(entry); err != nil {
-			log.Printf("Error adding default allow kube-system rule to AZURE-NPM chain\n")
-			return err
-		}
-	}
-
-	entry.Specs = []string{
-		util.IptablesMatchFlag,
-		util.IptablesSetFlag,
-		util.IptablesMatchSetFlag,
-		util.GetHashedName(util.KubeSystemFlag),
-		util.IptablesSrcFlag,
-		util.IptablesJumpFlag,
-		util.IptablesAccept,
-	}
-	exists, err = iptMgr.Exists(entry)
-	if err != nil {
-		return err
-	}
-
-	if !exists {
-		iptMgr.OperationFlag = util.IptablesAppendFlag
-		if _, err := iptMgr.Run(entry); err != nil {
-			log.Printf("Error adding default allow kube-system rule to AZURE-NPM chain\n")
-			return err
-		}
-	}
 	// Create AZURE-NPM-INGRESS-PORT chain.
 	if err := iptMgr.AddChain(util.IptablesAzureIngressPortChain); err != nil {
 		return err
@@ -149,8 +105,13 @@ func (iptMgr *IptablesManager) InitNpmChains() error {
 		}
 	}
 
-	// Create AZURE-NPM-INGRESS-FROM chain.
-	if err := iptMgr.AddChain(util.IptablesAzureIngressFromChain); err != nil {
+	// Create AZURE-NPM-INGRESS-FROM-NS chain.
+	if err = iptMgr.AddChain(util.IptablesAzureIngressFromNsChain); err != nil {
+		return err
+	}
+
+	// Create AZURE-NPM-INGRESS-FROM-POD chain.
+	if err = iptMgr.AddChain(util.IptablesAzureIngressFromPodChain); err != nil {
 		return err
 	}
 
@@ -175,8 +136,13 @@ func (iptMgr *IptablesManager) InitNpmChains() error {
 		}
 	}
 
-	// Create AZURE-NPM-EGRESS-FROM chain.
-	if err := iptMgr.AddChain(util.IptablesAzureEgressToChain); err != nil {
+	// Create AZURE-NPM-EGRESS-TO-NS chain.
+	if err = iptMgr.AddChain(util.IptablesAzureEgressToNsChain); err != nil {
+		return err
+	}
+
+	// Create AZURE-NPM-EGRESS-TO-POD chain.
+	if err = iptMgr.AddChain(util.IptablesAzureEgressToPodChain); err != nil {
 		return err
 	}
 
@@ -209,9 +175,11 @@ func (iptMgr *IptablesManager) UninitNpmChains() error {
 	IptablesAzureChainList := []string{
 		util.IptablesAzureChain,
 		util.IptablesAzureIngressPortChain,
-		util.IptablesAzureIngressFromChain,
+		util.IptablesAzureIngressFromNsChain,
+		util.IptablesAzureIngressFromPodChain,
 		util.IptablesAzureEgressPortChain,
-		util.IptablesAzureEgressToChain,
+		util.IptablesAzureEgressToNsChain,
+		util.IptablesAzureEgressToPodChain,
 		util.IptablesAzureTargetSetsChain,
 	}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/azure-container-networking/telemetry"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	networkinginformers "k8s.io/client-go/informers/networking/v1"
@@ -42,6 +43,8 @@ type NetworkPolicyManager struct {
 
 	clusterState  telemetry.ClusterState
 	reportManager *telemetry.ReportManager
+
+	serverVersion *version.Info
 }
 
 // GetClusterState returns current cluster state.
@@ -116,14 +119,26 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 	nsInformer := informerFactory.Core().V1().Namespaces()
 	npInformer := informerFactory.Networking().V1().NetworkPolicies()
 
+	serverVersion, err := clientset.ServerVersion()
+	if err != nil {
+		log.Printf("Error retrieving server version")
+		panic(err.Error)
+	}
+	log.Printf("API server version: %+v", serverVersion)
+
+	if err = util.SetIsNewNwPolicyVerFlag(serverVersion); err != nil {
+		log.Printf("Error setting IsNewNwPolicyVerFlag")
+		panic(err.Error)
+	}
+
 	npMgr := &NetworkPolicyManager{
-		clientset:       clientset,
-		informerFactory: informerFactory,
-		podInformer:     podInformer,
-		nsInformer:      nsInformer,
-		npInformer:      npInformer,
-		nodeName:        os.Getenv("HOSTNAME"),
-		nsMap:           make(map[string]*namespace),
+		clientset:              clientset,
+		informerFactory:        informerFactory,
+		podInformer:            podInformer,
+		nsInformer:             nsInformer,
+		npInformer:             npInformer,
+		nodeName:               os.Getenv("HOSTNAME"),
+		nsMap:                  make(map[string]*namespace),
 		isAzureNpmChainCreated: false,
 		clusterState: telemetry.ClusterState{
 			PodCount:      0,
@@ -135,12 +150,7 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 			ContentType:     contentType,
 			Report:          &telemetry.NPMReport{},
 		},
-	}
-
-	serverVersion, err := clientset.ServerVersion()
-	if err != nil {
-		log.Printf("Error retrieving server version")
-		panic(err.Error)
+		serverVersion: serverVersion,
 	}
 
 	clusterID := util.GetClusterID(npMgr.nodeName)
