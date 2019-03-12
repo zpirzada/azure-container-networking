@@ -175,6 +175,63 @@ func TestCloseTelemetryConnection(t *testing.T) {
 	}
 }
 
+func TestServerCloseTelemetryConnection(t *testing.T) {
+	// create server telemetrybuffer and start server
+	tb = NewTelemetryBuffer(hostAgentUrl)
+	err := tb.StartServer()
+	if err == nil {
+		go tb.BufferAndPushData(0)
+	}
+
+	// create client telemetrybuffer and connect to server
+	tb1 := NewTelemetryBuffer(hostAgentUrl)
+	if err := tb1.Connect(); err != nil {
+		t.Errorf("connection to telemetry server failed %v", err)
+	}
+
+	// Exit server thread and close server connection
+	tb.Cancel()
+	time.Sleep(300 * time.Millisecond)
+
+	b := []byte("tamil")
+	if _, err := tb1.Write(b); err == nil {
+		t.Errorf("Client couldn't recognise server close")
+	}
+
+	if len(tb.connections) != 0 {
+		t.Errorf("All connections not closed as expected")
+	}
+
+	// Close client connection
+	tb1.Close()
+}
+
+func TestClientCloseTelemetryConnection(t *testing.T) {
+	// create server telemetrybuffer and start server
+	tb = NewTelemetryBuffer(hostAgentUrl)
+	err := tb.StartServer()
+	if err == nil {
+		go tb.BufferAndPushData(0)
+	}
+
+	// create client telemetrybuffer and connect to server
+	tb1 := NewTelemetryBuffer(hostAgentUrl)
+	if err := tb1.Connect(); err != nil {
+		t.Errorf("connection to telemetry server failed %v", err)
+	}
+
+	// Close client connection
+	tb1.Close()
+	time.Sleep(300 * time.Millisecond)
+
+	if len(tb.connections) != 0 {
+		t.Errorf("All connections not closed as expected")
+	}
+
+	// Exit server thread and close server connection
+	tb.Cancel()
+}
+
 func TestSetReportState(t *testing.T) {
 	err := reportManager.SetReportState("a.json")
 	if err != nil {

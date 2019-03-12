@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-container-networking/common"
@@ -52,6 +53,7 @@ type TelemetryBuffer struct {
 	Connected          bool
 	data               chan interface{}
 	cancel             chan bool
+	mutex              sync.Mutex
 }
 
 // Payload object holds the different types of reports
@@ -87,8 +89,13 @@ func NewTelemetryBuffer(hostReportURL string) *TelemetryBuffer {
 }
 
 func remove(s []net.Conn, i int) []net.Conn {
-	s[i] = s[len(s)-1]
-	return s[:len(s)-1]
+	if len(s) > 0 && i < len(s) {
+		s[i] = s[len(s)-1]
+		return s[:len(s)-1]
+	}
+
+	telemetryLogger.Printf("tb connections remove failed index %v len %v", i, len(s))
+	return s
 }
 
 // Starts Telemetry server listening on unix domain socket
@@ -107,7 +114,9 @@ func (tb *TelemetryBuffer) StartServer() error {
 			// Spawn worker goroutines to communicate with client
 			conn, err := tb.listener.Accept()
 			if err == nil {
+				tb.mutex.Lock()
 				tb.connections = append(tb.connections, conn)
+				tb.mutex.Unlock()
 				go func() {
 					for {
 						reportStr, err := read(conn)
@@ -132,18 +141,32 @@ func (tb *TelemetryBuffer) StartServer() error {
 								tb.data <- cnsReport
 							}
 						} else {
-							telemetryLogger.Printf("Server closing client connection")
-							for index, value := range tb.connections {
+							var index int
+							var value net.Conn
+							var found bool
+
+							tb.mutex.Lock()
+							defer tb.mutex.Unlock()
+
+							for index, value = range tb.connections {
 								if value == conn {
+									telemetryLogger.Printf("Server closing client connection")
 									conn.Close()
-									tb.connections = remove(tb.connections, index)
-									return
+									found = true
+									break
 								}
 							}
+
+							if found {
+								tb.connections = remove(tb.connections, index)
+							}
+
+							return
 						}
 					}
 				}()
 			} else {
+				telemetryLogger.Printf("Telemetry Server accept error %v", err)
 				return
 			}
 		}
@@ -239,9 +262,12 @@ func (tb *TelemetryBuffer) Close() {
 		tb.listener = nil
 	}
 
+	tb.mutex.Lock()
+	defer tb.mutex.Unlock()
+
 	for _, conn := range tb.connections {
 		if conn != nil {
-			telemetryLogger.Printf("connection close")
+			telemetryLogger.Printf("connection close as server closed")
 			conn.Close()
 		}
 	}
