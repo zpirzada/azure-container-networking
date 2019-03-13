@@ -133,6 +133,52 @@ func handleIfCniUpdate(update func(*skel.CmdArgs) error) (bool, error) {
 	return isupdate, nil
 }
 
+// startTelemetryService - Kills if any telemetry service runs and start new telemetry service
+func startTelemetryService(path string) error {
+	platform.KillProcessByName(telemetry.TelemetryServiceProcessName)
+
+	log.Printf("[cni] Starting telemetry service process")
+
+	if err := common.StartProcess(path); err != nil {
+		log.Printf("[Telemetry] Failed to start telemetry service process :%v", err)
+		return err
+	}
+
+	log.Printf("[cni] Telemetry service started")
+
+	for attempt := 0; attempt < 5; attempt++ {
+		if telemetry.SockExists() {
+			break
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	return nil
+}
+
+func connectToTelemetryService(tb *telemetry.TelemetryBuffer) {
+	path := fmt.Sprintf("%v/%v", telemetry.CniInstallDir, telemetry.TelemetryServiceProcessName)
+
+	for attempt := 0; attempt < 2; attempt++ {
+		if err := tb.Connect(); err != nil {
+			log.Printf("Connection to telemetry socket failed: %v", err)
+			tb.Cleanup(telemetry.FdName)
+
+			if isExists, _ := common.CheckIfFileExists(path); !isExists {
+				log.Printf("Skip starting telemetry service as file didn't exist")
+				return
+			}
+
+			startTelemetryService(path)
+		} else {
+			tb.Connected = true
+			log.Printf("Connected to telemetry service")
+			return
+		}
+	}
+}
+
 // Main is the entry point for CNI network plugin.
 func main() {
 
@@ -170,20 +216,7 @@ func main() {
 	}
 
 	tb := telemetry.NewTelemetryBuffer("")
-
-	for attempt := 0; attempt < 2; attempt++ {
-		err = tb.Connect()
-		if err != nil {
-			log.Printf("Connection to telemetry socket failed: %v", err)
-			tb.Cleanup(telemetry.FdName)
-			telemetry.StartTelemetryService()
-		} else {
-			tb.Connected = true
-			log.Printf("Connected to telemetry service")
-			break
-		}
-	}
-
+	connectToTelemetryService(tb)
 	defer tb.Close()
 
 	t := time.Now()

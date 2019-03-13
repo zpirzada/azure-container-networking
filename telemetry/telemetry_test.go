@@ -94,6 +94,10 @@ func TestMain(m *testing.M) {
 	reportManager.ContentType = "application/json"
 	reportManager.Report = &CNIReport{}
 
+	if err := InitTelemetryLogger(); err == nil {
+		defer CloseTelemetryLogger()
+	}
+
 	tb = NewTelemetryBuffer(hostAgentUrl)
 	err = tb.StartServer()
 	if err == nil {
@@ -158,6 +162,14 @@ func TestSendTelemetry(t *testing.T) {
 	if err != nil {
 		t.Errorf("SendTelemetry failed due to %v", err)
 	}
+
+	i := 3
+	rpMgr := &ReportManager{}
+	rpMgr.Report = &i
+	err = rpMgr.SendReport(tb)
+	if err == nil {
+		t.Errorf("SendTelemetry not failed for incorrect report type")
+	}
 }
 
 func TestReceiveTelemetryData(t *testing.T) {
@@ -212,6 +224,10 @@ func TestClientCloseTelemetryConnection(t *testing.T) {
 	err := tb.StartServer()
 	if err == nil {
 		go tb.BufferAndPushData(0)
+	}
+
+	if !SockExists() {
+		t.Errorf("telemetry sock doesn't exist")
 	}
 
 	// create client telemetrybuffer and connect to server

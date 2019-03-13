@@ -15,9 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
-	"github.com/Azure/azure-container-networking/platform"
 )
 
 // FdName - file descriptor name
@@ -30,7 +28,7 @@ const (
 	FdName                    = "azure-vnet-telemetry"
 	Delimiter                 = '\n'
 	azureHostReportURL        = "http://168.63.129.16/machine/plugins?comp=netagent&type=payload"
-	DefaultInterval           = 10 * time.Second
+	DefaultInterval           = 30 * time.Second
 	logName                   = "azure-vnet-telemetry"
 	MaxPayloadSize     uint16 = 65535
 	dnc                       = "DNC"
@@ -64,6 +62,14 @@ type Payload struct {
 	CNSReports []CNSReport
 }
 
+func InitTelemetryLogger() error {
+	return telemetryLogger.SetTarget(log.TargetLogfile)
+}
+
+func CloseTelemetryLogger() {
+	telemetryLogger.Close()
+}
+
 // NewTelemetryBuffer - create a new TelemetryBuffer
 func NewTelemetryBuffer(hostReportURL string) *TelemetryBuffer {
 	var tb TelemetryBuffer
@@ -79,11 +85,6 @@ func NewTelemetryBuffer(hostReportURL string) *TelemetryBuffer {
 	tb.payload.CNIReports = make([]CNIReport, 0)
 	tb.payload.NPMReports = make([]NPMReport, 0)
 	tb.payload.CNSReports = make([]CNSReport, 0)
-
-	err := telemetryLogger.SetTarget(log.TargetLogfile)
-	if err != nil {
-		fmt.Printf("Failed to configure logging: %v\n", err)
-	}
 
 	return &tb
 }
@@ -106,6 +107,8 @@ func (tb *TelemetryBuffer) StartServer() error {
 		telemetryLogger.Printf("Listen returns: %v", err.Error())
 		return err
 	}
+
+	InitTelemetryLogger()
 
 	telemetryLogger.Printf("Telemetry service started")
 	// Spawn server goroutine to handle incoming connections
@@ -251,7 +254,6 @@ func (tb *TelemetryBuffer) Cancel() {
 // Close - close all connections
 func (tb *TelemetryBuffer) Close() {
 	if tb.client != nil {
-		telemetryLogger.Printf("client close")
 		tb.client.Close()
 		tb.client = nil
 	}
@@ -259,7 +261,7 @@ func (tb *TelemetryBuffer) Close() {
 	if tb.listener != nil {
 		telemetryLogger.Printf("server close")
 		tb.listener.Close()
-		tb.listener = nil
+		CloseTelemetryLogger()
 	}
 
 	tb.mutex.Lock()
@@ -267,7 +269,6 @@ func (tb *TelemetryBuffer) Close() {
 
 	for _, conn := range tb.connections {
 		if conn != nil {
-			telemetryLogger.Printf("connection close as server closed")
 			conn.Close()
 		}
 	}
@@ -390,10 +391,11 @@ func getHostMetadata() (Metadata, error) {
 	if err == nil {
 		var metadata Metadata
 		if err = json.Unmarshal(content, &metadata); err == nil {
-			telemetryLogger.Printf("[Telemetry] Returning hostmetadata from state")
 			return metadata, nil
 		}
 	}
+
+	telemetryLogger.Printf("[Telemetry] Request metadata from wireserver")
 
 	req, err := http.NewRequest("GET", metadataURL, nil)
 	if err != nil {
@@ -423,28 +425,4 @@ func getHostMetadata() (Metadata, error) {
 	}
 
 	return metareport.Metadata, err
-}
-
-// StartTelemetryService - Kills if any telemetry service runs and start new telemetry service
-func StartTelemetryService() error {
-	platform.KillProcessByName(telemetryServiceProcessName)
-
-	telemetryLogger.Printf("[Telemetry] Starting telemetry service process")
-	path := fmt.Sprintf("%v/%v", cniInstallDir, telemetryServiceProcessName)
-	if err := common.StartProcess(path); err != nil {
-		telemetryLogger.Printf("[Telemetry] Failed to start telemetry service process :%v", err)
-		return err
-	}
-
-	telemetryLogger.Printf("[Telemetry] Telemetry service started")
-
-	for attempt := 0; attempt < 5; attempt++ {
-		if checkIfSockExists() {
-			break
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	return nil
 }
