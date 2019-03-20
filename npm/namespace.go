@@ -121,8 +121,6 @@ func (npMgr *NetworkPolicyManager) AddNamespace(nsObj *corev1.Namespace) error {
 	}
 	npMgr.nsMap[nsName] = ns
 
-	npMgr.clusterState.NsCount++
-
 	return nil
 }
 
@@ -202,8 +200,6 @@ func (npMgr *NetworkPolicyManager) DeleteNamespace(nsObj *corev1.Namespace) erro
 	}
 
 	delete(npMgr.nsMap, nsName)
-
-	npMgr.clusterState.NsCount--
 
 	return nil
 }

@@ -573,7 +573,7 @@ func parseEgress(ns string, targetSets []string, rules []networkingv1.NetworkPol
 						util.IptablesSetFlag,
 						util.IptablesMatchSetFlag,
 						hashedTargetSetName,
-						util.IptablesDstFlag,
+						util.IptablesSrcFlag,
 						util.IptablesJumpFlag,
 						util.IptablesAzureEgressToNsChain,
 					},
