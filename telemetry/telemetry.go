@@ -325,7 +325,7 @@ func (report *CNIReport) GetInterfaceDetails(queryUrl string) {
 	if resp.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("Error while getting interface details. http code :%d", resp.StatusCode)
 		report.InterfaceDetails.ErrorMessage = errMsg
-		telemetryLogger.Printf(errMsg)
+		log.Printf(errMsg)
 		return
 	}
 

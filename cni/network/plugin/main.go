@@ -22,9 +22,11 @@ import (
 )
 
 const (
-	hostNetAgentURL = "http://168.63.129.16/machine/plugins?comp=netagent&type=cnireport"
-	ipamQueryURL    = "http://168.63.129.16/machine/plugins?comp=nmagent&type=getinterfaceinfov1"
-	pluginName      = "CNI"
+	hostNetAgentURL                 = "http://168.63.129.16/machine/plugins?comp=netagent&type=cnireport"
+	ipamQueryURL                    = "http://168.63.129.16/machine/plugins?comp=nmagent&type=getinterfaceinfov1"
+	pluginName                      = "CNI"
+	telemetryNumRetries             = 5
+	telemetryWaitTimeInMilliseconds = 200
 )
 
 // Version is populated by make during build.
@@ -133,32 +135,9 @@ func handleIfCniUpdate(update func(*skel.CmdArgs) error) (bool, error) {
 	return isupdate, nil
 }
 
-// startTelemetryService - Kills if any telemetry service runs and start new telemetry service
-func startTelemetryService(path string) error {
-	platform.KillProcessByName(telemetry.TelemetryServiceProcessName)
-
-	log.Printf("[cni] Starting telemetry service process")
-
-	if err := common.StartProcess(path); err != nil {
-		log.Printf("[Telemetry] Failed to start telemetry service process :%v", err)
-		return err
-	}
-
-	log.Printf("[cni] Telemetry service started")
-
-	for attempt := 0; attempt < 5; attempt++ {
-		if telemetry.SockExists() {
-			break
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	return nil
-}
-
 func connectToTelemetryService(tb *telemetry.TelemetryBuffer) {
 	path := fmt.Sprintf("%v/%v", telemetry.CniInstallDir, telemetry.TelemetryServiceProcessName)
+	args := []string{"-d", telemetry.CniInstallDir}
 
 	for attempt := 0; attempt < 2; attempt++ {
 		if err := tb.Connect(); err != nil {
@@ -170,7 +149,8 @@ func connectToTelemetryService(tb *telemetry.TelemetryBuffer) {
 				return
 			}
 
-			startTelemetryService(path)
+			telemetry.StartTelemetryService(path, args)
+			telemetry.WaitForTelemetrySocket(telemetryNumRetries, telemetryWaitTimeInMilliseconds)
 		} else {
 			tb.Connected = true
 			log.Printf("Connected to telemetry service")
