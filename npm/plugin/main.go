@@ -57,12 +57,14 @@ func main() {
 	factory := informers.NewSharedInformerFactory(clientset, time.Hour*24)
 
 	npMgr := npm.NewNetworkPolicyManager(clientset, factory, version)
-	err = npMgr.Run(wait.NeverStop)
+	err = npMgr.Start(wait.NeverStop)
 	if err != nil {
 		log.Printf("[Azure-NPM] npm failed with error %v.", err)
 		panic(err.Error)
 	}
 
+	// Disable Azure-NPM telemetry for now since it might throttle wireserver.
+	npMgr.TelemetryEnabled = false
 	go npMgr.RunReportManager()
 
 	select {}

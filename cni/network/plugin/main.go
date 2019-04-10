@@ -22,9 +22,11 @@ import (
 )
 
 const (
-	hostNetAgentURL = "http://168.63.129.16/machine/plugins?comp=netagent&type=cnireport"
-	ipamQueryURL    = "http://168.63.129.16/machine/plugins?comp=nmagent&type=getinterfaceinfov1"
-	pluginName      = "CNI"
+	hostNetAgentURL                 = "http://168.63.129.16/machine/plugins?comp=netagent&type=cnireport"
+	ipamQueryURL                    = "http://168.63.129.16/machine/plugins?comp=nmagent&type=getinterfaceinfov1"
+	pluginName                      = "CNI"
+	telemetryNumRetries             = 5
+	telemetryWaitTimeInMilliseconds = 200
 )
 
 // Version is populated by make during build.
@@ -170,20 +172,7 @@ func main() {
 	}
 
 	tb := telemetry.NewTelemetryBuffer("")
-
-	for attempt := 0; attempt < 2; attempt++ {
-		err = tb.Connect()
-		if err != nil {
-			log.Printf("Connection to telemetry socket failed: %v", err)
-			tb.Cleanup(telemetry.FdName)
-			telemetry.StartTelemetryService()
-		} else {
-			tb.Connected = true
-			log.Printf("Connected to telemetry service")
-			break
-		}
-	}
-
+	tb.ConnectToTelemetryService(telemetryNumRetries, telemetryWaitTimeInMilliseconds)
 	defer tb.Close()
 
 	t := time.Now()

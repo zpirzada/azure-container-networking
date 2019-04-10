@@ -217,6 +217,8 @@ func (logger *Logger) Debugf(format string, args ...interface{}) {
 func (logger *Logger) Errorf(format string, args ...interface{}) {
 	logger.Printf(format, args...)
 	go func() {
-		logger.reports <- fmt.Sprintf(format, args...)
+		if logger.reports != nil {
+			logger.reports <- fmt.Sprintf(format, args...)
+		}
 	}()
 }

@@ -10,10 +10,12 @@ import (
 	"time"
 
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/npm/iptm"
 	"github.com/Azure/azure-container-networking/npm/util"
 	"github.com/Azure/azure-container-networking/telemetry"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -22,9 +24,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-var (
-	hostNetAgentURLForNpm = "http://168.63.129.16/machine/plugins?comp=netagent&type=npmreport"
-	contentType           = "application/json"
+const (
+	hostNetAgentURLForNpm           = "http://168.63.129.16/machine/plugins?comp=netagent&type=npmreport"
+	contentType                     = "application/json"
+	telemetryRetryWaitTimeInSeconds = 60
+	restoreRetryWaitTimeInSeconds   = 5
+	restoreMaxRetries               = 10
+	backupWaitTimeInSeconds         = 60
 )
 
 // NetworkPolicyManager contains informers for pod, namespace and networkpolicy.
@@ -44,17 +50,41 @@ type NetworkPolicyManager struct {
 	clusterState  telemetry.ClusterState
 	reportManager *telemetry.ReportManager
 
-	serverVersion *version.Info
+	serverVersion    *version.Info
+	TelemetryEnabled bool
 }
 
 // GetClusterState returns current cluster state.
 func (npMgr *NetworkPolicyManager) GetClusterState() telemetry.ClusterState {
+	pods, err := npMgr.clientset.CoreV1().Pods("").List(metav1.ListOptions{})
+	if err != nil {
+		log.Printf("Error Listing pods in GetClusterState")
+	}
+
+	namespaces, err := npMgr.clientset.CoreV1().Namespaces().List(metav1.ListOptions{})
+	if err != nil {
+		log.Printf("Error Listing namespaces in GetClusterState")
+	}
+
+	networkpolicies, err := npMgr.clientset.NetworkingV1().NetworkPolicies("").List(metav1.ListOptions{})
+	if err != nil {
+		log.Printf("Error Listing networkpolicies in GetClusterState")
+	}
+
+	npMgr.clusterState.PodCount = len(pods.Items)
+	npMgr.clusterState.NsCount = len(namespaces.Items)
+	npMgr.clusterState.NwPolicyCount = len(networkpolicies.Items)
+
 	return npMgr.clusterState
 }
 
 // UpdateAndSendReport updates the npm report then send it.
 // This function should only be called when npMgr is locked.
 func (npMgr *NetworkPolicyManager) UpdateAndSendReport(err error, eventMsg string) error {
+	if !npMgr.TelemetryEnabled {
+		return nil
+	}
+
 	clusterState := npMgr.GetClusterState()
 	v := reflect.ValueOf(npMgr.reportManager.Report).Elem().FieldByName("ClusterState")
 	if v.CanSet() {
@@ -69,13 +99,50 @@ func (npMgr *NetworkPolicyManager) UpdateAndSendReport(err error, eventMsg strin
 		reflect.ValueOf(npMgr.reportManager.Report).Elem().FieldByName("EventMessage").SetString(err.Error())
 	}
 
-	return npMgr.reportManager.SendReport(nil)
+	var telemetryBuffer *telemetry.TelemetryBuffer
+	connectToTelemetryServer(telemetryBuffer)
+
+	return npMgr.reportManager.SendReport(telemetryBuffer)
 }
 
-// Run starts shared informers and waits for the shared informer cache to sync.
-func (npMgr *NetworkPolicyManager) Run(stopCh <-chan struct{}) error {
+// restore restores iptables from backup file
+func (npMgr *NetworkPolicyManager) restore() {
+	iptMgr := iptm.NewIptablesManager()
+	var err error
+	for i := 0; i < restoreMaxRetries; i++ {
+		if err = iptMgr.Restore(util.IptablesConfigFile); err == nil {
+			return
+		}
+
+		time.Sleep(restoreRetryWaitTimeInSeconds * time.Second)
+	}
+
+	log.Printf("Timeout restoring Azure-NPM states")
+	panic(err.Error)
+}
+
+// backup takes snapshots of iptables filter table and saves it periodically.
+func (npMgr *NetworkPolicyManager) backup() {
+	iptMgr := iptm.NewIptablesManager()
+	var err error
+	for {
+		time.Sleep(backupWaitTimeInSeconds * time.Second)
+
+		if err = iptMgr.Save(util.IptablesConfigFile); err != nil {
+			log.Printf("Error backing up Azure-NPM states")
+		}
+	}
+}
+
+// Start starts shared informers and waits for the shared informer cache to sync.
+func (npMgr *NetworkPolicyManager) Start(stopCh <-chan struct{}) error {
 	// Starts all informers manufactured by npMgr's informerFactory.
 	npMgr.informerFactory.Start(stopCh)
+
+	// Failure detected. Needs to restore Azure-NPM related iptables entries.
+	if util.Exists(util.IptablesConfigFile) {
+		npMgr.restore()
+	}
 
 	// Wait for the initial sync of local cache.
 	if !cache.WaitForCacheSync(stopCh, npMgr.podInformer.Informer().HasSynced) {
@@ -90,11 +157,38 @@ func (npMgr *NetworkPolicyManager) Run(stopCh <-chan struct{}) error {
 		return fmt.Errorf("Namespace informer failed to sync")
 	}
 
+	go npMgr.backup()
+
 	return nil
+}
+
+func connectToTelemetryServer(telemetryBuffer *telemetry.TelemetryBuffer) {
+	for {
+		telemetryBuffer = telemetry.NewTelemetryBuffer("")
+		err := telemetryBuffer.StartServer()
+		if err == nil || telemetryBuffer.FdExists {
+			connErr := telemetryBuffer.Connect()
+			if connErr == nil {
+				break
+			}
+
+			log.Printf("[NPM-Telemetry] Failed to establish telemetry manager connection.")
+			time.Sleep(time.Second * telemetryRetryWaitTimeInSeconds)
+		}
+	}
 }
 
 // RunReportManager starts NPMReportManager and send telemetry periodically.
 func (npMgr *NetworkPolicyManager) RunReportManager() {
+	if !npMgr.TelemetryEnabled {
+		return
+	}
+
+	var telemetryBuffer *telemetry.TelemetryBuffer
+	connectToTelemetryServer(telemetryBuffer)
+
+	go telemetryBuffer.BufferAndPushData(time.Duration(0))
+
 	for {
 		clusterState := npMgr.GetClusterState()
 		v := reflect.ValueOf(npMgr.reportManager.Report).Elem().FieldByName("ClusterState")
@@ -104,11 +198,12 @@ func (npMgr *NetworkPolicyManager) RunReportManager() {
 			v.FieldByName("NwPolicyCount").SetInt(int64(clusterState.NwPolicyCount))
 		}
 
-		if err := npMgr.reportManager.SendReport(nil); err != nil {
-			log.Printf("Error sending NPM telemetry report")
+		if err := npMgr.reportManager.SendReport(telemetryBuffer); err != nil {
+			log.Printf("[NPM-Telemetry] Error sending NPM telemetry report")
+			connectToTelemetryServer(telemetryBuffer)
 		}
 
-		time.Sleep(1 * time.Minute)
+		time.Sleep(5 * time.Minute)
 	}
 }
 
@@ -150,7 +245,8 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 			ContentType:     contentType,
 			Report:          &telemetry.NPMReport{},
 		},
-		serverVersion: serverVersion,
+		serverVersion:    serverVersion,
+		TelemetryEnabled: true,
 	}
 
 	clusterID := util.GetClusterID(npMgr.nodeName)
