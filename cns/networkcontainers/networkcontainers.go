@@ -78,9 +78,6 @@ func (cn *NetworkContainers) Create(createNetworkContainerRequest cns.CreateNetw
 func (cn *NetworkContainers) Update(createNetworkContainerRequest cns.CreateNetworkContainerRequest, netpluginConfig *NetPluginConfiguration) error {
 	log.Printf("[Azure CNS] NetworkContainers.Update called")
 	err := updateInterface(createNetworkContainerRequest, netpluginConfig)
-	if err == nil {
-		err = setWeakHostOnInterface(createNetworkContainerRequest.PrimaryInterfaceIdentifier)
-	}
 	log.Printf("[Azure CNS] NetworkContainers.Update finished.")
 	return err
 }
