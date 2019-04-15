@@ -72,6 +72,10 @@ const (
 	OptTelemetryConfigDir      = "telemetry-config-file"
 	OptTelemetryConfigDirAlias = "d"
 
+	// Create ext Hns network
+	OptCreateDefaultExtNetworkType      = "create-defaultextnetwork-type"
+	OptCreateDefaultExtNetworkTypeAlias = "defaultextnetworktype"
+
 	// Disable Telemetry
 	OptTelemetry      = "telemetry"
 	OptTelemetryAlias = "dt"
