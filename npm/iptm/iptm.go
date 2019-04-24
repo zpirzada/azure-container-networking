@@ -7,10 +7,8 @@ https://github.com/kubernetes/kubernetes/blob/master/pkg/util/iptables
 package iptm
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"syscall"
 	"time"
 
@@ -19,6 +17,10 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/npm/util"
 	"k8s.io/apimachinery/pkg/util/wait"
+)
+
+const (
+	defaultlockWaitTimeInSeconds = "60"
 )
 
 // IptEntry represents an iptables rule.
@@ -337,10 +339,11 @@ func (iptMgr *IptablesManager) Run(entry *IptEntry) (int, error) {
 		entry.Command = util.Iptables
 	}
 
-	waitFlag := fmt.Sprintf("%s %s", util.IptablesWaitFlag, entry.LockWaitTimeInSeconds)
-	waitFlag = strings.TrimSpace(waitFlag)
-	cmdArgs := append([]string{waitFlag, iptMgr.OperationFlag, entry.Chain}, entry.Specs...)
+	if entry.LockWaitTimeInSeconds == "" {
+		entry.LockWaitTimeInSeconds = defaultlockWaitTimeInSeconds
+	}
 
+	cmdArgs := append([]string{util.IptablesWaitFlag, entry.LockWaitTimeInSeconds, iptMgr.OperationFlag, entry.Chain}, entry.Specs...)
 	cmdOut, err := exec.Command(entry.Command, cmdArgs...).Output()
 	log.Printf("%s\n", string(cmdOut))
 
