@@ -7,8 +7,10 @@ https://github.com/kubernetes/kubernetes/blob/master/pkg/util/iptables
 package iptm
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,11 +23,13 @@ import (
 
 // IptEntry represents an iptables rule.
 type IptEntry struct {
-	Name       string
-	HashedName string
-	Chain      string
-	Flag       string
-	Specs      []string
+	Command               string
+	Name                  string
+	HashedName            string
+	Chain                 string
+	Flag                  string
+	LockWaitTimeInSeconds string
+	Specs                 []string
 }
 
 // IptablesManager stores iptables entries.
@@ -329,10 +333,15 @@ func (iptMgr *IptablesManager) Delete(entry *IptEntry) error {
 
 // Run execute an iptables command to update iptables.
 func (iptMgr *IptablesManager) Run(entry *IptEntry) (int, error) {
-	cmdName := util.Iptables
-	cmdArgs := append([]string{util.IptablesWaitFlag, iptMgr.OperationFlag, entry.Chain}, entry.Specs...)
+	if entry.Command == "" {
+		entry.Command = util.Iptables
+	}
 
-	cmdOut, err := exec.Command(cmdName, cmdArgs...).Output()
+	waitFlag := fmt.Sprintf("%s %s", util.IptablesWaitFlag, entry.LockWaitTimeInSeconds)
+	waitFlag = strings.TrimSpace(waitFlag)
+	cmdArgs := append([]string{waitFlag, iptMgr.OperationFlag, entry.Chain}, entry.Specs...)
+
+	cmdOut, err := exec.Command(entry.Command, cmdArgs...).Output()
 	log.Printf("%s\n", string(cmdOut))
 
 	if msg, failed := err.(*exec.ExitError); failed {
