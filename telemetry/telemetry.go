@@ -4,11 +4,9 @@
 package telemetry
 
 import (
-	"bufio"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -182,38 +180,6 @@ type ReportManager struct {
 	HostNetAgentURL string
 	ContentType     string
 	Report          interface{}
-}
-
-// ReadFileByLines reads file line by line and return array of lines.
-func ReadFileByLines(filename string) ([]string, error) {
-	var (
-		lineStrArr []string
-	)
-
-	f, err := os.Open(filename)
-	if err != nil {
-		return nil, fmt.Errorf("Error opening %s file error %v", filename, err)
-	}
-
-	r := bufio.NewReader(f)
-
-	for {
-		lineStr, err := r.ReadString('\n')
-		if err != nil {
-			if err != io.EOF {
-				return nil, fmt.Errorf("Error reading %s file error %v", filename, err)
-			}
-			break
-		}
-		lineStrArr = append(lineStrArr, lineStr)
-	}
-
-	err = f.Close()
-	if err != nil {
-		return nil, fmt.Errorf("Error closing %s file error %v", filename, err)
-	}
-
-	return lineStrArr, nil
 }
 
 // GetReport retrieves orchestrator, system, OS and Interface details and create a report structure.
