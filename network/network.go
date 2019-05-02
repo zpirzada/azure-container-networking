@@ -26,7 +26,7 @@ type externalInterface struct {
 	Networks    map[string]*network
 	Subnets     []string
 	BridgeName  string
-	DNSServerIP string
+	DNSInfo     DNSInfo
 	MacAddress  net.HardwareAddr
 	IPAddresses []*net.IPNet
 	Routes      []*route

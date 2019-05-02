@@ -24,6 +24,7 @@ const (
 	distroID              = "ID"
 	ubuntuStr             = "ubuntu"
 	dnsServersStr         = "DNS Servers"
+	dnsDomainStr          = "DNS Domain"
 	ubuntuVersion17       = 17
 	defaultDnsServerIP    = "168.63.129.16"
 	systemdResolvConfFile = "/run/systemd/resolve/resolv.conf"
@@ -190,44 +191,51 @@ func isGreaterOrEqaulUbuntuVersion(versionToMatch int) bool {
 	return false
 }
 
-func readDnsServerIP(ifName string) (string, error) {
+func readDnsInfo(ifName string) (DNSInfo, error) {
+	var dnsInfo DNSInfo
+
 	cmd := fmt.Sprintf("systemd-resolve --status %s", ifName)
 	out, err := platform.ExecuteCommand(cmd)
 	if err != nil {
-		return "", err
+		return dnsInfo, err
 	}
 
 	log.Printf("[net] console output for above cmd: %s", out)
 
 	lineArr := strings.Split(out, lineDelimiter)
 	if len(lineArr) <= 0 {
-		return "", fmt.Errorf("[net] Output of cmd %s returned nothing", cmd)
+		return dnsInfo, fmt.Errorf("[net] Console output doesn't have any lines")
 	}
 
 	for _, line := range lineArr {
 		if strings.Contains(line, dnsServersStr) {
 			dnsServerSplit := strings.Split(line, colonDelimiter)
 			if len(dnsServerSplit) > 1 {
-				return dnsServerSplit[1], nil
+				dnsServerSplit[1] = strings.TrimSpace(dnsServerSplit[1])
+				dnsInfo.Servers = append(dnsInfo.Servers, dnsServerSplit[1])
+			}
+		} else if strings.Contains(line, dnsDomainStr) {
+			dnsDomainSplit := strings.Split(line, colonDelimiter)
+			if len(dnsDomainSplit) > 1 {
+				dnsInfo.Suffix = strings.TrimSpace(dnsDomainSplit[1])
 			}
 		}
 	}
 
-	return "", fmt.Errorf("[net] Dns server ip not set on interface %v", ifName)
+	return dnsInfo, nil
 }
 
-func saveDnsConfig(extIf *externalInterface) {
-	var err error
-
-	extIf.DNSServerIP, err = readDnsServerIP(extIf.Name)
-	if err != nil {
-		log.Printf("[net] Failed to read dns server IP from interface %v: %v", extIf.Name, err)
-		extIf.DNSServerIP = defaultDnsServerIP
-		return
+func saveDnsConfig(extIf *externalInterface) error {
+	dnsInfo, err := readDnsInfo(extIf.Name)
+	if err != nil || len(dnsInfo.Servers) == 0 || dnsInfo.Suffix == "" {
+		log.Printf("[net] Failed to read dns info %+v from interface %v: %v", dnsInfo, extIf.Name, err)
+		return err
 	}
 
-	extIf.DNSServerIP = strings.TrimSpace(extIf.DNSServerIP)
-	log.Printf("[net] Saved DNS server IP %v from %v", extIf.DNSServerIP, extIf.Name)
+	extIf.DNSInfo = dnsInfo
+	log.Printf("[net] Saved DNS Info %v from %v", extIf.DNSInfo, extIf.Name)
+
+	return nil
 }
 
 // ApplyIPConfig applies a previously saved IP configuration to an interface.
@@ -260,8 +268,14 @@ func (nm *networkManager) applyIPConfig(extIf *externalInterface, targetIf *net.
 }
 
 func applyDnsConfig(extIf *externalInterface, ifName string) error {
-	cmd := fmt.Sprintf("systemd-resolve --interface=%s --set-dns=%s", ifName, extIf.DNSServerIP)
+	cmd := fmt.Sprintf("systemd-resolve --interface=%s --set-dns=%s", ifName, extIf.DNSInfo.Servers[0])
 	_, err := platform.ExecuteCommand(cmd)
+	if err != nil {
+		return err
+	}
+
+	cmd = fmt.Sprintf("systemd-resolve --interface=%s --set-domain=%s", ifName, extIf.DNSInfo.Suffix)
+	_, err = platform.ExecuteCommand(cmd)
 	return err
 }
 
@@ -337,7 +351,10 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 	isGreaterOrEqualUbuntu17 := isGreaterOrEqaulUbuntuVersion(ubuntuVersion17)
 	if isGreaterOrEqualUbuntu17 {
 		log.Printf("[net] Saving dns config from %v", extIf.Name)
-		saveDnsConfig(extIf)
+		if err := saveDnsConfig(extIf); err != nil {
+			log.Printf("[net] Failed to save dns config: %v", err)
+			return err
+		}
 	}
 
 	// External interface down.
@@ -394,7 +411,7 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 			return err
 		}
 
-		log.Printf("[net] Applied dns IP %v on %v", extIf.DNSServerIP, bridgeName)
+		log.Printf("[net] Applied dns config %v on %v", extIf.DNSInfo, bridgeName)
 	}
 
 	extIf.BridgeName = bridgeName
