@@ -619,7 +619,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	// Parse Pod arguments.
 	k8sPodName, k8sNamespace, err := plugin.getPodInfo(args.Args)
 	if err != nil {
-		return err
+		log.Printf("[cni-net] Failed to get POD info due to error: %v", err)
 	}
 
 	// Initialize values from network config.
