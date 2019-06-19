@@ -156,6 +156,7 @@ type NPMReport struct {
 	ErrorMessage      string
 	EventMessage      string
 	UpTime            string
+	Timestamp         string
 	ClusterState      ClusterState
 	Metadata          Metadata `json:"compute"`
 }
@@ -238,7 +239,7 @@ func (reportMgr *ReportManager) SetReportState(telemetryFile string) error {
 
 	_, err = f.Write(reportBytes)
 	if err != nil {
-		log.Printf("[Telemetry] Error while writing to file %v", err)
+		fmt.Printf("[Telemetry] Error while writing to file %v", err)
 		return fmt.Errorf("[Telemetry] Error while writing to file %v", err)
 	}
 
@@ -251,7 +252,7 @@ func (reportMgr *ReportManager) SetReportState(telemetryFile string) error {
 func (reportMgr *ReportManager) GetReportState(telemetryFile string) bool {
 	// try to set IsNewInstance in report
 	if _, err := os.Stat(telemetryFile); os.IsNotExist(err) {
-		log.Printf("[Telemetry] File not exist %v", telemetryFile)
+		fmt.Printf("[Telemetry] File not exist %v", telemetryFile)
 		reflect.ValueOf(reportMgr.Report).Elem().FieldByName("IsNewInstance").SetBool(true)
 		return false
 	}
@@ -291,7 +292,7 @@ func (report *CNIReport) GetInterfaceDetails(queryUrl string) {
 	if resp.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("Error while getting interface details. http code :%d", resp.StatusCode)
 		report.InterfaceDetails.ErrorMessage = errMsg
-		log.Printf(errMsg)
+		log.Logf(errMsg)
 		return
 	}
 
