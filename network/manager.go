@@ -282,10 +282,12 @@ func (nm *networkManager) GetNetworkInfo(networkId string) (*NetworkInfo, error)
 	}
 
 	nwInfo := &NetworkInfo{
-		Id:      networkId,
-		Subnets: nw.Subnets,
-		Mode:    nw.Mode,
-		Options: make(map[string]interface{}),
+		Id:               networkId,
+		Subnets:          nw.Subnets,
+		Mode:             nw.Mode,
+		EnableSnatOnHost: nw.EnableSnatOnHost,
+		DNS:              nw.DNS,
+		Options:          make(map[string]interface{}),
 	}
 
 	getNetworkInfoImpl(nwInfo, nw)

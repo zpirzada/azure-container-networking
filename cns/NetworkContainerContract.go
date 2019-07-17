@@ -57,6 +57,7 @@ type CreateNetworkContainerRequest struct {
 	CnetAddressSpace           []IPSubnet // To setup SNAT (should include service endpoint vips).
 	Routes                     []Route
 	AllowHostToNCCommunication bool
+	AllowNCToHostCommunication bool
 }
 
 // ConfigureContainerNetworkingRequest - specifies request to attach/detach container to network.
@@ -137,6 +138,7 @@ type GetNetworkContainerResponse struct {
 	LocalIPConfiguration       IPConfiguration
 	Response                   Response
 	AllowHostToNCCommunication bool
+	AllowNCToHostCommunication bool
 }
 
 // DeleteNetworkContainerRequest specifies the details about the request to delete a specifc network container.

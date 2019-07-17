@@ -12,17 +12,19 @@ import (
 )
 
 type OVSEndpointClient struct {
-	bridgeName        string
-	hostPrimaryIfName string
-	hostVethName      string
-	hostPrimaryMac    string
-	containerVethName string
-	containerMac      string
-	snatClient        ovssnat.OVSSnatClient
-	infraVnetClient   ovsinfravnet.OVSInfraVnetClient
-	vlanID            int
-	enableSnatOnHost  bool
-	enableInfraVnet   bool
+	bridgeName               string
+	hostPrimaryIfName        string
+	hostVethName             string
+	hostPrimaryMac           string
+	containerVethName        string
+	containerMac             string
+	snatClient               ovssnat.OVSSnatClient
+	infraVnetClient          ovsinfravnet.OVSInfraVnetClient
+	vlanID                   int
+	enableSnatOnHost         bool
+	enableInfraVnet          bool
+	allowInboundFromHostToNC bool
+	allowInboundFromNCToHost bool
 }
 
 const (
@@ -31,26 +33,28 @@ const (
 )
 
 func NewOVSEndpointClient(
-	extIf *externalInterface,
+	nw *network,
 	epInfo *EndpointInfo,
 	hostVethName string,
 	containerVethName string,
 	vlanid int,
-) *OVSEndpointClient {
+	localIP string) *OVSEndpointClient {
 
 	client := &OVSEndpointClient{
-		bridgeName:        extIf.BridgeName,
-		hostPrimaryIfName: extIf.Name,
-		hostVethName:      hostVethName,
-		hostPrimaryMac:    extIf.MacAddress.String(),
-		containerVethName: containerVethName,
-		vlanID:            vlanid,
-		enableSnatOnHost:  epInfo.EnableSnatOnHost,
-		enableInfraVnet:   epInfo.EnableInfraVnet,
+		bridgeName:               nw.extIf.BridgeName,
+		hostPrimaryIfName:        nw.extIf.Name,
+		hostVethName:             hostVethName,
+		hostPrimaryMac:           nw.extIf.MacAddress.String(),
+		containerVethName:        containerVethName,
+		vlanID:                   vlanid,
+		enableSnatOnHost:         epInfo.EnableSnatOnHost,
+		enableInfraVnet:          epInfo.EnableInfraVnet,
+		allowInboundFromHostToNC: epInfo.AllowInboundFromHostToNC,
+		allowInboundFromNCToHost: epInfo.AllowInboundFromNCToHost,
 	}
 
 	NewInfraVnetClient(client, epInfo.Id[:7])
-	NewSnatClient(client, epInfo)
+	NewSnatClient(client, nw.SnatBridgeIP, localIP, epInfo)
 
 	return client
 }
@@ -155,6 +159,7 @@ func (client *OVSEndpointClient) DeleteEndpointRules(ep *endpoint) {
 	log.Printf("[ovs] Deleting interface %v from bridge %v", client.hostVethName, client.bridgeName)
 	ovsctl.DeletePortFromOVS(client.bridgeName, client.hostVethName)
 
+	DeleteSnatEndpointRules(client)
 	DeleteInfraVnetEndpointRules(client, ep, hostPort)
 }
 
@@ -212,5 +217,6 @@ func (client *OVSEndpointClient) DeleteEndpoints(ep *endpoint) error {
 		return err
 	}
 
+	DeleteSnatEndpoint(client)
 	return DeleteInfraVnetEndpoint(client, ep.Id[:7])
 }
