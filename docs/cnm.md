@@ -92,4 +92,4 @@ $ docker network rm azure
 If you have deployed kubernetes cluster via other sources(not using aks/aks-engine), you have to add following iptable command to allow outbound(internet) connectivity from pod
 ```bash
 iptables -t nat -A POSTROUTING -m addrtype ! --dst-type local ! -d <vnet_address_space> -j MASQUERADE
-``
+```
