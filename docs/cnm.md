@@ -88,7 +88,7 @@ Finally, once all containers on the network exit, you can delete the network.
 $ docker network rm azure
 ```
 
-## Outbound Connectivity from pods
+## Outbound Connectivity from container
 If you have deployed kubernetes cluster via other sources(not using aks/aks-engine), you have to add following iptable command to allow outbound(internet) connectivity from pod
 ```bash
 iptables -t nat -A POSTROUTING -m addrtype ! --dst-type local ! -d <vnet_address_space> -j MASQUERADE
