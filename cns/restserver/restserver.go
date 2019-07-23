@@ -1583,9 +1583,11 @@ func (service *HTTPRestService) getNumberOfCPUCores(w http.ResponseWriter, r *ht
 	log.Printf("[Azure-CNS] getNumberOfCPUCores")
 	log.Request(service.Name, "getNumberOfCPUCores", nil)
 
-	var num int
-	var returnCode int
-	var errMsg string
+	var (
+		num        int
+		returnCode int
+		errMsg     string
+	)
 
 	switch r.Method {
 	case "GET":
