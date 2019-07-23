@@ -21,6 +21,7 @@ const (
 	UnknownContainerID           = 18
 	UnsupportedOrchestratorType  = 19
 	DockerContainerNotSpecified  = 20
+	UnsupportedVerb              = 21
 	UnexpectedError              = 99
 )
 

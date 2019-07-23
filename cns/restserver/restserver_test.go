@@ -689,3 +689,29 @@ func TestGetInterfaceForNetworkContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGetNumOfCPUCores(t *testing.T) {
+	fmt.Println("Test: getNumberOfCPUCores")
+
+	var (
+		err error
+		req *http.Request
+	)
+
+	req, err = http.NewRequest(http.MethodGet, cns.NumberOfCPUCoresPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var w *httptest.ResponseRecorder
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	var numOfCoresResponse cns.NumOfCPUCoresResponse
+
+	err = decodeResponse(w, &numOfCoresResponse)
+	if err != nil || numOfCoresResponse.Response.ReturnCode != 0 {
+		t.Errorf("getNumberOfCPUCores failed with response %+v", numOfCoresResponse)
+	} else {
+		fmt.Printf("getNumberOfCPUCores Responded with %+v\n", numOfCoresResponse)
+	}
+}
