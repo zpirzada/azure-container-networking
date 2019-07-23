@@ -140,7 +140,7 @@ type Response struct {
 	Message    string
 }
 
-// getNumberOfCPUCores describes reponse that returns num of cpu cores present on host.
+// NumOfCPUCoresResponse describes reponse that returns num of cpu cores present on host.
 type NumOfCPUCoresResponse struct {
 	Response      Response
 	NumOfCPUCores int
