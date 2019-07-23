@@ -18,7 +18,7 @@ const (
 	GetIPAddressUtilizationPath = "/network/ip/utilization"
 	GetUnhealthyIPAddressesPath = "/network/ipaddresses/unhealthy"
 	GetHealthReportPath         = "/network/health"
-	NumberOfCPUCoresPath        = "/network/hostcpucores"
+	NumberOfCPUCoresPath        = "/hostcpucores"
 	V1Prefix                    = "/v0.1"
 	V2Prefix                    = "/v0.2"
 )
@@ -140,7 +140,7 @@ type Response struct {
 	Message    string
 }
 
-// getNumberOfCPUCores describes reponse that returns the host local IP Address.
+// getNumberOfCPUCores describes reponse that returns num of cpu cores present on host.
 type NumOfCPUCoresResponse struct {
 	Response      Response
 	NumOfCPUCores int

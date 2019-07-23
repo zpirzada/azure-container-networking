@@ -1580,22 +1580,22 @@ func (service *HTTPRestService) getNetPluginDetails() *networkcontainers.NetPlug
 // Retrieves the number of logic processors on a node. It will be primarily
 // used to enforce per VM delegated NIC limit by DNC.
 func (service *HTTPRestService) getNumberOfCPUCores(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[Azure CNS] getNumberOfCPUCores")
+	log.Printf("[Azure-CNS] getNumberOfCPUCores")
 	log.Request(service.Name, "getNumberOfCPUCores", nil)
 
-	var num = 0
-	var returnCode = 0
-	var errmsg string
+	var num int
+	var returnCode int
+	var errMsg string
 
 	switch r.Method {
 	case "GET":
 		num = runtime.NumCPU()
 	default:
-		errmsg = "[Azure-CNS] getNumberOfCPUCores API expects a GET."
+		errMsg = "[Azure-CNS] getNumberOfCPUCores API expects a GET."
 		returnCode = UnsupportedVerb
 	}
 
-	resp := cns.Response{ReturnCode: returnCode, Message: errmsg}
+	resp := cns.Response{ReturnCode: returnCode, Message: errMsg}
 	numOfCPUCoresResp := cns.NumOfCPUCoresResponse{
 		Response:      resp,
 		NumOfCPUCores: num,
