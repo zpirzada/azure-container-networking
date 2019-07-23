@@ -693,8 +693,11 @@ func TestGetInterfaceForNetworkContainer(t *testing.T) {
 func TestGetNumOfCPUCores(t *testing.T) {
 	fmt.Println("Test: getNumberOfCPUCores")
 
-	var err error
-	var req *http.Request
+	var (
+		err error
+		req *http.Request
+	)
+
 	req, err = http.NewRequest(http.MethodGet, cns.NumberOfCPUCoresPath, nil)
 	if err != nil {
 		t.Fatal(err)
