@@ -22,8 +22,6 @@ import (
 )
 
 const (
-	// Plugin name.
-	name                = "azure-vnet"
 	dockerNetworkOption = "com.docker.network.generic"
 	opModeTransparent   = "transparent"
 	// Supported IP version. Currently support only IPv4
@@ -45,7 +43,7 @@ type netPlugin struct {
 }
 
 // NewPlugin creates a new netPlugin object.
-func NewPlugin(config *common.PluginConfig) (*netPlugin, error) {
+func NewPlugin(name string, config *common.PluginConfig) (*netPlugin, error) {
 	// Setup base plugin.
 	plugin, err := cni.NewPlugin(name, config.Version)
 	if err != nil {
@@ -101,7 +99,6 @@ func (plugin *netPlugin) Stop() {
 	plugin.nm.Uninitialize()
 	plugin.Uninitialize()
 	log.Printf("[cni-net] Plugin stopped.")
-	log.Close()
 }
 
 // FindMasterInterface returns the name of the master interface.

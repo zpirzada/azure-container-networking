@@ -182,10 +182,7 @@ func (nm *networkManager) restore() error {
 	for _, extIf := range nm.ExternalInterfaces {
 		log.Printf("External Interface %+v", extIf)
 		for _, nw := range extIf.Networks {
-			log.Printf("network %+v", nw)
-			for _, ep := range nw.Endpoints {
-				log.Printf("endpoint %+v", ep)
-			}
+			log.Printf("Number of endpoints: %d", len(nw.Endpoints))
 		}
 	}
 
