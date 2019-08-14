@@ -580,7 +580,7 @@ func TestCreateNetworkContainer(t *testing.T) {
 
 	// Test create network container of type JobObject
 	fmt.Println("TestCreateNetworkContainer: JobObject")
-	err := creatOrUpdateNetworkContainerWithName(t, "testJobObject", "11.0.0.5", "JobObject")
+	err := creatOrUpdateNetworkContainerWithName(t, "testJobObject", "10.1.0.5", "JobObject")
 	if err != nil {
 		t.Errorf("Failed to save the goal state for network container of type JobObject "+
 			" due to error: %+v", err)
@@ -596,13 +596,13 @@ func TestCreateNetworkContainer(t *testing.T) {
 
 	// Test create network container of type WebApps
 	fmt.Println("TestCreateNetworkContainer: WebApps")
-	err = creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "11.0.0.5", "WebApps")
+	err = creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "192.0.0.5", "WebApps")
 	if err != nil {
 		t.Errorf("creatOrUpdateWebAppContainerWithName failed Err:%+v", err)
 		t.Fatal(err)
 	}
 
-	err = creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "11.0.0.6", "WebApps")
+	err = creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "192.0.0.6", "WebApps")
 	if err != nil {
 		t.Errorf("Updating interface failed Err:%+v", err)
 		t.Fatal(err)
@@ -613,6 +613,21 @@ func TestCreateNetworkContainer(t *testing.T) {
 	err = deleteNetworkAdapterWithName(t, "ethWebApp")
 	if err != nil {
 		t.Errorf("Deleting interface failed Err:%+v", err)
+		t.Fatal(err)
+	}
+
+	// Test create network container of type COW
+	err = creatOrUpdateNetworkContainerWithName(t, "testCOWContainer", "10.0.0.5", "COW")
+	if err != nil {
+		t.Errorf("Failed to save the goal state for network container of type COW"+
+			" due to error: %+v", err)
+		t.Fatal(err)
+	}
+
+	fmt.Println("Deleting the saved goal state for network container of type COW")
+	err = deleteNetworkAdapterWithName(t, "testCOWContainer")
+	if err != nil {
+		t.Errorf("Failed to delete the saved goal state due to error: %+v", err)
 		t.Fatal(err)
 	}
 
