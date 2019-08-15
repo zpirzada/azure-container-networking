@@ -65,12 +65,14 @@ func (client *OVSInfraVnetClient) CreateInfraVnetRules(
 		return err
 	}
 
-	if err := ovsctl.AddIpSnatRule(bridgeName, infraContainerPort, hostPrimaryMac, hostPort); err != nil {
+	// 0 signifies not to add vlan tag to this traffic
+	if err := ovsctl.AddIpSnatRule(bridgeName, infraIP.IP, 0, infraContainerPort, hostPrimaryMac, hostPort); err != nil {
 		log.Printf("[ovs] AddIpSnatRule failed with error %v", err)
 		return err
 	}
 
-	if err := ovsctl.AddMacDnatRule(bridgeName, hostPort, infraIP.IP, client.containerInfraMac, 0); err != nil {
+	// 0 signifies not to match traffic based on vlan tag
+	if err := ovsctl.AddMacDnatRule(bridgeName, hostPort, infraIP.IP, client.containerInfraMac, 0, infraContainerPort); err != nil {
 		log.Printf("[ovs] AddMacDnatRule failed with error %v", err)
 		return err
 	}
