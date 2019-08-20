@@ -4,10 +4,10 @@ jobs:
     # docker:
     # - image: golang:1.12
     machine:
-      image: circleci/classic:latest
+      image: ubuntu-1604:201903-01
     steps:
       - checkout
-      - run: 
+      - run:
           name: Setup-and-test
           command: |
             sudo -E env "PATH=$PATH" apt-get update
@@ -34,6 +34,7 @@ jobs:
             sudo -E env "PATH=$PATH" go test ./netlink/ -coverprofile coverage-netlink.out
             sudo -E env "PATH=$PATH" go test ./store/ -coverprofile coverage-store.out
             sudo -E env "PATH=$PATH" go test ./telemetry/ -coverprofile coverage-telemetry.out
+            sudo -E env "PATH=$PATH" go test ./network/ovssnat/ -coverprofile coverage-ovssnat.out
             sudo -E env "PATH=$PATH" go test ./cni/ipam/ -coverprofile coverage-ipam.out
             sudo -E env "PATH=$PATH" go test ./cnm/network/ -coverprofile coverage-network.out
             sudo -E env "PATH=$PATH" go test ./cns/ipamclient/ -coverprofile coverage-ipamclient.out

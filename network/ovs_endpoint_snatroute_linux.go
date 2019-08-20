@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 
+	"github.com/Azure/azure-container-networking/network/epcommon"
 	"github.com/Azure/azure-container-networking/network/ovssnat"
 )
 
@@ -40,6 +41,10 @@ func AddSnatEndpointRules(client *OVSEndpointClient) error {
 
 		// Add route for 169.254.169.54 in host via azure0, otherwise it will route via snat bridge
 		if err := AddStaticRoute(ovssnat.ImdsIP, client.bridgeName); err != nil {
+			return err
+		}
+
+		if err := epcommon.EnableIPForwarding(ovssnat.SnatBridgeName); err != nil {
 			return err
 		}
 

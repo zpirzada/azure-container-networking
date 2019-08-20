@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/azure-container-networking/iptables"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/netlink"
+	"github.com/Azure/azure-container-networking/platform"
 )
 
 /*RFC For Private Address Space: https://tools.ietf.org/html/rfc1918
@@ -25,6 +26,10 @@ RFC for Link Local Addresses: https://tools.ietf.org/html/rfc3927
    169.254/16 prefix that is valid for communication with other devices
    connected to the same physical (or logical) link.
 */
+
+const (
+	enableIPForwardCmd = "sysctl -w net.ipv4.ip_forward=1"
+)
 
 func getPrivateIPSpace() []string {
 	privateIPAddresses := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16"}
@@ -163,6 +168,28 @@ func BlockIPAddresses(bridgeName string, action string) error {
 		if err := addOrDeleteFilterRule(bridgeName, action, ipAddress, chains[2], target[1]); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+/**
+ This fucntion enables ip forwarding in VM and allow forwarding packets from the interface
+**/
+func EnableIPForwarding(ifName string) error {
+	// Enable ip forwading on linux vm.
+	// sysctl -w net.ipv4.ip_forward=1
+	cmd := fmt.Sprintf(enableIPForwardCmd)
+	_, err := platform.ExecuteCommand(cmd)
+	if err != nil {
+		log.Printf("[net] Enable ipforwarding failed with: %v", err)
+		return err
+	}
+
+	// Append a rule in forward chain to allow forwarding from bridge
+	if err := iptables.AppendIptableRule(iptables.Filter, iptables.Forward, "", iptables.Accept); err != nil {
+		log.Printf("[net] Appending forward chain rule: allow traffic coming from snatbridge failed with: %v", err)
+		return err
 	}
 
 	return nil
