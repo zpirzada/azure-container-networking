@@ -54,7 +54,7 @@ func TestAddNetworkPolicy(t *testing.T) {
 
 	nsObj := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-nwpolicy",
+			Namespace: "test-nwpolicy",
 			Labels: map[string]string{
 				"app": "test-namespace",
 			},
@@ -66,7 +66,8 @@ func TestAddNetworkPolicy(t *testing.T) {
 	}
 
 	tcp := corev1.ProtocolTCP
-	allow := &networkingv1.NetworkPolicy{
+	port8000 := intstr.FromInt(8000)
+	allowIngress := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "allow-ingress",
 			Namespace: "test-nwpolicy",
@@ -81,17 +82,43 @@ func TestAddNetworkPolicy(t *testing.T) {
 					}},
 					Ports: []networkingv1.NetworkPolicyPort{{
 						Protocol: &tcp,
-						Port: &intstr.IntOrString{
-							StrVal: "8000",
-						},
+						Port: &port8000,
 					}},
 				},
 			},
 		},
 	}
 
-	if err := npMgr.AddNetworkPolicy(allow); err != nil {
-		t.Errorf("TestAddNetworkPolicy failed @ AddNetworkPolicy")
+	if err := npMgr.AddNetworkPolicy(allowIngress); err != nil {
+		t.Errorf("TestAddNetworkPolicy failed @ allowIngress AddNetworkPolicy")
+		t.Errorf("Error: %v", err)
+	}
+
+	allowEgress := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "allow-egress",
+			Namespace: "test-nwpolicy",
+		},
+		Spec: networkingv1.NetworkPolicySpec{
+			Egress: []networkingv1.NetworkPolicyEgressRule{
+				networkingv1.NetworkPolicyEgressRule{
+					To: []networkingv1.NetworkPolicyPeer{{
+						PodSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "test"},
+						},
+					}},
+					Ports: []networkingv1.NetworkPolicyPort{{
+						Protocol: &tcp,
+						Port: &port8000,
+					}},
+				},
+			},
+		},
+	}
+
+	if err := npMgr.AddNetworkPolicy(allowEgress); err != nil {
+		t.Errorf("TestAddNetworkPolicy failed @ allowEgress AddNetworkPolicy")
+		t.Errorf("Error: %v", err)
 	}
 }
 

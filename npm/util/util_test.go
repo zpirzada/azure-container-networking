@@ -2,9 +2,44 @@ package util
 
 import (
 	"testing"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/version"
 )
+
+func TestSortMap(t *testing.T) {
+	m := &map[string]string{
+		"e": "f",
+		"c": "d",
+		"a": "b",
+	}
+
+	sortedKeys, sortedVals := SortMap(m)
+	
+	expectedKeys := []string{
+		"a",
+		"c",
+		"e",
+	}
+
+	expectedVals := []string{
+		"b",
+		"d",
+		"f",
+	}
+
+	if !reflect.DeepEqual(sortedKeys, expectedKeys) {
+		t.Errorf("TestSortMap failed @ key comparison")
+		t.Errorf("sortedKeys: %v", sortedKeys)
+		t.Errorf("expectedKeys: %v", expectedKeys)
+	}
+
+	if !reflect.DeepEqual(sortedVals, expectedVals) {
+		t.Errorf("TestSortMap failed @ val comparison")
+		t.Errorf("sortedVals: %v", sortedVals)
+		t.Errorf("expectedVals: %v", expectedVals)
+	}
+}
 
 func TestCompareK8sVer(t *testing.T) {
 	firstVer := &version.Info{
@@ -103,5 +138,37 @@ func TestIsNewNwPolicyVer(t *testing.T) {
 	isNew, err = IsNewNwPolicyVer(ver)
 	if !isNew || err != nil {
 		t.Errorf("TestIsNewNwPolicyVer failed @ newer version test")
+	}
+}
+
+func TestDropEmptyFields(t *testing.T) {
+	testSlice := []string{
+		"",
+		"a:b",
+		"",
+		"!",
+		"-m",
+		"--match-set",
+		"",
+	}
+
+	resultSlice := DropEmptyFields(testSlice)
+	expectedSlice := []string{
+		"a:b",
+		"!",
+		"-m",
+		"--match-set",
+	}
+
+	if !reflect.DeepEqual(resultSlice, expectedSlice) {
+		t.Errorf("TestDropEmptyFields failed @ slice comparison")
+	}
+
+	testSlice = []string{""}
+	resultSlice = DropEmptyFields(testSlice)
+	expectedSlice = []string{}
+
+	if !reflect.DeepEqual(resultSlice, expectedSlice) {
+		t.Errorf("TestDropEmptyFields failed @ slice comparison")
 	}
 }

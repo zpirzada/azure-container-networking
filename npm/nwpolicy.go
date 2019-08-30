@@ -3,20 +3,51 @@
 package npm
 
 import (
+	"github.com/Azure/azure-container-networking/npm/iptm"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/npm/util"
 	networkingv1 "k8s.io/api/networking/v1"
 )
+
+func (npMgr *NetworkPolicyManager) canCleanUpNpmChains() bool {
+	if !npMgr.isSafeToCleanUpAzureNpmChain {
+		return false
+	}
+
+	for _, ns := range npMgr.nsMap {
+		if len(ns.processedNpMap) > 0 {
+			return false
+		}
+	}
+
+	return true
+}
 
 // AddNetworkPolicy handles adding network policy to iptables.
 func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkPolicy) error {
 	npMgr.Lock()
 	defer npMgr.Unlock()
 
-	var err error
+	var (
+		err error
+		ns  *namespace
+	)
 
-	npNs, npName := npObj.ObjectMeta.Namespace, npObj.ObjectMeta.Name
+	npNs, npName := "ns-" + npObj.ObjectMeta.Namespace, npObj.ObjectMeta.Name
 	log.Printf("NETWORK POLICY CREATING: %v", npObj)
+
+	var exists bool
+	if ns, exists = npMgr.nsMap[npNs]; !exists {
+		ns, err = newNs(npNs)
+		if err != nil {
+			log.Printf("Error creating namespace %s\n", npNs)
+		}
+		npMgr.nsMap[npNs] = ns
+	}
+
+	if ns.policyExists(npObj) {
+		return nil
+	}
 
 	allNs := npMgr.nsMap[util.KubeAllNamespacesFlag]
 
@@ -34,28 +65,49 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 		npMgr.isAzureNpmChainCreated = true
 	}
 
-	podSets, nsLists, iptEntries := parsePolicy(npObj)
+	hashedSelector := HashSelector(&npObj.Spec.PodSelector)
 
+	var addedPolicy *networkingv1.NetworkPolicy
+	addedPolicy = nil
+	if oldPolicy, oldPolicyExists := ns.processedNpMap[hashedSelector]; oldPolicyExists {
+		addedPolicy, err = addPolicy(oldPolicy, npObj)
+		if err != nil {
+			log.Printf("Error adding policy %s to %s", npName, oldPolicy.ObjectMeta.Name)
+		}
+		npMgr.isSafeToCleanUpAzureNpmChain = false
+		npMgr.Unlock()
+		npMgr.DeleteNetworkPolicy(oldPolicy)
+		npMgr.Lock()
+		npMgr.isSafeToCleanUpAzureNpmChain = true
+	} else {
+		ns.processedNpMap[hashedSelector] = npObj
+	}
+
+	var sets, lists []string
+	var iptEntries []*iptm.IptEntry
+	if addedPolicy != nil {
+		sets, lists, iptEntries = translatePolicy(addedPolicy)
+	} else {
+		sets, lists, iptEntries = translatePolicy(npObj)
+	}
 	ipsMgr := allNs.ipsMgr
-	for _, set := range podSets {
+	for _, set := range sets {
+		log.Printf("Creating set: %v, hashedSet: %v", set, util.GetHashedName(set))
 		if err = ipsMgr.CreateSet(set); err != nil {
-			log.Errorf("Error: failed to create ipset %s-%s", npNs, set)
+			log.Printf("Error creating ipset %s", set)
 			return err
 		}
 	}
-
-	for _, list := range nsLists {
+	for _, list := range lists {
 		if err = ipsMgr.CreateList(list); err != nil {
-			log.Errorf("Error: failed to create ipset list %s-%s", npNs, list)
+			log.Printf("Error creating ipset list %s", list)
 			return err
 		}
 	}
-
 	if err = npMgr.InitAllNsList(); err != nil {
-		log.Errorf("Error: failed to initialize all-namespace ipset list.")
+		log.Printf("Error initializing all-namespace ipset list.")
 		return err
 	}
-
 	iptMgr := allNs.iptMgr
 	for _, iptEntry := range iptEntries {
 		if err = iptMgr.Add(iptEntry); err != nil {
@@ -63,14 +115,6 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 			return err
 		}
 	}
-
-	allNs.npMap[npName] = npObj
-
-	ns, err := newNs(npNs)
-	if err != nil {
-		log.Errorf("Error: failed to create namespace %s", npNs)
-	}
-	npMgr.nsMap[npNs] = ns
 
 	return nil
 }
@@ -99,14 +143,26 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 	npMgr.Lock()
 	defer npMgr.Unlock()
 
-	var err error
+	var (
+		err error
+		ns  *namespace
+	)
 
-	npName := npObj.ObjectMeta.Name
+	npNs, npName := "ns-" + npObj.ObjectMeta.Namespace, npObj.ObjectMeta.Name
 	log.Printf("NETWORK POLICY DELETING: %v", npObj)
+
+	var exists bool
+	if ns, exists = npMgr.nsMap[npNs]; !exists {
+		ns, err = newNs(npName)
+		if err != nil {
+			log.Printf("Error creating namespace %s", npNs)
+		}
+		npMgr.nsMap[npNs] = ns
+	}
 
 	allNs := npMgr.nsMap[util.KubeAllNamespacesFlag]
 
-	_, _, iptEntries := parsePolicy(npObj)
+	_, _, iptEntries := translatePolicy(npObj)
 
 	iptMgr := allNs.iptMgr
 	for _, iptEntry := range iptEntries {
@@ -116,9 +172,21 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 		}
 	}
 
-	delete(allNs.npMap, npName)
-
-	if len(allNs.npMap) == 0 {
+	hashedSelector := HashSelector(&npObj.Spec.PodSelector)
+	if oldPolicy, oldPolicyExists := ns.processedNpMap[hashedSelector]; oldPolicyExists {
+		deductedPolicy, err := deductPolicy(oldPolicy, npObj)
+		if err != nil {
+			log.Printf("Error deducting policy %s from %s", npName, oldPolicy.ObjectMeta.Name)
+		}
+		
+		if deductedPolicy == nil {
+			delete(ns.processedNpMap, hashedSelector)
+		} else {
+			ns.processedNpMap[hashedSelector] = deductedPolicy
+		}
+	}
+	
+	if npMgr.canCleanUpNpmChains() {
 		if err = iptMgr.UninitNpmChains(); err != nil {
 			log.Errorf("Error: failed to uninitialize azure-npm chains.")
 			return err

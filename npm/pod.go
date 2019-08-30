@@ -3,8 +3,6 @@
 package npm
 
 import (
-	"strings"
-
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/npm/util"
 
@@ -33,7 +31,7 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 
 	var err error
 
-	podNs := podObj.ObjectMeta.Namespace
+	podNs := "ns-" + podObj.ObjectMeta.Namespace
 	podName := podObj.ObjectMeta.Name
 	podNodeName := podObj.Spec.NodeName
 	podLabels := podObj.ObjectMeta.Labels
@@ -50,20 +48,19 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 	}
 
 	// Add the pod to its label's ipset.
-	var labelKeys []string
 	for podLabelKey, podLabelVal := range podLabels {
-		//Ignore pod-template-hash label.
-		if strings.Contains(podLabelKey, util.KubePodTemplateHashFlag) {
-			continue
-		}
-
-		labelKey := util.KubeAllNamespacesFlag + "-" + podLabelKey + ":" + podLabelVal
-		log.Printf("Adding pod %s to ipset %s", podIP, labelKey)
-		if err = ipsMgr.AddToSet(labelKey, podIP); err != nil {
+		log.Printf("Adding pod %s to ipset %s", podIP, podLabelKey)
+		if err = ipsMgr.AddToSet(podLabelKey, podIP); err != nil {
 			log.Errorf("Error: failed to add pod to label ipset.")
 			return err
 		}
-		labelKeys = append(labelKeys, labelKey)
+
+		label := podLabelKey + ":" + podLabelVal
+		log.Printf("Adding pod %s to ipset %s", podIP, label)
+		if err = ipsMgr.AddToSet(label, podIP); err != nil {
+			log.Errorf("Error: failed to add pod to label ipset.")
+			return err
+		}
 	}
 
 	ns, err := newNs(podNs)
@@ -125,7 +122,7 @@ func (npMgr *NetworkPolicyManager) DeletePod(podObj *corev1.Pod) error {
 
 	var err error
 
-	podNs := podObj.ObjectMeta.Namespace
+	podNs := "ns-" + podObj.ObjectMeta.Namespace
 	podName := podObj.ObjectMeta.Name
 	podNodeName := podObj.Spec.NodeName
 	podLabels := podObj.ObjectMeta.Labels
@@ -141,13 +138,15 @@ func (npMgr *NetworkPolicyManager) DeletePod(podObj *corev1.Pod) error {
 	}
 	// Delete the pod from its label's ipset.
 	for podLabelKey, podLabelVal := range podLabels {
-		//Ignore pod-template-hash label.
-		if strings.Contains(podLabelKey, "pod-template-hash") {
-			continue
-		}
+		log.Printf("Deleting pod %s from ipset %s", podIP, podLabelKey)
+		if err = ipsMgr.DeleteFromSet(podLabelKey, podIP); err != nil {
+			log.Errorf("Error: failed to delete pod from label ipset.")
+			return err
+		}		
 
-		labelKey := util.KubeAllNamespacesFlag + "-" + podLabelKey + ":" + podLabelVal
-		if err = ipsMgr.DeleteFromSet(labelKey, podIP); err != nil {
+		label := podLabelKey + ":" + podLabelVal
+		log.Printf("Deleting pod %s from ipset %s", podIP, label)
+		if err = ipsMgr.DeleteFromSet(label, podIP); err != nil {
 			log.Errorf("Error: failed to delete pod from label ipset.")
 			return err
 		}

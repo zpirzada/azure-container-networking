@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sort"
 
 	"k8s.io/apimachinery/pkg/version"
 )
@@ -36,16 +37,32 @@ func GetClusterID(nodeName string) string {
 	return s[2]
 }
 
-// GetNsIpsetName returns ipset name from namespaceSelector.
-func GetNsIpsetName(k, v string) string {
-	return "ns-" + k + ":" + v
-}
-
 // Hash hashes a string to another string with length <= 32.
 func Hash(s string) string {
 	h := fnv.New32a()
 	h.Write([]byte(s))
 	return fmt.Sprint(h.Sum32())
+}
+
+// SortMap sorts the map by key in alphabetical order.
+// Note: even though the map is sorted, accessing it through range will still result in random order.
+func SortMap(m *map[string]string) ([]string, []string) {
+	var sortedKeys, sortedVals []string
+	for k := range *m {
+		sortedKeys = append(sortedKeys, k)
+	}
+	sort.Strings(sortedKeys)
+
+	sortedMap := &map[string]string{}
+	for _, k := range sortedKeys {
+		v := (*m)[k]
+		(*sortedMap)[k] = v
+		sortedVals = append(sortedVals, v)
+	}
+
+	m = sortedMap
+
+	return sortedKeys, sortedVals
 }
 
 // UniqueStrSlice removes duplicate elements from the input string.
@@ -151,4 +168,52 @@ func SetIsNewNwPolicyVerFlag(ver *version.Info) error {
 	}
 
 	return nil
+}
+
+// GetOperatorAndLabel returns the operator associated with the label and the label without operator.
+func GetOperatorAndLabel(label string) (string, string) {
+	if len(label) == 0 {
+		return "", ""
+	}
+
+	if string(label[0]) == IptablesNotFlag {
+		return IptablesNotFlag, label[1:]
+	}
+
+	return "", label
+}
+
+// GetLabelsWithoutOperators returns labels without operators.
+func GetLabelsWithoutOperators(labels []string) []string {
+	var res []string
+	for _, label := range labels {
+		if len(label) > 0 {
+			if string(label[0]) == IptablesNotFlag {
+				res = append(res, label[1:])
+			} else {
+				res = append(res, label)
+			}
+		}
+	}
+
+	return res
+}
+
+// DropEmptyFields deletes empty entries from a slice.
+func DropEmptyFields(s []string) []string {
+	i := 0
+	for {
+		if i == len(s) {
+			break
+		}
+
+		if s[i] == "" {
+			s = append(s[:i], s[i+1:]...)
+			continue
+		}
+
+		i++
+	}
+
+	return s
 }
