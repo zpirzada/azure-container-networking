@@ -302,3 +302,19 @@ ifeq ($(GOOS),linux)
 	cd $(NPM_BUILD_DIR) && $(ARCHIVE_CMD) $(NPM_ARCHIVE_NAME) azure-npm$(EXE_EXT) azure-vnet-telemetry$(EXE_EXT) azure-vnet-telemetry.config
 	chown $(BUILD_USER):$(BUILD_USER) $(NPM_BUILD_DIR)/$(NPM_ARCHIVE_NAME)
 endif
+
+# run all tests
+.PHONY: test-all
+test-all:
+	go test -v -covermode count -coverprofile=coverage.out \
+        ./ipam/ \
+        ./log/ \
+        ./netlink/ \
+        ./store/ \
+        ./telemetry/ \
+        ./cnm/network/ \
+        ./cni/ipam/ \
+        ./cns/ipamclient/ \
+        ./npm/iptm/ \
+        ./npm/ipsm/ \
+        ./npm

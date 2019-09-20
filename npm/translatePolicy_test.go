@@ -2807,7 +2807,7 @@ func TestTranslatePolicy(t *testing.T) {
 		},
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, true)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, true)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ k8s-example-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)

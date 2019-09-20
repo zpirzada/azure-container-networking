@@ -8,3 +8,6 @@ ipam-*.xml
 
 # Environment
 .vscode/*
+
+# Coverage 
+*.out

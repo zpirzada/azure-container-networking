@@ -269,14 +269,19 @@ func (nm *networkManager) applyIPConfig(extIf *externalInterface, targetIf *net.
 }
 
 func applyDnsConfig(extIf *externalInterface, ifName string) error {
-	cmd := fmt.Sprintf("systemd-resolve --interface=%s --set-dns=%s", ifName, extIf.DNSInfo.Servers[0])
-	_, err := platform.ExecuteCommand(cmd)
-	if err != nil {
-		return err
+	var err error
+
+	if extIf != nil && len(extIf.DNSInfo.Servers) > 0 {
+		cmd := fmt.Sprintf("systemd-resolve --interface=%s --set-dns=%s", ifName, extIf.DNSInfo.Servers[0])
+		_, err = platform.ExecuteCommand(cmd)
+		if err != nil {
+			return err
+		}
+
+		cmd = fmt.Sprintf("systemd-resolve --interface=%s --set-domain=%s", ifName, extIf.DNSInfo.Suffix)
+		_, err = platform.ExecuteCommand(cmd)
 	}
 
-	cmd = fmt.Sprintf("systemd-resolve --interface=%s --set-domain=%s", ifName, extIf.DNSInfo.Suffix)
-	_, err = platform.ExecuteCommand(cmd)
 	return err
 }
 

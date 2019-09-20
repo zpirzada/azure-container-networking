@@ -9,6 +9,7 @@ package iptm
 import (
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
@@ -365,8 +366,8 @@ func (iptMgr *IptablesManager) Run(entry *IptEntry) (int, error) {
 
 	if msg, failed := err.(*exec.ExitError); failed {
 		errCode := msg.Sys().(syscall.WaitStatus).ExitStatus()
-		if errCode > 1 {
-			log.Errorf("Error: There was an error running command: %s %s Arguments:%v", err, cmdName, cmdArgs)
+		if errCode > 0 {
+			log.Errorf("Error: There was an error running command: [%s %v] Stderr: [%v, %s]", cmdName, strings.Join(cmdArgs, " "), err, strings.TrimSuffix(string(msg.Stderr), "\n"))
 		}
 
 		return errCode, err

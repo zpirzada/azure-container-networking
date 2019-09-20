@@ -4,6 +4,7 @@ package ipsm
 
 import (
 	"testing"
+	"os"
 
 	"github.com/Azure/azure-container-networking/npm/util"
 )
@@ -76,6 +77,10 @@ func TestAddToList(t *testing.T) {
 		}
 	}()
 
+	if err := ipsMgr.CreateSet("test-set"); err != nil {
+		t.Errorf("TestAddToList failed @ ipsMgr.CreateSet")
+	}
+
 	if err := ipsMgr.AddToList("test-list", "test-set"); err != nil {
 		t.Errorf("TestAddToList failed @ ipsMgr.AddToList")
 	}
@@ -93,12 +98,20 @@ func TestDeleteFromList(t *testing.T) {
 		}
 	}()
 
+	if err := ipsMgr.CreateSet("test-set"); err != nil {
+		t.Errorf("TestDeleteFromList failed @ ipsMgr.CreateSet")
+	}
+
 	if err := ipsMgr.AddToList("test-list", "test-set"); err != nil {
 		t.Errorf("TestDeleteFromList failed @ ipsMgr.AddToList")
 	}
 
 	if err := ipsMgr.DeleteFromList("test-list", "test-set"); err != nil {
 		t.Errorf("TestDeleteFromList failed @ ipsMgr.DeleteFromList")
+	}
+
+	if err := ipsMgr.DeleteSet("test-set"); err != nil {
+		t.Errorf("TestDeleteSet failed @ ipsMgr.DeleteSet")
 	}
 }
 
@@ -246,7 +259,9 @@ func TestMain(m *testing.M) {
 	ipsMgr := NewIpsetManager()
 	ipsMgr.Save(util.IpsetConfigFile)
 
-	m.Run()
+	exitCode := m.Run()
 
 	ipsMgr.Restore(util.IpsetConfigFile)
+	
+	os.Exit(exitCode)
 }

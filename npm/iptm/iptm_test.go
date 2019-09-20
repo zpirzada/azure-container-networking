@@ -2,6 +2,7 @@ package iptm
 
 import (
 	"testing"
+	"os"
 
 	"github.com/Azure/azure-container-networking/npm/util"
 )
@@ -204,7 +205,9 @@ func TestMain(m *testing.M) {
 	iptMgr := NewIptablesManager()
 	iptMgr.Save(util.IptablesConfigFile)
 
-	m.Run()
+	exitCode := m.Run()
 
 	iptMgr.Restore(util.IptablesConfigFile)
+
+	os.Exit(exitCode)
 }

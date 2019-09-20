@@ -4,6 +4,7 @@ package npm
 
 import (
 	"testing"
+	"os"
 
 	"github.com/Azure/azure-container-networking/npm/iptm"
 	"github.com/Azure/azure-container-networking/telemetry"
@@ -190,8 +191,10 @@ func TestMain(m *testing.M) {
 	ipsMgr := ipsm.NewIpsetManager()
 	ipsMgr.Save(util.IpsetConfigFile)
 
-	m.Run()
+	exitCode := m.Run()
 
 	iptMgr.Restore(util.IptablesConfigFile)
 	ipsMgr.Restore(util.IpsetConfigFile)
+
+	os.Exit(exitCode)
 }

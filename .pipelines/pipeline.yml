@@ -1,0 +1,122 @@
+pr:
+  - master
+
+trigger:
+  branches:
+    include:
+      - master
+
+jobs:
+  - job: UnitTest
+    pool:
+      name: Networking-ContainerNetworking
+      demands: agent.os -equals Linux
+
+    container:
+      image: containernetworking/pipeline-ci:1.0.3
+      options: "--privileged"
+
+    # Go setup for the vmImage:
+    # https://github.com/Microsoft/azure-pipelines-image-generation/blob/master/images/linux/scripts/installers/go.sh
+    variables:
+      GOBIN: "$(GOPATH)/bin" # Go binaries path
+      GOPATH: "$(System.DefaultWorkingDirectory)/gopath" # Go workspace path
+      modulePath: "$(GOPATH)/src/github.com/Azure/azure-container-networking" # $(build.repository.name)' # Path to the module's code
+
+    steps:
+      - bash: |
+          echo $UID
+          sudo apt-get install -y ebtables ipset python3-dev gcc zip iptables ipset
+          sudo pip install coverage
+        displayName: "Install OS dependencies"
+
+      - bash: |
+          go version
+          go env
+          mkdir -p '$(GOBIN)'
+          mkdir -p '$(GOPATH)/pkg'
+          mkdir -p '$(modulePath)'
+          shopt -s extglob
+          shopt -s dotglob
+          mv !(gopath) '$(modulePath)'
+          echo '##vso[task.prependpath]$(GOBIN)'
+          echo '##vso[task.prependpath]$(GOROOT)/bin'
+        displayName: "Set up the Go workspace"
+
+      - bash: |
+          go get -v -t -d ./...
+          if [ -f Gopkg.toml ]; then
+              curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+          fi
+          go get github.com/docker/libnetwork/driverapi
+          go get github.com/gorilla/mux
+          go get github.com/jstemmer/go-junit-report
+          go get github.com/axw/gocov/gocov
+          go get github.com/AlekSi/gocov-xml
+          go get -u gopkg.in/matm/v1/gocov-html
+        workingDirectory: "$(modulePath)"
+        displayName: "Install Go dependencies"
+
+      - bash: |
+          sudo rm /run/docker/plugins/test.sock || true
+          sudo ip link del dev dummy || true
+        workingDirectory: "$(modulePath)"
+        displayName: "Workspace setup"
+        condition: always()
+
+      - bash: |
+          export GOOS=linux
+          make all-binaries
+          export GOOS=windows
+          make all-binaries
+          cd output 
+          sudo find . -mindepth 2 -type f -regextype posix-extended ! -iregex '.*\.(zip|tgz)$' -delete
+          sudo find . -mindepth 2 -type f -print -exec mv {} . \;
+          sudo rm -R -- */
+        workingDirectory: "$(modulePath)"
+        displayName: "Build"
+
+      - bash: |
+          # run test, echo exit status code to fd 3, pipe output from test to tee, which splits output to stdout and go-junit-report (which converts test output to report.xml), stdout from tee is redirected to fd 4. Take output written to fd 3 (which is the exit code of test), redirect to stdout, pipe to read from stdout then exit with that status code. Read all output from fd 4 (output from tee) and write to top stdout
+          { { { { 
+                sudo -E env "PATH=$PATH" make test-all; 
+                echo $? >&3; 
+                } | tee >(go-junit-report > report.xml) >&4; 
+              } 3>&1; 
+            } | { read xs; exit $xs; } 
+          } 4>&1
+        workingDirectory: "$(modulePath)"
+        failOnStderr: true
+        displayName: "Run Tests"
+
+      - bash: |
+          bash <(curl -s https://codecov.io/bash)
+          gocov convert coverage.out > coverage.json
+          gocov-xml < coverage.json > coverage.xml
+        workingDirectory: "$(modulePath)"
+        displayName: "Generate Coverage Reports"
+        condition: always()
+
+      - task: PublishTestResults@2
+        inputs:
+          testRunner: JUnit
+          testResultsFiles: $(System.DefaultWorkingDirectory)/**/report.xml
+        condition: always()
+
+      - task: PublishCodeCoverageResults@1
+        inputs:
+          codeCoverageTool: Cobertura
+          summaryFileLocation: $(System.DefaultWorkingDirectory)/**/coverage.xml
+        condition: always()
+
+      - task: CopyFiles@2
+        inputs:
+          sourceFolder: "$(modulePath)/output"
+          targetFolder: $(Build.ArtifactStagingDirectory)
+        condition: succeeded()
+
+      - task: PublishBuildArtifacts@1
+        inputs:
+          artifactName: "output"
+          pathtoPublish: "$(Build.ArtifactStagingDirectory)"
+        condition: succeeded()

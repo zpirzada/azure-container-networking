@@ -42,6 +42,11 @@ func TestAddNetworkPolicy(t *testing.T) {
 		t.Errorf("TestAddNetworkPolicy failed @ ipsMgr.Save")
 	}
 
+	// Create ns-kube-system set
+	if err := ipsMgr.CreateSet("ns-" + util.KubeSystemFlag); err != nil {
+		t.Errorf("TestAddNetworkPolicy failed @ ipsMgr.CreateSet, adding kube-system set%+v", err)
+	}
+
 	defer func() {
 		if err := iptMgr.Restore(util.IptablesTestConfigFile); err != nil {
 			t.Errorf("TestAddNetworkPolicy failed @ iptMgr.Restore")
@@ -140,23 +145,28 @@ func TestUpdateNetworkPolicy(t *testing.T) {
 
 	iptMgr := iptm.NewIptablesManager()
 	if err := iptMgr.Save(util.IptablesTestConfigFile); err != nil {
-		t.Errorf("UpdateAddNetworkPolicy failed @ iptMgr.Save")
+		t.Errorf("TestUpdateNetworkPolicy failed @ iptMgr.Save")
 	}
 
 	ipsMgr := ipsm.NewIpsetManager()
 	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
-		t.Errorf("UpdateAddNetworkPolicy failed @ ipsMgr.Save")
+		t.Errorf("TestUpdateNetworkPolicy failed @ ipsMgr.Save")
 	}
 
 	defer func() {
 		if err := iptMgr.Restore(util.IptablesTestConfigFile); err != nil {
-			t.Errorf("UpdateAddNetworkPolicy failed @ iptMgr.Restore")
+			t.Errorf("TestUpdateNetworkPolicy failed @ iptMgr.Restore")
 		}
 
 		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
-			t.Errorf("UpdateAddNetworkPolicy failed @ ipsMgr.Restore")
+			t.Errorf("TestUpdateNetworkPolicy failed @ ipsMgr.Restore")
 		}
 	}()
+
+	// Create ns-kube-system set
+	if err := ipsMgr.CreateSet("ns-" + util.KubeSystemFlag); err != nil {
+		t.Errorf("TestUpdateNetworkPolicy failed @ ipsMgr.CreateSet, adding kube-system set%+v", err)
+	}
 
 	nsObj := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -168,7 +178,7 @@ func TestUpdateNetworkPolicy(t *testing.T) {
 	}
 
 	if err := npMgr.AddNamespace(nsObj); err != nil {
-		t.Errorf("TestAddNetworkPolicy @ npMgr.AddNamespace")
+		t.Errorf("TestUpdateNetworkPolicy @ npMgr.AddNamespace")
 	}
 
 	tcp, udp := corev1.ProtocolTCP, corev1.ProtocolUDP
@@ -265,6 +275,11 @@ func TestDeleteNetworkPolicy(t *testing.T) {
 		}
 	}()
 
+	// Create ns-kube-system set
+	if err := ipsMgr.CreateSet("ns-" + util.KubeSystemFlag); err != nil {
+		t.Errorf("TestDeleteNetworkPolicy failed @ ipsMgr.CreateSet, adding kube-system set%+v", err)
+	}
+
 	nsObj := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-nwpolicy",
@@ -308,6 +323,6 @@ func TestDeleteNetworkPolicy(t *testing.T) {
 	}
 
 	if err := npMgr.DeleteNetworkPolicy(allow); err != nil {
-		t.Errorf("TestAddNetworkPolicy failed @ DeleteNetworkPolicy")
+		t.Errorf("TestDeleteNetworkPolicy failed @ DeleteNetworkPolicy")
 	}
 }
