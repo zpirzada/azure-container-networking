@@ -1,0 +1,55 @@
+parameters:
+  name: ""
+  clusterDefinitionUrl: ""
+  clusterDefinitionCniTypeKey: ""
+  clusterDefinitionCniBuildOS: ""
+  clusterDefinitionCniBuildExt: ""
+
+steps:
+  - checkout: none
+  - bash: |
+      go version
+      go env
+      go get -v github.com/Azure/aks-engine
+      mkdir -p '$(GOBIN)'
+      mkdir -p '$(GOPATH)/pkg'
+      mkdir -p '$(modulePath)'
+      echo '##vso[task.prependpath]$(GOBIN)'
+      echo '##vso[task.prependpath]$(GOROOT)/bin'
+    name: "GoEnv"
+    displayName: "Set up the Go environment"
+
+  - bash: |
+      rm -f clusterDefinition.json*
+      wget '${{ parameters.clusterDefinitionUrl }}' -O clusterDefinition.json
+      export CNI_URL='"'https://$(ARTIFACT_STORAGE).blob.core.windows.net/acn-$(CommitHash)/azure-vnet-cni-${{ parameters.clusterDefinitionCniBuildOS }}-amd64-$(Tag)${{ parameters.clusterDefinitionCniBuildExt }}'"'
+      export CNI_TYPE=${{ parameters.clusterDefinitionCniTypeKey }}
+      echo CNI type is $CNI_TYPE
+      sed -i "s|\"$CNI_TYPE\":\".*\"|\"$CNI_TYPE\":$CNI_URL|g" clusterDefinition.json
+      sed -i "s|\"azureCNIVersion\":\".*\"|\"azureCNIVersion\":\"$(Tag)\"|g" clusterDefinition.json
+      echo "Running E2E tests against a cluster built with the following API model:"
+      cat ./clusterDefinition.json
+      curl -L https://dl.k8s.io/v1.16.0/kubernetes-client-linux-amd64.tar.gz | tar xvzf -
+      sudo cp kubernetes/client/bin/kubectl /usr/local/bin/kubectl
+      sudo cp kubernetes/client/bin/kubectl /usr/local/bin/k
+      make bootstrap
+      make build-binary
+    displayName: Build AKS-Engine
+    workingDirectory: "$(modulePath)"
+
+  - bash: |
+      export CLUSTER_DEFINITION=./clusterDefinition.json 
+      export ORCHESTRATOR=kubernetes 
+      export CREATE_VNET=false 
+      export TIMEOUT=10m 
+      export CLIENT_ID=$(AKS_ENGINE_CLIENT_ID) 
+      export CLIENT_SECRET=$(AKS_ENGINE_CLIENT_SECRET) 
+      export TENANT_ID=$(AKS_ENGINE_TENANT_ID) 
+      export SUBSCRIPTION_ID=$(AKS_ENGINE_SUBSCRIPTION_ID) 
+      export CLEANUP_ON_EXIT=true 
+      export REGIONS=$(AKS_ENGINE_REGION) 
+      export IS_JENKINS=false 
+      make test-kubernetes
+    name: DeployAKSEngine
+    displayName: Deploy AKS-Engine
+    workingDirectory: "$(modulePath)"

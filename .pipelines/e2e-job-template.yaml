@@ -1,0 +1,30 @@
+parameters:
+  name: ""
+  pipelineBuildImage: "containernetworking/pipeline-ci:1.0.4"
+  clusterDefinitionUrl: "https://raw.githubusercontent.com/Azure/azure-container-networking/master/test/e2e/kubernetes/cniLinux.json"
+  clusterDefinitionCniTypeKey: ""
+  clusterDefinitionCniBuildOS: ""
+  clusterDefinitionCniBuildExt: ""
+
+jobs:
+  - job: ${{ parameters.name }}
+    dependsOn: unit_tests
+    pool:
+      name: Networking-ContainerNetworking
+      demands: agent.os -equals Linux
+    container:
+      image: ${{ parameters.pipelineBuildImage }}
+    variables:
+      GOPATH: "$(System.DefaultWorkingDirectory)/gopath"
+      GOBIN: "$(GOPATH)/bin" # Go binaries path
+      modulePath: "$(GOPATH)/src/github.com/Azure/aks-engine"
+      Tag: $[ dependencies.unit_tests.outputs['EnvironmentalVariables.Tag'] ]
+      CommitHash: $[ dependencies.unit_tests.outputs['EnvironmentalVariables.CommitHash'] ]
+
+    steps:
+      - template: e2e-step-template.yaml
+        parameters:
+          clusterDefinitionUrl: ${{ parameters.clusterDefinitionUrl }}
+          clusterDefinitionCniTypeKey: ${{ parameters.clusterDefinitionCniTypeKey }}
+          clusterDefinitionCniBuildOS: ${{ parameters.clusterDefinitionCniBuildOS }}
+          clusterDefinitionCniBuildExt: ${{ parameters.clusterDefinitionCniBuildExt }}
