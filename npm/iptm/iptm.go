@@ -21,7 +21,8 @@ import (
 )
 
 const (
-	defaultlockWaitTimeInSeconds = "60"
+	defaultlockWaitTimeInSeconds string = "60"
+	iptablesErrDoesNotExist      int    = 1
 )
 
 // IptEntry represents an iptables rule.
@@ -212,6 +213,12 @@ func (iptMgr *IptablesManager) UninitNpmChains() error {
 		util.IptablesAzureEgressPortChain,
 		util.IptablesAzureEgressToChain,
 		util.IptablesAzureTargetSetsChain,
+		// Below chains exists only for before Azure-NPM:v1.0.27
+		// and should be removed after a baking period.
+		util.IptablesAzureIngressFromNsChain,
+		util.IptablesAzureIngressFromPodChain,
+		util.IptablesAzureEgressToNsChain,
+		util.IptablesAzureEgressToPodChain,
 	}
 
 	// Remove AZURE-NPM chain from FORWARD chain.
@@ -224,7 +231,7 @@ func (iptMgr *IptablesManager) UninitNpmChains() error {
 	}
 	iptMgr.OperationFlag = util.IptablesDeletionFlag
 	errCode, err := iptMgr.Run(entry)
-	if errCode != 1 && err != nil {
+	if errCode != iptablesErrDoesNotExist && err != nil {
 		log.Errorf("Error: failed to remove default rule from FORWARD chain.")
 		return err
 	}
@@ -234,7 +241,8 @@ func (iptMgr *IptablesManager) UninitNpmChains() error {
 		entry := &IptEntry{
 			Chain: chain,
 		}
-		if _, err := iptMgr.Run(entry); err != nil {
+		errCode, err := iptMgr.Run(entry)
+		if errCode != iptablesErrDoesNotExist && err != nil {
 			log.Errorf("Error: failed to flush iptables chain %s.", chain)
 		}
 	}
@@ -257,7 +265,7 @@ func (iptMgr *IptablesManager) Exists(entry *IptEntry) (bool, error) {
 		return true, nil
 	}
 
-	if returnCode == 1 {
+	if returnCode == iptablesErrDoesNotExist {
 		log.Printf("Rule doesn't exist. %+v.", entry)
 		return false, nil
 	}
@@ -273,7 +281,7 @@ func (iptMgr *IptablesManager) AddChain(chain string) error {
 	iptMgr.OperationFlag = util.IptablesChainCreationFlag
 	errCode, err := iptMgr.Run(entry)
 	if err != nil {
-		if errCode == 1 {
+		if errCode == iptablesErrDoesNotExist {
 			log.Printf("Chain already exists %s.", entry.Chain)
 			return nil
 		}
@@ -293,7 +301,7 @@ func (iptMgr *IptablesManager) DeleteChain(chain string) error {
 	iptMgr.OperationFlag = util.IptablesDestroyFlag
 	errCode, err := iptMgr.Run(entry)
 	if err != nil {
-		if errCode == 1 {
+		if errCode == iptablesErrDoesNotExist {
 			log.Printf("Chain doesn't exist %s.", entry.Chain)
 			return nil
 		}

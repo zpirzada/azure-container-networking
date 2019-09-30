@@ -86,7 +86,7 @@ func (npMgr *NetworkPolicyManager) UninitAllNsList() error {
 	return nil
 }
 
-// AddNamespace handles adding  namespace to ipset.
+// AddNamespace handles adding namespace to ipset.
 func (npMgr *NetworkPolicyManager) AddNamespace(nsObj *corev1.Namespace) error {
 	npMgr.Lock()
 	defer npMgr.Unlock()

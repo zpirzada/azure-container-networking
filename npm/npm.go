@@ -45,9 +45,9 @@ type NetworkPolicyManager struct {
 	nsInformer      coreinformers.NamespaceInformer
 	npInformer      networkinginformers.NetworkPolicyInformer
 
-	nodeName               string
-	nsMap                  map[string]*namespace
-	isAzureNpmChainCreated bool
+	nodeName                     string
+	nsMap                        map[string]*namespace
+	isAzureNpmChainCreated       bool
 	isSafeToCleanUpAzureNpmChain bool
 
 	clusterState  telemetry.ClusterState
@@ -169,11 +169,6 @@ func (npMgr *NetworkPolicyManager) Start(stopCh <-chan struct{}) error {
 	// Starts all informers manufactured by npMgr's informerFactory.
 	npMgr.informerFactory.Start(stopCh)
 
-	// Failure detected. Needs to restore Azure-NPM related iptables entries.
-	if util.Exists(util.IptablesConfigFile) {
-		npMgr.restore()
-	}
-
 	// Wait for the initial sync of local cache.
 	if !cache.WaitForCacheSync(stopCh, npMgr.podInformer.Informer().HasSynced) {
 		return fmt.Errorf("Pod informer failed to sync")
@@ -194,6 +189,10 @@ func (npMgr *NetworkPolicyManager) Start(stopCh <-chan struct{}) error {
 
 // NewNetworkPolicyManager creates a NetworkPolicyManager
 func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory informers.SharedInformerFactory, npmVersion string) *NetworkPolicyManager {
+	// Clear out left over iptables states
+	log.Logf("Azure-NPM creating, cleaning iptables")
+	iptMgr := iptm.NewIptablesManager()
+	iptMgr.UninitNpmChains()
 
 	podInformer := informerFactory.Core().V1().Pods()
 	nsInformer := informerFactory.Core().V1().Namespaces()
@@ -212,14 +211,14 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 	}
 
 	npMgr := &NetworkPolicyManager{
-		clientset:              clientset,
-		informerFactory:        informerFactory,
-		podInformer:            podInformer,
-		nsInformer:             nsInformer,
-		npInformer:             npInformer,
-		nodeName:               os.Getenv("HOSTNAME"),
-		nsMap:                  make(map[string]*namespace),
-		isAzureNpmChainCreated: false,
+		clientset:                    clientset,
+		informerFactory:              informerFactory,
+		podInformer:                  podInformer,
+		nsInformer:                   nsInformer,
+		npInformer:                   npInformer,
+		nodeName:                     os.Getenv("HOSTNAME"),
+		nsMap:                        make(map[string]*namespace),
+		isAzureNpmChainCreated:       false,
 		isSafeToCleanUpAzureNpmChain: false,
 		clusterState: telemetry.ClusterState{
 			PodCount:      0,
@@ -243,12 +242,14 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 	clusterState := npMgr.GetClusterState()
 	npMgr.reportManager.Report.(*telemetry.NPMReport).GetReport(clusterID, npMgr.nodeName, npmVersion, serverVersion.GitVersion, clusterState)
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		log.Logf("Error: failed to create all-namespace.")
-		panic(err.Error)
-	}
+	allNs, _ := newNs(util.KubeAllNamespacesFlag)
 	npMgr.nsMap[util.KubeAllNamespacesFlag] = allNs
+
+	// Create ipset for the namespace.
+	kubeSystemNs := "ns-" + util.KubeSystemFlag
+	if err := allNs.ipsMgr.CreateSet(kubeSystemNs); err != nil {
+		log.Logf("Error: failed to create ipset for namespace %s.", kubeSystemNs)
+	}
 
 	podInformer.Informer().AddEventHandler(
 		// Pod event handlers

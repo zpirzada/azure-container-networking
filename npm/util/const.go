@@ -47,7 +47,7 @@ const (
 	IptablesSFlag             string = "-s"
 	IptablesDFlag             string = "-d"
 	IptablesDstPortFlag       string = "--dport"
-	IptablesModuleFlag         string = "-m"
+	IptablesModuleFlag        string = "-m"
 	IptablesSetModuleFlag     string = "set"
 	IptablesMatchSetFlag      string = "--match-set"
 	IptablesStateModuleFlag   string = "state"
@@ -60,15 +60,21 @@ const (
 	IptablesCommentModuleFlag string = "comment"
 	IptablesCommentFlag       string = "--comment"
 	IptablesAddCommentFlag
-	IptablesAzureChain               string = "AZURE-NPM"
-	IptablesAzureKubeSystemChain     string = "AZURE-NPM-KUBE-SYSTEM"
-	IptablesAzureIngressPortChain    string = "AZURE-NPM-INGRESS-PORT"
-	IptablesAzureIngressFromChain    string = "AZURE-NPM-INGRESS-FROM"
-	IptablesAzureEgressPortChain     string = "AZURE-NPM-EGRESS-PORT"
-	IptablesAzureEgressToChain       string = "AZURE-NPM-EGRESS-TO"
-	IptablesAzureTargetSetsChain     string = "AZURE-NPM-TARGET-SETS"
-	IptablesForwardChain             string = "FORWARD"
-	IptablesInputChain               string = "INPUT"
+	IptablesAzureChain            string = "AZURE-NPM"
+	IptablesAzureKubeSystemChain  string = "AZURE-NPM-KUBE-SYSTEM"
+	IptablesAzureIngressPortChain string = "AZURE-NPM-INGRESS-PORT"
+	IptablesAzureIngressFromChain string = "AZURE-NPM-INGRESS-FROM"
+	IptablesAzureEgressPortChain  string = "AZURE-NPM-EGRESS-PORT"
+	IptablesAzureEgressToChain    string = "AZURE-NPM-EGRESS-TO"
+	IptablesAzureTargetSetsChain  string = "AZURE-NPM-TARGET-SETS"
+	IptablesForwardChain          string = "FORWARD"
+	IptablesInputChain            string = "INPUT"
+	// Below chains exists only for before Azure-NPM:v1.0.27
+	// and should be removed after a baking period.
+	IptablesAzureIngressFromNsChain  string = "AZURE-NPM-INGRESS-FROM-NS"
+	IptablesAzureIngressFromPodChain string = "AZURE-NPM-INGRESS-FROM-POD"
+	IptablesAzureEgressToNsChain     string = "AZURE-NPM-EGRESS-TO-NS"
+	IptablesAzureEgressToPodChain    string = "AZURE-NPM-EGRESS-TO-POD"
 )
 
 //ipset related constants.
