@@ -53,7 +53,7 @@ printf "done.\n"
 
 # Install loopback plugin.
 printf "Installing loopback CNI plugin version $CNI_VERSION to $CNI_BIN_DIR..."
-/usr/bin/curl -sSL https://github.com/containernetworking/cni/releases/download/$CNI_VERSION/cni-amd64-$CNI_VERSION.tgz > $CNI_BIN_DIR/cni.tgz
+/usr/bin/curl -sSL https://github.com/containernetworking/plugins/releases/download/$CNI_VERSION/cni-plugins-linux-amd64-$CNI_VERSION.tgz > $CNI_BIN_DIR/cni.tgz
 tar -xzf $CNI_BIN_DIR/cni.tgz -C $CNI_BIN_DIR ./loopback
 printf "done.\n"
 
