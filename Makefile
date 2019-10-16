@@ -7,6 +7,7 @@ COREFILES = \
 	$(wildcard netlink/*.go) \
 	$(wildcard network/*.go) \
 	$(wildcard telemetry/*.go) \
+	$(wildcard aitelemetry/*.go) \
 	$(wildcard network/epcommon/*.go) \
 	$(wildcard network/policy/*.go) \
 	$(wildcard platform/*.go) \
@@ -313,6 +314,7 @@ test-all:
         ./netlink/ \
         ./store/ \
         ./telemetry/ \
+		./aitelemetry/ \
         ./cnm/network/ \
         ./cni/ipam/ \
         ./cns/ipamclient/ \

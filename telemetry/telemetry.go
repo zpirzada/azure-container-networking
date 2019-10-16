@@ -75,30 +75,6 @@ type OrchestratorInfo struct {
 	ErrorMessage        string
 }
 
-// Metadata retrieved from wireserver
-type Metadata struct {
-	Location             string `json:"location"`
-	VMName               string `json:"name"`
-	Offer                string `json:"offer"`
-	OsType               string `json:"osType"`
-	PlacementGroupID     string `json:"placementGroupId"`
-	PlatformFaultDomain  string `json:"platformFaultDomain"`
-	PlatformUpdateDomain string `json:"platformUpdateDomain"`
-	Publisher            string `json:"publisher"`
-	ResourceGroupName    string `json:"resourceGroupName"`
-	Sku                  string `json:"sku"`
-	SubscriptionID       string `json:"subscriptionId"`
-	Tags                 string `json:"tags"`
-	OSVersion            string `json:"version"`
-	VMID                 string `json:"vmId"`
-	VMSize               string `json:"vmSize"`
-	KernelVersion        string
-}
-
-type metadataWrapper struct {
-	Metadata Metadata `json:"compute"`
-}
-
 // Azure CNI Telemetry Report structure.
 type CNIReport struct {
 	IsNewInstance       bool
@@ -121,7 +97,7 @@ type CNIReport struct {
 	SystemDetails       SystemInfo
 	InterfaceDetails    InterfaceInfo
 	BridgeDetails       BridgeInfo
-	Metadata            Metadata `json:"compute"`
+	Metadata            common.Metadata `json:"compute"`
 }
 
 // Azure CNS Telemetry Report structure.
@@ -135,7 +111,7 @@ type CNSReport struct {
 	Timestamp       string
 	UUID            string
 	Errorcode       string
-	Metadata        Metadata `json:"compute"`
+	Metadata        common.Metadata `json:"compute"`
 }
 
 // ClusterState contains the current kubernetes cluster state.
@@ -158,7 +134,7 @@ type NPMReport struct {
 	UpTime            string
 	Timestamp         string
 	ClusterState      ClusterState
-	Metadata          Metadata `json:"compute"`
+	Metadata          common.Metadata `json:"compute"`
 }
 
 // DNCReport structure.
@@ -176,7 +152,7 @@ type DNCReport struct {
 	Orchestrator  string
 	ContainerType string
 	Errorcode     string
-	Metadata      Metadata `json:"compute"`
+	Metadata      common.Metadata `json:"compute"`
 }
 
 // ReportManager structure.

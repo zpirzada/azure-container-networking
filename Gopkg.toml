@@ -61,6 +61,10 @@
   name = "github.com/containernetworking/cni"
   revision = "fbb95fff8a5239a4295c991efa8a397d43118f7e"
 
+[[constraint]]
+  name = "github.com/microsoft/ApplicationInsights-Go"
+  revision = "d813d7725313000ad1b71627b8951323635f0572"
+
 [prune]
   go-tests = true
   unused-packages = true

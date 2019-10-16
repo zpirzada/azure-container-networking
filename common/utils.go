@@ -6,13 +6,23 @@ package common
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/Azure/azure-container-networking/log"
+)
+
+const (
+	metadataURL           = "http://169.254.169.254/metadata/instance?api-version=2017-08-01&format=json"
+	httpConnectionTimeout = 10
+	headerTimeout         = 20
 )
 
 // XmlDocument - Azure host agent XML document format.
@@ -34,6 +44,31 @@ type XmlDocument struct {
 			}
 		}
 	}
+}
+
+// Metadata retrieved from wireserver
+type Metadata struct {
+	Location             string `json:"location"`
+	VMName               string `json:"name"`
+	Offer                string `json:"offer"`
+	OsType               string `json:"osType"`
+	PlacementGroupID     string `json:"placementGroupId"`
+	PlatformFaultDomain  string `json:"platformFaultDomain"`
+	PlatformUpdateDomain string `json:"platformUpdateDomain"`
+	Publisher            string `json:"publisher"`
+	ResourceGroupName    string `json:"resourceGroupName"`
+	Sku                  string `json:"sku"`
+	SubscriptionID       string `json:"subscriptionId"`
+	Tags                 string `json:"tags"`
+	OSVersion            string `json:"version"`
+	VMID                 string `json:"vmId"`
+	VMSize               string `json:"vmSize"`
+	KernelVersion        string
+}
+
+// This is how metadata server returns in response for querying metadata
+type metadataWrapper struct {
+	Metadata Metadata `json:"compute"`
 }
 
 // LogNetworkInterfaces logs the host's network interfaces in the default namespace.
@@ -157,4 +192,69 @@ func ReadFileByLines(filename string) ([]string, error) {
 	}
 
 	return lineStrArr, nil
+}
+
+// GetHostMetadata - retrieve VM metadata from wireserver
+func GetHostMetadata(fileName string) (Metadata, error) {
+	content, err := ioutil.ReadFile(fileName)
+	if err == nil {
+		var metadata Metadata
+		if err = json.Unmarshal(content, &metadata); err == nil {
+			return metadata, nil
+		}
+	}
+
+	log.Printf("[Telemetry] Request metadata from wireserver")
+
+	req, err := http.NewRequest("GET", metadataURL, nil)
+	if err != nil {
+		return Metadata{}, err
+	}
+
+	req.Header.Set("Metadata", "True")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout: time.Duration(httpConnectionTimeout) * time.Second,
+			}).DialContext,
+			ResponseHeaderTimeout: time.Duration(headerTimeout) * time.Second,
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return Metadata{}, err
+	}
+
+	defer resp.Body.Close()
+
+	metareport := metadataWrapper{}
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("[Telemetry] Request failed with HTTP error %d", resp.StatusCode)
+	} else if resp.Body != nil {
+		err = json.NewDecoder(resp.Body).Decode(&metareport)
+		if err != nil {
+			err = fmt.Errorf("[Telemetry] Unable to decode response body due to error: %s", err.Error())
+		}
+	} else {
+		err = fmt.Errorf("[Telemetry] Response body is empty")
+	}
+
+	return metareport.Metadata, err
+}
+
+// SaveHostMetadata - save metadata got from wireserver to json file
+func SaveHostMetadata(metadata Metadata, fileName string) error {
+	dataBytes, err := json.Marshal(metadata)
+	if err != nil {
+		return fmt.Errorf("[Telemetry] marshal data failed with err %+v", err)
+	}
+
+	if err = ioutil.WriteFile(fileName, dataBytes, 0644); err != nil {
+		log.Printf("[Telemetry] Writing metadata to file failed: %v", err)
+	}
+
+	return err
 }

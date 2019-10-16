@@ -45,7 +45,7 @@ var sampleCniReport = CNIReport{
 	IsNewInstance: false,
 	EventMessage:  "[azure-cns] Code:UnknownContainerID {IPConfiguration:{IPSubnet:{IPAddress: PrefixLength:0} DNSServers:[] GatewayIPAddress:} Routes:[] CnetAddressSpace:[] MultiTenancyInfo:{EncapType: ID:0} PrimaryInterfaceIdentifier: LocalIPConfiguration:{IPSubnet:{IPAddress: PrefixLength:0} DNSServers:[] GatewayIPAddress:} {ReturnCode:18 Message:NetworkContainer doesn't exist.}}.",
 	Timestamp:     "2019-02-27 17:44:47.319911225 +0000 UTC",
-	Metadata: Metadata{
+	Metadata: common.Metadata{
 		Location:             "EastUS2EUAP",
 		VMName:               "k8s-agentpool1-65609007-0",
 		Offer:                "aks",

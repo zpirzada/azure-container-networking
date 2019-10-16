@@ -22,6 +22,7 @@ import (
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/platform"
+	"github.com/Azure/azure-container-networking/store"
 )
 
 // TelemetryConfig - telemetry config read by telemetry service
@@ -411,14 +412,21 @@ func (tb *TelemetryBuffer) sendToHost() error {
 
 // push - push the report (x) to corresponding slice
 func (buf *Buffer) push(x interface{}) {
-	metadata, err := getHostMetadata()
+	metadata, err := common.GetHostMetadata(metadataFile)
 	if err != nil {
 		log.Logf("Error getting metadata %v", err)
 	} else {
-		err = saveHostMetadata(metadata)
+		kvs, err := store.NewJsonFileStore(metadataFile)
+		if err != nil {
+			log.Printf("Error acuiring lock for writing metadata file: %v", err)
+		}
+
+		kvs.Lock(true)
+		err = common.SaveHostMetadata(metadata, metadataFile)
 		if err != nil {
 			log.Logf("saving host metadata failed with :%v", err)
 		}
+		kvs.Unlock(true)
 	}
 
 	switch x.(type) {
@@ -464,62 +472,6 @@ func (buf *Buffer) reset() {
 	buf.CNSReports = nil
 	buf.CNSReports = make([]CNSReport, 0)
 	payloadSize = 0
-}
-
-// saveHostMetadata - save metadata got from wireserver to json file
-func saveHostMetadata(metadata Metadata) error {
-	dataBytes, err := json.Marshal(metadata)
-	if err != nil {
-		return fmt.Errorf("[Telemetry] marshal data failed with err %+v", err)
-	}
-
-	if err = ioutil.WriteFile(metadataFile, dataBytes, 0644); err != nil {
-		log.Logf("[Telemetry] Writing metadata to file failed: %v", err)
-	}
-
-	return err
-}
-
-// getHostMetadata - retrieve metadata from host
-func getHostMetadata() (Metadata, error) {
-	content, err := ioutil.ReadFile(metadataFile)
-	if err == nil {
-		var metadata Metadata
-		if err = json.Unmarshal(content, &metadata); err == nil {
-			return metadata, nil
-		}
-	}
-
-	log.Logf("[Telemetry] Request metadata from wireserver")
-
-	req, err := http.NewRequest("GET", metadataURL, nil)
-	if err != nil {
-		return Metadata{}, err
-	}
-
-	req.Header.Set("Metadata", "True")
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return Metadata{}, err
-	}
-
-	defer resp.Body.Close()
-
-	metareport := metadataWrapper{}
-
-	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("[Telemetry] Request failed with HTTP error %d", resp.StatusCode)
-	} else if resp.Body != nil {
-		err = json.NewDecoder(resp.Body).Decode(&metareport)
-		if err != nil {
-			err = fmt.Errorf("[Telemetry] Unable to decode response body due to error: %s", err.Error())
-		}
-	} else {
-		err = fmt.Errorf("[Telemetry] Response body is empty")
-	}
-
-	return metareport.Metadata, err
 }
 
 // WaitForTelemetrySocket - Block still pipe/sock created or until max attempts retried
