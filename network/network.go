@@ -45,6 +45,7 @@ type network struct {
 	extIf            *externalInterface
 	DNS              DNSInfo
 	EnableSnatOnHost bool
+	NetNs            string
 	SnatBridgeIP     string
 }
 
@@ -58,6 +59,7 @@ type NetworkInfo struct {
 	Policies         []policy.Policy
 	BridgeName       string
 	EnableSnatOnHost bool
+	NetNs            string
 	Options          map[string]interface{}
 }
 
@@ -72,6 +74,7 @@ type SubnetInfo struct {
 type DNSInfo struct {
 	Suffix  string
 	Servers []string
+	Options []string
 }
 
 // NewExternalInterface adds a host interface to the list of available external interfaces.

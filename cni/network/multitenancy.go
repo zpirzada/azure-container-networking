@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
+	"strings"
 
 	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/cns"
@@ -119,12 +121,16 @@ func convertToCniResult(networkConfig *cns.GetNetworkContainerResponse, ifName s
 		}
 	}
 
+	var sb strings.Builder
+	sb.WriteString("Adding cnetAddressspace routes ")
 	for _, ipRouteSubnet := range networkConfig.CnetAddressSpace {
-		log.Printf("Adding cnetAddressspace routes %v %v", ipRouteSubnet.IPAddress, ipRouteSubnet.PrefixLength)
+		sb.WriteString(ipRouteSubnet.IPAddress + "/" + strconv.Itoa((int)(ipRouteSubnet.PrefixLength)) + ", ")
 		routeIPnet := net.IPNet{IP: net.ParseIP(ipRouteSubnet.IPAddress), Mask: net.CIDRMask(int(ipRouteSubnet.PrefixLength), 32)}
 		gwIP := net.ParseIP(ipconfig.GatewayIPAddress)
 		result.Routes = append(result.Routes, &cniTypes.Route{Dst: routeIPnet, GW: gwIP})
 	}
+
+	log.Printf(sb.String())
 
 	iface := &cniTypesCurr.Interface{Name: ifName}
 	result.Interfaces = append(result.Interfaces, iface)

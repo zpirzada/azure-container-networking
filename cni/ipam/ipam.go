@@ -138,8 +138,8 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	var result *cniTypesCurr.Result
 	var err error
 
-	log.Printf("[cni-ipam] Processing ADD command with args {ContainerID:%v Netns:%v IfName:%v Args:%v Path:%v}.",
-		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path)
+	log.Printf("[cni-ipam] Processing ADD command with args {ContainerID:%v Netns:%v IfName:%v Args:%v Path:%v StdinData:%s}.",
+		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path, args.StdinData)
 
 	defer func() { log.Printf("[cni-ipam] ADD command completed with result:%+v err:%v.", result, err) }()
 
@@ -259,8 +259,8 @@ func (plugin *ipamPlugin) Get(args *cniSkel.CmdArgs) error {
 func (plugin *ipamPlugin) Delete(args *cniSkel.CmdArgs) error {
 	var err error
 
-	log.Printf("[cni-ipam] Processing DEL command with args {ContainerID:%v Netns:%v IfName:%v Args:%v Path:%v}.",
-		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path)
+	log.Printf("[cni-ipam] Processing DEL command with args {ContainerID:%v Netns:%v IfName:%v Args:%v Path:%v StdinData:%s}.",
+		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path, args.StdinData)
 
 	defer func() { log.Printf("[cni-ipam] DEL command completed with err:%v.", err) }()
 

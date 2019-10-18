@@ -18,10 +18,12 @@
   version = "v0.4.12"
 
 [[projects]]
-  digest = "1:6a16b820c16f0587d63a3c462a9d787106f966adae5056aa430ebca18c7fba46"
+  digest = "1:8cf3e59c26d185775c218c4ac3e63ba8dac9c2692d97e99152a353f7344b5a1d"
   name = "github.com/Microsoft/hcsshim"
   packages = [
     ".",
+    "hcn",
+    "internal/cni",
     "internal/guestrequest",
     "internal/guid",
     "internal/hcs",
@@ -31,6 +33,8 @@
     "internal/logfields",
     "internal/longpath",
     "internal/mergemaps",
+    "internal/regstate",
+    "internal/runhcs",
     "internal/safefile",
     "internal/schema1",
     "internal/schema2",
@@ -234,11 +238,12 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:4cf0abce65ca9e0e906fdd0d76ad1dd1dcc94afe5901473cbc7f8d623cceabb4"
+  digest = "1:5a8d9a6dfd3f8a2c75bf3d59fe35dadb8052084d02803ffab046e460feb31145"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
+    "windows/registry",
   ]
   pruneopts = "UT"
   revision = "a43fa875dd822b81eb6d2ad538bc1f4caba169bd"
@@ -583,6 +588,7 @@
   input-imports = [
     "github.com/Microsoft/go-winio",
     "github.com/Microsoft/hcsshim",
+    "github.com/Microsoft/hcsshim/hcn",
     "github.com/containernetworking/cni/libcni",
     "github.com/containernetworking/cni/pkg/invoke",
     "github.com/containernetworking/cni/pkg/skel",

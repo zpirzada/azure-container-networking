@@ -193,8 +193,8 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		nwDNSInfo        network.DNSInfo
 	)
 
-	log.Printf("[cni-net] Processing ADD command with args {ContainerID:%v Netns:%v IfName:%v Args:%v Path:%v}.",
-		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path)
+	log.Printf("[cni-net] Processing ADD command with args {ContainerID:%v Netns:%v IfName:%v Args:%v Path:%v StdinData:%s}.",
+		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path, args.StdinData)
 
 	// Parse network configuration from stdin.
 	nwCfg, err = cni.ParseNetworkConfig(args.StdinData)
@@ -298,7 +298,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		 */
 		epInfo, _ := plugin.nm.GetEndpointInfo(networkId, endpointId)
 		if epInfo != nil {
-			resultConsAdd, errConsAdd := handleConsecutiveAdd(args.ContainerID, endpointId, nwInfo, nwCfg)
+			resultConsAdd, errConsAdd := handleConsecutiveAdd(args, endpointId, nwInfo, nwCfg)
 			if errConsAdd != nil {
 				log.Printf("handleConsecutiveAdd failed with error %v", errConsAdd)
 				result = resultConsAdd
@@ -390,6 +390,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 			EnableSnatOnHost: nwCfg.EnableSnatOnHost,
 			DNS:              nwDNSInfo,
 			Policies:         policies,
+			NetNs:            args.Netns,
 		}
 
 		nwInfo.Options = make(map[string]interface{})
@@ -606,8 +607,8 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		epInfo       *network.EndpointInfo
 	)
 
-	log.Printf("[cni-net] Processing DEL command with args {ContainerID:%v Netns:%v IfName:%v Args:%v Path:%v}.",
-		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path)
+	log.Printf("[cni-net] Processing DEL command with args {ContainerID:%v Netns:%v IfName:%v Args:%v Path:%v, StdinData:%s}.",
+		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path, args.StdinData)
 
 	defer func() { log.Printf("[cni-net] DEL command completed with err:%v.", err) }()
 

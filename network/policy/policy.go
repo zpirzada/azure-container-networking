@@ -8,6 +8,8 @@ const (
 	NetworkPolicy     CNIPolicyType = "NetworkPolicy"
 	EndpointPolicy    CNIPolicyType = "EndpointPolicy"
 	OutBoundNatPolicy CNIPolicyType = "OutBoundNAT"
+	RoutePolicy       CNIPolicyType = "ROUTE"
+	PortMappingPolicy CNIPolicyType = "NAT"
 )
 
 type CNIPolicyType string

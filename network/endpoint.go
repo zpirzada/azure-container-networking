@@ -40,6 +40,7 @@ type endpoint struct {
 	PODName                  string `json:",omitempty"`
 	PODNameSpace             string `json:",omitempty"`
 	InfraVnetAddressSpace    string `json:",omitempty"`
+	NetNs                    string `json:",omitempty"`
 }
 
 // EndpointInfo contains read-only information about an endpoint.
@@ -66,7 +67,7 @@ type EndpointInfo struct {
 	PODNameSpace             string
 	Data                     map[string]interface{}
 	InfraVnetAddressSpace    string
-	SkipHotAttachEp       bool
+	SkipHotAttachEp          bool
 }
 
 // RouteInfo contains information about an IP route.

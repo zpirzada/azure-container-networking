@@ -5,12 +5,25 @@ package network
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"strings"
 
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network/policy"
 	"github.com/Microsoft/hcsshim"
+	"github.com/Microsoft/hcsshim/hcn"
+)
+
+const (
+	// hcnSchemaVersionMajor indicates major version number for hcn schema
+	hcnSchemaVersionMajor = 2
+
+	// hcnSchemaVersionMinor indicates minor version number for hcn schema
+	hcnSchemaVersionMinor = 0
+
+	// hcnIpamTypeStatic indicates the static type of ipam
+	hcnIpamTypeStatic = "Static"
 )
 
 // HotAttachEndpoint is a wrapper of hcsshim's HotAttachEndpoint.
@@ -44,6 +57,19 @@ func ConstructEndpointID(containerID string, netNsPath string, ifName string) (s
 
 // newEndpointImpl creates a new endpoint in the network.
 func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
+	if useHnsV2, err := UseHnsV2(epInfo.NetNsPath); useHnsV2 {
+		if err != nil {
+			return nil, err
+		}
+
+		return nw.newEndpointImplHnsV2(epInfo)
+	}
+
+	return nw.newEndpointImplHnsV1(epInfo)
+}
+
+// newEndpointImplHnsV1 creates a new endpoint in the network using HnsV1
+func (nw *network) newEndpointImplHnsV1(epInfo *EndpointInfo) (*endpoint, error) {
 	var vlanid int
 
 	if epInfo.Data != nil {
@@ -55,7 +81,6 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 	// Get Infrastructure containerID. Handle ADD calls for workload container.
 	var err error
 	infraEpName, _ := ConstructEndpointID(epInfo.ContainerID, epInfo.NetNsPath, epInfo.IfName)
-
 	hnsEndpoint := &hcsshim.HNSEndpoint{
 		Name:           infraEpName,
 		VirtualNetwork: nw.HnsId,
@@ -118,6 +143,127 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 		DNS:              epInfo.DNS,
 		VlanID:           vlanid,
 		EnableSnatOnHost: epInfo.EnableSnatOnHost,
+		NetNs:            epInfo.NetNsPath,
+	}
+
+	for _, route := range epInfo.Routes {
+		ep.Routes = append(ep.Routes, route)
+	}
+
+	ep.MacAddress, _ = net.ParseMAC(hnsResponse.MacAddress)
+
+	return ep, nil
+}
+
+// configureHcnEndpoint configures hcn endpoint for creation
+func (nw *network) configureHcnEndpoint(epInfo *EndpointInfo) (*hcn.HostComputeEndpoint, error) {
+	infraEpName, _ := ConstructEndpointID(epInfo.ContainerID, epInfo.NetNsPath, epInfo.IfName)
+
+	hcnEndpoint := &hcn.HostComputeEndpoint{
+		Name:               infraEpName,
+		HostComputeNetwork: nw.HnsId,
+		Dns: hcn.Dns{
+			Search:     strings.Split(epInfo.DNS.Suffix, ","),
+			ServerList: epInfo.DNS.Servers,
+			Options:    epInfo.DNS.Options,
+		},
+		SchemaVersion: hcn.SchemaVersion{
+			Major: hcnSchemaVersionMajor,
+			Minor: hcnSchemaVersionMinor,
+		},
+		MacAddress: epInfo.MacAddress.String(),
+	}
+
+	if endpointPolicies, err := policy.GetHcnEndpointPolicies(policy.EndpointPolicy, epInfo.Policies, epInfo.Data); err == nil {
+		for _, epPolicy := range endpointPolicies {
+			hcnEndpoint.Policies = append(hcnEndpoint.Policies, epPolicy)
+		}
+	} else {
+		log.Printf("[net] Failed to get endpoint policies due to error: %v", err)
+		return nil, err
+	}
+
+	for _, route := range epInfo.Routes {
+		hcnRoute := hcn.Route{
+			NextHop:           route.Gw.String(),
+			DestinationPrefix: route.Dst.String(),
+		}
+
+		hcnEndpoint.Routes = append(hcnEndpoint.Routes, hcnRoute)
+	}
+
+	for _, ipAddress := range epInfo.IPAddresses {
+		prefixLength, _ := ipAddress.Mask.Size()
+		ipConfiguration := hcn.IpConfig{
+			IpAddress:    ipAddress.IP.String(),
+			PrefixLength: uint8(prefixLength),
+		}
+
+		hcnEndpoint.IpConfigurations = append(hcnEndpoint.IpConfigurations, ipConfiguration)
+	}
+
+	return hcnEndpoint, nil
+}
+
+// newEndpointImplHnsV2 creates a new endpoint in the network using HnsV2
+func (nw *network) newEndpointImplHnsV2(epInfo *EndpointInfo) (*endpoint, error) {
+	hcnEndpoint, err := nw.configureHcnEndpoint(epInfo)
+	if err != nil {
+		log.Printf("[net] Failed to configure hcn endpoint due to error: %v", err)
+		return nil, err
+	}
+
+	// Create the HCN endpoint.
+	log.Printf("[net] Creating hcn endpoint: %+v", hcnEndpoint)
+	hnsResponse, err := hcnEndpoint.Create()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create endpoint: %s due to error: %v", hcnEndpoint.Name, err)
+	}
+
+	log.Printf("[net] Successfully created hcn endpoint with response: %+v", hnsResponse)
+
+	defer func() {
+		if err != nil {
+			log.Printf("[net] Deleting hcn endpoint with id: %s", hnsResponse.Id)
+			err = hnsResponse.Delete()
+			log.Printf("[net] Completed hcn endpoint deletion for id: %s with error: %v", hnsResponse.Id, err)
+		}
+	}()
+
+	var namespace *hcn.HostComputeNamespace
+	if namespace, err = hcn.GetNamespaceByID(epInfo.NetNsPath); err != nil {
+		return nil, fmt.Errorf("Failed to get hcn namespace: %s due to error: %v", epInfo.NetNsPath, err)
+	}
+
+	if err = hcn.AddNamespaceEndpoint(namespace.Id, hnsResponse.Id); err != nil {
+		return nil, fmt.Errorf("[net] Failed to add endpoint: %s to hcn namespace: %s due to error: %v",
+			hnsResponse.Id, namespace.Id, err)
+	}
+
+	var vlanid int
+	if epInfo.Data != nil {
+		if vlanData, ok := epInfo.Data[VlanIDKey]; ok {
+			vlanid = vlanData.(int)
+		}
+	}
+
+	var gateway net.IP
+	if len(hnsResponse.Routes) > 0 {
+		gateway = net.ParseIP(hnsResponse.Routes[0].NextHop)
+	}
+
+	// Create the endpoint object.
+	ep := &endpoint{
+		Id:               hcnEndpoint.Name,
+		HnsId:            hnsResponse.Id,
+		SandboxKey:       epInfo.ContainerID,
+		IfName:           epInfo.IfName,
+		IPAddresses:      epInfo.IPAddresses,
+		Gateways:         []net.IP{gateway},
+		DNS:              epInfo.DNS,
+		VlanID:           vlanid,
+		EnableSnatOnHost: epInfo.EnableSnatOnHost,
+		NetNs:            epInfo.NetNsPath,
 	}
 
 	for _, route := range epInfo.Routes {
@@ -131,12 +277,50 @@ func (nw *network) newEndpointImpl(epInfo *EndpointInfo) (*endpoint, error) {
 
 // deleteEndpointImpl deletes an existing endpoint from the network.
 func (nw *network) deleteEndpointImpl(ep *endpoint) error {
-	// Delete the HNS endpoint.
+	if useHnsV2, err := UseHnsV2(ep.NetNs); useHnsV2 {
+		if err != nil {
+			return err
+		}
+
+		return nw.deleteEndpointImplHnsV2(ep)
+	}
+
+	return nw.deleteEndpointImplHnsV1(ep)
+}
+
+// deleteEndpointImplHnsV1 deletes an existing endpoint from the network using HNS v1.
+func (nw *network) deleteEndpointImplHnsV1(ep *endpoint) error {
 	log.Printf("[net] HNSEndpointRequest DELETE id:%v", ep.HnsId)
 	hnsResponse, err := hcsshim.HNSEndpointRequest("DELETE", ep.HnsId, "")
 	log.Printf("[net] HNSEndpointRequest DELETE response:%+v err:%v.", hnsResponse, err)
 
 	return err
+}
+
+// deleteEndpointImplHnsV2 deletes an existing endpoint from the network using HNS v2.
+func (nw *network) deleteEndpointImplHnsV2(ep *endpoint) error {
+	var hcnEndpoint *hcn.HostComputeEndpoint
+	var err error
+
+	log.Printf("[net] Deleting hcn endpoint with id: %s", ep.HnsId)
+
+	if hcnEndpoint, err = hcn.GetEndpointByID(ep.HnsId); err != nil {
+		return fmt.Errorf("Failed to get hcn endpoint with id: %s due to err: %v", ep.HnsId, err)
+	}
+
+	// Remove this endpoint from the namespace
+	if err = hcn.RemoveNamespaceEndpoint(hcnEndpoint.HostComputeNamespace, hcnEndpoint.Id); err != nil {
+		return fmt.Errorf("Failed to remove hcn endpoint: %s from namespace: %s due to error: %v", ep.HnsId,
+			hcnEndpoint.HostComputeNamespace, err)
+	}
+
+	if err = hcnEndpoint.Delete(); err != nil {
+		return fmt.Errorf("Failed to delete hcn endpoint: %s due to error: %v", ep.HnsId, err)
+	}
+
+	log.Printf("[net] Successfully deleted hcn endpoint with id: %s", ep.HnsId)
+
+	return nil
 }
 
 // getInfoImpl returns information about the endpoint.
