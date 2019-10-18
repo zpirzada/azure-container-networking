@@ -9,6 +9,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/Azure/azure-container-networking/cns/cnsclient"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network/policy"
 	"github.com/Microsoft/hcsshim"
@@ -205,6 +206,63 @@ func (nw *network) configureHcnEndpoint(epInfo *EndpointInfo) (*hcn.HostComputeE
 	return hcnEndpoint, nil
 }
 
+func (nw *network) deleteHostNCApipaEndpoint(networkContainerID string) error {
+	cnsClient, err := cnsclient.GetCnsClient()
+	if err != nil {
+		log.Errorf("Failed to get CNS client. Error %v", err)
+		return err
+	}
+
+	log.Printf("[net] Deleting HostNCApipaEndpoint for network container: %s", networkContainerID)
+	err = cnsClient.DeleteHostNCApipaEndpoint(networkContainerID)
+	log.Printf("[net] Completed HostNCApipaEndpoint deletion for network container: %s"+
+		" with error: %v", networkContainerID, err)
+
+	return nil
+}
+
+// createHostNCApipaEndpoint creates a new endpoint in the HostNCApipaNetwork
+// for host container connectivity
+func (nw *network) createHostNCApipaEndpoint(epInfo *EndpointInfo) error {
+	var (
+		err                   error
+		cnsClient             *cnsclient.CNSClient
+		hostNCApipaEndpointID string
+		namespace             *hcn.HostComputeNamespace
+	)
+
+	if namespace, err = hcn.GetNamespaceByID(epInfo.NetNsPath); err != nil {
+		return fmt.Errorf("Failed to retrieve namespace with GetNamespaceByID for NetNsPath: %s"+
+			" due to error: %v", epInfo.NetNsPath, err)
+	}
+
+	if cnsClient, err = cnsclient.GetCnsClient(); err != nil {
+		log.Errorf("Failed to get CNS client. Error %v", err)
+		return err
+	}
+
+	log.Printf("[net] Creating HostNCApipaEndpoint for host container connectivity for NC: %s",
+		epInfo.NetworkContainerID)
+
+	if hostNCApipaEndpointID, err =
+		cnsClient.CreateHostNCApipaEndpoint(epInfo.NetworkContainerID); err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			nw.deleteHostNCApipaEndpoint(epInfo.NetworkContainerID)
+		}
+	}()
+
+	if err = hcn.AddNamespaceEndpoint(namespace.Id, hostNCApipaEndpointID); err != nil {
+		return fmt.Errorf("[net] Failed to add HostNCApipaEndpoint: %s to namespace: %s due to error: %v",
+			hostNCApipaEndpointID, namespace.Id, err)
+	}
+
+	return nil
+}
+
 // newEndpointImplHnsV2 creates a new endpoint in the network using HnsV2
 func (nw *network) newEndpointImplHnsV2(epInfo *EndpointInfo) (*endpoint, error) {
 	hcnEndpoint, err := nw.configureHcnEndpoint(epInfo)
@@ -240,6 +298,22 @@ func (nw *network) newEndpointImplHnsV2(epInfo *EndpointInfo) (*endpoint, error)
 			hnsResponse.Id, namespace.Id, err)
 	}
 
+	defer func() {
+		if err != nil {
+			if errRemoveNsEp := hcn.RemoveNamespaceEndpoint(namespace.Id, hnsResponse.Id); errRemoveNsEp != nil {
+				log.Printf("[net] Failed to remove endpoint: %s from namespace: %s due to error: %v",
+					hnsResponse.Id, hnsResponse.Id, errRemoveNsEp)
+			}
+		}
+	}()
+
+	// If the Host - container connectivity is requested, create endpoint in HostNCApipaNetwork
+	if epInfo.AllowInboundFromHostToNC || epInfo.AllowInboundFromNCToHost {
+		if err = nw.createHostNCApipaEndpoint(epInfo); err != nil {
+			return nil, fmt.Errorf("Failed to create HostNCApipaEndpoint due to error: %v", err)
+		}
+	}
+
 	var vlanid int
 	if epInfo.Data != nil {
 		if vlanData, ok := epInfo.Data[VlanIDKey]; ok {
@@ -264,6 +338,9 @@ func (nw *network) newEndpointImplHnsV2(epInfo *EndpointInfo) (*endpoint, error)
 		VlanID:           vlanid,
 		EnableSnatOnHost: epInfo.EnableSnatOnHost,
 		NetNs:            epInfo.NetNsPath,
+		AllowInboundFromNCToHost: epInfo.AllowInboundFromNCToHost,
+		AllowInboundFromHostToNC: epInfo.AllowInboundFromHostToNC,
+		NetworkContainerID:       epInfo.NetworkContainerID,
 	}
 
 	for _, route := range epInfo.Routes {
@@ -299,8 +376,17 @@ func (nw *network) deleteEndpointImplHnsV1(ep *endpoint) error {
 
 // deleteEndpointImplHnsV2 deletes an existing endpoint from the network using HNS v2.
 func (nw *network) deleteEndpointImplHnsV2(ep *endpoint) error {
-	var hcnEndpoint *hcn.HostComputeEndpoint
-	var err error
+	var (
+		hcnEndpoint *hcn.HostComputeEndpoint
+		err         error
+	)
+
+	if ep.AllowInboundFromHostToNC || ep.AllowInboundFromNCToHost {
+		if err = nw.deleteHostNCApipaEndpoint(ep.NetworkContainerID); err != nil {
+			log.Errorf("[net] Failed to delete HostNCApipaEndpoint due to error: %v", err)
+			return err
+		}
+	}
 
 	log.Printf("[net] Deleting hcn endpoint with id: %s", ep.HnsId)
 

@@ -27,11 +27,21 @@ func createOrUpdateInterface(createNetworkContainerRequest cns.CreateNetworkCont
 		return nil
 	}
 
-	if exists, _ := interfaceExists(createNetworkContainerRequest.NetworkContainerid); !exists {
-		return createOrUpdateWithOperation(createNetworkContainerRequest, "CREATE")
+	if exists, _ := InterfaceExists(createNetworkContainerRequest.NetworkContainerid); !exists {
+		return createOrUpdateWithOperation(
+			createNetworkContainerRequest.NetworkContainerid,
+			createNetworkContainerRequest.IPConfiguration,
+			true, // Flag to setWeakHostOnInterface
+			createNetworkContainerRequest.PrimaryInterfaceIdentifier,
+			"CREATE")
 	}
 
-	return createOrUpdateWithOperation(createNetworkContainerRequest, "UPDATE")
+	return createOrUpdateWithOperation(
+		createNetworkContainerRequest.NetworkContainerid,
+		createNetworkContainerRequest.IPConfiguration,
+		true, // Flag to setWeakHostOnInterface
+		createNetworkContainerRequest.PrimaryInterfaceIdentifier,
+		"UPDATE")
 }
 
 func updateInterface(createNetworkContainerRequest cns.CreateNetworkContainerRequest, netpluginConfig *NetPluginConfiguration) error {
@@ -102,28 +112,31 @@ func setWeakHostOnInterface(ipAddress, ncID string) error {
 	return nil
 }
 
-func createOrUpdateWithOperation(createNetworkContainerRequest cns.CreateNetworkContainerRequest, operation string) error {
+func createOrUpdateWithOperation(
+	adapterName string,
+	ipConfig cns.IPConfiguration,
+	setWeakHost bool,
+	primaryInterfaceIdentifier string,
+	operation string) error {
 	if _, err := os.Stat("./AzureNetworkContainer.exe"); err != nil {
-		if os.IsNotExist(err) {
-			return errors.New("[Azure CNS] Unable to find AzureNetworkContainer.exe. Cannot continue")
-		}
+		return fmt.Errorf("[Azure CNS] Unable to find AzureNetworkContainer.exe. Cannot continue")
 	}
 
-	if createNetworkContainerRequest.IPConfiguration.IPSubnet.IPAddress == "" {
-		return errors.New("[Azure CNS] IPAddress in IPConfiguration of createNetworkContainerRequest is nil")
+	if ipConfig.IPSubnet.IPAddress == "" {
+		return fmt.Errorf("[Azure CNS] IPAddress in IPConfiguration is nil")
 	}
 
-	ipv4AddrCidr := fmt.Sprintf("%v/%d", createNetworkContainerRequest.IPConfiguration.IPSubnet.IPAddress, createNetworkContainerRequest.IPConfiguration.IPSubnet.PrefixLength)
+	ipv4AddrCidr := fmt.Sprintf("%v/%d", ipConfig.IPSubnet.IPAddress, ipConfig.IPSubnet.PrefixLength)
 	log.Printf("[Azure CNS] Created ipv4Cidr as %v", ipv4AddrCidr)
 	ipv4Addr, _, err := net.ParseCIDR(ipv4AddrCidr)
-	ipv4NetInt := net.CIDRMask((int)(createNetworkContainerRequest.IPConfiguration.IPSubnet.PrefixLength), 32)
+	ipv4NetInt := net.CIDRMask((int)(ipConfig.IPSubnet.PrefixLength), 32)
 	log.Printf("[Azure CNS] Created netmask as %v", ipv4NetInt)
 	ipv4NetStr := fmt.Sprintf("%d.%d.%d.%d", ipv4NetInt[0], ipv4NetInt[1], ipv4NetInt[2], ipv4NetInt[3])
 	log.Printf("[Azure CNS] Created netmask in string format %v", ipv4NetStr)
 
 	args := []string{"/C", "AzureNetworkContainer.exe", "/logpath", log.GetLogDirectory(),
 		"/name",
-		createNetworkContainerRequest.NetworkContainerid,
+		adapterName,
 		"/operation",
 		operation,
 		"/ip",
@@ -131,7 +144,7 @@ func createOrUpdateWithOperation(createNetworkContainerRequest cns.CreateNetwork
 		"/netmask",
 		ipv4NetStr,
 		"/gateway",
-		createNetworkContainerRequest.IPConfiguration.GatewayIPAddress,
+		ipConfig.GatewayIPAddress,
 		"/weakhostsend",
 		"true",
 		"/weakhostreceive",
@@ -142,38 +155,34 @@ func createOrUpdateWithOperation(createNetworkContainerRequest cns.CreateNetwork
 	loopbackOperationLock.Lock()
 	log.Printf("[Azure CNS] Going to create/update network loopback adapter: %v", args)
 	bytes, err := c.Output()
-	if err == nil {
-		err = setWeakHostOnInterface(createNetworkContainerRequest.PrimaryInterfaceIdentifier,
-			createNetworkContainerRequest.NetworkContainerid)
+	if err == nil && setWeakHost {
+		err = setWeakHostOnInterface(primaryInterfaceIdentifier, adapterName)
 	}
 	loopbackOperationLock.Unlock()
 
 	if err == nil {
-		log.Printf("[Azure CNS] Successfully created network loopback adapter for NC: %s. Output:%v.",
-			createNetworkContainerRequest.NetworkContainerid, string(bytes))
+		log.Printf("[Azure CNS] Successfully created network loopback adapter with name: %s and IP config: %+v. Output:%v.",
+			adapterName, ipConfig, string(bytes))
 	} else {
-		log.Printf("Failed to create/update Network Container: %s. Error: %v. Output: %v",
-			createNetworkContainerRequest.NetworkContainerid, err.Error(), string(bytes))
+		log.Printf("[Azure CNS] Failed to create network loopback adapter with name: %s and IP config: %+v."+
+			" Error: %v. Output: %v", adapterName, ipConfig, err, string(bytes))
 	}
 
 	return err
 }
 
-func deleteInterface(networkContainerID string) error {
-
+func deleteInterface(interfaceName string) error {
 	if _, err := os.Stat("./AzureNetworkContainer.exe"); err != nil {
-		if os.IsNotExist(err) {
-			return errors.New("[Azure CNS] Unable to find AzureNetworkContainer.exe. Cannot continue")
-		}
+		return fmt.Errorf("[Azure CNS] Unable to find AzureNetworkContainer.exe. Cannot continue")
 	}
 
-	if networkContainerID == "" {
-		return errors.New("[Azure CNS] networkContainerID is nil")
+	if interfaceName == "" {
+		return fmt.Errorf("[Azure CNS] Interface name is nil")
 	}
 
 	args := []string{"/C", "AzureNetworkContainer.exe", "/logpath", log.GetLogDirectory(),
 		"/name",
-		networkContainerID,
+		interfaceName,
 		"/operation",
 		"DELETE"}
 
@@ -185,14 +194,14 @@ func deleteInterface(networkContainerID string) error {
 	loopbackOperationLock.Unlock()
 
 	if err == nil {
-		log.Printf("[Azure CNS] Successfully deleted network container: %s. Output: %v.",
-			networkContainerID, string(bytes))
+		log.Printf("[Azure CNS] Successfully deleted loopack adapter with name: %s. Output: %v.",
+			interfaceName, string(bytes))
 	} else {
-		log.Printf("Failed to delete Network Container: %s. Error:%v. Output:%v",
-			networkContainerID, err.Error(), string(bytes))
-		return err
+		log.Printf("[Azure CNS] Failed to delete loopback adapter with name: %s. Error:%v. Output:%v",
+			interfaceName, err.Error(), string(bytes))
 	}
-	return nil
+
+	return err
 }
 
 func configureNetworkContainerNetworking(operation, podName, podNamespace, dockerContainerid string, netPluginConfig *NetPluginConfiguration) (err error) {

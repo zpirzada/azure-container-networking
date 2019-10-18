@@ -52,7 +52,7 @@ func NewNetPluginConfiguration(binPath, configPath string) *NetPluginConfigurati
 	}
 }
 
-func interfaceExists(iFaceName string) (bool, error) {
+func InterfaceExists(iFaceName string) (bool, error) {
 	_, err := net.InterfaceByName(iFaceName)
 	if err != nil {
 		errMsg := fmt.Sprintf("[Azure CNS] Unable to get interface by name %s. Error: %v", iFaceName, err)
@@ -92,6 +92,25 @@ func (cn *NetworkContainers) Delete(networkContainerID string) error {
 	log.Printf("[Azure CNS] NetworkContainers.Delete completed for NC: %s with error: %v", networkContainerID, err)
 
 	return err
+}
+
+// CreateLoopbackAdapter creates a loopback adapter with the specified settings
+func CreateLoopbackAdapter(
+	adapterName string,
+	ipConfig cns.IPConfiguration,
+	setWeakHostOnInterface bool,
+	primaryInterfaceIdentifier string) error {
+	return createOrUpdateWithOperation(
+		adapterName,
+		ipConfig,
+		setWeakHostOnInterface, // Flag to setWeakHostOnInterface
+		primaryInterfaceIdentifier,
+		"CREATE")
+}
+
+// DeleteLoopbackAdapter deletes loopback adapter with the specified name
+func DeleteLoopbackAdapter(adapterName string) error {
+	return deleteInterface(adapterName)
 }
 
 // This function gets the flattened network configuration (compliant with azure cni) in byte array format

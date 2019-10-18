@@ -23,6 +23,7 @@ const (
 	DockerContainerNotSpecified     = 20
 	UnsupportedVerb                 = 21
 	UnsupportedNetworkContainerType = 22
+	InvalidRequest                  = 23
 	UnexpectedError                 = 99
 )
 

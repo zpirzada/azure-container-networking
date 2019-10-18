@@ -131,6 +131,7 @@ type GetNetworkContainerRequest struct {
 
 // GetNetworkContainerResponse describes the response to retrieve a specifc network container.
 type GetNetworkContainerResponse struct {
+	NetworkContainerID         string
 	IPConfiguration            IPConfiguration
 	Routes                     []Route
 	CnetAddressSpace           []IPSubnet

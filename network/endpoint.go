@@ -35,6 +35,7 @@ type endpoint struct {
 	EnableMultitenancy       bool
 	AllowInboundFromHostToNC bool
 	AllowInboundFromNCToHost bool
+	NetworkContainerID       string
 	NetworkNameSpace         string `json:",omitempty"`
 	ContainerID              string
 	PODName                  string `json:",omitempty"`
@@ -63,6 +64,7 @@ type EndpointInfo struct {
 	EnableMultiTenancy       bool
 	AllowInboundFromHostToNC bool
 	AllowInboundFromNCToHost bool
+	NetworkContainerID       string
 	PODName                  string
 	PODNameSpace             string
 	Data                     map[string]interface{}
@@ -202,11 +204,12 @@ func (ep *endpoint) getInfo() *EndpointInfo {
 		EnableMultiTenancy:       ep.EnableMultitenancy,
 		AllowInboundFromHostToNC: ep.AllowInboundFromHostToNC,
 		AllowInboundFromNCToHost: ep.AllowInboundFromNCToHost,
-		IfName:       ep.IfName,
-		ContainerID:  ep.ContainerID,
-		NetNsPath:    ep.NetworkNameSpace,
-		PODName:      ep.PODName,
-		PODNameSpace: ep.PODNameSpace,
+		IfName:             ep.IfName,
+		ContainerID:        ep.ContainerID,
+		NetNsPath:          ep.NetworkNameSpace,
+		PODName:            ep.PODName,
+		PODNameSpace:       ep.PODNameSpace,
+		NetworkContainerID: ep.NetworkContainerID,
 	}
 
 	for _, route := range ep.Routes {

@@ -7,20 +7,22 @@ import "encoding/json"
 
 // Container Network Service remote API Contract
 const (
-	SetEnvironmentPath          = "/network/environment"
-	CreateNetworkPath           = "/network/create"
-	DeleteNetworkPath           = "/network/delete"
-	CreateHnsNetworkPath        = "/network/hns/create"
-	DeleteHnsNetworkPath        = "/network/hns/delete"
-	ReserveIPAddressPath        = "/network/ip/reserve"
-	ReleaseIPAddressPath        = "/network/ip/release"
-	GetHostLocalIPPath          = "/network/ip/hostlocal"
-	GetIPAddressUtilizationPath = "/network/ip/utilization"
-	GetUnhealthyIPAddressesPath = "/network/ipaddresses/unhealthy"
-	GetHealthReportPath         = "/network/health"
-	NumberOfCPUCoresPath        = "/hostcpucores"
-	V1Prefix                    = "/v0.1"
-	V2Prefix                    = "/v0.2"
+	SetEnvironmentPath            = "/network/environment"
+	CreateNetworkPath             = "/network/create"
+	DeleteNetworkPath             = "/network/delete"
+	CreateHnsNetworkPath          = "/network/hns/create"
+	DeleteHnsNetworkPath          = "/network/hns/delete"
+	ReserveIPAddressPath          = "/network/ip/reserve"
+	ReleaseIPAddressPath          = "/network/ip/release"
+	GetHostLocalIPPath            = "/network/ip/hostlocal"
+	GetIPAddressUtilizationPath   = "/network/ip/utilization"
+	GetUnhealthyIPAddressesPath   = "/network/ipaddresses/unhealthy"
+	GetHealthReportPath           = "/network/health"
+	NumberOfCPUCoresPath          = "/hostcpucores"
+	CreateHostNCApipaEndpointPath = "/network/createhostncapipaendpoint"
+	DeleteHostNCApipaEndpointPath = "/network/deletehostncapipaendpoint"
+	V1Prefix                      = "/v0.1"
+	V2Prefix                      = "/v0.2"
 )
 
 // SetEnvironmentRequest describes the Request to set the environment in CNS.
@@ -152,4 +154,28 @@ type OptionMap map[string]interface{}
 // Response to a failed request.
 type errorResponse struct {
 	Err string
+}
+
+// CreateHostNCApipaEndpointRequest describes request for create apipa endpoint
+// for host container connectivity for the given network container
+type CreateHostNCApipaEndpointRequest struct {
+	NetworkContainerID string
+}
+
+// CreateHostNCApipaEndpointResponse describes response for create apipa endpoint request
+// for host container connectivity.
+type CreateHostNCApipaEndpointResponse struct {
+	Response   Response
+	EndpointID string
+}
+
+// DeleteHostNCApipaEndpointRequest describes request for deleting apipa endpoint created
+// for host NC connectivity.
+type DeleteHostNCApipaEndpointRequest struct {
+	NetworkContainerID string
+}
+
+// DeleteHostNCApipaEndpointResponse describes response for delete host NC apipa endpoint request.
+type DeleteHostNCApipaEndpointResponse struct {
+	Response Response
 }

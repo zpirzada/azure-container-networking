@@ -64,9 +64,9 @@ func getContainerNetworkConfigurationInternal(
 	namespace string,
 	podName string,
 	ifName string) (*cniTypesCurr.Result, *cns.GetNetworkContainerResponse, net.IPNet, error) {
-	cnsClient, err := cnsclient.NewCnsClient(address)
+	cnsClient, err := cnsclient.GetCnsClient()
 	if err != nil {
-		log.Printf("Initializing CNS client error %v", err)
+		log.Printf("Failed to get CNS client. Error: %v", err)
 		return nil, nil, net.IPNet{}, err
 	}
 

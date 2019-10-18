@@ -30,3 +30,22 @@ func CreateHnsNetwork(nwConfig cns.CreateHnsNetworkRequest) error {
 func DeleteHnsNetwork(networkName string) error {
 	return fmt.Errorf("DeleteHnsNetwork shouldn't be called for linux platform")
 }
+
+// CreateHostNCApipaEndpoint creates the endpoint in the apipa network
+// for host container connectivity
+// This is windows platform specific.
+func CreateHostNCApipaEndpoint(
+	networkContainerID string,
+	localIPConfiguration cns.IPConfiguration,
+	allowNCToHostCommunication bool,
+	allowHostToNCCommunication bool) (string, error) {
+	return "", nil
+}
+
+// DeleteHostNCApipaEndpoint deletes the endpoint in the apipa network
+// created for host container connectivity
+// This is windows platform specific.
+func DeleteHostNCApipaEndpoint(
+	networkContainerID string) error {
+	return nil
+}
