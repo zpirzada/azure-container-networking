@@ -15,31 +15,53 @@ const (
 	vmSizeStr         = "VMSize"
 	osVersionStr      = "OSVersion"
 	locationStr       = "Region"
-	appVersionStr     = "Appversion"
+	appNameStr        = "AppName"
 	subscriptionIDStr = "SubscriptionID"
+	vmNameStr         = "VMName"
 	defaultTimeout    = 10
 )
 
+var debugMode bool
+
 func messageListener() appinsights.DiagnosticsMessageListener {
-	return appinsights.NewDiagnosticsMessageListener(func(msg string) error {
-		log.Printf("[AppInsights] [%s] %s\n", time.Now().Format(time.UnixDate), msg)
-		return nil
-	})
+	if debugMode {
+		return appinsights.NewDiagnosticsMessageListener(func(msg string) error {
+			debuglog("[AppInsights] [%s] %s\n", time.Now().Format(time.UnixDate), msg)
+			return nil
+		})
+	}
+
+	return nil
+}
+
+func debuglog(format string, args ...interface{}) {
+	if debugMode {
+		log.Printf(format, args...)
+	}
 }
 
 func getMetadata(th *telemetryHandle) {
 	var metadata common.Metadata
 	var err error
 
+	if th.refreshTimeout < 4 {
+		th.refreshTimeout = defaultTimeout
+	}
+
 	// check if metadata in memory otherwise initiate wireserver request
 	for {
 		metadata, err = common.GetHostMetadata(metadataFile)
-		if err == nil || !th.enableMetadataRefreshThread {
+		if err == nil || th.disableMetadataRefreshThread {
 			break
 		}
 
-		log.Printf("[AppInsights] Error getting metadata %v. Sleep for %d", err, th.refreshTimeout)
+		debuglog("[AppInsights] Error getting metadata %v. Sleep for %d", err, th.refreshTimeout)
 		time.Sleep(time.Duration(th.refreshTimeout) * time.Second)
+	}
+
+	if err != nil {
+		debuglog("[AppInsights] Error getting metadata %v", err)
+		return
 	}
 
 	//acquire write lock before writing metadata to telemetry handle
@@ -50,7 +72,7 @@ func getMetadata(th *telemetryHandle) {
 	// Save metadata retrieved from wireserver to a file
 	kvs, err := store.NewJsonFileStore(metadataFile)
 	if err != nil {
-		log.Printf("[AppInsights] Error initializing kvs store: %v", err)
+		debuglog("[AppInsights] Error initializing kvs store: %v", err)
 		return
 	}
 
@@ -58,38 +80,34 @@ func getMetadata(th *telemetryHandle) {
 	err = common.SaveHostMetadata(th.metadata, metadataFile)
 	kvs.Unlock(true)
 	if err != nil {
-		log.Printf("[AppInsights] saving host metadata failed with :%v", err)
+		debuglog("[AppInsights] saving host metadata failed with :%v", err)
 	}
 }
 
-// NewAITelemetry creates telemetry handle with user specified appinsights key.
+// NewAITelemetry creates telemetry handle with user specified appinsights id.
 func NewAITelemetry(
-	key string,
-	appName string,
-	appVersion string,
-	batchSize int,
-	batchInterval int,
-	enableMetadataRefreshThread bool,
-	refreshTimeout int,
+	id string,
+	aiConfig AIConfig,
 ) TelemetryHandle {
 
-	telemetryConfig := appinsights.NewTelemetryConfiguration(key)
-	telemetryConfig.MaxBatchSize = batchSize
-	telemetryConfig.MaxBatchInterval = time.Duration(batchInterval) * time.Second
+	telemetryConfig := appinsights.NewTelemetryConfiguration(id)
+	telemetryConfig.MaxBatchSize = aiConfig.BatchSize
+	telemetryConfig.MaxBatchInterval = time.Duration(aiConfig.BatchInterval) * time.Second
+	debugMode = aiConfig.DebugMode
 
 	th := &telemetryHandle{
-		client:                      appinsights.NewTelemetryClientFromConfig(telemetryConfig),
-		appName:                     appName,
-		appVersion:                  appVersion,
-		diagListener:                messageListener(),
-		enableMetadataRefreshThread: enableMetadataRefreshThread,
-		refreshTimeout:              refreshTimeout,
+		client:                       appinsights.NewTelemetryClientFromConfig(telemetryConfig),
+		appName:                      aiConfig.AppName,
+		appVersion:                   aiConfig.AppVersion,
+		diagListener:                 messageListener(),
+		disableMetadataRefreshThread: aiConfig.DisableMetadataRefreshThread,
+		refreshTimeout:               aiConfig.RefreshTimeout,
 	}
 
-	if th.enableMetadataRefreshThread {
-		go getMetadata(th)
-	} else {
+	if th.disableMetadataRefreshThread {
 		getMetadata(th)
+	} else {
+		go getMetadata(th)
 	}
 
 	return th
@@ -104,14 +122,14 @@ func (th *telemetryHandle) TrackLog(report Report) {
 	//Override few of existing columns with metadata
 	trace.Tags.User().SetAuthUserId(runtime.GOOS)
 	trace.Tags.Operation().SetId(report.Context)
-	trace.Tags.Operation().SetParentId(th.appName)
+	trace.Tags.Operation().SetParentId(th.appVersion)
 
 	// copy app specified custom dimension
 	for key, value := range report.CustomDimensions {
 		trace.Properties[key] = value
 	}
 
-	trace.Properties[appVersionStr] = th.appVersion
+	trace.Properties[appNameStr] = th.appName
 
 	// Acquire read lock to read metadata
 	th.rwmutex.RLock()
@@ -148,6 +166,7 @@ func (th *telemetryHandle) TrackMetric(metric Metric) {
 	if metadata.SubscriptionID != "" {
 		aimetric.Properties[locationStr] = th.metadata.Location
 		aimetric.Properties[subscriptionIDStr] = th.metadata.SubscriptionID
+		aimetric.Properties[vmNameStr] = th.metadata.VMName
 	}
 
 	// copy custom dimensions

@@ -21,17 +21,27 @@ type Metric struct {
 	CustomDimensions map[string]string
 }
 
+type AIConfig struct {
+	AppName                      string
+	AppVersion                   string
+	BatchSize                    int
+	BatchInterval                int
+	DisableMetadataRefreshThread bool
+	RefreshTimeout               int
+	DebugMode                    bool
+}
+
 // TelmetryHandle holds appinsight handles and metadata
 type telemetryHandle struct {
-	telemetryConfig             *appinsights.TelemetryConfiguration
-	appName                     string
-	appVersion                  string
-	metadata                    common.Metadata
-	diagListener                appinsights.DiagnosticsMessageListener
-	client                      appinsights.TelemetryClient
-	enableMetadataRefreshThread bool
-	refreshTimeout              int
-	rwmutex                     sync.RWMutex
+	telemetryConfig              *appinsights.TelemetryConfiguration
+	appName                      string
+	appVersion                   string
+	metadata                     common.Metadata
+	diagListener                 appinsights.DiagnosticsMessageListener
+	client                       appinsights.TelemetryClient
+	disableMetadataRefreshThread bool
+	refreshTimeout               int
+	rwmutex                      sync.RWMutex
 }
 
 // Telemetry Interface to send metrics/Logs to appinsights
