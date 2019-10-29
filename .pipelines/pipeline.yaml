@@ -80,6 +80,7 @@ stages:
             displayName: "Install Go dependencies"
 
           - script: |
+              echo Building in $(pwd)
               echo Build tag is $(EnvironmentalVariables.Tag)
               export GOOS=linux
               make all-binaries VERSION=$(EnvironmentalVariables.Tag)
@@ -103,7 +104,6 @@ stages:
                 } | { read xs; exit $xs; } 
               } 4>&1
             workingDirectory: "$(modulePath)"
-            failOnStderr: true
             name: "Test"
             displayName: "Run Tests"
 
@@ -111,6 +111,8 @@ stages:
               bash <(curl -s https://codecov.io/bash)
               gocov convert coverage.out > coverage.json
               gocov-xml < coverage.json > coverage.xml
+              echo listing cluster definitions
+              ls $(modulePath)/test/e2e/kubernetes/*
             workingDirectory: "$(modulePath)"
             name: "Coverage"
             displayName: "Generate Coverage Reports"
@@ -140,6 +142,9 @@ stages:
               pathtoPublish: "$(Build.ArtifactStagingDirectory)"
             condition: succeeded()
 
+          - publish: $(modulePath)/test/e2e/kubernetes/
+            artifact: clusterdefinitions
+
           - task: AzureCLI@1
             inputs:
               azureSubscription: $(ARTIFACT_SUBSCRIPTION)
@@ -153,22 +158,41 @@ stages:
       - template: e2e-job-template.yaml
         parameters:
           name: "ubuntu_16_04_linux_e2e"
-          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.4"
-          clusterDefinitionUrl: "https://raw.githubusercontent.com/Azure/azure-container-networking/master/test/e2e/kubernetes/cniLinux.json"
+          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.5"
+          clusterDefinition: "cniLinux1604.json"
           clusterDefinitionCniTypeKey: "azureCNIURLLinux"
           clusterDefinitionCniBuildOS: "linux"
           clusterDefinitionCniBuildExt: ".tgz"
 
       - template: e2e-job-template.yaml
         parameters:
-          name: "windows_e2e"
-          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.4"
-          clusterDefinitionUrl: "https://raw.githubusercontent.com/Azure/azure-container-networking/master/test/e2e/kubernetes/cniWindows.json"
+          name: "ubuntu_18_04_linux_e2e"
+          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.5"
+          clusterDefinition: "cniLinux1804.json"
+          clusterDefinitionCniTypeKey: "azureCNIURLLinux"
+          clusterDefinitionCniBuildOS: "linux"
+          clusterDefinitionCniBuildExt: ".tgz"
+
+      - template: e2e-job-template.yaml
+        parameters:
+          name: "windows_18_09_e2e"
+          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.5"
+          clusterDefinition: "cniWindows1809.json"
+          clusterDefinitionCniTypeKey: "azureCNIURLWindows"
+          clusterDefinitionCniBuildOS: "windows"
+          clusterDefinitionCniBuildExt: ".zip"
+
+      - template: e2e-job-template.yaml
+        parameters:
+          name: "windows_19_03_e2e"
+          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.5"
+          clusterDefinition: "cniWindows1903.json"
           clusterDefinitionCniTypeKey: "azureCNIURLWindows"
           clusterDefinitionCniBuildOS: "windows"
           clusterDefinitionCniBuildExt: ".zip"
 
   - stage: cleanup
+    condition: always()
     jobs:
       - job: delete_remote_artifacts
         pool:
@@ -178,7 +202,7 @@ stages:
           image: containernetworking/pipeline-ci:1.0.4
         variables:
           Tag: $[ dependencies.unit_tests.outputs['EnvironmentalVariables.Tag'] ]
-
+        condition: always()
         steps:
           - checkout: none
           - task: AzureCLI@1
@@ -190,3 +214,4 @@ stages:
                 az storage container delete -n acn-$CommitHash --account-name $(STORAGE_ACCOUNT_NAME)
               workingDirectory: "$(modulePath)"
             displayName: Cleanup remote Azure storage container
+            condition: always()

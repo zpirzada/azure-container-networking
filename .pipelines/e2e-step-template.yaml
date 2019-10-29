@@ -1,6 +1,6 @@
 parameters:
   name: ""
-  clusterDefinitionUrl: ""
+  clusterDefinition: ""
   clusterDefinitionCniTypeKey: ""
   clusterDefinitionCniBuildOS: ""
   clusterDefinitionCniBuildExt: ""
@@ -19,16 +19,24 @@ steps:
     name: "GoEnv"
     displayName: "Set up the Go environment"
 
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      buildType: current
+      artifactName: clusterdefinitions
+      targetPath: "$(modulePath)"
+      #buildType: 'current' # Options: current, specific
+      #project: # Required when buildType == Specific
+
   - bash: |
-      rm -f clusterDefinition.json*
-      wget '${{ parameters.clusterDefinitionUrl }}' -O clusterDefinition.json
+      ls -lah
       export CNI_URL='"'https://$(ARTIFACT_STORAGE).blob.core.windows.net/acn-$(CommitHash)/azure-vnet-cni-${{ parameters.clusterDefinitionCniBuildOS }}-amd64-$(Tag)${{ parameters.clusterDefinitionCniBuildExt }}'"'
       export CNI_TYPE=${{ parameters.clusterDefinitionCniTypeKey }}
       echo CNI type is $CNI_TYPE
-      sed -i "s|\"$CNI_TYPE\":\".*\"|\"$CNI_TYPE\":$CNI_URL|g" clusterDefinition.json
-      sed -i "s|\"azureCNIVersion\":\".*\"|\"azureCNIVersion\":\"$(Tag)\"|g" clusterDefinition.json
+      sed -i "s|\"$CNI_TYPE\":\".*\"|\"$CNI_TYPE\":$CNI_URL|g" '${{ parameters.clusterDefinition }}'
+      sed -i "s|\"azureCNIVersion\":\".*\"|\"azureCNIVersion\":\"$(Tag)\"|g" '${{ parameters.clusterDefinition }}'
       echo "Running E2E tests against a cluster built with the following API model:"
-      cat ./clusterDefinition.json
+      cat '${{ parameters.clusterDefinition }}'
+      cp ${{ parameters.clusterDefinition }} clusterDefinition.json
       curl -L https://dl.k8s.io/v1.16.0/kubernetes-client-linux-amd64.tar.gz | tar xvzf -
       sudo cp kubernetes/client/bin/kubectl /usr/local/bin/kubectl
       sudo cp kubernetes/client/bin/kubectl /usr/local/bin/k
@@ -38,7 +46,7 @@ steps:
     workingDirectory: "$(modulePath)"
 
   - bash: |
-      export CLUSTER_DEFINITION=./clusterDefinition.json 
+      export CLUSTER_DEFINITION=./'${{ parameters.clusterDefinition }}'
       export ORCHESTRATOR=kubernetes 
       export CREATE_VNET=false 
       export TIMEOUT=10m 
@@ -50,6 +58,16 @@ steps:
       export REGIONS=$(AKS_ENGINE_REGION) 
       export IS_JENKINS=false 
       make test-kubernetes
+      mkdir -p $(Build.ArtifactStagingDirectory)/kube-${{ parameters.name }}
+      cp -r _output/k*/kubeconfig/kubeconfig.$REGIONS.json $(Build.ArtifactStagingDirectory)/kube-${{ parameters.name }}
+      cp -r _output/kubernetes-*-ssh $(Build.ArtifactStagingDirectory)/kube-${{ parameters.name }}
     name: DeployAKSEngine
     displayName: Deploy AKS-Engine
     workingDirectory: "$(modulePath)"
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      artifactName: "kube-${{ parameters.name }}"
+      pathtoPublish: "$(Build.ArtifactStagingDirectory)/kube-${{ parameters.name }}"
+    displayName: "Save cluster configs"
+    condition: always()
