@@ -10,10 +10,7 @@ import (
 )
 
 func isValidPod(podObj *corev1.Pod) bool {
-	return podObj.Status.Phase != corev1.PodPhase(util.KubePodStatusFailedFlag) &&
-		podObj.Status.Phase != corev1.PodPhase(util.KubePodStatusSucceededFlag) &&
-		podObj.Status.Phase != corev1.PodPhase(util.KubePodStatusUnknownFlag) &&
-		len(podObj.Status.PodIP) > 0
+	return len(podObj.Status.PodIP) > 0
 }
 
 func isSystemPod(podObj *corev1.Pod) bool {
@@ -142,7 +139,7 @@ func (npMgr *NetworkPolicyManager) DeletePod(podObj *corev1.Pod) error {
 		if err = ipsMgr.DeleteFromSet(podLabelKey, podIP); err != nil {
 			log.Errorf("Error: failed to delete pod from label ipset.")
 			return err
-		}		
+		}
 
 		label := podLabelKey + ":" + podLabelVal
 		log.Printf("Deleting pod %s from ipset %s", podIP, label)

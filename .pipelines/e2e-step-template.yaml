@@ -29,11 +29,15 @@ steps:
 
   - bash: |
       ls -lah
-      export CNI_URL='"'https://$(ARTIFACT_STORAGE).blob.core.windows.net/acn-$(CommitHash)/azure-vnet-cni-${{ parameters.clusterDefinitionCniBuildOS }}-amd64-$(Tag)${{ parameters.clusterDefinitionCniBuildExt }}'"'
+      export CNI_URL=https://$(ARTIFACT_STORAGE).blob.core.windows.net/acn-$(CommitHash)/azure-vnet-cni-${{ parameters.clusterDefinitionCniBuildOS }}-amd64-$(Tag)${{ parameters.clusterDefinitionCniBuildExt }}
       export CNI_TYPE=${{ parameters.clusterDefinitionCniTypeKey }}
       echo CNI type is $CNI_TYPE
-      sed -i "s|\"$CNI_TYPE\":\".*\"|\"$CNI_TYPE\":$CNI_URL|g" '${{ parameters.clusterDefinition }}'
-      sed -i "s|\"azureCNIVersion\":\".*\"|\"azureCNIVersion\":\"$(Tag)\"|g" '${{ parameters.clusterDefinition }}'
+      #sed -i "s|\"$CNI_TYPE\":\".*\"|\"$CNI_TYPE\":$CNI_URL|g" '${{ parameters.clusterDefinition }}'	      
+      # sed -i "s|\"$CNI_TYPE\":\".*\"|\"$CNI_TYPE\":$CNI_URL|g" '${{ parameters.clusterDefinition }}'
+      cat '${{ parameters.clusterDefinition }}' | jq --arg cnikey $CNI_TYPE --arg cniurl $CNI_URL '.properties.orchestratorProfile.kubernetesConfig[$cnikey]= $cniurl' > '${{ parameters.clusterDefinition }}'.tmp	      #
+      # sed -i "s|\"azureCNIVersion\":\".*\"|\"azureCNIVersion\":\"$(Tag)\"|g" '${{ parameters.clusterDefinition }}'
+      #sed -i "s|\"azureCNIVersion\":\".*\"|\"azureCNIVersion\":\"$(Tag)\"|g" '${{ parameters.clusterDefinition }}'	
+      cat '${{ parameters.clusterDefinition }}'.tmp | jq --arg tag $(Tag) '.properties.orchestratorProfile.kubernetesConfig.azureCNIVersion = $tag' > '${{ parameters.clusterDefinition }}'
       echo "Running E2E tests against a cluster built with the following API model:"
       cat '${{ parameters.clusterDefinition }}'
       cp ${{ parameters.clusterDefinition }} clusterDefinition.json
@@ -61,6 +65,10 @@ steps:
       mkdir -p $(Build.ArtifactStagingDirectory)/kube-${{ parameters.name }}
       cp -r _output/k*/kubeconfig/kubeconfig.$REGIONS.json $(Build.ArtifactStagingDirectory)/kube-${{ parameters.name }}
       cp -r _output/kubernetes-*-ssh $(Build.ArtifactStagingDirectory)/kube-${{ parameters.name }}
+      echo "Deleting work directory"
+      sudo rm -rf ./
+      echo "Deleting file in GOPATH"
+      sudo rm -rf '$(GOPATH)'
     name: DeployAKSEngine
     displayName: Deploy AKS-Engine
     workingDirectory: "$(modulePath)"

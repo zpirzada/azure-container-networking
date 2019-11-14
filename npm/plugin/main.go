@@ -62,8 +62,6 @@ func main() {
 
 	go npMgr.SendNpmTelemetry()
 
-	time.Sleep(time.Second * waitForTelemetryInSeconds)
-
 	if err = npMgr.Start(wait.NeverStop); err != nil {
 		log.Logf("npm failed with error %v.", err)
 		panic(err.Error)

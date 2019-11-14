@@ -964,9 +964,9 @@ func getAllowKubeSystemEntries(ns string, targetSelector metav1.LabelSelector) [
 // 3. iptables entries generated from the input network policy object.
 func translatePolicy(npObj *networkingv1.NetworkPolicy) ([]string, []string, []*iptm.IptEntry) {
 	var (
-		resultSets          []string
-		resultLists         []string
-		entries             []*iptm.IptEntry
+		resultSets            []string
+		resultLists           []string
+		entries               []*iptm.IptEntry
 		hasIngress, hasEgress bool
 	)
 
@@ -1010,7 +1010,15 @@ func translatePolicy(npObj *networkingv1.NetworkPolicy) ([]string, []string, []*
 			resultSets = append(resultSets, ingressSets...)
 			resultLists = append(resultLists, ingressLists...)
 			entries = append(entries, ingressEntries...)
-			hasIngress = true
+
+			if npObj.Spec.Ingress != nil &&
+				len(npObj.Spec.Ingress) == 1 &&
+				len(npObj.Spec.Ingress[0].Ports) == 0 &&
+				len(npObj.Spec.Ingress[0].From) == 0 {
+				hasIngress = false
+			} else {
+				hasIngress = true
+			}
 		}
 
 		if ptype == networkingv1.PolicyTypeEgress {
@@ -1018,12 +1026,20 @@ func translatePolicy(npObj *networkingv1.NetworkPolicy) ([]string, []string, []*
 			resultSets = append(resultSets, egressSets...)
 			resultLists = append(resultLists, egressLists...)
 			entries = append(entries, egressEntries...)
-			hasEgress = true
+
+			if npObj.Spec.Egress != nil &&
+				len(npObj.Spec.Egress) == 1 &&
+				len(npObj.Spec.Egress[0].Ports) == 0 &&
+				len(npObj.Spec.Egress[0].To) == 0 {
+				hasEgress = false
+			} else {
+				hasEgress = true
+			}
 		}
 	}
 
 	entries = append(entries, getDefaultDropEntries(npNs, npObj.Spec.PodSelector, hasIngress, hasEgress)...)
-
+	log.Printf("Translating Policy: %+v", npObj)
 	resultSets, resultLists = util.UniqueStrSlice(resultSets), util.UniqueStrSlice(resultLists)
 
 	return resultSets, resultLists, entries

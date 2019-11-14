@@ -3,8 +3,8 @@
 package npm
 
 import (
-	"github.com/Azure/azure-container-networking/npm/iptm"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/npm/iptm"
 	"github.com/Azure/azure-container-networking/npm/util"
 	networkingv1 "k8s.io/api/networking/v1"
 )
@@ -33,7 +33,7 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 		ns  *namespace
 	)
 
-	npNs, npName := "ns-" + npObj.ObjectMeta.Namespace, npObj.ObjectMeta.Name
+	npNs, npName := "ns-"+npObj.ObjectMeta.Namespace, npObj.ObjectMeta.Name
 	log.Printf("NETWORK POLICY CREATING: %v", npObj)
 
 	var exists bool
@@ -148,7 +148,7 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 		ns  *namespace
 	)
 
-	npNs, npName := "ns-" + npObj.ObjectMeta.Namespace, npObj.ObjectMeta.Name
+	npNs, npName := "ns-"+npObj.ObjectMeta.Namespace, npObj.ObjectMeta.Name
 	log.Printf("NETWORK POLICY DELETING: %v", npObj)
 
 	var exists bool
@@ -178,14 +178,14 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 		if err != nil {
 			log.Printf("Error deducting policy %s from %s", npName, oldPolicy.ObjectMeta.Name)
 		}
-		
+
 		if deductedPolicy == nil {
 			delete(ns.processedNpMap, hashedSelector)
 		} else {
 			ns.processedNpMap[hashedSelector] = deductedPolicy
 		}
 	}
-	
+
 	if npMgr.canCleanUpNpmChains() {
 		if err = iptMgr.UninitNpmChains(); err != nil {
 			log.Errorf("Error: failed to uninitialize azure-npm chains.")

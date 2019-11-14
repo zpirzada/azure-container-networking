@@ -123,6 +123,10 @@ func main() {
 
 	log.Logf("read config returned %+v", config)
 
+	// Cleaning up orphan socket if present
+	tbtemp := telemetry.NewTelemetryBuffer("")
+	tbtemp.Cleanup(telemetry.FdName)
+
 	for {
 		tb = telemetry.NewTelemetryBuffer("")
 
