@@ -6,7 +6,12 @@ package network
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"net/http"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/cns"
@@ -35,11 +40,32 @@ const (
 	CNI_UPDATE = "UPDATE"
 )
 
+const (
+	// URL to query NMAgent version and determine whether we snat on host
+	nmAgentSupportedApisURL = "http://168.63.129.16/machine/plugins/?comp=nmagent&type=GetSupportedApis"
+	// Only SNAT support (no DNS support)
+	nmAgentSnatSupportAPI = "NetworkManagementSnatSupport"
+	// SNAT and DNS are both supported
+	nmAgentSnatAndDnsSupportAPI = "NetworkManagementDNSSupport"
+)
+
+// temporary consts related func determineSnat() which is to be deleted after
+// a baking period with newest NMAgent changes
+const (
+	jsonFileExtension = ".json"
+)
+
 // NetPlugin represents the CNI network plugin.
 type netPlugin struct {
 	*cni.Plugin
 	nm     network.NetworkManager
 	report *telemetry.CNIReport
+}
+
+// snatConfiguration contains a bool that determines whether CNI enables snat on host and snat for dns
+type snatConfiguration struct {
+	EnableSnatOnHost bool
+	EnableSnatForDns bool
 }
 
 // NewPlugin creates a new netPlugin object.
@@ -190,6 +216,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		subnetPrefix     net.IPNet
 		cnsNetworkConfig *cns.GetNetworkContainerResponse
 		enableInfraVnet  bool
+		enableSnatForDns bool
 		nwDNSInfo        network.DNSInfo
 	)
 
@@ -204,6 +231,13 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	}
 
 	log.Printf("[cni-net] Read network configuration %+v.", nwCfg)
+
+	// Temporary if block to determing whether we disable SNAT on host (for multi-tenant scenario only)
+	if nwCfg.MultiTenancy {
+		if enableSnatForDns, nwCfg.EnableSnatOnHost, err = determineSnat(); err != nil {
+			return err
+		}
+	}
 
 	plugin.setCNIReportDetails(nwCfg, CNI_ADD, "")
 
@@ -453,6 +487,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		EnableSnatOnHost:   nwCfg.EnableSnatOnHost,
 		EnableMultiTenancy: nwCfg.MultiTenancy,
 		EnableInfraVnet:    enableInfraVnet,
+		EnableSnatForDns:   enableSnatForDns,
 		PODName:            k8sPodName,
 		PODNameSpace:       k8sNamespace,
 		SkipHotAttachEp:    false, // Hot attach at the time of endpoint creation
@@ -854,4 +889,69 @@ func (plugin *netPlugin) Update(args *cniSkel.CmdArgs) error {
 	plugin.setCNIReportDetails(nwCfg, CNI_UPDATE, msg)
 
 	return nil
+}
+
+// Temporary function to determine whether we need to disable SNAT due to NMAgent support
+func determineSnat() (bool, bool, error) {
+	var (
+		snatConfig            snatConfiguration
+		retrieveSnatConfigErr error
+		jsonFile              *os.File
+		httpClient            = &http.Client{Timeout: time.Second * 5}
+		snatConfigFile        = snatConfigFileName + jsonFileExtension
+	)
+
+	// Check if we've already retrieved NMAgent version and determined whether to disable snat on host
+	if jsonFile, retrieveSnatConfigErr = os.Open(snatConfigFile); retrieveSnatConfigErr == nil {
+		bytes, _ := ioutil.ReadAll(jsonFile)
+		jsonFile.Close()
+		if retrieveSnatConfigErr = json.Unmarshal(bytes, &snatConfig); retrieveSnatConfigErr != nil {
+			log.Errorf("[cni-net] failed to unmarshal to snatConfig with error %v",
+				retrieveSnatConfigErr)
+		}
+
+	}
+
+	// If we weren't able to retrieve snatConfiguration, query NMAgent
+	if retrieveSnatConfigErr != nil {
+		var resp *http.Response
+		resp, retrieveSnatConfigErr = httpClient.Get(nmAgentSupportedApisURL)
+		if retrieveSnatConfigErr == nil {
+			defer resp.Body.Close()
+
+			if resp.StatusCode == http.StatusOK {
+				var bodyBytes []byte
+				// if the list of APIs (strings) contains the nmAgentSnatSupportAPI we will disable snat on host
+				if bodyBytes, retrieveSnatConfigErr = ioutil.ReadAll(resp.Body); retrieveSnatConfigErr == nil {
+					bodyStr := string(bodyBytes)
+					if !strings.Contains(bodyStr, nmAgentSnatAndDnsSupportAPI) {
+						snatConfig.EnableSnatForDns = true
+						snatConfig.EnableSnatOnHost = !strings.Contains(bodyStr, nmAgentSnatSupportAPI)
+					}
+
+					jsonStr, _ := json.Marshal(snatConfig)
+					fp, err := os.OpenFile(snatConfigFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(0664))
+					if err == nil {
+						fp.Write(jsonStr)
+						fp.Close()
+					} else {
+						log.Printf("[cni-net] failed to save snatConfig")
+					}
+				}
+			} else {
+				retrieveSnatConfigErr = fmt.Errorf("nmagent request status code %d", resp.StatusCode)
+			}
+		}
+	}
+
+	// Log and return the error when we fail acquire snat configuration for host and dns
+	if retrieveSnatConfigErr != nil {
+		log.Errorf("[cni-net] failed to acquire SNAT configuration with error %v",
+			retrieveSnatConfigErr)
+		return snatConfig.EnableSnatForDns, snatConfig.EnableSnatOnHost, retrieveSnatConfigErr
+	}
+
+	log.Printf("[cni-net] EnableSnatOnHost set to %t; EnableSnatForDns set to %t", snatConfig.EnableSnatOnHost, snatConfig.EnableSnatForDns)
+
+	return snatConfig.EnableSnatForDns, snatConfig.EnableSnatOnHost, nil
 }

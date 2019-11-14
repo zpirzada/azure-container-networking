@@ -45,20 +45,37 @@ type KVPairRoute struct {
 	NeedEncap         bool          `json:"NeedEncap"`
 }
 
+var ValidWinVerForDnsNat bool
+
 // SerializePolicies serializes policies to json.
-func SerializePolicies(policyType CNIPolicyType, policies []Policy, epInfoData map[string]interface{}) []json.RawMessage {
-	var jsonPolicies []json.RawMessage
+func SerializePolicies(policyType CNIPolicyType, policies []Policy, epInfoData map[string]interface{}, enableSnatForDns, enableMultiTenancy bool) []json.RawMessage {
+	var (
+		jsonPolicies     []json.RawMessage
+		snatAndSerialize = enableMultiTenancy && enableSnatForDns
+	)
+
 	for _, policy := range policies {
 		if policy.Type == policyType {
 			if isPolicyTypeOutBoundNAT := IsPolicyTypeOutBoundNAT(policy); isPolicyTypeOutBoundNAT {
-				if serializedOutboundNatPolicy, err := SerializeOutBoundNATPolicy(policy, epInfoData); err != nil {
-					log.Printf("Failed to serialize OutBoundNAT policy")
-				} else {
-					jsonPolicies = append(jsonPolicies, serializedOutboundNatPolicy)
+				if snatAndSerialize || !enableMultiTenancy {
+					if serializedOutboundNatPolicy, err := SerializeOutBoundNATPolicy(policy, epInfoData); err != nil {
+						log.Printf("Failed to serialize OutBoundNAT policy")
+					} else {
+						jsonPolicies = append(jsonPolicies, serializedOutboundNatPolicy)
+					}
 				}
 			} else {
 				jsonPolicies = append(jsonPolicies, policy.Data)
 			}
+		}
+	}
+
+	if snatAndSerialize && ValidWinVerForDnsNat {
+		// SerializePolicies is only called for HnsV1 operations
+		if serializedDnsNatPolicy, err := AddDnsNATPolicyV1(); err != nil {
+			log.Printf("Failed to serialize DnsNAT policy")
+		} else {
+			jsonPolicies = append(jsonPolicies, serializedDnsNatPolicy)
 		}
 	}
 	return jsonPolicies
@@ -327,8 +344,11 @@ func GetHcnPortMappingPolicy(policy Policy) (hcn.EndpointPolicy, error) {
 }
 
 // GetHcnEndpointPolicies returns array of all endpoint policies.
-func GetHcnEndpointPolicies(policyType CNIPolicyType, policies []Policy, epInfoData map[string]interface{}) ([]hcn.EndpointPolicy, error) {
-	var hcnEndPointPolicies []hcn.EndpointPolicy
+func GetHcnEndpointPolicies(policyType CNIPolicyType, policies []Policy, epInfoData map[string]interface{}, enableSnatForDns, enableMultiTenancy bool) ([]hcn.EndpointPolicy, error) {
+	var (
+		hcnEndPointPolicies []hcn.EndpointPolicy
+		snatAndSerialize    = enableMultiTenancy && enableSnatForDns
+	)
 	for _, policy := range policies {
 		if policy.Type == policyType {
 			var err error
@@ -356,5 +376,34 @@ func GetHcnEndpointPolicies(policyType CNIPolicyType, policies []Policy, epInfoD
 		}
 	}
 
+	if snatAndSerialize && ValidWinVerForDnsNat {
+		dnsNatPolicy, err := AddDnsNATPolicyV2()
+		if err != nil {
+			log.Printf("Failed to retrieve DnsNAT endpoint policy due to error: %v", err)
+			return hcnEndPointPolicies, err
+		}
+
+		hcnEndPointPolicies = append(hcnEndPointPolicies, dnsNatPolicy)
+	}
+
 	return hcnEndPointPolicies, nil
+}
+
+// AddDnsNATPolicyV1 returns serialized DNS NAT policy (json) for HNSv1
+func AddDnsNATPolicyV1() (json.RawMessage, error) {
+	outBoundNatPolicy := hcsshim.OutboundNatPolicy{
+		Policy:       hcsshim.Policy{Type: hcsshim.OutboundNat},
+		Destinations: []string{"168.63.129.16"}}
+	serializedPolicy, err := json.Marshal(outBoundNatPolicy)
+	return serializedPolicy, err
+}
+
+// AddDnsNATPolicyV2 returns DNS NAT endpoint policy for HNSv2
+func AddDnsNATPolicyV2() (hcn.EndpointPolicy, error) {
+	outBoundNatPolicySettings := hcn.OutboundNatPolicySetting{Destinations: []string{"168.63.129.16"}}
+	outBoundNatPolicySettingsBytes, err := json.Marshal(outBoundNatPolicySettings)
+	endpointPolicy := hcn.EndpointPolicy{
+		Type:     hcn.OutBoundNAT,
+		Settings: outBoundNatPolicySettingsBytes}
+	return endpointPolicy, err
 }

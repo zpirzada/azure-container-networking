@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -13,10 +15,17 @@ import (
 	"github.com/Azure/azure-container-networking/network"
 	"github.com/Azure/azure-container-networking/network/policy"
 	"github.com/Microsoft/hcsshim"
+	"golang.org/x/sys/windows/registry"
 
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
 	cniTypesCurr "github.com/containernetworking/cni/pkg/types/current"
+)
+
+var (
+	snatConfigFileName = filepath.FromSlash(os.Getenv("TEMP")) + "\\snatConfig"
+	// windows build for version 1903
+	win1903Version = 18362
 )
 
 /* handleConsecutiveAdd handles consecutive add calls for infrastructure containers on Windows platform.
@@ -73,6 +82,9 @@ func handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId string, nwInfo *netw
 func addDefaultRoute(gwIPString string, epInfo *network.EndpointInfo, result *cniTypesCurr.Result) {
 }
 
+func addSnatForDNS(gwIPString string, epInfo *network.EndpointInfo, result *cniTypesCurr.Result) {
+}
+
 func addInfraRoutes(azIpamResult *cniTypesCurr.Result, result *cniTypesCurr.Result, epInfo *network.EndpointInfo) {
 }
 
@@ -125,6 +137,7 @@ func getNetworkName(podName, podNs, ifName string, nwCfg *cni.NetworkConfig) (ne
 	networkName = nwCfg.Name
 	err = nil
 	if nwCfg.MultiTenancy {
+		determineWinVer()
 		if len(strings.TrimSpace(podName)) == 0 || len(strings.TrimSpace(podNs)) == 0 {
 			err = fmt.Errorf("POD info cannot be empty. PodName: %s, PodNamespace: %s", podName, podNs)
 			return
@@ -240,5 +253,24 @@ func getCustomDNS(nwCfg *cni.NetworkConfig) network.DNSInfo {
 		Servers: nwCfg.RuntimeConfig.DNS.Servers,
 		Suffix:  search,
 		Options: nwCfg.RuntimeConfig.DNS.Options,
+	}
+}
+
+func determineWinVer() {
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
+	if err == nil {
+		defer k.Close()
+
+		cb, _, err := k.GetStringValue("CurrentBuild")
+		if err == nil {
+			winVer, err := strconv.Atoi(cb)
+			if err == nil {
+				policy.ValidWinVerForDnsNat = winVer >= win1903Version
+			}
+		}
+	}
+
+	if err != nil {
+		log.Errorf(err.Error())
 	}
 }
