@@ -5,6 +5,7 @@ package ipam
 
 import (
 	"encoding/xml"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -17,9 +18,12 @@ import (
 const (
 	// Host URL to query.
 	azureQueryUrl = "http://168.63.129.16/machine/plugins?comp=nmagent&type=getinterfaceinfov1"
-
 	// Minimum time interval between consecutive queries.
 	azureQueryInterval = 10 * time.Second
+	// http connection timeout
+	httpConnectionTimeout = 10
+	// http response header timeout
+	responseHeaderTimeout = 10
 )
 
 // Microsoft Azure IPAM configuration source.
@@ -84,13 +88,26 @@ func (s *azureSource) refresh() error {
 		return err
 	}
 
+	httpClient := common.InitHttpClient(httpConnectionTimeout, responseHeaderTimeout)
+	if httpClient == nil {
+		log.Errorf("[ipam] Failed intializing http client")
+		return fmt.Errorf("Error intializing http client")
+	}
+
+	log.Printf("[ipam] Wireserver call %v to retrieve IP List", s.queryUrl)
 	// Fetch configuration.
-	resp, err := http.Get(s.queryUrl)
+	resp, err := httpClient.Get(s.queryUrl)
 	if err != nil {
+		log.Printf("[ipam] wireserver call failed with: %v", err)
 		return err
 	}
 
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("[ipam] http return error code for wireserver call %+v", resp)
+		return fmt.Errorf("wireserver http error %+v", resp)
+	}
 
 	// Decode XML document.
 	var doc common.XmlDocument

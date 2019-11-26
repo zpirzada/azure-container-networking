@@ -51,7 +51,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Create the plugin.
-	plugin, err = NewPlugin(&config)
+	plugin, err = NewPlugin("ipamtest", &config)
 	if err != nil {
 		fmt.Printf("Failed to create IPAM plugin, err:%v.\n", err)
 		return

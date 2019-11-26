@@ -19,11 +19,6 @@ import (
 	cniTypesCurr "github.com/containernetworking/cni/pkg/types/current"
 )
 
-const (
-	// Plugin name.
-	name = "azure-vnet-ipam"
-)
-
 var (
 	ipv4DefaultRouteDstPrefix = net.IPNet{net.IPv4zero, net.IPv4Mask(0, 0, 0, 0)}
 )
@@ -35,7 +30,7 @@ type ipamPlugin struct {
 }
 
 // NewPlugin creates a new ipamPlugin object.
-func NewPlugin(config *common.PluginConfig) (*ipamPlugin, error) {
+func NewPlugin(name string, config *common.PluginConfig) (*ipamPlugin, error) {
 	// Setup base plugin.
 	plugin, err := cni.NewPlugin(name, config.Version)
 	if err != nil {

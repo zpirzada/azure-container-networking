@@ -10,6 +10,11 @@ import (
 	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/cni/ipam"
 	"github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/log"
+)
+
+const (
+	name = "azure-vnet-ipam"
 )
 
 // Version is populated by make during build.
@@ -20,7 +25,16 @@ func main() {
 	var config common.PluginConfig
 	config.Version = version
 
-	ipamPlugin, err := ipam.NewPlugin(&config)
+	log.SetName(name)
+	log.SetLevel(log.LevelInfo)
+	if err := log.SetTarget(log.TargetLogfile); err != nil {
+		fmt.Printf("Failed to setup cni logging: %v\n", err)
+		return
+	}
+
+	defer log.Close()
+
+	ipamPlugin, err := ipam.NewPlugin(name, &config)
 	if err != nil {
 		fmt.Printf("Failed to create IPAM plugin, err:%v.\n", err)
 		os.Exit(1)
