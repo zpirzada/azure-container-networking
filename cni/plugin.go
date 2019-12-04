@@ -6,6 +6,7 @@ package cni
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"runtime"
 
@@ -186,9 +187,9 @@ func (plugin *Plugin) InitializeKeyValueStore(config *common.PluginConfig) error
 }
 
 // Uninitialize key-value store
-func (plugin *Plugin) UninitializeKeyValueStore() error {
+func (plugin *Plugin) UninitializeKeyValueStore(force bool) error {
 	if plugin.Store != nil {
-		err := plugin.Store.Unlock(false)
+		err := plugin.Store.Unlock(force)
 		if err != nil {
 			log.Printf("[cni] Failed to unlock store: %v.", err)
 			return err
@@ -197,4 +198,45 @@ func (plugin *Plugin) UninitializeKeyValueStore() error {
 	plugin.Store = nil
 
 	return nil
+}
+
+// check if safe to remove lockfile
+func (plugin *Plugin) IsSafeToRemoveLock(processName string) (bool, error) {
+	if plugin != nil && plugin.Store != nil {
+		// check if get process command supported
+		if cmdErr := platform.GetProcessSupport(); cmdErr != nil {
+			log.Errorf("Get process cmd not supported. Error %v", cmdErr)
+			return false, cmdErr
+		}
+
+		// Read pid from lockfile
+		lockFileName := plugin.Store.GetLockFileName()
+		content, err := ioutil.ReadFile(lockFileName)
+		if err != nil {
+			log.Errorf("Failed to read lock file :%v, ", err)
+			return false, err
+		}
+
+		if len(content) <= 0 {
+			log.Errorf("Num bytes read from lock file is 0")
+			return false, fmt.Errorf("Num bytes read from lock file is 0")
+		}
+
+		log.Printf("Read from Lock file:%s", content)
+		// Get the process name if running and
+		// check if that matches with our expected process
+		pName, err := platform.GetProcessNameByID(string(content))
+		if err != nil {
+			return true, nil
+		}
+
+		log.Printf("[CNI] Process name is %s", pName)
+
+		if pName != processName {
+			return true, nil
+		}
+	}
+
+	log.Errorf("Plugin store is nil")
+	return false, fmt.Errorf("plugin store nil")
 }

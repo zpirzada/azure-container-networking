@@ -241,3 +241,7 @@ func (kvs *jsonFileStore) GetLockFileModificationTime() (time.Time, error) {
 
 	return info.ModTime().UTC(), nil
 }
+
+func (kvs *jsonFileStore) GetLockFileName() string {
+	return kvs.fileName + lockExtension
+}

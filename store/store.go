@@ -17,6 +17,7 @@ type KeyValueStore interface {
 	Unlock(forceUnlock bool) error
 	GetModificationTime() (time.Time, error)
 	GetLockFileModificationTime() (time.Time, error)
+	GetLockFileName() string
 }
 
 var (
