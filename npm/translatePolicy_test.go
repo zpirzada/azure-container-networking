@@ -603,7 +603,7 @@ func TestTranslateIngress(t *testing.T) {
 	}
 
 	util.IsNewNwPolicyVerFlag = true
-	sets, lists, iptEntries := translateIngress(ns, targetSelector, rules)
+	sets, lists, iptEntries, _ := translateIngress(ns, targetSelector, rules)
 	expectedSets := []string{
 		"context:dev",
 		"testNotIn:frontend",
@@ -633,33 +633,6 @@ func TestTranslateIngress(t *testing.T) {
 	}
 
 	expectedIptEntries := []*iptm.IptEntry{
-		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
-			Specs: []string{
-				util.IptablesProtFlag,
-				string(v1.ProtocolTCP),
-				util.IptablesDstPortFlag,
-				"6783",
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("context:dev"),
-				util.IptablesDstFlag,
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesNotFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("testNotIn:frontend"),
-				util.IptablesDstFlag,
-				util.IptablesJumpFlag,
-				util.IptablesAzureIngressFromChain,
-				util.IptablesModuleFlag,
-				util.IptablesCommentModuleFlag,
-				util.IptablesCommentFlag,
-				"ALLOW-ALL-TO-TCP-PORT-6783-OF-context:dev-AND-!testNotIn:frontend-TO-JUMP-TO-" +
-					util.IptablesAzureIngressFromChain,
-			},
-		},
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
@@ -765,6 +738,55 @@ func TestTranslateIngress(t *testing.T) {
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
 				"ALLOW-ns-planet:earth-AND-ns-keyExists-AND-region:northpole-AND-!k-TO-context:dev-AND-!testNotIn:frontend",
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressPortChain,
+			Specs: []string{
+				util.IptablesProtFlag,
+				string(v1.ProtocolTCP),
+				util.IptablesDstPortFlag,
+				"6783",
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("context:dev"),
+				util.IptablesDstFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesNotFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("testNotIn:frontend"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAzureIngressFromChain,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-ALL-TO-TCP-PORT-6783-OF-context:dev-AND-!testNotIn:frontend-TO-JUMP-TO-" +
+					util.IptablesAzureIngressFromChain,
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("context:dev"),
+				util.IptablesDstFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesNotFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("testNotIn:frontend"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesDrop,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"DROP-ALL-TO-context:dev-AND-!testNotIn:frontend",
 			},
 		},
 	}
@@ -873,7 +895,7 @@ func TestTranslateEgress(t *testing.T) {
 	}
 
 	util.IsNewNwPolicyVerFlag = true
-	sets, lists, iptEntries := translateEgress(ns, targetSelector, rules)
+	sets, lists, iptEntries, _ := translateEgress(ns, targetSelector, rules)
 	expectedSets := []string{
 		"context:dev",
 		"testNotIn:frontend",
@@ -903,33 +925,6 @@ func TestTranslateEgress(t *testing.T) {
 	}
 
 	expectedIptEntries := []*iptm.IptEntry{
-		&iptm.IptEntry{
-			Chain: util.IptablesAzureEgressPortChain,
-			Specs: []string{
-				util.IptablesProtFlag,
-				string(v1.ProtocolTCP),
-				util.IptablesDstPortFlag,
-				"6783",
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("context:dev"),
-				util.IptablesSrcFlag,
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesNotFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("testNotIn:frontend"),
-				util.IptablesSrcFlag,
-				util.IptablesJumpFlag,
-				util.IptablesAzureEgressToChain,
-				util.IptablesModuleFlag,
-				util.IptablesCommentModuleFlag,
-				util.IptablesCommentFlag,
-				"ALLOW-ALL-FROM-TCP-PORT-6783-OF-context:dev-AND-!testNotIn:frontend-TO-JUMP-TO-" +
-					util.IptablesAzureEgressToChain,
-			},
-		},
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureEgressToChain,
 			Specs: []string{
@@ -1037,6 +1032,55 @@ func TestTranslateEgress(t *testing.T) {
 				"ALLOW-context:dev-AND-!testNotIn:frontend-TO-ns-planet:earth-AND-ns-keyExists-AND-region:northpole-AND-!k",
 			},
 		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureEgressPortChain,
+			Specs: []string{
+				util.IptablesProtFlag,
+				string(v1.ProtocolTCP),
+				util.IptablesDstPortFlag,
+				"6783",
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("context:dev"),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesNotFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("testNotIn:frontend"),
+				util.IptablesSrcFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAzureEgressToChain,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-ALL-FROM-TCP-PORT-6783-OF-context:dev-AND-!testNotIn:frontend-TO-JUMP-TO-" +
+					util.IptablesAzureEgressToChain,
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureEgressToChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("context:dev"),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesNotFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("testNotIn:frontend"),
+				util.IptablesSrcFlag,
+				util.IptablesJumpFlag,
+				util.IptablesDrop,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"DROP-ALL-FROM-context:dev-AND-!testNotIn:frontend",
+			},
+		},
 	}
 
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
@@ -1081,10 +1125,6 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries := []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
 	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ deny-all-policy policy comparison")
@@ -1145,12 +1185,29 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
 
 	nonKubeSystemEntries := []*iptm.IptEntry{
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:frontend"),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:backend"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAccept,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-app:frontend-TO-app:backend",
+			},
+		},
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressPortChain,
 			Specs: []string{
@@ -1174,24 +1231,18 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
 				util.IptablesMatchSetFlag,
-				util.GetHashedName("app:frontend"),
-				util.IptablesSrcFlag,
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
 				util.GetHashedName("app:backend"),
 				util.IptablesDstFlag,
 				util.IptablesJumpFlag,
-				util.IptablesAccept,
+				util.IptablesDrop,
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-app:frontend-TO-app:backend",
+				"DROP-ALL-TO-app:backend",
 			},
 		},
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-app:frontend-TO-app:backend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1242,10 +1293,6 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
 
 	nonKubeSystemEntries = []*iptm.IptEntry{
 		&iptm.IptEntry{
@@ -1318,10 +1365,6 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
 	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-none-TO-app:frontend-policy policy comparison")
@@ -1378,12 +1421,28 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
-
 	nonKubeSystemEntries = []*iptm.IptEntry{
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("ns-testnamespace"),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:frontend"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAccept,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-ns-testnamespace-TO-app:frontend",
+			},
+		},
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressPortChain,
 			Specs: []string{
@@ -1407,24 +1466,19 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
 				util.IptablesMatchSetFlag,
-				util.GetHashedName("ns-testnamespace"),
-				util.IptablesSrcFlag,
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
 				util.GetHashedName("app:frontend"),
 				util.IptablesDstFlag,
 				util.IptablesJumpFlag,
-				util.IptablesAccept,
+				util.IptablesDrop,
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-ns-testnamespace-TO-app:frontend",
+				"DROP-ALL-TO-app:frontend",
 			},
 		},
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ns-testnamespace-TO-app:frontend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1480,12 +1534,28 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
-
 	nonKubeSystemEntries = []*iptm.IptEntry{
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName(util.KubeAllNamespacesFlag),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:frontend"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAccept,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-all-namespaces-TO-app:frontend",
+			},
+		},
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressPortChain,
 			Specs: []string{
@@ -1509,24 +1579,19 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
 				util.IptablesMatchSetFlag,
-				util.GetHashedName(util.KubeAllNamespacesFlag),
-				util.IptablesSrcFlag,
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
 				util.GetHashedName("app:frontend"),
 				util.IptablesDstFlag,
 				util.IptablesJumpFlag,
-				util.IptablesAccept,
+				util.IptablesDrop,
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-all-namespaces-TO-app:frontend",
+				"DROP-ALL-TO-app:frontend",
 			},
 		},
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-all-namespaces-TO-app:frontend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1599,29 +1664,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
-
 	nonKubeSystemEntries = []*iptm.IptEntry{
-		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
-			Specs: []string{
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("app:frontend"),
-				util.IptablesDstFlag,
-				util.IptablesJumpFlag,
-				util.IptablesAzureIngressFromChain,
-				util.IptablesModuleFlag,
-				util.IptablesCommentModuleFlag,
-				util.IptablesCommentFlag,
-				"ALLOW-ALL-TO-app:frontend-TO-JUMP-TO-" +
-					util.IptablesAzureIngressFromChain,
-			},
-		},
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
@@ -1655,10 +1698,43 @@ func TestTranslatePolicy(t *testing.T) {
 				"ALLOW-ns-namespace:dev-AND-ns-!namespace:test0-AND-ns-!namespace:test1-TO-app:frontend",
 			},
 		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressPortChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:frontend"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAzureIngressFromChain,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-ALL-TO-app:frontend-TO-JUMP-TO-" +
+					util.IptablesAzureIngressFromChain,
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:frontend"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesDrop,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"DROP-ALL-TO-app:frontend",
+			},
+		},
 	}
 
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ns-namespace:dev-AND-!ns-namespace:test0-AND-!ns-namespace:test1-TO-app:frontend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1728,11 +1804,44 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
 	nonKubeSystemEntries = []*iptm.IptEntry{
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName(util.KubeAllNamespacesFlag),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:frontend"),
+				util.IptablesDstFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesNotFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("k0"),
+				util.IptablesDstFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("k1:v0"),
+				util.IptablesDstFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("k1:v1"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAccept,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-all-namespaces-TO-app:frontend-AND-!k0-AND-k1:v0-AND-k1:v1",
+			},
+		},
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressPortChain,
 			Specs: []string{
@@ -1772,11 +1881,6 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
 				util.IptablesMatchSetFlag,
-				util.GetHashedName(util.KubeAllNamespacesFlag),
-				util.IptablesSrcFlag,
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
 				util.GetHashedName("app:frontend"),
 				util.IptablesDstFlag,
 				util.IptablesModuleFlag,
@@ -1796,17 +1900,17 @@ func TestTranslatePolicy(t *testing.T) {
 				util.GetHashedName("k1:v1"),
 				util.IptablesDstFlag,
 				util.IptablesJumpFlag,
-				util.IptablesAccept,
+				util.IptablesDrop,
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-all-namespaces-TO-app:frontend-AND-!k0-AND-k1:v0-AND-k1:v1",
+				"DROP-ALL-TO-app:frontend-AND-!k0-AND-k1:v0-AND-k1:v1",
 			},
 		},
 	}
 
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ AllOW-all-TO-k0-AND-k1:v0-AND-k1:v1-AND-app:frontend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1874,28 +1978,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
 	nonKubeSystemEntries = []*iptm.IptEntry{
-		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
-			Specs: []string{
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("app:frontend"),
-				util.IptablesDstFlag,
-				util.IptablesJumpFlag,
-				util.IptablesAzureIngressFromChain,
-				util.IptablesModuleFlag,
-				util.IptablesCommentModuleFlag,
-				util.IptablesCommentFlag,
-				"ALLOW-ALL-TO-app:frontend-TO-JUMP-TO-" +
-					util.IptablesAzureIngressFromChain,
-			},
-		},
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
@@ -1922,10 +2005,43 @@ func TestTranslatePolicy(t *testing.T) {
 				"ALLOW-ns-ns:dev-AND-app:backend-TO-app:frontend",
 			},
 		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressPortChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:frontend"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAzureIngressFromChain,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-ALL-TO-app:frontend-TO-JUMP-TO-" +
+					util.IptablesAzureIngressFromChain,
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:frontend"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesDrop,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"DROP-ALL-TO-app:frontend",
+			},
+		},
 	}
 
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ns-ns:dev-AND-app:backend-TO-app:frontend policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1976,11 +2092,6 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
-
 	nonKubeSystemEntries = []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressPortChain,
@@ -2085,12 +2196,28 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
-
 	nonKubeSystemEntries = []*iptm.IptEntry{
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:backend"),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:frontend"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAccept,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-app:backend-TO-app:frontend",
+			},
+		},
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressPortChain,
 			Specs: []string{
@@ -2116,25 +2243,20 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
 				util.IptablesMatchSetFlag,
-				util.GetHashedName("app:backend"),
-				util.IptablesSrcFlag,
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
 				util.GetHashedName("app:frontend"),
 				util.IptablesDstFlag,
 				util.IptablesJumpFlag,
-				util.IptablesAccept,
+				util.IptablesDrop,
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-app:backend-TO-app:frontend",
+				"DROP-ALL-TO-app:frontend",
 			},
 		},
 	}
 
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("dangerous", targetSelector, true, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("dangerous", targetSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ALL-TO-app:backdoor-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2208,34 +2330,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("acn", targetSelector)...,
-	)
-
 	nonKubeSystemEntries = []*iptm.IptEntry{
-		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
-			Specs: []string{
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("app:k8s"),
-				util.IptablesDstFlag,
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("team:aks"),
-				util.IptablesDstFlag,
-				util.IptablesJumpFlag,
-				util.IptablesAzureIngressFromChain,
-				util.IptablesModuleFlag,
-				util.IptablesCommentModuleFlag,
-				util.IptablesCommentFlag,
-				"ALLOW-ALL-TO-app:k8s-AND-team:aks-TO-JUMP-TO-" +
-					util.IptablesAzureIngressFromChain,
-			},
-		},
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
@@ -2298,10 +2393,53 @@ func TestTranslatePolicy(t *testing.T) {
 				"ALLOW-binary:cns-AND-group:container-TO-app:k8s-AND-team:aks",
 			},
 		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressPortChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:k8s"),
+				util.IptablesDstFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("team:aks"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAzureIngressFromChain,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-ALL-TO-app:k8s-AND-team:aks-TO-JUMP-TO-" +
+					util.IptablesAzureIngressFromChain,
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:k8s"),
+				util.IptablesDstFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("team:aks"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesDrop,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"DROP-ALL-TO-app:k8s-AND-team:aks",
+			},
+		},
 	}
 
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("acn", targetSelector, true, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("acn", targetSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-program:cni-AND-team:acn-OR-binary:cns-AND-group:container-TO-app:k8s-AND-team:aks-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2347,10 +2485,6 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
 	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, true)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-none-FROM-app:backend-policy policy comparison")
@@ -2404,11 +2538,6 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
-
 	nonKubeSystemEntries = []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureEgressPortChain,
@@ -2477,10 +2606,6 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("unsafe", targetSelector)...,
-	)
 	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("unsafe", targetSelector, false, true)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-none-FROM-app:backend-policy policy comparison")
@@ -2553,11 +2678,6 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
-
 	nonKubeSystemEntries = []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureEgressPortChain,
@@ -2600,6 +2720,28 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
+			Chain: util.IptablesAzureEgressToChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:frontend"),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName(util.KubeAllNamespacesFlag),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAccept,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-app:frontend-TO-" +
+					util.KubeAllNamespacesFlag,
+			},
+		},
+		&iptm.IptEntry{
 			Chain: util.IptablesAzureEgressPortChain,
 			Specs: []string{
 				util.IptablesModuleFlag,
@@ -2624,23 +2766,17 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesMatchSetFlag,
 				util.GetHashedName("app:frontend"),
 				util.IptablesSrcFlag,
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName(util.KubeAllNamespacesFlag),
-				util.IptablesDstFlag,
 				util.IptablesJumpFlag,
-				util.IptablesAccept,
+				util.IptablesDrop,
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-app:frontend-TO-" +
-					util.KubeAllNamespacesFlag,
+				"DROP-ALL-FROM-app:frontend",
 			},
 		},
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, true)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ALL-FROM-app:frontend-TCP-PORT-53-OR-UDP-PORT-53-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2744,31 +2880,23 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(
-		expectedIptEntries,
-		getAllowKubeSystemEntries("testnamespace", targetSelector)...,
-	)
-
 	nonKubeSystemEntries = []*iptm.IptEntry{
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
-				util.IptablesProtFlag,
-				"TCP",
-				util.IptablesDstPortFlag,
-				"6379",
+				util.IptablesSFlag,
+				"172.17.1.0/24",
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
 				util.IptablesMatchSetFlag,
 				util.GetHashedName("role:db"),
 				util.IptablesDstFlag,
 				util.IptablesJumpFlag,
-				util.IptablesAzureIngressFromChain,
+				util.IptablesDrop,
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-ALL-TO-TCP-PORT-6379-OF-role:db-TO-JUMP-TO-" +
-					util.IptablesAzureIngressFromChain,
+				"DROP-172.17.1.0/24-TO-role:db",
 			},
 		},
 		&iptm.IptEntry{
@@ -2787,24 +2915,6 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
 				"ALLOW-172.17.0.0/16-TO-role:db",
-			},
-		},
-		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
-			Specs: []string{
-				util.IptablesSFlag,
-				"172.17.1.0/24",
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("role:db"),
-				util.IptablesDstFlag,
-				util.IptablesJumpFlag,
-				util.IptablesDrop,
-				util.IptablesModuleFlag,
-				util.IptablesCommentModuleFlag,
-				util.IptablesCommentFlag,
-				"DROP-172.17.1.0/24-TO-role:db",
 			},
 		},
 		&iptm.IptEntry{
@@ -2850,6 +2960,61 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressPortChain,
+			Specs: []string{
+				util.IptablesProtFlag,
+				"TCP",
+				util.IptablesDstPortFlag,
+				"6379",
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("role:db"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAzureIngressFromChain,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-ALL-TO-TCP-PORT-6379-OF-role:db-TO-JUMP-TO-" +
+					util.IptablesAzureIngressFromChain,
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("role:db"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesDrop,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"DROP-ALL-TO-role:db",
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureEgressToChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("role:db"),
+				util.IptablesSrcFlag,
+				util.IptablesDFlag,
+				"10.0.0.0/24",
+				util.IptablesJumpFlag,
+				util.IptablesAccept,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-10.0.0.0/24-FROM-role:db",
+			},
+		},
+		&iptm.IptEntry{
 			Chain: util.IptablesAzureEgressPortChain,
 			Specs: []string{
 				util.IptablesProtFlag,
@@ -2878,19 +3043,17 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesMatchSetFlag,
 				util.GetHashedName("role:db"),
 				util.IptablesSrcFlag,
-				util.IptablesDFlag,
-				"10.0.0.0/24",
 				util.IptablesJumpFlag,
-				util.IptablesAccept,
+				util.IptablesDrop,
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-10.0.0.0/24-FROM-role:db",
+				"DROP-ALL-FROM-role:db",
 			},
 		},
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, true)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ k8s-example-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2900,7 +3063,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 }
 
-func TestAllowPrecedenceOverDeny(t *testing.T) {
+func TestDropPrecedenceOverAllow(t *testing.T) {
 	targetSelector := metav1.LabelSelector{}
 	targetSelectorA := metav1.LabelSelector{
 		MatchLabels: map[string]string{
@@ -3051,28 +3214,6 @@ func TestAllowPrecedenceOverDeny(t *testing.T) {
 	}
 	nonKubeSystemEntries2 := []*iptm.IptEntry{
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
-			Specs: []string{
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("app:test"),
-				util.IptablesDstFlag,
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("testIn:pod-A"),
-				util.IptablesDstFlag,
-				util.IptablesJumpFlag,
-				util.IptablesAzureIngressFromChain,
-				util.IptablesModuleFlag,
-				util.IptablesCommentModuleFlag,
-				util.IptablesCommentFlag,
-				"ALLOW-ALL-TO-app:test-AND-testIn:pod-A-TO-JUMP-TO-" +
-					util.IptablesAzureIngressFromChain,
-			},
-		},
-		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
 				util.IptablesModuleFlag,
@@ -3135,6 +3276,75 @@ func TestAllowPrecedenceOverDeny(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressPortChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:test"),
+				util.IptablesDstFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("testIn:pod-A"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAzureIngressFromChain,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-ALL-TO-app:test-AND-testIn:pod-A-TO-JUMP-TO-" +
+					util.IptablesAzureIngressFromChain,
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:test"),
+				util.IptablesDstFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("testIn:pod-A"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesDrop,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"DROP-ALL-TO-app:test-AND-testIn:pod-A",
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureEgressToChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:test"),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("testIn:pod-A"),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("all-namespaces"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAccept,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-app:test-AND-testIn:pod-A-TO-all-namespaces",
+			},
+		},
+		&iptm.IptEntry{
 			Chain: util.IptablesAzureEgressPortChain,
 			Specs: []string{
 				util.IptablesModuleFlag,
@@ -3169,26 +3379,19 @@ func TestAllowPrecedenceOverDeny(t *testing.T) {
 				util.IptablesMatchSetFlag,
 				util.GetHashedName("testIn:pod-A"),
 				util.IptablesSrcFlag,
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("all-namespaces"),
-				util.IptablesDstFlag,
 				util.IptablesJumpFlag,
-				util.IptablesAccept,
+				util.IptablesDrop,
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-app:test-AND-testIn:pod-A-TO-all-namespaces",
+				"DROP-ALL-FROM-app:test-AND-testIn:pod-A",
 			},
 		},
 	}
 	expectedIptEntries := []*iptm.IptEntry{}
-	expectedIptEntries = append(expectedIptEntries, getAllowKubeSystemEntries("default", targetSelector)...)
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getAllowKubeSystemEntries("default", targetSelectorA)...)
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries2...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("default", targetSelectorA, true, true)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("default", targetSelectorA, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("TestAllowPrecedenceOverDeny failed @ k8s-example-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
