@@ -8,6 +8,7 @@
             "bridge": "azure0",
             "multiTenancy":true,
             "enableSnatOnHost":true,
+            "enableExactMatchForPodName": true,
             "capabilities": {
                 "portMappings": true
             },
