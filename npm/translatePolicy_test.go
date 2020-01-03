@@ -754,7 +754,8 @@ func TestTranslateIngress(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain:       util.IptablesAzureIngressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -1032,7 +1033,8 @@ func TestTranslateEgress(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureEgressPortChain,
+			Chain:       util.IptablesAzureEgressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -1182,7 +1184,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain:       util.IptablesAzureIngressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -1199,7 +1202,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
+			Chain:       util.IptablesAzureIngressFromChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -1429,7 +1433,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain:       util.IptablesAzureIngressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -1446,7 +1451,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
+			Chain:       util.IptablesAzureIngressFromChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -1560,7 +1566,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain:       util.IptablesAzureIngressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -1577,7 +1584,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
+			Chain:       util.IptablesAzureIngressFromChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -1720,7 +1728,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain:       util.IptablesAzureIngressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -1737,7 +1746,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
+			Chain:       util.IptablesAzureIngressFromChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -1882,7 +1892,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain:       util.IptablesAzureIngressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -1915,7 +1926,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
+			Chain:       util.IptablesAzureIngressFromChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -2079,7 +2091,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain:       util.IptablesAzureIngressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -2096,7 +2109,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
+			Chain:       util.IptablesAzureIngressFromChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -2296,7 +2310,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain:       util.IptablesAzureIngressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -2469,7 +2484,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain:       util.IptablesAzureIngressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -2491,7 +2507,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
+			Chain:       util.IptablesAzureIngressFromChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -2849,7 +2866,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureEgressPortChain,
+			Chain:       util.IptablesAzureEgressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -2866,7 +2884,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureEgressToChain,
+			Chain:       util.IptablesAzureEgressToChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -3013,6 +3032,46 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesMatchSetFlag,
 				util.GetHashedName("role:db"),
 				util.IptablesDstFlag,
+				util.IptablesSFlag,
+				"172.17.0.0/16",
+				util.IptablesProtFlag,
+				"TCP",
+				util.IptablesDstPortFlag,
+				"6379",
+				util.IptablesJumpFlag,
+				util.IptablesAccept,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-172.17.0.0/16-:-TCP-PORT-6379-TO-role:db",
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressFromChain,
+			Specs: []string{
+				util.IptablesSFlag,
+				"172.17.1.0/24",
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("role:db"),
+				util.IptablesDstFlag,
+				util.IptablesJumpFlag,
+				util.IptablesDrop,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"DROP-172.17.1.0/24-TO-role:db",
+			},
+		},
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureIngressPortChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("role:db"),
+				util.IptablesDstFlag,
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
 				util.IptablesMatchSetFlag,
@@ -3056,47 +3115,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
-			Specs: []string{
-				util.IptablesSFlag,
-				"172.17.1.0/24",
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("role:db"),
-				util.IptablesDstFlag,
-				util.IptablesJumpFlag,
-				util.IptablesDrop,
-				util.IptablesModuleFlag,
-				util.IptablesCommentModuleFlag,
-				util.IptablesCommentFlag,
-				"DROP-172.17.1.0/24-TO-role:db",
-			},
-		},
-		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
-			Specs: []string{
-				util.IptablesModuleFlag,
-				util.IptablesSetModuleFlag,
-				util.IptablesMatchSetFlag,
-				util.GetHashedName("role:db"),
-				util.IptablesDstFlag,
-				util.IptablesSFlag,
-				"172.17.0.0/16",
-				util.IptablesProtFlag,
-				"TCP",
-				util.IptablesDstPortFlag,
-				"6379",
-				util.IptablesJumpFlag,
-				util.IptablesAccept,
-				util.IptablesModuleFlag,
-				util.IptablesCommentModuleFlag,
-				util.IptablesCommentFlag,
-				"ALLOW-172.17.0.0/16-:-TCP-PORT-6379-TO-role:db",
-			},
-		},
-		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain:       util.IptablesAzureIngressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -3112,7 +3132,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
+			Chain:       util.IptablesAzureIngressFromChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -3150,7 +3171,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureEgressPortChain,
+			Chain:       util.IptablesAzureEgressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -3423,7 +3445,8 @@ func TestDropPrecedenceOverAllow(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
+			Chain:       util.IptablesAzureIngressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -3445,7 +3468,8 @@ func TestDropPrecedenceOverAllow(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
+			Chain:       util.IptablesAzureIngressFromChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -3492,7 +3516,8 @@ func TestDropPrecedenceOverAllow(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureEgressPortChain,
+			Chain:       util.IptablesAzureEgressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -3514,7 +3539,8 @@ func TestDropPrecedenceOverAllow(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureEgressToChain,
+			Chain:       util.IptablesAzureEgressToChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,

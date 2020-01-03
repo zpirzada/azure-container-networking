@@ -242,31 +242,6 @@ func translateIngress(ns string, targetSelector metav1.LabelSelector, rules []ne
 		for _, fromRule := range rule.From {
 			// Handle IPBlock field of NetworkPolicyPeer
 			if fromRule.IPBlock != nil {
-				if len(fromRule.IPBlock.Except) > 0 {
-					for _, except := range fromRule.IPBlock.Except {
-						exceptEntry := &iptm.IptEntry{
-							Chain: util.IptablesAzureIngressFromChain,
-						}
-						exceptEntry.Specs = append(
-							exceptEntry.Specs,
-							util.IptablesSFlag,
-							except,
-						)
-						exceptEntry.Specs = append(exceptEntry.Specs, targetSelectorIptEntrySpec...)
-						exceptEntry.Specs = append(
-							exceptEntry.Specs,
-							util.IptablesJumpFlag,
-							util.IptablesDrop,
-							util.IptablesModuleFlag,
-							util.IptablesCommentModuleFlag,
-							util.IptablesCommentFlag,
-							"DROP-"+except+
-								"-TO-"+targetSelectorComment,
-						)
-						fromRuleEntries = append(fromRuleEntries, exceptEntry)
-					}
-					addedIngressFromEntry = true
-				}
 				if len(fromRule.IPBlock.CIDR) > 0 {
 					if portRuleExists {
 						for _, portRule := range rule.Ports {
@@ -317,6 +292,31 @@ func translateIngress(ns string, targetSelector metav1.LabelSelector, rules []ne
 								"-TO-"+targetSelectorComment,
 						)
 						fromRuleEntries = append(fromRuleEntries, cidrEntry)
+						addedIngressFromEntry = true
+					}
+					if len(fromRule.IPBlock.Except) > 0 {
+						for _, except := range fromRule.IPBlock.Except {
+							exceptEntry := &iptm.IptEntry{
+								Chain: util.IptablesAzureIngressFromChain,
+							}
+							exceptEntry.Specs = append(
+								exceptEntry.Specs,
+								util.IptablesSFlag,
+								except,
+							)
+							exceptEntry.Specs = append(exceptEntry.Specs, targetSelectorIptEntrySpec...)
+							exceptEntry.Specs = append(
+								exceptEntry.Specs,
+								util.IptablesJumpFlag,
+								util.IptablesDrop,
+								util.IptablesModuleFlag,
+								util.IptablesCommentModuleFlag,
+								util.IptablesCommentFlag,
+								"DROP-"+except+
+									"-TO-"+targetSelectorComment,
+							)
+							fromRuleEntries = append(fromRuleEntries, exceptEntry)
+						}
 						addedIngressFromEntry = true
 					}
 				}
@@ -568,14 +568,17 @@ func translateIngress(ns string, targetSelector metav1.LabelSelector, rules []ne
 		}
 	}
 
+	// prepending fromRuleEntries (which is in reverse order) so that they will retain correct ordering
+	// of drop->allow... when the rules are beind prepended to their corresponding chain
 	if len(fromRuleEntries) > 0 {
-		entries = append(entries, fromRuleEntries...)
+		entries = append(fromRuleEntries, entries...)
 	}
 
 	if addedPortEntry && !addedIngressFromEntry {
 		entry := &iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
-			Specs: targetSelectorIptEntrySpec,
+			Chain:       util.IptablesAzureIngressPortChain,
+			Specs:       targetSelectorIptEntrySpec,
+			IsJumpEntry: true,
 		}
 		entry.Specs = append(
 			entry.Specs,
@@ -591,8 +594,9 @@ func translateIngress(ns string, targetSelector metav1.LabelSelector, rules []ne
 		entries = append(entries, entry)
 	} else if addedIngressFromEntry {
 		portEntry := &iptm.IptEntry{
-			Chain: util.IptablesAzureIngressPortChain,
-			Specs: targetSelectorIptEntrySpec,
+			Chain:       util.IptablesAzureIngressPortChain,
+			Specs:       targetSelectorIptEntrySpec,
+			IsJumpEntry: true,
 		}
 		portEntry.Specs = append(
 			portEntry.Specs,
@@ -607,8 +611,9 @@ func translateIngress(ns string, targetSelector metav1.LabelSelector, rules []ne
 		)
 		entries = append(entries, portEntry)
 		entry := &iptm.IptEntry{
-			Chain: util.IptablesAzureIngressFromChain,
-			Specs: targetSelectorIptEntrySpec,
+			Chain:       util.IptablesAzureIngressFromChain,
+			Specs:       targetSelectorIptEntrySpec,
+			IsJumpEntry: true,
 		}
 		entry.Specs = append(
 			entry.Specs,
@@ -724,31 +729,6 @@ func translateEgress(ns string, targetSelector metav1.LabelSelector, rules []net
 		for _, toRule := range rule.To {
 			// Handle IPBlock field of NetworkPolicyPeer
 			if toRule.IPBlock != nil {
-				if len(toRule.IPBlock.Except) > 0 {
-					for _, except := range toRule.IPBlock.Except {
-						exceptEntry := &iptm.IptEntry{
-							Chain: util.IptablesAzureEgressToChain,
-							Specs: targetSelectorIptEntrySpec,
-						}
-						exceptEntry.Specs = append(
-							exceptEntry.Specs,
-							util.IptablesDFlag,
-							except,
-						)
-						exceptEntry.Specs = append(
-							exceptEntry.Specs,
-							util.IptablesJumpFlag,
-							util.IptablesDrop,
-							util.IptablesModuleFlag,
-							util.IptablesCommentModuleFlag,
-							util.IptablesCommentFlag,
-							"DROP-"+except+
-								"-FROM-"+targetSelectorComment,
-						)
-						toRuleEntries = append(toRuleEntries, exceptEntry)
-					}
-					addedEgressToEntry = true
-				}
 				if len(toRule.IPBlock.CIDR) > 0 {
 					if portRuleExists {
 						for _, portRule := range rule.Ports {
@@ -802,6 +782,31 @@ func translateEgress(ns string, targetSelector metav1.LabelSelector, rules []net
 								"-FROM-"+targetSelectorComment,
 						)
 						toRuleEntries = append(toRuleEntries, cidrEntry)
+						addedEgressToEntry = true
+					}
+					if len(toRule.IPBlock.Except) > 0 {
+						for _, except := range toRule.IPBlock.Except {
+							exceptEntry := &iptm.IptEntry{
+								Chain: util.IptablesAzureEgressToChain,
+								Specs: targetSelectorIptEntrySpec,
+							}
+							exceptEntry.Specs = append(
+								exceptEntry.Specs,
+								util.IptablesDFlag,
+								except,
+							)
+							exceptEntry.Specs = append(
+								exceptEntry.Specs,
+								util.IptablesJumpFlag,
+								util.IptablesDrop,
+								util.IptablesModuleFlag,
+								util.IptablesCommentModuleFlag,
+								util.IptablesCommentFlag,
+								"DROP-"+except+
+									"-FROM-"+targetSelectorComment,
+							)
+							toRuleEntries = append(toRuleEntries, exceptEntry)
+						}
 						addedEgressToEntry = true
 					}
 				}
@@ -1054,14 +1059,17 @@ func translateEgress(ns string, targetSelector metav1.LabelSelector, rules []net
 		}
 	}
 
+	// prepending toRuleEntries (which is in reverse order) so that they will retain correct ordering
+	// of drop->allow... when the rules are beind prepended to their corresponding chain
 	if len(toRuleEntries) > 0 {
-		entries = append(entries, toRuleEntries...)
+		entries = append(toRuleEntries, entries...)
 	}
 
 	if addedPortEntry && !addedEgressToEntry {
 		entry := &iptm.IptEntry{
-			Chain: util.IptablesAzureEgressPortChain,
-			Specs: targetSelectorIptEntrySpec,
+			Chain:       util.IptablesAzureEgressPortChain,
+			Specs:       targetSelectorIptEntrySpec,
+			IsJumpEntry: true,
 		}
 		entry.Specs = append(
 			entry.Specs,
@@ -1077,8 +1085,9 @@ func translateEgress(ns string, targetSelector metav1.LabelSelector, rules []net
 		entries = append(entries, entry)
 	} else if addedEgressToEntry {
 		portEntry := &iptm.IptEntry{
-			Chain: util.IptablesAzureEgressPortChain,
-			Specs: targetSelectorIptEntrySpec,
+			Chain:       util.IptablesAzureEgressPortChain,
+			Specs:       targetSelectorIptEntrySpec,
+			IsJumpEntry: true,
 		}
 		portEntry.Specs = append(
 			portEntry.Specs,
@@ -1093,8 +1102,9 @@ func translateEgress(ns string, targetSelector metav1.LabelSelector, rules []net
 		)
 		entries = append(entries, portEntry)
 		entry := &iptm.IptEntry{
-			Chain: util.IptablesAzureEgressToChain,
-			Specs: targetSelectorIptEntrySpec,
+			Chain:       util.IptablesAzureEgressToChain,
+			Specs:       targetSelectorIptEntrySpec,
+			IsJumpEntry: true,
 		}
 		entry.Specs = append(
 			entry.Specs,
