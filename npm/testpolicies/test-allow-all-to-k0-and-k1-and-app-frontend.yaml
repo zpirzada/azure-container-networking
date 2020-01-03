@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-policy
+  namespace: testnamespace
+spec:
+  policyTypes:
+    - Ingress
+  podSelector:
+    matchLabels:
+      app: "frontend"
+    matchExpressions:
+      - key: k0
+        operator: DoesNotExist
+        values: []
+      - key: k1
+        operator: In
+        values:
+          - v0
+          - v1
+  ingress:
+    - from:
+        - namespaceSelector: {}

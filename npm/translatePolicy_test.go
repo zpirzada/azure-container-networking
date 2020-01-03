@@ -2,6 +2,7 @@ package npm
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"reflect"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 func TestCraftPartialIptEntrySpecFromPort(t *testing.T) {
@@ -1066,20 +1068,23 @@ func TestTranslateEgress(t *testing.T) {
 	}
 }
 
-func TestTranslatePolicy(t *testing.T) {
-	targetSelector := metav1.LabelSelector{}
-	denyAllPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "deny-all-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{},
-		},
+func readPolicyYaml(policyYaml string) (*networkingv1.NetworkPolicy, error) {
+	decode := scheme.Codecs.UniversalDeserializer().Decode
+	b, err := ioutil.ReadFile(policyYaml)
+	if err != nil {
+		return nil, err
+	}
+	obj, _, err := decode([]byte(b), nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*networkingv1.NetworkPolicy), nil
+}
+
+func TestDenyAllPolicy(t *testing.T) {
+	denyAllPolicy, err := readPolicyYaml("testpolicies/deny-all-policy.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	sets, lists, iptEntries := translatePolicy(denyAllPolicy)
@@ -1099,7 +1104,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries := []*iptm.IptEntry{}
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", denyAllPolicy.Spec.PodSelector, true, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ deny-all-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1107,41 +1112,16 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "backend",
-		},
+func TestAllowBackendToFrontend(t *testing.T) {
+	allowBackendToFrontendPolicy, err := readPolicyYaml("testpolicies/allow-backend-to-frontend.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
-	allowBackendToFrontendPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-app:backend-TO-app:frontend-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From: []networkingv1.NetworkPolicyPeer{
-						networkingv1.NetworkPolicyPeer{
-							PodSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"app": "frontend",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
+	sets, lists, iptEntries := translatePolicy(allowBackendToFrontendPolicy)
 
-	sets, lists, iptEntries = translatePolicy(allowBackendToFrontendPolicy)
-
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:backend",
 		"ns-testnamespace",
 		"app:frontend",
@@ -1152,14 +1132,14 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{}
+	expectedLists := []string{}
 	if !reflect.DeepEqual(lists, expectedLists) {
 		t.Errorf("translatedPolicy failed @ ALLOW-app:backend-TO-app:frontend-policy lists comparison")
 		t.Errorf("lists: %v", lists)
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
+	expectedIptEntries := []*iptm.IptEntry{}
 
 	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
@@ -1244,31 +1224,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "frontend",
-		},
-	}
-	allowToFrontendPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-all-TO-app:frontend-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{},
-			},
-		},
+func TestAllowAllToAppFrontend(t *testing.T) {
+	allowToFrontendPolicy, err := readPolicyYaml("testpolicies/allow-all-to-app-frontend.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	sets, lists, iptEntries = translatePolicy(allowToFrontendPolicy)
+	sets, lists, iptEntries := translatePolicy(allowToFrontendPolicy)
 
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:frontend",
 		"ns-testnamespace",
 	}
@@ -1278,16 +1244,16 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{}
+	expectedLists := []string{}
 	if !reflect.DeepEqual(lists, expectedLists) {
 		t.Errorf("translatedPolicy failed @ ALLOW-all-TO-app:frontend-policy lists comparison")
 		t.Errorf("lists: %v", lists)
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
+	expectedIptEntries := []*iptm.IptEntry{}
 
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressPortChain,
 			Specs: []string{
@@ -1306,7 +1272,7 @@ func TestTranslatePolicy(t *testing.T) {
 		},
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", allowToFrontendPolicy.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-all-TO-app:frontend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1314,29 +1280,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "frontend",
-		},
-	}
-	denyAllToFrontendPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-none-TO-app:frontend-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{},
-		},
+func TestDenyAllToAppFrontend(t *testing.T) {
+	denyAllToFrontendPolicy, err := readPolicyYaml("testpolicies/deny-all-to-app-frontend.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	sets, lists, iptEntries = translatePolicy(denyAllToFrontendPolicy)
+	sets, lists, iptEntries := translatePolicy(denyAllToFrontendPolicy)
 
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:frontend",
 		"ns-testnamespace",
 	}
@@ -1346,15 +1300,15 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{}
+	expectedLists := []string{}
 	if !reflect.DeepEqual(lists, expectedLists) {
 		t.Errorf("translatedPolicy failed @ ALLOW-none-TO-app:frontend-policy lists comparison")
 		t.Errorf("lists: %v", lists)
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, true, false)...)
+	expectedIptEntries := []*iptm.IptEntry{}
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", denyAllToFrontendPolicy.Spec.PodSelector, true, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-none-TO-app:frontend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1362,37 +1316,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "frontend",
-		},
-	}
-	allowNsTestNamespaceToFrontendPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-ns-testnamespace-TO-app:frontend-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From: []networkingv1.NetworkPolicyPeer{
-						networkingv1.NetworkPolicyPeer{
-							PodSelector: &metav1.LabelSelector{},
-						},
-					},
-				},
-			},
-		},
+func TestNamespaceToFrontend(t *testing.T) {
+	allowNsTestNamespaceToFrontendPolicy, err := readPolicyYaml("testpolicies/allow-ns-test-namespace-to-frontend.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	sets, lists, iptEntries = translatePolicy(allowNsTestNamespaceToFrontendPolicy)
+	sets, lists, iptEntries := translatePolicy(allowNsTestNamespaceToFrontendPolicy)
 
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:frontend",
 		"ns-testnamespace",
 	}
@@ -1402,15 +1336,15 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{}
+	expectedLists := []string{}
 	if !reflect.DeepEqual(lists, expectedLists) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ns-testnamespace-TO-app:frontend-policy lists comparison")
 		t.Errorf("lists: %v", lists)
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
@@ -1486,7 +1420,7 @@ func TestTranslatePolicy(t *testing.T) {
 		},
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", allowNsTestNamespaceToFrontendPolicy.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ns-testnamespace-TO-app:frontend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1494,36 +1428,16 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "frontend",
-		},
-	}
-	allowAllNsToFrontendPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-all-namespaces-TO-app:frontend-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From: []networkingv1.NetworkPolicyPeer{
-						networkingv1.NetworkPolicyPeer{
-							NamespaceSelector: &metav1.LabelSelector{},
-						},
-					},
-				},
-			},
-		},
+func TestAllowAllNamespacesToAppFrontend(t *testing.T) {
+	allowAllNsToFrontendPolicy, err := readPolicyYaml("testpolicies/allow-all-ns-to-frontend.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	sets, lists, iptEntries = translatePolicy(allowAllNsToFrontendPolicy)
-	expectedSets = []string{
+	sets, lists, iptEntries := translatePolicy(allowAllNsToFrontendPolicy)
+	expectedSets := []string{
 		"app:frontend",
 		"ns-testnamespace",
 	}
@@ -1533,7 +1447,7 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{
+	expectedLists := []string{
 		util.KubeAllNamespacesFlag,
 	}
 	if !reflect.DeepEqual(lists, expectedLists) {
@@ -1542,8 +1456,8 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
@@ -1619,7 +1533,7 @@ func TestTranslatePolicy(t *testing.T) {
 		},
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", allowAllNsToFrontendPolicy.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-all-namespaces-TO-app:frontend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1627,51 +1541,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "frontend",
-		},
-	}
-	allowNsDevToFrontendPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-ns-namespace:dev-AND-!ns-namespace:test0-AND-!ns-namespace:test1-TO-app:frontend-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From: []networkingv1.NetworkPolicyPeer{
-						networkingv1.NetworkPolicyPeer{
-							NamespaceSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"namespace": "dev",
-								},
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									metav1.LabelSelectorRequirement{
-										Key:      "namespace",
-										Operator: metav1.LabelSelectorOpNotIn,
-										Values: []string{
-											"test0",
-											"test1",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
+func TestAllowNamespaceDevToAppFrontend(t *testing.T) {
+	allowNsDevToFrontendPolicy, err := readPolicyYaml("testpolicies/allow-ns-dev-to-app-frontend.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	sets, lists, iptEntries = translatePolicy(allowNsDevToFrontendPolicy)
+	sets, lists, iptEntries := translatePolicy(allowNsDevToFrontendPolicy)
 
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:frontend",
 		"ns-testnamespace",
 	}
@@ -1681,7 +1561,7 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{
+	expectedLists := []string{
 		"ns-namespace:dev",
 		"ns-namespace:test0",
 		"ns-namespace:test1",
@@ -1692,8 +1572,8 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
@@ -1782,7 +1662,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", allowNsDevToFrontendPolicy.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ns-namespace:dev-AND-!ns-namespace:test0-AND-!ns-namespace:test1-TO-app:frontend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -1790,49 +1670,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
-			metav1.LabelSelectorRequirement{
-				Key:      "k0",
-				Operator: metav1.LabelSelectorOpDoesNotExist,
-				Values:   []string{},
-			},
-			metav1.LabelSelectorRequirement{
-				Key:      "k1",
-				Operator: metav1.LabelSelectorOpIn,
-				Values:   []string{"v0", "v1"},
-			},
-		},
-		MatchLabels: map[string]string{
-			"app": "frontend",
-		},
-	}
-	allowAllToFrontendPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "AllOW-ALL-TO-k0-AND-k1:v0-AND-k1:v1-AND-app:frontend-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From: []networkingv1.NetworkPolicyPeer{
-						networkingv1.NetworkPolicyPeer{
-							NamespaceSelector: &metav1.LabelSelector{},
-						},
-					},
-				},
-			},
-		},
+func TestAllowAllToK0AndK1AndAppFrontend(t *testing.T) {
+	allowAllToFrontendPolicy, err := readPolicyYaml("testpolicies/test-allow-all-to-k0-and-k1-and-app-frontend.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	sets, lists, iptEntries = translatePolicy(allowAllToFrontendPolicy)
+	sets, lists, iptEntries := translatePolicy(allowAllToFrontendPolicy)
 
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:frontend",
 		"k0",
 		"k1:v0",
@@ -1845,15 +1693,15 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{util.KubeAllNamespacesFlag}
+	expectedLists := []string{util.KubeAllNamespacesFlag}
 	if !reflect.DeepEqual(lists, expectedLists) {
 		t.Errorf("translatedPolicy failed @ AllOW-ALL-TO-k0-AND-k1:v0-AND-k1:v1-AND-app:frontend-policy lists comparison")
 		t.Errorf("lists: %v", lists)
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
@@ -1994,7 +1842,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", allowAllToFrontendPolicy.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ AllOW-all-TO-k0-AND-k1:v0-AND-k1:v1-AND-app:frontend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2002,47 +1850,18 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "frontend",
-		},
-	}
-	allowNsDevAndBackendToFrontendPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-ns-ns:dev-AND-app:backend-TO-app:frontend",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From: []networkingv1.NetworkPolicyPeer{
-						networkingv1.NetworkPolicyPeer{
-							PodSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"app": "backend",
-								},
-							},
-							NamespaceSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"ns": "dev",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
+func TestAllowNsDevAndAppBackendToAppFrontend(t *testing.T) {
+	allowNsDevAndBackendToFrontendPolicy, err := readPolicyYaml("testpolicies/allow-ns-dev-and-app-backend-to-app-frontend.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	util.IsNewNwPolicyVerFlag = true
-	sets, lists, iptEntries = translatePolicy(allowNsDevAndBackendToFrontendPolicy)
+	sets, lists, iptEntries := translatePolicy(allowNsDevAndBackendToFrontendPolicy)
 
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:frontend",
 		"ns-testnamespace",
 		"app:backend",
@@ -2053,7 +1872,7 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{
+	expectedLists := []string{
 		"ns-ns:dev",
 	}
 	if !reflect.DeepEqual(lists, expectedLists) {
@@ -2062,8 +1881,8 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
@@ -2145,7 +1964,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", allowNsDevAndBackendToFrontendPolicy.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ns-ns:dev-AND-app:backend-TO-app:frontend policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2153,33 +1972,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "backdoor",
-		},
-	}
-	allowInternalAndExternalPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-ALL-TO-app:backdoor-policy",
-			Namespace: "dangerous",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From: []networkingv1.NetworkPolicyPeer{},
-				},
-			},
-		},
+func TestAllowInternalAndExternal(t *testing.T) {
+	allowInternalAndExternalPolicy, err := readPolicyYaml("testpolicies/allow-internal-and-external.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	sets, lists, iptEntries = translatePolicy(allowInternalAndExternalPolicy)
+	sets, lists, iptEntries := translatePolicy(allowInternalAndExternalPolicy)
 
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:backdoor",
 		"ns-dangerous",
 	}
@@ -2189,15 +1992,15 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{}
+	expectedLists := []string{}
 	if !reflect.DeepEqual(lists, expectedLists) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ALL-TO-app:backdoor-policy lists comparison")
 		t.Errorf("lists: %v", lists)
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressPortChain,
 			Specs: []string{
@@ -2217,7 +2020,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("dangerous", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("dangerous", allowInternalAndExternalPolicy.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ALL-TO-app:backdoor-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2225,48 +2028,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "frontend",
-		},
+func TestAllowBackendToFrontendPort8000(t *testing.T) {
+	allowBackendToFrontendPort8000Policy, err := readPolicyYaml("testpolicies/allow-app-backend-to-app-frontend-port-8000.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	port8000 := intstr.FromInt(8000)
-	allowBackendToFrontendPort8000Policy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-app:backend-TO-app:frontend-port-8000-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					Ports: []networkingv1.NetworkPolicyPort{
-						networkingv1.NetworkPolicyPort{
-							Port: &port8000,
-						},
-					},
-					From: []networkingv1.NetworkPolicyPeer{
-						networkingv1.NetworkPolicyPeer{
-							PodSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"app": "backend",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
+	sets, lists, iptEntries := translatePolicy(allowBackendToFrontendPort8000Policy)
 
-	sets, lists, iptEntries = translatePolicy(allowBackendToFrontendPort8000Policy)
-
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:frontend",
 		"ns-testnamespace",
 		"app:backend",
@@ -2277,15 +2049,15 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{}
+	expectedLists := []string{}
 	if !reflect.DeepEqual(lists, expectedLists) {
 		t.Errorf("translatedPolicy failed @ ALLOW-app:backend-TO-app:frontend-port-8000-policy lists comparison")
 		t.Errorf("lists: %v", lists)
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressPortChain,
 			Specs: []string{
@@ -2323,7 +2095,7 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-ALL-TO-app:frontend-TO-JUMP-TO-"+util.IptablesAzureTargetSetsChain,
+				"ALLOW-ALL-TO-app:frontend-TO-JUMP-TO-" + util.IptablesAzureTargetSetsChain,
 			},
 		},
 		&iptm.IptEntry{
@@ -2345,7 +2117,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("dangerous", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("dangerous", allowBackendToFrontendPort8000Policy.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ALL-TO-app:backdoor-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2353,51 +2125,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app":  "k8s",
-			"team": "aks",
-		},
-	}
-	allowCniOrCnsToK8sPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-program:cni-AND-team:acn-OR-binary:cns-AND-group:container-TO-app:k8s-AND-team:aks-policy",
-			Namespace: "acn",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From: []networkingv1.NetworkPolicyPeer{
-						networkingv1.NetworkPolicyPeer{
-							PodSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"program": "cni",
-									"team":    "acn",
-								},
-							},
-						},
-						networkingv1.NetworkPolicyPeer{
-							PodSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"binary": "cns",
-									"group":  "container",
-								},
-							},
-						},
-					},
-				},
-			},
-		},
+func TestAllowMultipleLabelsToMultipleLabels(t *testing.T) {
+	allowCniOrCnsToK8sPolicy, err := readPolicyYaml("testpolicies/allow-multiple-labels-to-multiple-labels.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	sets, lists, iptEntries = translatePolicy(allowCniOrCnsToK8sPolicy)
+	sets, lists, iptEntries := translatePolicy(allowCniOrCnsToK8sPolicy)
 
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:k8s",
 		"team:aks",
 		"ns-acn",
@@ -2412,15 +2150,15 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{}
+	expectedLists := []string{}
 	if !reflect.DeepEqual(lists, expectedLists) {
 		t.Errorf("translatedPolicy failed @ ALLOW-program:cni-AND-team:acn-OR-binary:cns-AND-group:container-TO-app:k8s-AND-team:aks-policy lists comparison")
 		t.Errorf("lists: %v", lists)
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressFromChain,
 			Specs: []string{
@@ -2525,7 +2263,7 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-ALL-TO-app:k8s-AND-team:aks-TO-JUMP-TO-"+util.IptablesAzureTargetSetsChain,
+				"ALLOW-ALL-TO-app:k8s-AND-team:aks-TO-JUMP-TO-" + util.IptablesAzureTargetSetsChain,
 			},
 		},
 		&iptm.IptEntry{
@@ -2552,7 +2290,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("acn", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("acn", allowCniOrCnsToK8sPolicy.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-program:cni-AND-team:acn-OR-binary:cns-AND-group:container-TO-app:k8s-AND-team:aks-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2560,28 +2298,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "backend",
-		},
-	}
-	denyAllFromBackendPolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-none-FROM-app:backend-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeEgress,
-			},
-		},
+func TestDenyAllFromAppBackend(t *testing.T) {
+	denyAllFromBackendPolicy, err := readPolicyYaml("testpolicies/deny-all-from-app-backend.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	sets, lists, iptEntries = translatePolicy(denyAllFromBackendPolicy)
+	sets, lists, iptEntries := translatePolicy(denyAllFromBackendPolicy)
 
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:backend",
 		"ns-testnamespace",
 	}
@@ -2591,15 +2318,15 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{}
+	expectedLists := []string{}
 	if !reflect.DeepEqual(lists, expectedLists) {
 		t.Errorf("translatedPolicy failed @ ALLOW-none-FROM-app:backend-policy lists comparison")
 		t.Errorf("lists: %v", lists)
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, true)...)
+	expectedIptEntries := []*iptm.IptEntry{}
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", denyAllFromBackendPolicy.Spec.PodSelector, false, true)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-none-FROM-app:backend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2607,33 +2334,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "backend",
-		},
+func TestAllowAllFromAppBackend(t *testing.T) {
+	allowAllEgress, err := readPolicyYaml("testpolicies/allow-all-from-app-backend.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	//////
-	/// This policy tests the case where pods should have unlimited egress traffic
-	//////
-	allowAllEgress := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-all-FROM-app:backend-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeEgress,
-			},
-			Egress: []networkingv1.NetworkPolicyEgressRule{networkingv1.NetworkPolicyEgressRule{}},
-		},
-	}
+	sets, lists, iptEntries := translatePolicy(allowAllEgress)
 
-	sets, lists, iptEntries = translatePolicy(allowAllEgress)
-
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:backend",
 		"ns-testnamespace",
 	}
@@ -2643,15 +2354,15 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{}
+	expectedLists := []string{}
 	if !reflect.DeepEqual(lists, expectedLists) {
 		t.Errorf("translatedPolicy failed @ ALLOW-all-FROM-app:backend-policy lists comparison")
 		t.Errorf("lists: %v", lists)
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureEgressPortChain,
 			Specs: []string{
@@ -2669,7 +2380,8 @@ func TestTranslatePolicy(t *testing.T) {
 			},
 		},
 		&iptm.IptEntry{
-			Chain: util.IptablesAzureEgressPortChain,
+			Chain:       util.IptablesAzureEgressPortChain,
+			IsJumpEntry: true,
 			Specs: []string{
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
@@ -2687,7 +2399,7 @@ func TestTranslatePolicy(t *testing.T) {
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
 	// has egress, but empty map means allow all
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", allowAllEgress.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-all-FROM-app:backend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2695,25 +2407,16 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{}
-	denyAllFromNsUnsafePolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-none-FROM-ns-unsafe-policy",
-			Namespace: "unsafe",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeEgress,
-			},
-			Egress: []networkingv1.NetworkPolicyEgressRule{},
-		},
+func TestDenyAllFromNsUnsafe(t *testing.T) {
+	denyAllFromNsUnsafePolicy, err := readPolicyYaml("testpolicies/deny-all-from-ns-unsafe.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
+	sets, lists, iptEntries := translatePolicy(denyAllFromNsUnsafePolicy)
 
-	sets, lists, iptEntries = translatePolicy(denyAllFromNsUnsafePolicy)
-
-	expectedSets = []string{
+	expectedSets := []string{
 		"ns-unsafe",
 	}
 	if !reflect.DeepEqual(sets, expectedSets) {
@@ -2721,15 +2424,15 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("sets: %v", sets)
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
-	expectedLists = []string{}
+	expectedLists := []string{}
 	if !reflect.DeepEqual(lists, expectedLists) {
 		t.Errorf("translatedPolicy failed @ ALLOW-none-FROM-app:backend-policy lists comparison")
 		t.Errorf("lists: %v", lists)
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("unsafe", targetSelector, false, true)...)
+	expectedIptEntries := []*iptm.IptEntry{}
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("unsafe", denyAllFromNsUnsafePolicy.Spec.PodSelector, false, true)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-none-FROM-app:backend-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2737,52 +2440,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"app": "frontend",
-		},
+func TestAllowAppFrontendToTCPPort53UDPPort53Policy(t *testing.T) {
+	allowFrontendToTCPPort53UDPPort53Policy, err := readPolicyYaml("testpolicies/allow-app-frontend-tcp-port-or-udp-port-53.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	tcp, udp := v1.ProtocolTCP, v1.ProtocolUDP
-	port53 := intstr.FromInt(53)
-	allowFrontendToTCPPort80UDPPOrt443Policy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "ALLOW-ALL-FROM-app:frontend-TCP-PORT-53-OR-UDP-PORT-53-policy",
-			Namespace: "testnamespace",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeEgress,
-			},
-			Egress: []networkingv1.NetworkPolicyEgressRule{
-				networkingv1.NetworkPolicyEgressRule{
-					Ports: []networkingv1.NetworkPolicyPort{
-						networkingv1.NetworkPolicyPort{
-							Protocol: &tcp,
-							Port:     &port53,
-						},
-						networkingv1.NetworkPolicyPort{
-							Protocol: &udp,
-							Port:     &port53,
-						},
-					},
-				},
-				networkingv1.NetworkPolicyEgressRule{
-					To: []networkingv1.NetworkPolicyPeer{
-						networkingv1.NetworkPolicyPeer{
-							NamespaceSelector: &metav1.LabelSelector{},
-						},
-					},
-				},
-			},
-		},
-	}
+	sets, lists, iptEntries := translatePolicy(allowFrontendToTCPPort53UDPPort53Policy)
 
-	sets, lists, iptEntries = translatePolicy(allowFrontendToTCPPort80UDPPOrt443Policy)
-
-	expectedSets = []string{
+	expectedSets := []string{
 		"app:frontend",
 		"ns-testnamespace",
 	}
@@ -2792,7 +2460,7 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{
+	expectedLists := []string{
 		util.KubeAllNamespacesFlag,
 	}
 	if !reflect.DeepEqual(lists, expectedLists) {
@@ -2801,8 +2469,8 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureEgressPortChain,
 			Specs: []string{
@@ -2897,7 +2565,7 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-ALL-FROM-app:frontend-TO-JUMP-TO-"+util.IptablesAzureTargetSetsChain,
+				"ALLOW-ALL-FROM-app:frontend-TO-JUMP-TO-" + util.IptablesAzureTargetSetsChain,
 			},
 		},
 		&iptm.IptEntry{
@@ -2918,7 +2586,7 @@ func TestTranslatePolicy(t *testing.T) {
 		},
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", allowFrontendToTCPPort53UDPPort53Policy.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ ALLOW-ALL-FROM-app:frontend-TCP-PORT-53-OR-UDP-PORT-53-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -2926,83 +2594,17 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("iptEntries: %s", marshalledIptEntries)
 		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
 	}
+}
 
-	targetSelector = metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"role": "db",
-		},
+func TestComplexPolicy(t *testing.T) {
+	k8sExamplePolicy, err := readPolicyYaml("testpolicies/complex-policy.yaml")
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	tcp = v1.ProtocolTCP
-	port6379, port5978 := intstr.FromInt(6379), intstr.FromInt(5978)
-	k8sExamplePolicy := &networkingv1.NetworkPolicy{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "k8s-example-policy",
-			Namespace: "default",
-		},
-		Spec: networkingv1.NetworkPolicySpec{
-			PodSelector: targetSelector,
-			PolicyTypes: []networkingv1.PolicyType{
-				networkingv1.PolicyTypeIngress,
-				networkingv1.PolicyTypeEgress,
-			},
-			Ingress: []networkingv1.NetworkPolicyIngressRule{
-				networkingv1.NetworkPolicyIngressRule{
-					From: []networkingv1.NetworkPolicyPeer{
-						networkingv1.NetworkPolicyPeer{
-							IPBlock: &networkingv1.IPBlock{
-								CIDR: "172.17.0.0/16",
-								Except: []string{
-									"172.17.1.0/24",
-								},
-							},
-						},
-						networkingv1.NetworkPolicyPeer{
-							NamespaceSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"project": "myproject",
-								},
-							},
-						},
-						networkingv1.NetworkPolicyPeer{
-							PodSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"role": "frontend",
-								},
-							},
-						},
-					},
-					Ports: []networkingv1.NetworkPolicyPort{
-						networkingv1.NetworkPolicyPort{
-							Protocol: &tcp,
-							Port:     &port6379,
-						},
-					},
-				},
-			},
-			Egress: []networkingv1.NetworkPolicyEgressRule{
-				networkingv1.NetworkPolicyEgressRule{
-					To: []networkingv1.NetworkPolicyPeer{
-						networkingv1.NetworkPolicyPeer{
-							IPBlock: &networkingv1.IPBlock{
-								CIDR: "10.0.0.0/24",
-							},
-						},
-					},
-					Ports: []networkingv1.NetworkPolicyPort{
-						networkingv1.NetworkPolicyPort{
-							Protocol: &tcp,
-							Port:     &port5978,
-						},
-					},
-				},
-			},
-		},
-	}
+	sets, lists, iptEntries := translatePolicy(k8sExamplePolicy)
 
-	sets, lists, iptEntries = translatePolicy(k8sExamplePolicy)
-
-	expectedSets = []string{
+	expectedSets := []string{
 		"role:db",
 		"ns-default",
 		"role:frontend",
@@ -3013,7 +2615,7 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedSets: %v", expectedSets)
 	}
 
-	expectedLists = []string{
+	expectedLists := []string{
 		"ns-project:myproject",
 	}
 	if !reflect.DeepEqual(lists, expectedLists) {
@@ -3022,8 +2624,8 @@ func TestTranslatePolicy(t *testing.T) {
 		t.Errorf("expectedLists: %v", expectedLists)
 	}
 
-	expectedIptEntries = []*iptm.IptEntry{}
-	nonKubeSystemEntries = []*iptm.IptEntry{
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
 		&iptm.IptEntry{
 			Chain: util.IptablesAzureIngressPortChain,
 			Specs: []string{
@@ -3128,7 +2730,7 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-ALL-TO-role:db-TO-JUMP-TO-"+util.IptablesAzureIngressFromChain,
+				"ALLOW-ALL-TO-role:db-TO-JUMP-TO-" + util.IptablesAzureIngressFromChain,
 			},
 		},
 		&iptm.IptEntry{
@@ -3145,7 +2747,7 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-ALL-TO-role:db-TO-JUMP-TO-"+util.IptablesAzureTargetSetsChain,
+				"ALLOW-ALL-TO-role:db-TO-JUMP-TO-" + util.IptablesAzureTargetSetsChain,
 			},
 		},
 		&iptm.IptEntry{
@@ -3184,7 +2786,7 @@ func TestTranslatePolicy(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-ALL-FROM-role:db-TO-JUMP-TO-"+util.IptablesAzureTargetSetsChain,
+				"ALLOW-ALL-FROM-role:db-TO-JUMP-TO-" + util.IptablesAzureTargetSetsChain,
 			},
 		},
 		&iptm.IptEntry{
@@ -3221,7 +2823,7 @@ func TestTranslatePolicy(t *testing.T) {
 		},
 	}
 	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
-	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", targetSelector, false, false)...)
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", k8sExamplePolicy.Spec.PodSelector, false, false)...)
 	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
 		t.Errorf("translatedPolicy failed @ k8s-example-policy policy comparison")
 		marshalledIptEntries, _ := json.Marshal(iptEntries)
@@ -3260,6 +2862,7 @@ func TestDropPrecedenceOverAllow(t *testing.T) {
 			Ingress: []networkingv1.NetworkPolicyIngressRule{},
 		},
 	}
+	denyAllPolicy.ObjectMeta.Namespace = metav1.NamespaceDefault
 	allowToPodPolicy := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pod-A",

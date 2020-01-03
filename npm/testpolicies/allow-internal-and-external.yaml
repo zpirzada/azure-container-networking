@@ -1,0 +1,13 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backdoor-policy
+  namespace: dangerous
+spec:
+  policyTypes:
+    - Ingress
+  podSelector:
+    matchLabels:
+      app: "backdoor"
+  ingress:
+    - from: []

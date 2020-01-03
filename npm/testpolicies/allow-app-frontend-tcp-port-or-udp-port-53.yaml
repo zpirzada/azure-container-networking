@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-to-frontend-on-port-53-policy
+  namespace: testnamespace
+spec:
+  policyTypes:
+    - Egress
+  podSelector:
+    matchLabels:
+      app: frontend
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to:
+        - namespaceSelector: {}
