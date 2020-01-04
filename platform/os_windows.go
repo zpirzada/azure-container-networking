@@ -226,3 +226,6 @@ func GetProcessNameByID(pidstr string) (string, error) {
 
 	return "", fmt.Errorf("Process not found")
 }
+
+func PrintDependencyPackageDetails() {
+}

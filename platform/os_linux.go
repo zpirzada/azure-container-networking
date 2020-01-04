@@ -149,3 +149,12 @@ func GetProcessNameByID(pidstr string) (string, error) {
 
 	return out, nil
 }
+
+func PrintDependencyPackageDetails() {
+	out, err := ExecuteCommand("iptables --version")
+	out = strings.TrimSuffix(out, "\n")
+	log.Printf("[cni-net] iptable version:%s, err:%v", out, err)
+	out, err = ExecuteCommand("ebtables --version")
+	out = strings.TrimSuffix(out, "\n")
+	log.Printf("[cni-net] ebtable version %s, err:%v", out, err)
+}

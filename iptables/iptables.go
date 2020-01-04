@@ -55,9 +55,20 @@ const (
 	lockTimeout = 60
 )
 
+var (
+	DisableIPTableLock bool
+)
+
 // Run iptables command
 func runCmd(params string) error {
-	cmd := fmt.Sprintf("%s -w %d %s", iptables, lockTimeout, params)
+	var cmd string
+
+	if DisableIPTableLock {
+		cmd = fmt.Sprintf("%s %s", iptables, params)
+	} else {
+		cmd = fmt.Sprintf("%s -w %d %s", iptables, lockTimeout, params)
+	}
+
 	if _, err := platform.ExecuteCommand(cmd); err != nil {
 		return err
 	}
