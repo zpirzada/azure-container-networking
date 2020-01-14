@@ -2,17 +2,33 @@ package aitelemetry
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/platform"
 )
 
-var th TelemetryHandle
+var (
+	th               TelemetryHandle
+	hostAgentUrl     = "localhost:3501"
+	getCloudResponse = "AzurePublicCloud"
+	httpURL          = "http://" + hostAgentUrl
+)
 
 func TestMain(m *testing.M) {
+	log.SetLogDirectory("/var/log/")
+	log.SetName("testaitelemetry")
+	log.SetLevel(log.LevelInfo)
+	err := log.SetTarget(log.TargetLogfile)
+	if err == nil {
+		fmt.Printf("TestST LogDir configuration succeeded\n")
+	}
 
 	if runtime.GOOS == "linux" {
 		platform.ExecuteCommand("cp metadata_test.json /tmp/azuremetadata.json")
@@ -20,6 +36,20 @@ func TestMain(m *testing.M) {
 		metadataFile := filepath.FromSlash(os.Getenv("TEMP")) + "\\azuremetadata.json"
 		cmd := fmt.Sprintf("copy metadata_test.json %s", metadataFile)
 		platform.ExecuteCommand(cmd)
+	}
+
+	hostu, _ := url.Parse("tcp://" + hostAgentUrl)
+	hostAgent, err := common.NewListener(hostu)
+	if err != nil {
+		fmt.Printf("Failed to create agent, err:%v.\n", err)
+		return
+	}
+
+	hostAgent.AddHandler("/", handleGetCloud)
+	err = hostAgent.Start(make(chan error, 1))
+	if err != nil {
+		fmt.Printf("Failed to start agent, err:%v.\n", err)
+		return
 	}
 
 	exitCode := m.Run()
@@ -32,10 +62,17 @@ func TestMain(m *testing.M) {
 		platform.ExecuteCommand(cmd)
 	}
 
+	log.Close()
 	os.Exit(exitCode)
 }
 
+func handleGetCloud(w http.ResponseWriter, req *http.Request) {
+	w.Write([]byte(getCloudResponse))
+}
+
 func TestEmptyAIKey(t *testing.T) {
+	var err error
+
 	aiConfig := AIConfig{
 		AppName:                      "testapp",
 		AppVersion:                   "v1.0.26",
@@ -45,26 +82,29 @@ func TestEmptyAIKey(t *testing.T) {
 		DebugMode:                    true,
 		DisableMetadataRefreshThread: true,
 	}
-	th := NewAITelemetry("", aiConfig)
-	if th == nil {
-		t.Errorf("Error intializing AI telemetry")
+	_, err = NewAITelemetry(httpURL, "", aiConfig)
+	if err == nil {
+		t.Errorf("Error intializing AI telemetry:%v", err)
 	}
-	th.Close(10)
 }
 
 func TestNewAITelemetry(t *testing.T) {
+	var err error
+
 	aiConfig := AIConfig{
 		AppName:                      "testapp",
 		AppVersion:                   "v1.0.26",
 		BatchSize:                    4096,
 		BatchInterval:                2,
 		RefreshTimeout:               10,
+		GetEnvRetryCount:             1,
+		GetEnvRetryWaitTimeInSecs:    2,
 		DebugMode:                    true,
 		DisableMetadataRefreshThread: true,
 	}
-	th = NewAITelemetry("00ca2a73-c8d6-4929-a0c2-cf84545ec225", aiConfig)
+	th, err = NewAITelemetry(httpURL, "00ca2a73-c8d6-4929-a0c2-cf84545ec225", aiConfig)
 	if th == nil {
-		t.Errorf("Error intializing AI telemetry")
+		t.Errorf("Error intializing AI telemetry: %v", err)
 	}
 }
 
@@ -95,6 +135,8 @@ func TestClose(t *testing.T) {
 }
 
 func TestClosewithoutSend(t *testing.T) {
+	var err error
+
 	aiConfig := AIConfig{
 		AppName:                      "testapp",
 		AppVersion:                   "v1.0.26",
@@ -102,11 +144,13 @@ func TestClosewithoutSend(t *testing.T) {
 		BatchInterval:                2,
 		DisableMetadataRefreshThread: true,
 		RefreshTimeout:               10,
+		GetEnvRetryCount:             1,
+		GetEnvRetryWaitTimeInSecs:    2,
 	}
 
-	thtest := NewAITelemetry("00ca2a73-c8d6-4929-a0c2-cf84545ec225", aiConfig)
+	thtest, err := NewAITelemetry(httpURL, "00ca2a73-c8d6-4929-a0c2-cf84545ec225", aiConfig)
 	if thtest == nil {
-		t.Errorf("Error intializing AI telemetry")
+		t.Errorf("Error intializing AI telemetry:%v", err)
 	}
 
 	thtest.Close(10)

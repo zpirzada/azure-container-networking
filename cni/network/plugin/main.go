@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/Azure/azure-container-networking/aitelemetry"
 	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/cni/network"
 	"github.com/Azure/azure-container-networking/common"
@@ -126,6 +127,8 @@ func handleIfCniUpdate(update func(*skel.CmdArgs) error) (bool, error) {
 // Main is the entry point for CNI network plugin.
 func main() {
 
+	startTime := time.Now()
+
 	// Initialize and parse command line arguments.
 	acn.ParseArgs(&args, printVersion)
 	vers := acn.GetArg(acn.OptVersion).(bool)
@@ -136,8 +139,9 @@ func main() {
 	}
 
 	var (
-		config common.PluginConfig
-		err    error
+		config    common.PluginConfig
+		err       error
+		cnimetric telemetry.AIMetric
 	)
 
 	log.SetName(name)
@@ -169,15 +173,12 @@ func main() {
 	}
 
 	cniReport.GetReport(pluginName, version, ipamQueryURL)
-	startTime := time.Now().UnixNano() / int64(time.Millisecond)
 
 	netPlugin, err := network.NewPlugin(name, &config)
 	if err != nil {
 		log.Printf("Failed to create network plugin, err:%v.\n", err)
 		return
 	}
-
-	netPlugin.SetCNIReport(cniReport)
 
 	// CNI Acquires lock
 	if err = netPlugin.Plugin.InitializeKeyValueStore(&config); err != nil {
@@ -214,6 +215,8 @@ func main() {
 	tb.ConnectToTelemetryService(telemetryNumRetries, telemetryWaitTimeInMilliseconds)
 	defer tb.Close()
 
+	netPlugin.SetCNIReport(cniReport, tb)
+
 	t := time.Now()
 	cniReport.Timestamp = t.Format("2006-01-02 15:04:05")
 
@@ -230,15 +233,21 @@ func main() {
 		log.Errorf("Failed to execute network plugin, err:%v.\n", err)
 	}
 
-	endTime := time.Now().UnixNano() / int64(time.Millisecond)
-	reflect.ValueOf(reportManager.Report).Elem().FieldByName("OperationDuration").SetInt(int64(endTime - startTime))
-
 	netPlugin.Stop()
 
 	// release cni lock
 	if errUninit := netPlugin.Plugin.UninitializeKeyValueStore(false); errUninit != nil {
 		log.Errorf("Failed to uninitialize key-value store of network plugin, err:%v.\n", errUninit)
 	}
+
+	executionTimeMs := time.Since(startTime).Milliseconds()
+	cnimetric.Metric = aitelemetry.Metric{
+		Name:             telemetry.CNIExecutimeMetricStr,
+		Value:            float64(executionTimeMs),
+		CustomDimensions: make(map[string]string),
+	}
+	network.SetCustomDimensions(&cnimetric, nil, err)
+	telemetry.SendCNIMetric(&cnimetric, tb)
 
 	if err != nil {
 		reportPluginError(reportManager, tb, err)
@@ -247,6 +256,7 @@ func main() {
 
 	// Report CNI successfully finished execution.
 	reflect.ValueOf(reportManager.Report).Elem().FieldByName("CniSucceeded").SetBool(true)
+	reflect.ValueOf(reportManager.Report).Elem().FieldByName("OperationDuration").SetInt(executionTimeMs)
 
 	if err = reportManager.SendReport(tb); err != nil {
 		log.Errorf("SendReport failed due to %v", err)

@@ -28,6 +28,8 @@ type AIConfig struct {
 	BatchInterval                int
 	DisableMetadataRefreshThread bool
 	RefreshTimeout               int
+	GetEnvRetryCount             int
+	GetEnvRetryWaitTimeInSecs    int
 	DebugMode                    bool
 }
 

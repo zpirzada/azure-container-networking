@@ -8,15 +8,22 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/Azure/azure-container-networking/aitelemetry"
 	acn "github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/telemetry"
 )
 
 const (
-	reportToHostIntervalInSeconds = 30
-	azureVnetTelemetry            = "azure-vnet-telemetry"
-	configExtension               = ".config"
+	defaultReportToHostIntervalInSecs = 30
+	defaultRefreshTimeoutInSecs       = 15
+	defaultBatchSizeInBytes           = 16384
+	defaultBatchIntervalInSecs        = 15
+	defaultGetEnvRetryCount           = 2
+	defaultGetEnvRetryWaitTimeInSecs  = 3
+	pluginName                        = "AzureCNI"
+	azureVnetTelemetry                = "azure-vnet-telemetry"
+	configExtension                   = ".config"
 )
 
 var version string
@@ -76,6 +83,32 @@ func printVersion() {
 	fmt.Printf("Version %v\n", version)
 }
 
+func setTelemetryDefaults(config *telemetry.TelemetryConfig) {
+	if config.ReportToHostIntervalInSeconds == 0 {
+		config.ReportToHostIntervalInSeconds = defaultReportToHostIntervalInSecs
+	}
+
+	if config.RefreshTimeoutInSecs == 0 {
+		config.RefreshTimeoutInSecs = defaultRefreshTimeoutInSecs
+	}
+
+	if config.BatchIntervalInSecs == 0 {
+		config.BatchIntervalInSecs = defaultBatchIntervalInSecs
+	}
+
+	if config.BatchSizeInBytes == 0 {
+		config.BatchSizeInBytes = defaultBatchSizeInBytes
+	}
+
+	if config.GetEnvRetryCount == 0 {
+		config.GetEnvRetryCount = defaultGetEnvRetryCount
+	}
+
+	if config.GetEnvRetryWaitTimeInSecs == 0 {
+		config.GetEnvRetryWaitTimeInSecs = defaultGetEnvRetryWaitTimeInSecs
+	}
+}
+
 func main() {
 	var tb *telemetry.TelemetryBuffer
 	var config telemetry.TelemetryConfig
@@ -123,6 +156,10 @@ func main() {
 
 	log.Logf("read config returned %+v", config)
 
+	setTelemetryDefaults(&config)
+
+	log.Logf("Config after setting defaults %+v", config)
+
 	// Cleaning up orphan socket if present
 	tbtemp := telemetry.NewTelemetryBuffer("")
 	tbtemp.Cleanup(telemetry.FdName)
@@ -131,7 +168,7 @@ func main() {
 		tb = telemetry.NewTelemetryBuffer("")
 
 		log.Logf("[Telemetry] Starting telemetry server")
-		err = tb.StartServer()
+		err = tb.StartServer(config.DisableTelemetryToNetAgent)
 		if err == nil || tb.FdExists {
 			break
 		}
@@ -141,11 +178,23 @@ func main() {
 		time.Sleep(time.Millisecond * 200)
 	}
 
-	if config.ReportToHostIntervalInSeconds == 0 {
-		config.ReportToHostIntervalInSeconds = reportToHostIntervalInSeconds
+	aiConfig := aitelemetry.AIConfig{
+		AppName:                      pluginName,
+		AppVersion:                   version,
+		BatchSize:                    config.BatchSizeInBytes,
+		BatchInterval:                config.BatchIntervalInSecs,
+		RefreshTimeout:               config.RefreshTimeoutInSecs,
+		DisableMetadataRefreshThread: config.DisableMetadataThread,
+		DebugMode:                    config.DebugMode,
+		GetEnvRetryCount:             config.GetEnvRetryCount,
+		GetEnvRetryWaitTimeInSecs:    config.GetEnvRetryWaitTimeInSecs,
 	}
 
+	err = telemetry.CreateAITelemetryHandle(aiConfig, config.DisableAll, config.DisableTrace, config.DisableMetric)
+	log.Printf("[Telemetry] AI Handle creation status:%v", err)
 	log.Logf("[Telemetry] Report to host for an interval of %d seconds", config.ReportToHostIntervalInSeconds)
 	tb.BufferAndPushData(config.ReportToHostIntervalInSeconds * time.Second)
+	telemetry.CloseAITelemetryHandle()
+
 	log.Close()
 }

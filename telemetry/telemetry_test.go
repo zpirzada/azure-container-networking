@@ -106,7 +106,7 @@ func TestMain(m *testing.M) {
 	reportManager.Report = &CNIReport{}
 
 	tb = NewTelemetryBuffer(hostAgentUrl)
-	err = tb.StartServer()
+	err = tb.StartServer(false)
 	if err == nil {
 		go tb.BufferAndPushData(0)
 	}
@@ -186,13 +186,6 @@ func TestSendTelemetry(t *testing.T) {
 	}
 }
 
-func TestReceiveTelemetryData(t *testing.T) {
-	time.Sleep(300 * time.Millisecond)
-	if len(tb.buffer.CNIReports) != 1 {
-		t.Errorf("buffer doesn't contain CNI report")
-	}
-}
-
 func TestCloseTelemetryConnection(t *testing.T) {
 	tb.Cancel()
 	time.Sleep(300 * time.Millisecond)
@@ -204,7 +197,7 @@ func TestCloseTelemetryConnection(t *testing.T) {
 func TestServerCloseTelemetryConnection(t *testing.T) {
 	// create server telemetrybuffer and start server
 	tb = NewTelemetryBuffer(hostAgentUrl)
-	err := tb.StartServer()
+	err := tb.StartServer(false)
 	if err == nil {
 		go tb.BufferAndPushData(0)
 	}
@@ -235,7 +228,7 @@ func TestServerCloseTelemetryConnection(t *testing.T) {
 func TestClientCloseTelemetryConnection(t *testing.T) {
 	// create server telemetrybuffer and start server
 	tb = NewTelemetryBuffer(hostAgentUrl)
-	err := tb.StartServer()
+	err := tb.StartServer(false)
 	if err == nil {
 		go tb.BufferAndPushData(0)
 	}

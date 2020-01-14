@@ -1,6 +1,7 @@
 package aitelemetry
 
 import (
+	"fmt"
 	"runtime"
 	"time"
 
@@ -11,14 +12,16 @@ import (
 )
 
 const (
-	resourceGroupStr  = "ResourceGroup"
-	vmSizeStr         = "VMSize"
-	osVersionStr      = "OSVersion"
-	locationStr       = "Region"
-	appNameStr        = "AppName"
-	subscriptionIDStr = "SubscriptionID"
-	vmNameStr         = "VMName"
-	defaultTimeout    = 10
+	resourceGroupStr    = "ResourceGroup"
+	vmSizeStr           = "VMSize"
+	osVersionStr        = "OSVersion"
+	locationStr         = "Region"
+	appNameStr          = "AppName"
+	subscriptionIDStr   = "SubscriptionID"
+	vmNameStr           = "VMName"
+	versionStr          = "AppVersion"
+	azurePublicCloudStr = "AzurePublicCloud"
+	defaultTimeout      = 10
 )
 
 var debugMode bool
@@ -26,7 +29,7 @@ var debugMode bool
 func messageListener() appinsights.DiagnosticsMessageListener {
 	if debugMode {
 		return appinsights.NewDiagnosticsMessageListener(func(msg string) error {
-			debuglog("[AppInsights] [%s] %s\n", time.Now().Format(time.UnixDate), msg)
+			debugLog("[AppInsights] [%s] %s\n", time.Now().Format(time.UnixDate), msg)
 			return nil
 		})
 	}
@@ -34,7 +37,7 @@ func messageListener() appinsights.DiagnosticsMessageListener {
 	return nil
 }
 
-func debuglog(format string, args ...interface{}) {
+func debugLog(format string, args ...interface{}) {
 	if debugMode {
 		log.Printf(format, args...)
 	}
@@ -55,12 +58,12 @@ func getMetadata(th *telemetryHandle) {
 			break
 		}
 
-		debuglog("[AppInsights] Error getting metadata %v. Sleep for %d", err, th.refreshTimeout)
+		debugLog("[AppInsights] Error getting metadata %v. Sleep for %d", err, th.refreshTimeout)
 		time.Sleep(time.Duration(th.refreshTimeout) * time.Second)
 	}
 
 	if err != nil {
-		debuglog("[AppInsights] Error getting metadata %v", err)
+		debugLog("[AppInsights] Error getting metadata %v", err)
 		return
 	}
 
@@ -72,7 +75,7 @@ func getMetadata(th *telemetryHandle) {
 	// Save metadata retrieved from wireserver to a file
 	kvs, err := store.NewJsonFileStore(metadataFile)
 	if err != nil {
-		debuglog("[AppInsights] Error initializing kvs store: %v", err)
+		debugLog("[AppInsights] Error initializing kvs store: %v", err)
 		return
 	}
 
@@ -80,20 +83,55 @@ func getMetadata(th *telemetryHandle) {
 	err = common.SaveHostMetadata(th.metadata, metadataFile)
 	kvs.Unlock(true)
 	if err != nil {
-		debuglog("[AppInsights] saving host metadata failed with :%v", err)
+		debugLog("[AppInsights] saving host metadata failed with :%v", err)
 	}
+}
+
+func isPublicEnvironment(url string, retryCount, waitTimeInSecs int) (bool, error) {
+	var (
+		cloudName string
+		err       error
+	)
+
+	for i := 0; i < retryCount; i++ {
+		cloudName, err = common.GetAzureCloud(url)
+		if cloudName == azurePublicCloudStr {
+			debugLog("[AppInsights] CloudName: %s\n", cloudName)
+			return true, nil
+		} else if err == nil {
+			debugLog("[AppInsights] This is not azure public cloud:%s", cloudName)
+			return false, fmt.Errorf("Not an azure public cloud: %s", cloudName)
+		}
+
+		debugLog("GetAzureCloud returned err :%v", err)
+		time.Sleep(time.Duration(waitTimeInSecs) * time.Second)
+	}
+
+	return false, err
 }
 
 // NewAITelemetry creates telemetry handle with user specified appinsights id.
 func NewAITelemetry(
+	azEnvUrl string,
 	id string,
 	aiConfig AIConfig,
-) TelemetryHandle {
+) (TelemetryHandle, error) {
+	debugMode = aiConfig.DebugMode
+
+	if id == "" {
+		debugLog("Empty AI key")
+		return nil, fmt.Errorf("AI key is empty")
+	}
+
+	// check if azure instance is in public cloud
+	isPublic, err := isPublicEnvironment(azEnvUrl, aiConfig.GetEnvRetryCount, aiConfig.GetEnvRetryWaitTimeInSecs)
+	if !isPublic {
+		return nil, err
+	}
 
 	telemetryConfig := appinsights.NewTelemetryConfiguration(id)
 	telemetryConfig.MaxBatchSize = aiConfig.BatchSize
 	telemetryConfig.MaxBatchInterval = time.Duration(aiConfig.BatchInterval) * time.Second
-	debugMode = aiConfig.DebugMode
 
 	th := &telemetryHandle{
 		client:                       appinsights.NewTelemetryClientFromConfig(telemetryConfig),
@@ -110,7 +148,7 @@ func NewAITelemetry(
 		go getMetadata(th)
 	}
 
-	return th
+	return th, nil
 }
 
 // TrackLog function sends report (trace) to appinsights resource. It overrides few of the existing columns with app information
@@ -167,6 +205,7 @@ func (th *telemetryHandle) TrackMetric(metric Metric) {
 		aimetric.Properties[locationStr] = th.metadata.Location
 		aimetric.Properties[subscriptionIDStr] = th.metadata.SubscriptionID
 		aimetric.Properties[vmNameStr] = th.metadata.VMName
+		aimetric.Properties[versionStr] = th.appVersion
 	}
 
 	// copy custom dimensions

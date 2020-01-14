@@ -28,6 +28,17 @@ import (
 // TelemetryConfig - telemetry config read by telemetry service
 type TelemetryConfig struct {
 	ReportToHostIntervalInSeconds time.Duration `json:"reportToHostIntervalInSeconds"`
+	DisableAll                    bool
+	DisableTrace                  bool
+	DisableMetric                 bool
+	DisableMetadataThread         bool
+	DebugMode                     bool
+	DisableTelemetryToNetAgent    bool
+	RefreshTimeoutInSecs          int
+	BatchIntervalInSecs           int
+	BatchSizeInBytes              int
+	GetEnvRetryCount              int
+	GetEnvRetryWaitTimeInSecs     int
 }
 
 // FdName - file descriptor name
@@ -50,7 +61,10 @@ const (
 	cni                = "CNI"
 )
 
-var payloadSize uint16 = 0
+var (
+	payloadSize                uint16 = 0
+	disableTelemetryToNetAgent bool
+)
 
 // TelemetryBuffer object
 type TelemetryBuffer struct {
@@ -104,7 +118,8 @@ func remove(s []net.Conn, i int) []net.Conn {
 }
 
 // Starts Telemetry server listening on unix domain socket
-func (tb *TelemetryBuffer) StartServer() error {
+func (tb *TelemetryBuffer) StartServer(disableNetAgentChannel bool) error {
+	disableTelemetryToNetAgent = disableNetAgentChannel
 	err := tb.Listen(FdName)
 	if err != nil {
 		tb.FdExists = strings.Contains(err.Error(), "in use") || strings.Contains(err.Error(), "Access is denied")
@@ -136,6 +151,10 @@ func (tb *TelemetryBuffer) StartServer() error {
 								var cniReport CNIReport
 								json.Unmarshal([]byte(reportStr), &cniReport)
 								tb.data <- cniReport
+							} else if _, ok := tmp["Metric"]; ok {
+								var aiMetric AIMetric
+								json.Unmarshal([]byte(reportStr), &aiMetric)
+								tb.data <- aiMetric
 							} else if _, ok := tmp["Allocations"]; ok {
 								var dncReport DNCReport
 								json.Unmarshal([]byte(reportStr), &dncReport)
@@ -279,6 +298,10 @@ func (tb *TelemetryBuffer) Close() {
 
 // sendToHost - send buffer to host
 func (tb *TelemetryBuffer) sendToHost() error {
+	if disableTelemetryToNetAgent {
+		return nil
+	}
+
 	buf := Buffer{
 		DNCReports: make([]DNCReport, 0),
 		CNIReports: make([]CNIReport, 0),
@@ -443,7 +466,13 @@ func (buf *Buffer) push(x interface{}) {
 		}
 		cniReport := x.(CNIReport)
 		cniReport.Metadata = metadata
+		SendAITelemetry(cniReport)
 		buf.CNIReports = append(buf.CNIReports, cniReport)
+
+	case AIMetric:
+		aiMetric := x.(AIMetric)
+		SendAIMetric(aiMetric)
+
 	case NPMReport:
 		if len(buf.NPMReports) >= MaxNumReports {
 			return

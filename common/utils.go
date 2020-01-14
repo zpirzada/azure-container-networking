@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-container-networking/log"
@@ -21,8 +22,9 @@ import (
 
 const (
 	metadataURL           = "http://169.254.169.254/metadata/instance?api-version=2017-08-01&format=json"
-	httpConnectionTimeout = 10
-	headerTimeout         = 20
+	azCloudUrl            = "http://169.254.169.254/metadata/instance/compute/azEnvironment?api-version=2018-10-01&format=text"
+	httpConnectionTimeout = 7
+	headerTimeout         = 7
 )
 
 // XmlDocument - Azure host agent XML document format.
@@ -287,4 +289,37 @@ func SaveHostMetadata(metadata Metadata, fileName string) error {
 	}
 
 	return err
+}
+
+func GetAzureCloud(url string) (string, error) {
+	if url == "" {
+		url = azCloudUrl
+	}
+
+	log.Printf("GetAzureCloud querying url: %s", url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Metadata", "True")
+
+	client := InitHttpClient(httpConnectionTimeout, headerTimeout)
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Bad http status:%v", resp.Status)
+	}
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(bodyBytes)), nil
 }

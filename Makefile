@@ -78,6 +78,8 @@ CNI_MULTITENANCY_BUILD_DIR = $(BUILD_DIR)/cni-multitenancy
 CNS_BUILD_DIR = $(BUILD_DIR)/cns
 NPM_BUILD_DIR = $(BUILD_DIR)/npm
 NPM_TELEMETRY_DIR = $(NPM_BUILD_DIR)/telemetry
+CNI_AI_ID = 5515a1eb-b2bc-406a-98eb-ba462e6f0411
+ACN_PACKAGE_PATH = github.com/Azure/azure-container-networking
 
 # Containerized build parameters.
 BUILD_CONTAINER_IMAGE = acn-build
@@ -169,7 +171,7 @@ $(CNI_BUILD_DIR)/azure-vnet-ipam$(EXE_EXT): $(CNIFILES)
 
 # Build the Azure CNI telemetry plugin.
 $(CNI_BUILD_DIR)/azure-vnet-telemetry$(EXE_EXT): $(CNIFILES)
-	go build -v -o $(CNI_BUILD_DIR)/azure-vnet-telemetry$(EXE_EXT) -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_TELEMETRY_DIR)/*.go
+	go build -v -o $(CNI_BUILD_DIR)/azure-vnet-telemetry$(EXE_EXT) -ldflags "-X main.version=$(VERSION) -X $(ACN_PACKAGE_PATH)/telemetry.aiMetadata=$(CNI_AI_ID) -s -w" $(CNI_TELEMETRY_DIR)/*.go
 
 # Build the Azure CNS Service.
 $(CNS_BUILD_DIR)/azure-cns$(EXE_EXT): $(CNSFILES)
