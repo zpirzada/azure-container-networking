@@ -24,7 +24,6 @@ jobs:
       CommitHash: $[ dependencies.unit_tests.outputs['EnvironmentalVariables.CommitHash'] ]
       CLEANUP_ON_EXIT: true
       CLEANUP_IF_FAIL: true
-      AKS_ENGINE_VERSION: v0.41.3
     steps:
       - template: e2e-step-template.yaml
         parameters:
