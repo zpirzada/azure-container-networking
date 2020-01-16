@@ -19,6 +19,7 @@ const (
 	appNameStr          = "AppName"
 	subscriptionIDStr   = "SubscriptionID"
 	vmNameStr           = "VMName"
+	vmIDStr             = "VMID"
 	versionStr          = "AppVersion"
 	azurePublicCloudStr = "AzurePublicCloud"
 	defaultTimeout      = 10
@@ -183,6 +184,7 @@ func (th *telemetryHandle) TrackLog(report Report) {
 		trace.Properties[resourceGroupStr] = th.metadata.ResourceGroupName
 		trace.Properties[vmSizeStr] = th.metadata.VMSize
 		trace.Properties[osVersionStr] = th.metadata.OSVersion
+		trace.Properties[vmIDStr] = th.metadata.VMID
 	}
 
 	// send to appinsights resource
@@ -206,6 +208,8 @@ func (th *telemetryHandle) TrackMetric(metric Metric) {
 		aimetric.Properties[subscriptionIDStr] = th.metadata.SubscriptionID
 		aimetric.Properties[vmNameStr] = th.metadata.VMName
 		aimetric.Properties[versionStr] = th.appVersion
+		aimetric.Properties[resourceGroupStr] = th.metadata.ResourceGroupName
+		aimetric.Properties[vmIDStr] = th.metadata.VMID
 	}
 
 	// copy custom dimensions
