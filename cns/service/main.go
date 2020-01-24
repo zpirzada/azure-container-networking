@@ -224,8 +224,8 @@ func main() {
 		logger.Errorf("[Azure CNS] Error reading cns config: %v", err)
 	}
 
-	logger.Printf("[Azure CNS] Read config :%+v", cnsconfig)
 	configuration.SetCNSConfigDefaults(&cnsconfig)
+	logger.Printf("[Azure CNS] Read config :%+v", cnsconfig)
 
 	disableTelemetry := cnsconfig.TelemetrySettings.DisableAll
 

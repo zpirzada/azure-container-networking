@@ -69,7 +69,7 @@ func ReadConfig() (CNSConfig, error) {
 }
 
 // set telmetry setting defaults
-func setTelemetrySettingDefaults(telemetrySettings TelemetrySettings) {
+func setTelemetrySettingDefaults(telemetrySettings *TelemetrySettings) {
 	if telemetrySettings.RefreshIntervalInSecs == 0 {
 		// set the default refresh interval of metadata thread to 15 seconds
 		telemetrySettings.RefreshIntervalInSecs = 15
@@ -93,5 +93,5 @@ func setTelemetrySettingDefaults(telemetrySettings TelemetrySettings) {
 
 // Set Default values of CNS config if not specified
 func SetCNSConfigDefaults(config *CNSConfig) {
-	setTelemetrySettingDefaults(config.TelemetrySettings)
+	setTelemetrySettingDefaults(&config.TelemetrySettings)
 }
