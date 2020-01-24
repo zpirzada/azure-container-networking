@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-container-networking/cns"
+	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/cns/networkcontainers"
 	"github.com/Azure/azure-container-networking/common"
-	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network/policy"
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
@@ -75,7 +75,7 @@ var (
 
 // CreateHnsNetwork creates the HNS network with the provided configuration
 func CreateHnsNetwork(nwConfig cns.CreateHnsNetworkRequest) error {
-	log.Printf("[Azure CNS] CreateHnsNetwork")
+	logger.Printf("[Azure CNS] CreateHnsNetwork")
 	// Initialize HNS network.
 	hnsNetwork := &hcsshim.HNSNetwork{
 		Name:                 nwConfig.NetworkName,
@@ -115,7 +115,7 @@ func CreateHnsNetwork(nwConfig cns.CreateHnsNetworkRequest) error {
 
 // DeleteHnsNetwork deletes the HNS network with the provided name
 func DeleteHnsNetwork(networkName string) error {
-	log.Printf("[Azure CNS] DeleteHnsNetwork")
+	logger.Printf("[Azure CNS] DeleteHnsNetwork")
 
 	return deleteHnsNetwork(networkName)
 }
@@ -134,11 +134,11 @@ func CreateDefaultExtNetwork(networkType string) error {
 		return fmt.Errorf("Invalid hns network type %s", networkType)
 	}
 
-	log.Printf("[Azure CNS] CreateDefaultExtNetwork")
+	logger.Printf("[Azure CNS] CreateDefaultExtNetwork")
 	extHnsNetwork, _ := hcsshim.GetHNSNetworkByName(ExtHnsNetworkName)
 
 	if extHnsNetwork != nil {
-		log.Printf("[Azure CNS] Found existing DefaultExtNetwork with type: %s", extHnsNetwork.Type)
+		logger.Printf("[Azure CNS] Found existing DefaultExtNetwork with type: %s", extHnsNetwork.Type)
 		if !strings.EqualFold(networkType, extHnsNetwork.Type) {
 			return fmt.Errorf("Network type mismatch with existing network: %s", extHnsNetwork.Type)
 		}
@@ -147,7 +147,7 @@ func CreateDefaultExtNetwork(networkType string) error {
 	}
 
 	// create new hns network
-	log.Printf("[Azure CNS] Creating DefaultExtNetwork with type %s", networkType)
+	logger.Printf("[Azure CNS] Creating DefaultExtNetwork with type %s", networkType)
 
 	hnsNetwork := &hcsshim.HNSNetwork{
 		Name: ExtHnsNetworkName,
@@ -166,7 +166,7 @@ func CreateDefaultExtNetwork(networkType string) error {
 
 // DeleteDefaultExtNetwork deletes the default HNS network
 func DeleteDefaultExtNetwork() error {
-	log.Printf("[Azure CNS] DeleteDefaultExtNetwork")
+	logger.Printf("[Azure CNS] DeleteDefaultExtNetwork")
 
 	return deleteHnsNetwork(ExtHnsNetworkName)
 }
@@ -181,9 +181,9 @@ func createHnsNetwork(hnsNetwork *hcsshim.HNSNetwork) error {
 	hnsRequest := string(buffer)
 
 	// Create the HNS network.
-	log.Printf("[Azure CNS] HNSNetworkRequest POST request:%+v", hnsRequest)
+	logger.Printf("[Azure CNS] HNSNetworkRequest POST request:%+v", hnsRequest)
 	hnsResponse, err := hcsshim.HNSNetworkRequest("POST", "", hnsRequest)
-	log.Printf("[Azure CNS] HNSNetworkRequest POST response:%+v err:%v.", hnsResponse, err)
+	logger.Printf("[Azure CNS] HNSNetworkRequest POST response:%+v err:%v.", hnsResponse, err)
 
 	return err
 }
@@ -194,9 +194,9 @@ func deleteHnsNetwork(networkName string) error {
 	if err == nil {
 		// Delete the HNS network.
 		var hnsResponse *hcsshim.HNSNetwork
-		log.Printf("[Azure CNS] HNSNetworkRequest DELETE id:%v", hnsNetwork.Id)
+		logger.Printf("[Azure CNS] HNSNetworkRequest DELETE id:%v", hnsNetwork.Id)
 		hnsResponse, err = hcsshim.HNSNetworkRequest("DELETE", hnsNetwork.Id, "")
-		log.Printf("[Azure CNS] HNSNetworkRequest DELETE response:%+v err:%v.", hnsResponse, err)
+		logger.Printf("[Azure CNS] HNSNetworkRequest DELETE response:%+v err:%v.", hnsResponse, err)
 	}
 
 	return err
@@ -259,7 +259,7 @@ func configureHostNCApipaNetwork(localIPConfiguration cns.IPConfiguration) (*hcn
 
 	network.Ipams[0].Subnets = append(network.Ipams[0].Subnets, subnet)
 
-	log.Printf("[Azure CNS] Configured HostNCApipaNetwork: %+v", network)
+	logger.Printf("[Azure CNS] Configured HostNCApipaNetwork: %+v", network)
 
 	return network, nil
 }
@@ -306,15 +306,15 @@ func createHostNCApipaNetwork(
 		}
 
 		// Create the HNS network.
-		log.Printf("[Azure CNS] Creating HostNCApipaNetwork: %+v", network)
+		logger.Printf("[Azure CNS] Creating HostNCApipaNetwork: %+v", network)
 
 		if network, err = network.Create(); err != nil {
 			return nil, err
 		}
 
-		log.Printf("[Azure CNS] Successfully created apipa network for host container connectivity: %+v", network)
+		logger.Printf("[Azure CNS] Successfully created apipa network for host container connectivity: %+v", network)
 	} else {
-		log.Printf("[Azure CNS] Found existing HostNCApipaNetwork: %+v", network)
+		logger.Printf("[Azure CNS] Found existing HostNCApipaNetwork: %+v", network)
 	}
 
 	return network, err
@@ -354,11 +354,11 @@ func configureAclSettingHostNCApipaEndpoint(
 	)
 
 	if allowNCToHostCommunication {
-		log.Printf("[Azure CNS] Allowing NC (%s) to Host (%s) connectivity", networkContainerApipaIP, hostApipaIP)
+		logger.Printf("[Azure CNS] Allowing NC (%s) to Host (%s) connectivity", networkContainerApipaIP, hostApipaIP)
 	}
 
 	if allowHostToNCCommunication {
-		log.Printf("[Azure CNS] Allowing Host (%s) to NC (%s) connectivity", hostApipaIP, networkContainerApipaIP)
+		logger.Printf("[Azure CNS] Allowing Host (%s) to NC (%s) connectivity", hostApipaIP, networkContainerApipaIP)
 	}
 
 	// Iterate thru the protocol list and add ACL for each
@@ -458,7 +458,7 @@ func configureHostNCApipaEndpoint(
 		allowHostToNCCommunication)
 
 	if err != nil {
-		log.Errorf("[Azure CNS] Failed to configure ACL for HostNCApipaEndpoint. Error: %v", err)
+		logger.Errorf("[Azure CNS] Failed to configure ACL for HostNCApipaEndpoint. Error: %v", err)
 		return nil, err
 	}
 
@@ -480,7 +480,7 @@ func configureHostNCApipaEndpoint(
 
 	endpoint.IpConfigurations = append(endpoint.IpConfigurations, ipConfiguration)
 
-	log.Printf("[Azure CNS] Configured HostNCApipaEndpoint: %+v", endpoint)
+	logger.Printf("[Azure CNS] Configured HostNCApipaEndpoint: %+v", endpoint)
 
 	return endpoint, nil
 }
@@ -511,16 +511,16 @@ func CreateHostNCApipaEndpoint(
 	}
 
 	if endpoint != nil {
-		log.Debugf("[Azure CNS] Found existing endpoint: %+v", endpoint)
+		logger.Debugf("[Azure CNS] Found existing endpoint: %+v", endpoint)
 		return endpoint.Id, nil
 	}
 
 	if network, err = createHostNCApipaNetwork(localIPConfiguration); err != nil {
-		log.Errorf("[Azure CNS] Failed to create HostNCApipaNetwork. Error: %v", err)
+		logger.Errorf("[Azure CNS] Failed to create HostNCApipaNetwork. Error: %v", err)
 		return "", err
 	}
 
-	log.Printf("[Azure CNS] Configuring HostNCApipaEndpoint: %s, in network: %s with localIPConfig: %+v",
+	logger.Printf("[Azure CNS] Configuring HostNCApipaEndpoint: %s, in network: %s with localIPConfig: %+v",
 		endpointName, network.Id, localIPConfiguration)
 
 	if endpoint, err = configureHostNCApipaEndpoint(
@@ -529,18 +529,18 @@ func CreateHostNCApipaEndpoint(
 		localIPConfiguration,
 		allowNCToHostCommunication,
 		allowHostToNCCommunication); err != nil {
-		log.Errorf("[Azure CNS] Failed to configure HostNCApipaEndpoint: %s. Error: %v", endpointName, err)
+		logger.Errorf("[Azure CNS] Failed to configure HostNCApipaEndpoint: %s. Error: %v", endpointName, err)
 		return "", err
 	}
 
-	log.Printf("[Azure CNS] Creating HostNCApipaEndpoint for host container connectivity: %+v", endpoint)
+	logger.Printf("[Azure CNS] Creating HostNCApipaEndpoint for host container connectivity: %+v", endpoint)
 	if endpoint, err = endpoint.Create(); err != nil {
 		err = fmt.Errorf("Failed to create HostNCApipaEndpoint: %s. Error: %v", endpointName, err)
-		log.Errorf("[Azure CNS] %s", err.Error())
+		logger.Errorf("[Azure CNS] %s", err.Error())
 		return "", err
 	}
 
-	log.Printf("[Azure CNS] Successfully created HostNCApipaEndpoint: %+v", endpoint)
+	logger.Printf("[Azure CNS] Successfully created HostNCApipaEndpoint: %+v", endpoint)
 
 	return endpoint.Id, nil
 }
@@ -565,7 +565,7 @@ func deleteNetworkByIDHnsV2(
 				"error with GetNetworkByID: %v", err)
 		}
 
-		log.Errorf("[Azure CNS] Delete called on the Network: %s which doesn't exist. Error: %v",
+		logger.Errorf("[Azure CNS] Delete called on the Network: %s which doesn't exist. Error: %v",
 			networkID, err)
 
 		return nil
@@ -575,7 +575,7 @@ func deleteNetworkByIDHnsV2(
 		return fmt.Errorf("Failed to delete network: %+v. Error: %v", network, err)
 	}
 
-	log.Errorf("[Azure CNS] Successfully deleted network: %+v", network)
+	logger.Errorf("[Azure CNS] Successfully deleted network: %+v", network)
 
 	return nil
 }
@@ -596,7 +596,7 @@ func deleteEndpointByNameHnsV2(
 				"error with GetEndpointByName: %v", err)
 		}
 
-		log.Errorf("[Azure CNS] Delete called on the Endpoint: %s which doesn't exist. Error: %v",
+		logger.Errorf("[Azure CNS] Delete called on the Endpoint: %s which doesn't exist. Error: %v",
 			endpointName, err)
 
 		return nil
@@ -606,7 +606,7 @@ func deleteEndpointByNameHnsV2(
 		return fmt.Errorf("Failed to delete endpoint: %+v. Error: %v", endpoint, err)
 	}
 
-	log.Errorf("[Azure CNS] Successfully deleted endpoint: %+v", endpoint)
+	logger.Errorf("[Azure CNS] Successfully deleted endpoint: %+v", endpoint)
 
 	return nil
 }
@@ -619,14 +619,14 @@ func DeleteHostNCApipaEndpoint(
 	namedLock.LockAcquire(endpointName)
 	defer namedLock.LockRelease(endpointName)
 
-	log.Debugf("[Azure CNS] Deleting HostNCApipaEndpoint: %s", endpointName)
+	logger.Debugf("[Azure CNS] Deleting HostNCApipaEndpoint: %s", endpointName)
 
 	if err := deleteEndpointByNameHnsV2(endpointName); err != nil {
-		log.Errorf("[Azure CNS] Failed to delete HostNCApipaEndpoint: %s. Error: %v", endpointName, err)
+		logger.Errorf("[Azure CNS] Failed to delete HostNCApipaEndpoint: %s. Error: %v", endpointName, err)
 		return err
 	}
 
-	log.Debugf("[Azure CNS] Successfully deleted HostNCApipaEndpoint: %s", endpointName)
+	logger.Debugf("[Azure CNS] Successfully deleted HostNCApipaEndpoint: %s", endpointName)
 
 	namedLock.LockAcquire(hostNCApipaNetworkName)
 	defer namedLock.LockRelease(hostNCApipaNetworkName)
@@ -635,14 +635,14 @@ func DeleteHostNCApipaEndpoint(
 	if network, err := hcn.GetNetworkByName(hostNCApipaNetworkName); err == nil {
 		var endpoints []hcn.HostComputeEndpoint
 		if endpoints, err = hcn.ListEndpointsOfNetwork(network.Id); err != nil {
-			log.Errorf("[Azure CNS] Failed to list endpoints in the network: %s. Error: %v",
+			logger.Errorf("[Azure CNS] Failed to list endpoints in the network: %s. Error: %v",
 				hostNCApipaNetworkName, err)
 			return nil
 		}
 
 		// Delete network if it doesn't have any endpoints
 		if len(endpoints) == 0 {
-			log.Debugf("[Azure CNS] Deleting network with ID: %s", network.Id)
+			logger.Debugf("[Azure CNS] Deleting network with ID: %s", network.Id)
 			if err = deleteNetworkByIDHnsV2(network.Id); err == nil {
 				// Delete the loopback adapter created for this network
 				networkcontainers.DeleteLoopbackAdapter(hostNCLoopbackAdapterName)

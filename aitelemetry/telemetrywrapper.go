@@ -12,20 +12,47 @@ import (
 )
 
 const (
-	resourceGroupStr    = "ResourceGroup"
-	vmSizeStr           = "VMSize"
-	osVersionStr        = "OSVersion"
-	locationStr         = "Region"
-	appNameStr          = "AppName"
-	subscriptionIDStr   = "SubscriptionID"
-	vmNameStr           = "VMName"
-	vmIDStr             = "VMID"
-	versionStr          = "AppVersion"
-	azurePublicCloudStr = "AzurePublicCloud"
-	defaultTimeout      = 10
+	resourceGroupStr                 = "ResourceGroup"
+	vmSizeStr                        = "VMSize"
+	osVersionStr                     = "OSVersion"
+	locationStr                      = "Region"
+	appNameStr                       = "AppName"
+	subscriptionIDStr                = "SubscriptionID"
+	vmNameStr                        = "VMName"
+	vmIDStr                          = "VMID"
+	versionStr                       = "AppVersion"
+	azurePublicCloudStr              = "AzurePublicCloud"
+	defaultTimeout                   = 10
+	defaultBatchIntervalInSecs       = 15
+	defaultBatchSizeInBytes          = 32768
+	defaultGetEnvRetryCount          = 5
+	defaultGetEnvRetryWaitTimeInSecs = 3
+	defaultRefreshTimeoutInSecs      = 10
 )
 
 var debugMode bool
+
+func setAIConfigDefaults(config *AIConfig) {
+	if config.RefreshTimeout == 0 {
+		config.RefreshTimeout = defaultRefreshTimeoutInSecs
+	}
+
+	if config.BatchInterval == 0 {
+		config.BatchInterval = defaultBatchIntervalInSecs
+	}
+
+	if config.BatchSize == 0 {
+		config.BatchSize = defaultBatchSizeInBytes
+	}
+
+	if config.GetEnvRetryCount == 0 {
+		config.GetEnvRetryCount = defaultGetEnvRetryCount
+	}
+
+	if config.GetEnvRetryWaitTimeInSecs == 0 {
+		config.GetEnvRetryWaitTimeInSecs = defaultGetEnvRetryWaitTimeInSecs
+	}
+}
 
 func messageListener() appinsights.DiagnosticsMessageListener {
 	if debugMode {
@@ -123,6 +150,8 @@ func NewAITelemetry(
 		debugLog("Empty AI key")
 		return nil, fmt.Errorf("AI key is empty")
 	}
+
+	setAIConfigDefaults(&aiConfig)
 
 	// check if azure instance is in public cloud
 	isPublic, err := isPublicEnvironment(azEnvUrl, aiConfig.GetEnvRetryCount, aiConfig.GetEnvRetryWaitTimeInSecs)

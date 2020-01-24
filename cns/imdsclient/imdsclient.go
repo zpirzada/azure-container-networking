@@ -10,16 +10,16 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/cns/logger"
 )
 
 // GetNetworkContainerInfoFromHost retrieves the programmed version of network container from Host.
 func (imdsClient *ImdsClient) GetNetworkContainerInfoFromHost(networkContainerID string, primaryAddress string, authToken string, apiVersion string) (*ContainerVersion, error) {
-	log.Printf("[Azure CNS] GetNetworkContainerInfoFromHost")
+	logger.Printf("[Azure CNS] GetNetworkContainerInfoFromHost")
 	queryURL := fmt.Sprintf(hostQueryURLForProgrammedVersion,
 		primaryAddress, networkContainerID, authToken, apiVersion)
 
-	log.Printf("[Azure CNS] Going to query Azure Host for container version @\n %v\n", queryURL)
+	logger.Printf("[Azure CNS] Going to query Azure Host for container version @\n %v\n", queryURL)
 	jsonResponse, err := http.Get(queryURL)
 	if err != nil {
 		return nil, err
@@ -27,7 +27,7 @@ func (imdsClient *ImdsClient) GetNetworkContainerInfoFromHost(networkContainerID
 
 	defer jsonResponse.Body.Close()
 
-	log.Printf("[Azure CNS] Response received from Azure Host for NetworkManagement/interfaces: %v", jsonResponse.Body)
+	logger.Printf("[Azure CNS] Response received from Azure Host for NetworkManagement/interfaces: %v", jsonResponse.Body)
 
 	var response containerVersionJsonResponse
 	err = json.NewDecoder(jsonResponse.Body).Decode(&response)
@@ -45,7 +45,7 @@ func (imdsClient *ImdsClient) GetNetworkContainerInfoFromHost(networkContainerID
 
 // GetPrimaryInterfaceInfoFromHost retrieves subnet and gateway of primary NIC from Host.
 func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo, error) {
-	log.Printf("[Azure CNS] GetPrimaryInterfaceInfoFromHost")
+	logger.Printf("[Azure CNS] GetPrimaryInterfaceInfoFromHost")
 
 	interfaceInfo := &InterfaceInfo{}
 	resp, err := http.Get(hostQueryURL)
@@ -55,7 +55,7 @@ func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo,
 
 	defer resp.Body.Close()
 
-	log.Printf("[Azure CNS] Response received from NMAgent for get interface details: %v", resp.Body)
+	logger.Printf("[Azure CNS] Response received from NMAgent for get interface details: %v", resp.Body)
 
 	var doc xmlDocument
 	decoder := xml.NewDecoder(resp.Body)
@@ -114,17 +114,17 @@ func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo,
 
 // GetPrimaryInterfaceInfoFromMemory retrieves subnet and gateway of primary NIC that is saved in memory.
 func (imdsClient *ImdsClient) GetPrimaryInterfaceInfoFromMemory() (*InterfaceInfo, error) {
-	log.Printf("[Azure CNS] GetPrimaryInterfaceInfoFromMemory")
+	logger.Printf("[Azure CNS] GetPrimaryInterfaceInfoFromMemory")
 
 	var iface *InterfaceInfo
 	var err error
 	if imdsClient.primaryInterface == nil {
-		log.Debugf("Azure-CNS] Primary interface in memory does not exist. Will get it from Host.")
+		logger.Debugf("Azure-CNS] Primary interface in memory does not exist. Will get it from Host.")
 		iface, err = imdsClient.GetPrimaryInterfaceInfoFromHost()
 		if err != nil {
-			log.Printf("[Azure-CNS] Unable to retrive primary interface info.")
+			logger.Errorf("[Azure-CNS] Unable to retrive primary interface info.")
 		} else {
-			log.Debugf("Azure-CNS] Primary interface received from HOST: %+v.", iface)
+			logger.Debugf("Azure-CNS] Primary interface received from HOST: %+v.", iface)
 		}
 	} else {
 		iface = imdsClient.primaryInterface

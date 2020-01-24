@@ -15,7 +15,7 @@ import (
 	"os/exec"
 
 	"github.com/Azure/azure-container-networking/cns"
-	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/invoke"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
@@ -56,20 +56,20 @@ func InterfaceExists(iFaceName string) (bool, error) {
 	_, err := net.InterfaceByName(iFaceName)
 	if err != nil {
 		errMsg := fmt.Sprintf("[Azure CNS] Unable to get interface by name %s. Error: %v", iFaceName, err)
-		log.Printf(errMsg)
+		logger.Printf(errMsg)
 		return false, errors.New(errMsg)
 	}
 
-	log.Printf("[Azure CNS] Found interface by name %s", iFaceName)
+	logger.Printf("[Azure CNS] Found interface by name %s", iFaceName)
 
 	return true, nil
 }
 
 // Create creates a network container.
 func (cn *NetworkContainers) Create(createNetworkContainerRequest cns.CreateNetworkContainerRequest) error {
-	log.Printf("[Azure CNS] NetworkContainers.Create called for NC: %s", createNetworkContainerRequest.NetworkContainerid)
+	logger.Printf("[Azure CNS] NetworkContainers.Create called for NC: %s", createNetworkContainerRequest.NetworkContainerid)
 	err := createOrUpdateInterface(createNetworkContainerRequest)
-	log.Printf("[Azure CNS] NetworkContainers.Create completed for NC: %s with error: %v",
+	logger.Printf("[Azure CNS] NetworkContainers.Create completed for NC: %s with error: %v",
 		createNetworkContainerRequest.NetworkContainerid, err)
 
 	return err
@@ -77,9 +77,9 @@ func (cn *NetworkContainers) Create(createNetworkContainerRequest cns.CreateNetw
 
 // Update updates a network container.
 func (cn *NetworkContainers) Update(createNetworkContainerRequest cns.CreateNetworkContainerRequest, netpluginConfig *NetPluginConfiguration) error {
-	log.Printf("[Azure CNS] NetworkContainers.Update called for NC: %s", createNetworkContainerRequest.NetworkContainerid)
+	logger.Printf("[Azure CNS] NetworkContainers.Update called for NC: %s", createNetworkContainerRequest.NetworkContainerid)
 	err := updateInterface(createNetworkContainerRequest, netpluginConfig)
-	log.Printf("[Azure CNS] NetworkContainers.Update completed for NC: %s with error: %v",
+	logger.Printf("[Azure CNS] NetworkContainers.Update completed for NC: %s with error: %v",
 		createNetworkContainerRequest.NetworkContainerid, err)
 
 	return err
@@ -87,9 +87,9 @@ func (cn *NetworkContainers) Update(createNetworkContainerRequest cns.CreateNetw
 
 // Delete deletes a network container.
 func (cn *NetworkContainers) Delete(networkContainerID string) error {
-	log.Printf("[Azure CNS] NetworkContainers.Delete called for NC: %s", networkContainerID)
+	logger.Printf("[Azure CNS] NetworkContainers.Delete called for NC: %s", networkContainerID)
 	err := deleteInterface(networkContainerID)
-	log.Printf("[Azure CNS] NetworkContainers.Delete completed for NC: %s with error: %v", networkContainerID, err)
+	logger.Printf("[Azure CNS] NetworkContainers.Delete completed for NC: %s with error: %v", networkContainerID, err)
 
 	return err
 }
@@ -122,7 +122,7 @@ func getNetworkConfig(configFilePath string) ([]byte, error) {
 
 	var configMap map[string]interface{}
 	if err = json.Unmarshal(content, &configMap); err != nil {
-		log.Printf("[Azure CNS] Failed to unmarshal network configuration with error %v", err)
+		logger.Printf("[Azure CNS] Failed to unmarshal network configuration with error %v", err)
 		return nil, err
 	}
 
@@ -134,7 +134,7 @@ func getNetworkConfig(configFilePath string) ([]byte, error) {
 
 	if flatNetConfigMap == nil {
 		msg := "[Azure CNS] " + pluginsStr + " section of the network configuration cannot be empty."
-		log.Printf(msg)
+		logger.Printf(msg)
 		return nil, errors.New(msg)
 	}
 
@@ -145,7 +145,7 @@ func getNetworkConfig(configFilePath string) ([]byte, error) {
 	// convert into bytes format
 	netConfig, err := json.Marshal(flatNetConfigMap)
 	if err != nil {
-		log.Printf("[Azure CNS] Failed to marshal flat network configuration with error %v", err)
+		logger.Printf("[Azure CNS] Failed to marshal flat network configuration with error %v", err)
 		return nil, err
 	}
 
@@ -193,7 +193,7 @@ func execPlugin(rt *libcni.RuntimeConf, netconf []byte, operation, path string) 
 		fallthrough
 	case cniUpdate:
 		environ := args(operation, path, rt).AsEnv()
-		log.Printf("[Azure CNS] CNI called with environ variables %v", environ)
+		logger.Printf("[Azure CNS] CNI called with environ variables %v", environ)
 		stdout := &bytes.Buffer{}
 		command := exec.Command(path + string(os.PathSeparator) + "azure-vnet")
 		command.Env = environ
@@ -207,16 +207,16 @@ func execPlugin(rt *libcni.RuntimeConf, netconf []byte, operation, path string) 
 
 // Attach - attaches network container to network.
 func (cn *NetworkContainers) Attach(podInfo cns.KubernetesPodInfo, dockerContainerid string, netPluginConfig *NetPluginConfiguration) error {
-	log.Printf("[Azure CNS] NetworkContainers.Attach called")
+	logger.Printf("[Azure CNS] NetworkContainers.Attach called")
 	err := configureNetworkContainerNetworking(cniAdd, podInfo.PodName, podInfo.PodNamespace, dockerContainerid, netPluginConfig)
-	log.Printf("[Azure CNS] NetworkContainers.Attach finished")
+	logger.Printf("[Azure CNS] NetworkContainers.Attach finished")
 	return err
 }
 
 // Detach - detaches network container from network.
 func (cn *NetworkContainers) Detach(podInfo cns.KubernetesPodInfo, dockerContainerid string, netPluginConfig *NetPluginConfiguration) error {
-	log.Printf("[Azure CNS] NetworkContainers.Detach called")
+	logger.Printf("[Azure CNS] NetworkContainers.Detach called")
 	err := configureNetworkContainerNetworking(cniDelete, podInfo.PodName, podInfo.PodNamespace, dockerContainerid, netPluginConfig)
-	log.Printf("[Azure CNS] NetworkContainers.Detach finished")
+	logger.Printf("[Azure CNS] NetworkContainers.Detach finished")
 	return err
 }

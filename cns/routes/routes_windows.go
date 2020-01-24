@@ -11,7 +11,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/cns/logger"
 )
 
 const (
@@ -20,20 +20,20 @@ const (
 )
 
 func getInterfaceByAddress(address string) (int, error) {
-	log.Printf("[Azure CNS] getInterfaceByAddress")
+	logger.Printf("[Azure CNS] getInterfaceByAddress")
 
 	var ifaces []net.Interface
-	log.Printf("[Azure CNS] Going to obtain interface for address %s", address)
+	logger.Printf("[Azure CNS] Going to obtain interface for address %s", address)
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return -1, err
 	}
 
 	for i := 0; i < len(ifaces); i++ {
-		log.Debugf("[Azure CNS] Going to check interface %v", ifaces[i].Name)
+		logger.Debugf("[Azure CNS] Going to check interface %v", ifaces[i].Name)
 		addrs, _ := ifaces[i].Addrs()
 		for _, addr := range addrs {
-			log.Debugf("[Azure CNS] ipAddress being compared input=%v %v\n",
+			logger.Debugf("[Azure CNS] ipAddress being compared input=%v %v\n",
 				address, addr.String())
 			ip := strings.Split(addr.String(), "/")
 			if len(ip) != 2 {
@@ -51,7 +51,7 @@ func getInterfaceByAddress(address string) (int, error) {
 }
 
 func getRoutes() ([]Route, error) {
-	log.Printf("[Azure CNS] getRoutes")
+	logger.Printf("[Azure CNS] getRoutes")
 
 	c := exec.Command("cmd", "/C", "route", "print")
 	var routePrintOutput string
@@ -59,9 +59,9 @@ func getRoutes() ([]Route, error) {
 	bytes, err := c.Output()
 	if err == nil {
 		routePrintOutput = string(bytes)
-		log.Debugf("[Azure CNS] Printing Routing table \n %v\n", routePrintOutput)
+		logger.Debugf("[Azure CNS] Printing Routing table \n %v\n", routePrintOutput)
 	} else {
-		log.Printf("Received error in printing routing table %v", err.Error())
+		logger.Printf("Received error in printing routing table %v", err.Error())
 		return nil, err
 	}
 
@@ -73,7 +73,7 @@ func getRoutes() ([]Route, error) {
 	table := tokens[0]
 	routes := strings.Split(table, "\r")
 	routeCount = len(routes)
-	log.Debugf("[Azure CNS] Recevied route count: %d", routeCount)
+	logger.Debugf("[Azure CNS] Recevied route count: %d", routeCount)
 	if routeCount == 0 {
 		return nil, nil
 	}
@@ -85,10 +85,10 @@ func getRoutes() ([]Route, error) {
 		if route != "" {
 			tokens := strings.Fields(route)
 			if len(tokens) != 5 {
-				log.Printf("[Azure CNS] Ignoring route %s", route)
+				logger.Printf("[Azure CNS] Ignoring route %s", route)
 				truncated++
 			} else {
-				log.Debugf("[Azure CNS] Parsing route: %s %s %s %s %s\n",
+				logger.Debugf("[Azure CNS] Parsing route: %s %s %s %s %s\n",
 					tokens[0], tokens[1], tokens[2], tokens[3], tokens[4])
 				rt := Route{
 					destination: tokens[0],
@@ -107,7 +107,7 @@ func getRoutes() ([]Route, error) {
 					localRoutes[cntr] = rt
 					cntr++
 				} else {
-					log.Printf("[Azure CNS] Error encountered while obtaining index. %v\n", err.Error())
+					logger.Printf("[Azure CNS] Error encountered while obtaining index. %v\n", err.Error())
 					truncated++
 				}
 			}
@@ -124,7 +124,7 @@ func getRoutes() ([]Route, error) {
 }
 
 func containsRoute(routes []Route, route Route) (bool, error) {
-	log.Printf("[Azure CNS] containsRoute")
+	logger.Printf("[Azure CNS] containsRoute")
 	if routes == nil {
 		return false, nil
 	}
@@ -140,10 +140,10 @@ func containsRoute(routes []Route, route Route) (bool, error) {
 }
 
 func putRoutes(routes []Route) error {
-	log.Printf("[Azure CNS] putRoutes")
+	logger.Printf("[Azure CNS] putRoutes")
 
 	var err error
-	log.Printf("[Azure CNS] Going to get current routes")
+	logger.Printf("[Azure CNS] Going to get current routes")
 	currentRoutes, err := getRoutes()
 	if err != nil {
 		return err
@@ -161,17 +161,17 @@ func putRoutes(routes []Route) error {
 				route.metric,
 				"IF",
 				fmt.Sprintf("%d", route.ifaceIndex)}
-			log.Printf("[Azure CNS] Adding missing route: %v", args)
+			logger.Printf("[Azure CNS] Adding missing route: %v", args)
 
 			c := exec.Command("cmd", args...)
 			bytes, err := c.Output()
 			if err == nil {
-				log.Printf("[Azure CNS] Successfully executed add route: %v\n%v", args, string(bytes))
+				logger.Printf("[Azure CNS] Successfully executed add route: %v\n%v", args, string(bytes))
 			} else {
-				log.Errorf("[Azure CNS] Failed to execute add route: %v\n%v", args, string(bytes))
+				logger.Errorf("[Azure CNS] Failed to execute add route: %v\n%v", args, string(bytes))
 			}
 		} else {
-			log.Printf("[Azure CNS] Route already exists. skipping %+v", route)
+			logger.Printf("[Azure CNS] Route already exists. skipping %+v", route)
 		}
 	}
 

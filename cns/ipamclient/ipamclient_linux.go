@@ -7,9 +7,10 @@ package ipamclient
 
 import (
 	"context"
-	"log"
 	"net"
 	"net/http"
+
+	"github.com/Azure/azure-container-networking/cns/logger"
 )
 
 const (
@@ -23,7 +24,7 @@ func getClient(url string) (*http.Client, error) {
 	if url == defaultIpamPluginURL {
 		dialContext, err := net.Dial("unix", pluginSockPath)
 		if err != nil {
-			log.Printf("[Azure CNS] Error.Dial context error %v", err.Error())
+			logger.Errorf("[Azure CNS] Error.Dial context error %v", err.Error())
 			return nil, err
 		}
 

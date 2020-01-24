@@ -1,22 +1,23 @@
 // Copyright 2018 Microsoft. All rights reserved.
 // MIT License
 
-package telemetry
+package logger
 
 import (
 	"reflect"
 	"regexp"
 	"time"
 
-	"github.com/Azure/azure-container-networking/cns/restserver"
+	"github.com/Azure/azure-container-networking/aitelemetry"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/platform"
+	"github.com/Azure/azure-container-networking/telemetry"
 	"github.com/google/uuid"
 )
 
 const (
 	// CNSTelemetryFile - telemetry file path.
-	CNSTelemetryFile                = platform.CNSRuntimePath + "AzureCNSTelemetry.json"
+	cnsTelemetryFile                = platform.CNSRuntimePath + "AzureCNSTelemetry.json"
 	errorcodePrefix                 = 5
 	heartbeatIntervalInMinutes      = 30
 	retryWaitTimeInSeconds          = 60
@@ -27,30 +28,32 @@ const (
 var codeRegex = regexp.MustCompile(`Code:(\w*)`)
 
 // SendCnsTelemetry - handles cns telemetry reports
-func SendCnsTelemetry(reports chan interface{}, service *restserver.HTTPRestService, telemetryStopProcessing chan bool) {
+func SendCnsTelemetry(reports chan interface{}, heartbeatIntervalInMins int, telemetryStopProcessing chan bool) {
 
 CONNECT:
-	tb := NewTelemetryBuffer("")
+	tb := telemetry.NewTelemetryBuffer("")
 	tb.ConnectToTelemetryService(telemetryNumRetries, telemetryWaitTimeInMilliseconds)
 	if tb.Connected {
-		heartbeat := time.NewTicker(time.Minute * heartbeatIntervalInMinutes).C
-		reportMgr := ReportManager{
-			ContentType: ContentType,
-			Report:      &CNSReport{},
+		heartbeat := time.NewTicker(time.Minute * time.Duration(heartbeatIntervalInMins)).C
+		metric := aitelemetry.Metric{
+			Name: HeartBeatMetricStr,
+			// This signifies 1 heartbeat is sent. Sum of this metric will give us number of heartbeats received
+			Value:            1.0,
+			CustomDimensions: make(map[string]string),
 		}
 
-		reportMgr.GetReportState(CNSTelemetryFile)
+		reportMgr := telemetry.ReportManager{
+			ContentType: telemetry.ContentType,
+			Report:      &telemetry.CNSReport{},
+		}
+
+		reportMgr.GetReportState(cnsTelemetryFile)
 		reportMgr.GetKernelVersion()
 
 		for {
-			// Try to set partition key from DNC
-			if reportMgr.Report.(*CNSReport).DncPartitionKey == "" {
-				reflect.ValueOf(reportMgr.Report).Elem().FieldByName("DncPartitionKey").SetString(service.GetPartitionKey())
-			}
-
 			select {
 			case <-heartbeat:
-				reflect.ValueOf(reportMgr.Report).Elem().FieldByName("EventMessage").SetString("Heartbeat")
+				SendMetric(metric)
 			case msg := <-reports:
 				codeStr := codeRegex.FindString(msg.(string))
 				if len(codeStr) > errorcodePrefix {
@@ -68,8 +71,8 @@ CONNECT:
 				reflect.ValueOf(reportMgr.Report).Elem().FieldByName("UUID").SetString(id.String())
 			}
 
-			if !reportMgr.GetReportState(CNSTelemetryFile) {
-				reportMgr.SetReportState(CNSTelemetryFile)
+			if !reportMgr.GetReportState(cnsTelemetryFile) {
+				reportMgr.SetReportState(cnsTelemetryFile)
 			}
 
 			report, err := reportMgr.ReportToBytes()

@@ -10,16 +10,18 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/Azure/azure-container-networking/aitelemetry"
 	"github.com/Azure/azure-container-networking/cnm/ipam"
 	"github.com/Azure/azure-container-networking/cnm/network"
 	"github.com/Azure/azure-container-networking/cns/common"
+	"github.com/Azure/azure-container-networking/cns/configuration"
 	"github.com/Azure/azure-container-networking/cns/hnsclient"
+	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/cns/restserver"
 	acn "github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/store"
-	"github.com/Azure/azure-container-networking/telemetry"
 )
 
 const (
@@ -27,6 +29,7 @@ const (
 	name                            = "azure-cns"
 	pluginName                      = "azure-vnet"
 	defaultCNINetworkConfigFileName = "10-azure.conflist"
+	configFileName                  = "config.json"
 )
 
 // Version is populated by make during build.
@@ -146,13 +149,6 @@ var args = acn.ArgumentList{
 		DefaultValue: "",
 	},
 	{
-		Name:         acn.OptTelemetry,
-		Shorthand:    acn.OptTelemetryAlias,
-		Description:  "Set to false to disable telemetry",
-		Type:         "bool",
-		DefaultValue: true,
-	},
-	{
 		Name:         acn.OptHttpConnectionTimeout,
 		Shorthand:    acn.OptHttpConnectionTimeoutAlias,
 		Description:  "Set HTTP connection timeout in seconds to be used by http client in CNS",
@@ -199,7 +195,6 @@ func main() {
 	startCNM := acn.GetArg(acn.OptStartAzureCNM).(bool)
 	vers := acn.GetArg(acn.OptVersion).(bool)
 	createDefaultExtNetworkType := acn.GetArg(acn.OptCreateDefaultExtNetworkType).(string)
-	telemetryEnabled := acn.GetArg(acn.OptTelemetry).(bool)
 	httpConnectionTimeout := acn.GetArg(acn.OptHttpConnectionTimeout).(int)
 	httpResponseHeaderTimeout := acn.GetArg(acn.OptHttpResponseHeaderTimeout).(int)
 	storeFileLocation := acn.GetArg(acn.OptStoreFileLocation).(string)
@@ -210,38 +205,52 @@ func main() {
 	}
 
 	// Initialize CNS.
-	var config common.ServiceConfig
+	var (
+		err    error
+		config common.ServiceConfig
+	)
+
 	config.Version = version
 	config.Name = name
-
 	// Create a channel to receive unhandled errors from CNS.
 	config.ErrChan = make(chan error, 1)
 
-	var err error
 	// Create logging provider.
-	log.SetName(name)
-	log.SetLevel(logLevel)
-	if logDirectory != "" {
-		log.SetLogDirectory(logDirectory)
-	}
+	logger.InitLogger(name, logLevel, logTarget)
+	logger.SetLogDirectory(logDirectory)
 
-	err = log.SetTarget(logTarget)
+	cnsconfig, err := configuration.ReadConfig()
 	if err != nil {
-		fmt.Printf("Failed to configure logging: %v\n", err)
-		return
+		logger.Errorf("[Azure CNS] Error reading cns config: %v", err)
 	}
 
-	// Set-up channel for CNS telemetry if it's enabled (enabled by default)
-	if logger := log.GetStd(); logger != nil && telemetryEnabled {
-		logger.SetChannel(reports)
+	logger.Printf("[Azure CNS] Read config :%+v", cnsconfig)
+	configuration.SetCNSConfigDefaults(&cnsconfig)
+
+	disableTelemetry := cnsconfig.TelemetrySettings.DisableAll
+
+	if !disableTelemetry {
+		ts := cnsconfig.TelemetrySettings
+		aiConfig := aitelemetry.AIConfig{
+			AppName:                      name,
+			AppVersion:                   version,
+			BatchSize:                    ts.TelemetryBatchSizeBytes,
+			BatchInterval:                ts.TelemetryBatchIntervalInSecs,
+			RefreshTimeout:               ts.RefreshIntervalInSecs,
+			DisableMetadataRefreshThread: ts.DisableMetadataRefreshThread,
+			DebugMode:                    ts.DebugMode,
+		}
+
+		logger.InitAI(aiConfig, ts.DisableTrace, ts.DisableMetric)
+		logger.InitReportChannel(reports)
 	}
 
 	// Log platform information.
-	log.Printf("Running on %v", platform.GetOSInfo())
+	logger.Printf("Running on %v", platform.GetOSInfo())
 
 	err = acn.CreateDirectory(storeFileLocation)
 	if err != nil {
-		log.Errorf("Failed to create File Store directory %s, due to Error:%v", storeFileLocation, err.Error())
+		logger.Errorf("Failed to create File Store directory %s, due to Error:%v", storeFileLocation, err.Error())
 		return
 	}
 
@@ -249,14 +258,14 @@ func main() {
 	storeFileName := storeFileLocation + name + ".json"
 	config.Store, err = store.NewJsonFileStore(storeFileName)
 	if err != nil {
-		log.Errorf("Failed to create store file: %s, due to error %v\n", storeFileName, err)
+		logger.Errorf("Failed to create store file: %s, due to error %v\n", storeFileName, err)
 		return
 	}
 
 	// Create CNS object.
 	httpRestService, err := restserver.NewHTTPRestService(&config)
 	if err != nil {
-		log.Errorf("Failed to create CNS object, err:%v.\n", err)
+		logger.Errorf("Failed to create CNS object, err:%v.\n", err)
 		return
 	}
 
@@ -271,27 +280,25 @@ func main() {
 	// Create default ext network if commandline option is set
 	if len(strings.TrimSpace(createDefaultExtNetworkType)) > 0 {
 		if err := hnsclient.CreateDefaultExtNetwork(createDefaultExtNetworkType); err == nil {
-			log.Printf("[Azure CNS] Successfully created default ext network")
+			logger.Printf("[Azure CNS] Successfully created default ext network")
 		} else {
-			log.Printf("[Azure CNS] Failed to create default ext network due to error: %v", err)
+			logger.Printf("[Azure CNS] Failed to create default ext network due to error: %v", err)
 			return
 		}
 	}
 
 	// Start CNS.
 	if httpRestService != nil {
-		if telemetryEnabled {
-			go telemetry.SendCnsTelemetry(
-				reports,
-				httpRestService.(*restserver.HTTPRestService),
-				telemetryStopProcessing)
-		}
-
 		err = httpRestService.Start(&config)
 		if err != nil {
-			log.Errorf("Failed to start CNS, err:%v.\n", err)
+			logger.Errorf("Failed to start CNS, err:%v.\n", err)
 			return
 		}
+	}
+
+	if !disableTelemetry {
+		go logger.SendCnsTelemetry(reports, cnsconfig.TelemetrySettings.HeartBeatIntervalInMins,
+			telemetryStopProcessing)
 	}
 
 	var netPlugin network.NetPlugin
@@ -307,14 +314,14 @@ func main() {
 		// Create network plugin.
 		netPlugin, err = network.NewPlugin(&pluginConfig)
 		if err != nil {
-			log.Errorf("Failed to create network plugin, err:%v.\n", err)
+			logger.Errorf("Failed to create network plugin, err:%v.\n", err)
 			return
 		}
 
 		// Create IPAM plugin.
 		ipamPlugin, err = ipam.NewPlugin(&pluginConfig)
 		if err != nil {
-			log.Errorf("Failed to create IPAM plugin, err:%v.\n", err)
+			logger.Errorf("Failed to create IPAM plugin, err:%v.\n", err)
 			return
 		}
 
@@ -322,15 +329,15 @@ func main() {
 		pluginStoreFile := storeFileLocation + pluginName + ".json"
 		pluginConfig.Store, err = store.NewJsonFileStore(pluginStoreFile)
 		if err != nil {
-			log.Errorf("Failed to create plugin store file %s, due to error : %v\n", pluginStoreFile, err)
+			logger.Errorf("Failed to create plugin store file %s, due to error : %v\n", pluginStoreFile, err)
 			return
 		}
 
 		// Set plugin options.
 		netPlugin.SetOption(acn.OptAPIServerURL, url)
-		log.Printf("Start netplugin\n")
+		logger.Printf("Start netplugin\n")
 		if err := netPlugin.Start(&pluginConfig); err != nil {
-			log.Errorf("Failed to create network plugin, err:%v.\n", err)
+			logger.Errorf("Failed to create network plugin, err:%v.\n", err)
 			return
 		}
 
@@ -339,7 +346,7 @@ func main() {
 		ipamPlugin.SetOption(acn.OptIpamQueryUrl, ipamQueryUrl)
 		ipamPlugin.SetOption(acn.OptIpamQueryInterval, ipamQueryInterval)
 		if err := ipamPlugin.Start(&pluginConfig); err != nil {
-			log.Errorf("Failed to create IPAM plugin, err:%v.\n", err)
+			logger.Errorf("Failed to create IPAM plugin, err:%v.\n", err)
 			return
 		}
 	}
@@ -351,25 +358,27 @@ func main() {
 	// Wait until receiving a signal.
 	select {
 	case sig := <-osSignalChannel:
-		log.Printf("CNS Received OS signal <" + sig.String() + ">, shutting down.")
+		logger.Printf("CNS Received OS signal <" + sig.String() + ">, shutting down.")
 	case err := <-config.ErrChan:
-		log.Printf("CNS Received unhandled error %v, shutting down.", err)
+		logger.Printf("CNS Received unhandled error %v, shutting down.", err)
 	}
 
 	if len(strings.TrimSpace(createDefaultExtNetworkType)) > 0 {
 		if err := hnsclient.DeleteDefaultExtNetwork(); err == nil {
-			log.Printf("[Azure CNS] Successfully deleted default ext network")
+			logger.Printf("[Azure CNS] Successfully deleted default ext network")
 		} else {
-			log.Printf("[Azure CNS] Failed to delete default ext network due to error: %v", err)
+			logger.Printf("[Azure CNS] Failed to delete default ext network due to error: %v", err)
 		}
+	}
+
+	if !disableTelemetry {
+		telemetryStopProcessing <- true
 	}
 
 	// Cleanup.
 	if httpRestService != nil {
 		httpRestService.Stop()
 	}
-
-	telemetryStopProcessing <- true
 
 	if startCNM {
 		if netPlugin != nil {
@@ -381,5 +390,5 @@ func main() {
 		}
 	}
 
-	log.Close()
+	logger.Close()
 }

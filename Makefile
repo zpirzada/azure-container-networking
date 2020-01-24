@@ -38,10 +38,12 @@ CNSFILES = \
 	$(wildcard cns/*.go) \
 	$(wildcard cns/cnsclient/*.go) \
 	$(wildcard cns/common/*.go) \
+	$(wildcard cns/configuration/*.go) \
 	$(wildcard cns/dockerclient/*.go) \
 	$(wildcard cns/imdsclient/*.go) \
 	$(wildcard cns/ipamclient/*.go) \
 	$(wildcard cns/hnsclient/*.go) \
+	$(wildcard cns/logger/*.go) \
 	$(wildcard cns/nmagentclient/*.go) \
 	$(wildcard cns/restserver/*.go) \
 	$(wildcard cns/routes/*.go) \
@@ -124,7 +126,8 @@ AZURE_VNET_TELEMETRY_IMAGE = containernetworking.azurecr.io/public/containernetw
 AZURE_CNS_IMAGE = containernetworking.azurecr.io/public/containernetworking/azure-cns
 
 VERSION ?= $(shell git describe --tags --always --dirty)
-
+CNS_AI_ID = ce672799-8f08-4235-8c12-08563dc2acef
+cnsaipath=github.com/Azure/azure-container-networking/cns/logger.aiMetadata
 ENSURE_OUTPUT_DIR_EXISTS := $(shell mkdir -p $(OUTPUT_DIR))
 
 # Shorthand target names for convenience.
@@ -176,7 +179,7 @@ $(CNI_BUILD_DIR)/azure-vnet-telemetry$(EXE_EXT): $(CNIFILES)
 
 # Build the Azure CNS Service.
 $(CNS_BUILD_DIR)/azure-cns$(EXE_EXT): $(CNSFILES)
-	go build -v -o $(CNS_BUILD_DIR)/azure-cns$(EXE_EXT) -ldflags "-X main.version=$(VERSION) -s -w" $(CNS_DIR)/*.go
+	go build -v -o $(CNS_BUILD_DIR)/azure-cns$(EXE_EXT) -ldflags "-X main.version=$(VERSION) -X $(cnsaipath)=$(CNS_AI_ID) -s -w" $(CNS_DIR)/*.go
 
 # Build the Azure NPM plugin.
 $(NPM_BUILD_DIR)/azure-npm$(EXE_EXT): $(NPMFILES)
@@ -317,8 +320,9 @@ cnm-archive:
 # Create a CNS archive for the target platform.
 .PHONY: cns-archive
 cns-archive:
+	cp cns/configuration/cns_config.json $(CNS_BUILD_DIR)/cns_config.json
 	chmod 0755 $(CNS_BUILD_DIR)/azure-cns$(EXE_EXT)
-	cd $(CNS_BUILD_DIR) && $(ARCHIVE_CMD) $(CNS_ARCHIVE_NAME) azure-cns$(EXE_EXT)
+	cd $(CNS_BUILD_DIR) && $(ARCHIVE_CMD) $(CNS_ARCHIVE_NAME) azure-cns$(EXE_EXT) cns_config.json
 	chown $(BUILD_USER):$(BUILD_USER) $(CNS_BUILD_DIR)/$(CNS_ARCHIVE_NAME)
 
 # Create a NPM archive for the target platform. Only Linux is supported for now.

@@ -5,15 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/common"
-	"github.com/Azure/azure-container-networking/log"
 )
 
 // JoinNetwork joins the given network
 func JoinNetwork(
 	networkID string,
 	joinNetworkURL string) (*http.Response, error) {
-	log.Printf("[NMAgentClient] JoinNetwork: %s", networkID)
+	logger.Printf("[NMAgentClient] JoinNetwork: %s", networkID)
 
 	// Empty body is required as wireserver cannot handle a post without the body.
 	var body bytes.Buffer
@@ -24,7 +24,7 @@ func JoinNetwork(
 		defer response.Body.Close()
 	}
 
-	log.Printf("[NMAgentClient][Response] Join network: %s. Response: %+v. Error: %v",
+	logger.Printf("[NMAgentClient][Response] Join network: %s. Response: %+v. Error: %v",
 		networkID, response, err)
 
 	return response, err
@@ -35,12 +35,12 @@ func PublishNetworkContainer(
 	networkContainerID string,
 	createNetworkContainerURL string,
 	requestBodyData []byte) (*http.Response, error) {
-	log.Printf("[NMAgentClient] PublishNetworkContainer NC: %s", networkContainerID)
+	logger.Printf("[NMAgentClient] PublishNetworkContainer NC: %s", networkContainerID)
 
 	requestBody := bytes.NewBuffer(requestBodyData)
 	response, err := common.GetHttpClient().Post(createNetworkContainerURL, "application/json", requestBody)
 
-	log.Printf("[NMAgentClient][Response] Publish NC: %s. Response: %+v. Error: %v",
+	logger.Printf("[NMAgentClient][Response] Publish NC: %s. Response: %+v. Error: %v",
 		networkContainerID, response, err)
 
 	return response, err
@@ -50,14 +50,14 @@ func PublishNetworkContainer(
 func UnpublishNetworkContainer(
 	networkContainerID string,
 	deleteNetworkContainerURL string) (*http.Response, error) {
-	log.Printf("[NMAgentClient] UnpublishNetworkContainer NC: %s", networkContainerID)
+	logger.Printf("[NMAgentClient] UnpublishNetworkContainer NC: %s", networkContainerID)
 
 	// Empty body is required as wireserver cannot handle a post without the body.
 	var body bytes.Buffer
 	json.NewEncoder(&body).Encode("")
 	response, err := common.GetHttpClient().Post(deleteNetworkContainerURL, "application/json", &body)
 
-	log.Printf("[NMAgentClient][Response] Unpublish NC: %s. Response: %+v. Error: %v",
+	logger.Printf("[NMAgentClient][Response] Unpublish NC: %s. Response: %+v. Error: %v",
 		networkContainerID, response, err)
 
 	return response, err

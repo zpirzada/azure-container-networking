@@ -6,8 +6,8 @@ package common
 import (
 	"errors"
 
+	"github.com/Azure/azure-container-networking/cns/logger"
 	acn "github.com/Azure/azure-container-networking/common"
-	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/store"
 )
 
@@ -39,7 +39,7 @@ type ServiceConfig struct {
 
 // NewService creates a new Service object.
 func NewService(name, version string, store store.KeyValueStore) (*Service, error) {
-	log.Debugf("[Azure CNS] Going to create a service object with name: %v. version: %v.", name, version)
+	logger.Debugf("[Azure CNS] Going to create a service object with name: %v. version: %v.", name, version)
 
 	svc := &Service{
 		Name:    name,
@@ -48,7 +48,7 @@ func NewService(name, version string, store store.KeyValueStore) (*Service, erro
 		Store:   store,
 	}
 
-	log.Debugf("[Azure CNS] Finished creating service object with name: %v. version: %v.", name, version)
+	logger.Debugf("[Azure CNS] Finished creating service object with name: %v. version: %v.", name, version)
 	return svc, nil
 }
 
@@ -56,17 +56,17 @@ func NewService(name, version string, store store.KeyValueStore) (*Service, erro
 func (service *Service) Initialize(config *ServiceConfig) error {
 	if config == nil {
 		err := "[Azure CNS Errror] Initialize called with nil ServiceConfig."
-		log.Printf(err)
+		logger.Errorf(err)
 		return errors.New(err)
 	}
 
-	log.Debugf("[Azure CNS] Going to initialize the service: %+v with config: %+v.", service, config)
+	logger.Debugf("[Azure CNS] Going to initialize the service: %+v with config: %+v.", service, config)
 
 	service.ErrChan = config.ErrChan
 	service.Store = config.Store
 	service.Version = config.Version
 
-	log.Debugf("[Azure CNS] nitialized service: %+v with config: %+v.", service, config)
+	logger.Debugf("[Azure CNS] nitialized service: %+v with config: %+v.", service, config)
 
 	return nil
 }

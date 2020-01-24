@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/Azure/azure-container-networking/cns"
-	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/cns/logger"
 )
 
 // CNSClient specifies a client to connect to Ipam Plugin.
@@ -55,7 +55,7 @@ func (cnsClient *CNSClient) GetNetworkConfiguration(orchestratorContext []byte) 
 
 	httpc := &http.Client{}
 	url := cnsClient.connectionURL + cns.GetNetworkContainerByOrchestratorContext
-	log.Printf("GetNetworkConfiguration url %v", url)
+	logger.Printf("GetNetworkConfiguration url %v", url)
 
 	payload := &cns.GetNetworkContainerRequest{
 		OrchestratorContext: orchestratorContext,
@@ -63,13 +63,13 @@ func (cnsClient *CNSClient) GetNetworkConfiguration(orchestratorContext []byte) 
 
 	err := json.NewEncoder(&body).Encode(payload)
 	if err != nil {
-		log.Errorf("encoding json failed with %v", err)
+		logger.Errorf("encoding json failed with %v", err)
 		return nil, err
 	}
 
 	res, err := httpc.Post(url, "application/json", &body)
 	if err != nil {
-		log.Errorf("[Azure CNSClient] HTTP Post returned error %v", err.Error())
+		logger.Errorf("[Azure CNSClient] HTTP Post returned error %v", err.Error())
 		return nil, err
 	}
 
@@ -77,7 +77,7 @@ func (cnsClient *CNSClient) GetNetworkConfiguration(orchestratorContext []byte) 
 
 	if res.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("[Azure CNSClient] GetNetworkConfiguration invalid http status code: %v", res.StatusCode)
-		log.Errorf(errMsg)
+		logger.Errorf(errMsg)
 		return nil, fmt.Errorf(errMsg)
 	}
 
@@ -85,12 +85,12 @@ func (cnsClient *CNSClient) GetNetworkConfiguration(orchestratorContext []byte) 
 
 	err = json.NewDecoder(res.Body).Decode(&resp)
 	if err != nil {
-		log.Errorf("[Azure CNSClient] Error received while parsing GetNetworkConfiguration response resp:%v err:%v", res.Body, err.Error())
+		logger.Errorf("[Azure CNSClient] Error received while parsing GetNetworkConfiguration response resp:%v err:%v", res.Body, err.Error())
 		return nil, err
 	}
 
 	if resp.Response.ReturnCode != 0 {
-		log.Errorf("[Azure CNSClient] GetNetworkConfiguration received error response :%v", resp.Response.Message)
+		logger.Errorf("[Azure CNSClient] GetNetworkConfiguration received error response :%v", resp.Response.Message)
 		return nil, fmt.Errorf(resp.Response.Message)
 	}
 
@@ -107,20 +107,20 @@ func (cnsClient *CNSClient) CreateHostNCApipaEndpoint(
 
 	httpc := &http.Client{}
 	url := cnsClient.connectionURL + cns.CreateHostNCApipaEndpointPath
-	log.Printf("CreateHostNCApipaEndpoint url: %v for NC: %s", url, networkContainerID)
+	logger.Printf("CreateHostNCApipaEndpoint url: %v for NC: %s", url, networkContainerID)
 
 	payload := &cns.CreateHostNCApipaEndpointRequest{
 		NetworkContainerID: networkContainerID,
 	}
 
 	if err = json.NewEncoder(&body).Encode(payload); err != nil {
-		log.Errorf("encoding json failed with %v", err)
+		logger.Errorf("encoding json failed with %v", err)
 		return "", err
 	}
 
 	res, err := httpc.Post(url, "application/json", &body)
 	if err != nil {
-		log.Errorf("[Azure CNSClient] HTTP Post returned error %v", err.Error())
+		logger.Errorf("[Azure CNSClient] HTTP Post returned error %v", err.Error())
 		return "", err
 	}
 
@@ -129,20 +129,20 @@ func (cnsClient *CNSClient) CreateHostNCApipaEndpoint(
 	if res.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("[Azure CNSClient] CreateHostNCApipaEndpoint: Invalid http status code: %v",
 			res.StatusCode)
-		log.Errorf(errMsg)
+		logger.Errorf(errMsg)
 		return "", fmt.Errorf(errMsg)
 	}
 
 	var resp cns.CreateHostNCApipaEndpointResponse
 
 	if err = json.NewDecoder(res.Body).Decode(&resp); err != nil {
-		log.Errorf("[Azure CNSClient] Error parsing CreateHostNCApipaEndpoint response resp: %v err: %v",
+		logger.Errorf("[Azure CNSClient] Error parsing CreateHostNCApipaEndpoint response resp: %v err: %v",
 			res.Body, err.Error())
 		return "", err
 	}
 
 	if resp.Response.ReturnCode != 0 {
-		log.Errorf("[Azure CNSClient] CreateHostNCApipaEndpoint received error response :%v", resp.Response.Message)
+		logger.Errorf("[Azure CNSClient] CreateHostNCApipaEndpoint received error response :%v", resp.Response.Message)
 		return "", fmt.Errorf(resp.Response.Message)
 	}
 
@@ -155,7 +155,7 @@ func (cnsClient *CNSClient) DeleteHostNCApipaEndpoint(networkContainerID string)
 
 	httpc := &http.Client{}
 	url := cnsClient.connectionURL + cns.DeleteHostNCApipaEndpointPath
-	log.Printf("DeleteHostNCApipaEndpoint url: %v for NC: %s", url, networkContainerID)
+	logger.Printf("DeleteHostNCApipaEndpoint url: %v for NC: %s", url, networkContainerID)
 
 	payload := &cns.DeleteHostNCApipaEndpointRequest{
 		NetworkContainerID: networkContainerID,
@@ -163,13 +163,13 @@ func (cnsClient *CNSClient) DeleteHostNCApipaEndpoint(networkContainerID string)
 
 	err := json.NewEncoder(&body).Encode(payload)
 	if err != nil {
-		log.Errorf("encoding json failed with %v", err)
+		logger.Errorf("encoding json failed with %v", err)
 		return err
 	}
 
 	res, err := httpc.Post(url, "application/json", &body)
 	if err != nil {
-		log.Errorf("[Azure CNSClient] HTTP Post returned error %v", err.Error())
+		logger.Errorf("[Azure CNSClient] HTTP Post returned error %v", err.Error())
 		return err
 	}
 
@@ -178,7 +178,7 @@ func (cnsClient *CNSClient) DeleteHostNCApipaEndpoint(networkContainerID string)
 	if res.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("[Azure CNSClient] DeleteHostNCApipaEndpoint: Invalid http status code: %v",
 			res.StatusCode)
-		log.Errorf(errMsg)
+		logger.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
 
@@ -186,13 +186,13 @@ func (cnsClient *CNSClient) DeleteHostNCApipaEndpoint(networkContainerID string)
 
 	err = json.NewDecoder(res.Body).Decode(&resp)
 	if err != nil {
-		log.Errorf("[Azure CNSClient] Error parsing DeleteHostNCApipaEndpoint response resp: %v err: %v",
+		logger.Errorf("[Azure CNSClient] Error parsing DeleteHostNCApipaEndpoint response resp: %v err: %v",
 			res.Body, err.Error())
 		return err
 	}
 
 	if resp.Response.ReturnCode != 0 {
-		log.Errorf("[Azure CNSClient] DeleteHostNCApipaEndpoint received error response :%v", resp.Response.Message)
+		logger.Errorf("[Azure CNSClient] DeleteHostNCApipaEndpoint received error response :%v", resp.Response.Message)
 		return fmt.Errorf(resp.Response.Message)
 	}
 

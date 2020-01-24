@@ -10,7 +10,7 @@ import (
 	"net/http"
 
 	"github.com/Azure/azure-container-networking/cns/imdsclient"
-	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/platform"
 )
 
@@ -45,13 +45,13 @@ func NewDefaultDockerClient(imdsClient *imdsclient.ImdsClient) (*DockerClient, e
 
 // NetworkExists tries to retrieve a network from docker (if it exists).
 func (dockerClient *DockerClient) NetworkExists(networkName string) error {
-	log.Printf("[Azure CNS] NetworkExists")
+	logger.Printf("[Azure CNS] NetworkExists")
 
 	res, err := http.Get(
 		dockerClient.connectionURL + inspectNetworkPath + networkName)
 
 	if err != nil {
-		log.Errorf("[Azure CNS] Error received from http Post for docker network inspect %v %v", networkName, err.Error())
+		logger.Errorf("[Azure CNS] Error received from http Post for docker network inspect %v %v", networkName, err.Error())
 		return err
 	}
 
@@ -59,13 +59,13 @@ func (dockerClient *DockerClient) NetworkExists(networkName string) error {
 
 	// network exists
 	if res.StatusCode == 200 {
-		log.Debugf("[Azure CNS] Network with name %v already exists. Docker return code: %v", networkName, res.StatusCode)
+		logger.Debugf("[Azure CNS] Network with name %v already exists. Docker return code: %v", networkName, res.StatusCode)
 		return nil
 	}
 
 	// network not found
 	if res.StatusCode == 404 {
-		log.Debugf("[Azure CNS] Network with name %v does not exist. Docker return code: %v", networkName, res.StatusCode)
+		logger.Debugf("[Azure CNS] Network with name %v does not exist. Docker return code: %v", networkName, res.StatusCode)
 		return fmt.Errorf("Network not found")
 	}
 
@@ -74,7 +74,7 @@ func (dockerClient *DockerClient) NetworkExists(networkName string) error {
 
 // CreateNetwork creates a network using docker network create.
 func (dockerClient *DockerClient) CreateNetwork(networkName string, nicInfo *imdsclient.InterfaceInfo, options map[string]interface{}) error {
-	log.Printf("[Azure CNS] CreateNetwork")
+	logger.Printf("[Azure CNS] CreateNetwork")
 
 	enableSnat := true
 
@@ -107,7 +107,7 @@ func (dockerClient *DockerClient) CreateNetwork(networkName string, nicInfo *imd
 		netConfig.Options[networkMode] = bridgeMode
 	}
 
-	log.Printf("[Azure CNS] Going to create network with config: %+v", netConfig)
+	logger.Printf("[Azure CNS] Going to create network with config: %+v", netConfig)
 
 	netConfigJSON := new(bytes.Buffer)
 	err := json.NewEncoder(netConfigJSON).Encode(netConfig)
@@ -121,7 +121,7 @@ func (dockerClient *DockerClient) CreateNetwork(networkName string, nicInfo *imd
 		netConfigJSON)
 
 	if err != nil {
-		log.Printf("[Azure CNS] Error received from http Post for docker network create %v", networkName)
+		logger.Printf("[Azure CNS] Error received from http Post for docker network create %v", networkName)
 		return err
 	}
 
@@ -142,7 +142,7 @@ func (dockerClient *DockerClient) CreateNetwork(networkName string, nicInfo *imd
 	if enableSnat {
 		err = platform.SetOutboundSNAT(nicInfo.Subnet)
 		if err != nil {
-			log.Printf("[Azure CNS] Error setting up SNAT outbound rule %v", err)
+			logger.Printf("[Azure CNS] Error setting up SNAT outbound rule %v", err)
 		}
 	}
 
@@ -151,12 +151,12 @@ func (dockerClient *DockerClient) CreateNetwork(networkName string, nicInfo *imd
 
 // DeleteNetwork creates a network using docker network create.
 func (dockerClient *DockerClient) DeleteNetwork(networkName string) error {
-	log.Printf("[Azure CNS] DeleteNetwork")
+	logger.Printf("[Azure CNS] DeleteNetwork")
 
 	url := dockerClient.connectionURL + inspectNetworkPath + networkName
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
-		log.Printf("[Azure CNS] Error received while creating http DELETE request for network delete %v %v", networkName, err.Error())
+		logger.Printf("[Azure CNS] Error received while creating http DELETE request for network delete %v %v", networkName, err.Error())
 		return err
 	}
 
@@ -164,7 +164,7 @@ func (dockerClient *DockerClient) DeleteNetwork(networkName string) error {
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		log.Printf("[Azure CNS] HTTP Post returned error %v", err.Error())
+		logger.Printf("[Azure CNS] HTTP Post returned error %v", err.Error())
 		return err
 	}
 
@@ -181,7 +181,7 @@ func (dockerClient *DockerClient) DeleteNetwork(networkName string) error {
 			primaryNic.Subnet)
 		_, err = platform.ExecuteCommand(cmd)
 		if err != nil {
-			log.Printf("[Azure CNS] Error Removing Outbound SNAT rule %v", err)
+			logger.Printf("[Azure CNS] Error Removing Outbound SNAT rule %v", err)
 		}
 
 		return nil
