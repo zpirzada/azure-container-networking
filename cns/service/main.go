@@ -149,6 +149,13 @@ var args = acn.ArgumentList{
 		DefaultValue: "",
 	},
 	{
+		Name:         acn.OptTelemetry,
+		Shorthand:    acn.OptTelemetryAlias,
+		Description:  "Set to false to disable telemetry. This is deprecated in favor of cns_config.json",
+		Type:         "bool",
+		DefaultValue: true,
+	},
+	{
 		Name:         acn.OptHttpConnectionTimeout,
 		Shorthand:    acn.OptHttpConnectionTimeoutAlias,
 		Description:  "Set HTTP connection timeout in seconds to be used by http client in CNS",
@@ -195,6 +202,7 @@ func main() {
 	startCNM := acn.GetArg(acn.OptStartAzureCNM).(bool)
 	vers := acn.GetArg(acn.OptVersion).(bool)
 	createDefaultExtNetworkType := acn.GetArg(acn.OptCreateDefaultExtNetworkType).(string)
+	telemetryEnabled := acn.GetArg(acn.OptTelemetry).(bool)
 	httpConnectionTimeout := acn.GetArg(acn.OptHttpConnectionTimeout).(int)
 	httpResponseHeaderTimeout := acn.GetArg(acn.OptHttpResponseHeaderTimeout).(int)
 	storeFileLocation := acn.GetArg(acn.OptStoreFileLocation).(string)
@@ -218,6 +226,10 @@ func main() {
 	// Create logging provider.
 	logger.InitLogger(name, logLevel, logTarget)
 	logger.SetLogDirectory(logDirectory)
+
+	if !telemetryEnabled {
+		logger.Errorf("[Azure CNS] Cannot disable telemetry via cmdline. Update cns_config.json to disable telemetry.")
+	}
 
 	cnsconfig, err := configuration.ReadConfig()
 	if err != nil {
