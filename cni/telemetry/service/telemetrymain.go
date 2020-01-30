@@ -129,11 +129,7 @@ func main() {
 
 	log.SetName(azureVnetTelemetry)
 	log.SetLevel(logLevel)
-	if logDirectory != "" {
-		log.SetLogDirectory(logDirectory)
-	}
-
-	err = log.SetTarget(logTarget)
+	err = log.SetTargetLogDirectory(logTarget, logDirectory)
 	if err != nil {
 		fmt.Printf("Failed to configure logging: %v\n", err)
 		return

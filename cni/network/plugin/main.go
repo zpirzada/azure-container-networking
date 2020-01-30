@@ -139,14 +139,15 @@ func main() {
 	}
 
 	var (
-		config    common.PluginConfig
-		err       error
-		cnimetric telemetry.AIMetric
+		config       common.PluginConfig
+		err          error
+		cnimetric    telemetry.AIMetric
+		logDirectory string // This sets empty string i.e. current location
 	)
 
 	log.SetName(name)
 	log.SetLevel(log.LevelInfo)
-	if err = log.SetTarget(log.TargetLogfile); err != nil {
+	if err = log.SetTargetLogDirectory(log.TargetLogfile, logDirectory); err != nil {
 		fmt.Printf("Failed to setup cni logging: %v\n", err)
 		return
 	}

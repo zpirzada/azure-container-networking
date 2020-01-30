@@ -24,10 +24,11 @@ var version string
 func main() {
 	var config common.PluginConfig
 	config.Version = version
+	logDirectory := "" // Sets the current location as log directory
 
 	log.SetName(name)
 	log.SetLevel(log.LevelInfo)
-	if err := log.SetTarget(log.TargetLogfile); err != nil {
+	if err := log.SetTargetLogDirectory(log.TargetLogfile, logDirectory); err != nil {
 		fmt.Printf("Failed to setup cni logging: %v\n", err)
 		return
 	}

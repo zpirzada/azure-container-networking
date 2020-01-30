@@ -224,8 +224,7 @@ func main() {
 	config.ErrChan = make(chan error, 1)
 
 	// Create logging provider.
-	logger.InitLogger(name, logLevel, logTarget)
-	logger.SetLogDirectory(logDirectory)
+	logger.InitLogger(name, logLevel, logTarget, logDirectory)
 
 	if !telemetryEnabled {
 		logger.Errorf("[Azure CNS] Cannot disable telemetry via cmdline. Update cns_config.json to disable telemetry.")

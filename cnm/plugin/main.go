@@ -166,9 +166,10 @@ func main() {
 	}
 
 	// Create logging provider.
+	logDirectory := "" // Sets the current location as log directory
 	log.SetName(name)
 	log.SetLevel(logLevel)
-	err = log.SetTarget(logTarget)
+	err = log.SetTargetLogDirectory(logTarget, logDirectory)
 	if err != nil {
 		fmt.Printf("Failed to configure logging: %v\n", err)
 		return

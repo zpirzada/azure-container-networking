@@ -28,9 +28,9 @@ type CNSLogger struct {
 }
 
 // Initialize CNS Logger
-func InitLogger(fileName string, logLevel, logTarget int) {
+func InitLogger(fileName string, logLevel, logTarget int, logDir string) {
 	Log = &CNSLogger{
-		logger: log.NewLogger(fileName, logLevel, logTarget),
+		logger: log.NewLogger(fileName, logLevel, logTarget, logDir),
 	}
 }
 
@@ -61,8 +61,8 @@ func Close() {
 	}
 }
 
-func SetLogDirectory(dir string) {
-	Log.logger.SetLogDirectory(dir)
+func SetTargetLogDirectory(target int, dir string) error {
+	return Log.logger.SetTargetLogDirectory(target, dir)
 }
 
 // Set context details for logs and metrics

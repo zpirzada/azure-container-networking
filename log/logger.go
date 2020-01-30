@@ -60,16 +60,16 @@ type Logger struct {
 var pid = os.Getpid()
 
 // NewLogger creates a new Logger.
-func NewLogger(name string, level int, target int) *Logger {
+func NewLogger(name string, level int, target int, logDir string) *Logger {
 	var logger Logger
 
 	logger.l = log.New(nil, logPrefix, log.LstdFlags)
 	logger.name = name
 	logger.level = level
+	logger.directory = logDir
 	logger.SetTarget(target)
 	logger.maxFileSize = maxLogFileSize
 	logger.maxFileCount = maxLogFileCount
-	logger.directory = ""
 	logger.mutex = &sync.Mutex{}
 
 	return &logger
@@ -103,9 +103,10 @@ func (logger *Logger) Close() {
 	}
 }
 
-// SetLogDirectory sets the directory location where logs should be stored.
-func (logger *Logger) SetLogDirectory(logDirectory string) {
+// SetTargetLogDirectory sets the directory location where logs should be stored along with the target
+func (logger *Logger) SetTargetLogDirectory(target int, logDirectory string) error {
 	logger.directory = logDirectory
+	return logger.SetTarget(target)
 }
 
 // GetLogDirectory gets the directory location where logs should be stored.

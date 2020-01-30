@@ -17,7 +17,8 @@ const (
 
 // Tests that the log file rotates when size limit is reached.
 func TestLogFileRotatesWhenSizeLimitIsReached(t *testing.T) {
-	l := NewLogger(logName, LevelInfo, TargetLogfile)
+	logDirectory := "" // This sets the current location for logs
+	l := NewLogger(logName, LevelInfo, TargetLogfile, logDirectory)
 	if l == nil {
 		t.Fatalf("Failed to create logger.\n")
 	}
@@ -53,7 +54,8 @@ func TestLogFileRotatesWhenSizeLimitIsReached(t *testing.T) {
 }
 
 func TestPid(t *testing.T) {
-	l := NewLogger(logName, LevelInfo, TargetLogfile)
+	logDirectory := "" // This sets the current location for logs
+	l := NewLogger(logName, LevelInfo, TargetLogfile, logDirectory)
 	if l == nil {
 		t.Fatalf("Failed to create logger.")
 	}
@@ -62,15 +64,15 @@ func TestPid(t *testing.T) {
 	l.Close()
 	fn := l.GetLogDirectory() + logName + ".log"
 	defer os.Remove(fn)
-	
+
 	logBytes, err := ioutil.ReadFile(fn)
 	if err != nil {
 		t.Fatalf("Failed to read log, %v", err)
 	}
 	log := string(logBytes)
-	exptectedLog := fmt.Sprintf("[%v] LogText 1", os.Getpid());
+	exptectedLog := fmt.Sprintf("[%v] LogText 1", os.Getpid())
 
-	if  !strings.Contains(log, exptectedLog){
+	if !strings.Contains(log, exptectedLog) {
 		t.Fatalf("Unexpected log: %s.", log)
 	}
 }

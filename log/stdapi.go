@@ -4,7 +4,8 @@
 package log
 
 // Standard logger is a pre-defined logger for convenience.
-var stdLog = NewLogger("azure-container-networking", LevelInfo, TargetStderr)
+// Set log directory as the current location
+var stdLog = NewLogger("azure-container-networking", LevelInfo, TargetStderr, "")
 
 // GetStd - Helper functions for the standard logger.
 func GetStd() *Logger {
@@ -13,10 +14,6 @@ func GetStd() *Logger {
 
 func SetName(name string) {
 	stdLog.SetName(name)
-}
-
-func SetTarget(target int) error {
-	return stdLog.SetTarget(target)
 }
 
 func SetLevel(level int) {
@@ -31,8 +28,8 @@ func Close() {
 	stdLog.Close()
 }
 
-func SetLogDirectory(logDirectory string) {
-	stdLog.SetLogDirectory(logDirectory)
+func SetTargetLogDirectory(target int, logDirectory string) error {
+	return stdLog.SetTargetLogDirectory(target, logDirectory)
 }
 
 func GetLogDirectory() string {
