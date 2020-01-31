@@ -115,6 +115,14 @@ func Errorf(format string, args ...interface{}) {
 	sendTraceInternal(msg)
 }
 
+func Request(tag string, request interface{}, err error) {
+	Log.logger.Request(tag, request, err)
+}
+
+func Response(tag string, response interface{}, returnCode int, returnStr string, err error) {
+	Log.logger.Response(tag, response, returnCode, returnStr, err)
+}
+
 // Send AI telemetry metric
 func SendMetric(metric aitelemetry.Metric) {
 	if Log.th == nil || Log.DisableMetricLogging {
