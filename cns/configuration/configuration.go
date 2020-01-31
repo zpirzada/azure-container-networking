@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/Azure/azure-container-networking/cns/logger"
+	"github.com/Azure/azure-container-networking/common"
 )
 
 const (
@@ -46,17 +47,16 @@ func ReadConfig() (CNSConfig, error) {
 	// Check if env set for config path otherwise use default path
 	configpath, found := os.LookupEnv("CNS_CONFIGURATION_PATH")
 	if !found {
-		dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+		dir, err := common.GetExecutableDirectory()
 		if err != nil {
 			logger.Errorf("[Configuration] Failed to find exe dir:%v", err)
 			return cnsConfig, err
 		}
 
 		configpath = filepath.Join(dir, defaultConfigName)
-		//dir + string(os.PathSeparator) + defaultConfigName
 	}
 
-	logger.Printf("Config path:%s", configpath)
+	logger.Printf("[Configuration] Config path:%s", configpath)
 
 	content, err := ioutil.ReadFile(configpath)
 	if err != nil {

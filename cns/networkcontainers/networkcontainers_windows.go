@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/logger"
+	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/containernetworking/cni/libcni"
 )
@@ -250,12 +250,13 @@ func getAzureNetworkContainerBinaryPath() (string, error) {
 		err        error
 	)
 
-	if workingDir, err = filepath.Abs(filepath.Dir(os.Args[0])); err != nil {
+	workingDir, err = common.GetExecutableDirectory()
+	if err != nil {
 		return binaryPath,
 			fmt.Errorf("[Azure CNS] Unable to find working directory. Error: %v. Cannot continue", err)
 	}
 
-	binaryPath = path.Join(workingDir, binaryAzureNetworkContainer)
+	binaryPath = filepath.Join(workingDir, binaryAzureNetworkContainer)
 
 	if _, err = os.Stat(binaryPath); err != nil {
 		return binaryPath,
