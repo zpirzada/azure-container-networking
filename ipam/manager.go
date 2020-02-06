@@ -190,7 +190,10 @@ func (am *addressManager) StartSource(options map[string]interface{}) error {
 		am.source, err = newAzureSource(options)
 
 	case common.OptEnvironmentMAS:
-		am.source, err = newMasSource(options)
+		am.source, err = newFileIpamSource(options)
+
+	case common.OptEnvironmentFileIpam:
+		am.source, err = newFileIpamSource(options)
 
 	case "null":
 		am.source, err = newNullSource()

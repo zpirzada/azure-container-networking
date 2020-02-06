@@ -5,11 +5,14 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+
+	"github.com/Azure/azure-container-networking/common"
 )
 
 func TestNewMasSource(t *testing.T) {
 	options := make(map[string]interface{})
-	mas, _ := newMasSource(options)
+	options[common.OptEnvironment] = common.OptEnvironmentMAS
+	mas, _ := newFileIpamSource(options)
 
 	if runtime.GOOS == windows {
 		if mas.filePath != defaultWindowsFilePath {
@@ -20,14 +23,35 @@ func TestNewMasSource(t *testing.T) {
 			t.Fatalf("default file path set incorrectly")
 		}
 	}
-	if mas.name != "MAS" {
+
+	if mas.name != "mas" {
 		t.Fatalf("mas source Name incorrect")
+	}
+}
+
+func TestNewFileIpamSource(t *testing.T) {
+	options := make(map[string]interface{})
+	options[common.OptEnvironment] = common.OptEnvironmentFileIPAM
+	fileIpam, _ := newFileIpamSource(options)
+
+	if runtime.GOOS == windows {
+		if fileIpam.filePath != defaultWindowsFilePath {
+			t.Fatalf("default file path set incorrectly")
+		}
+	} else {
+		if fileIpam.filePath != defaultLinuxFilePath {
+			t.Fatalf("default file path set incorrectly")
+		}
+	}
+
+	if fileIpam.name != "fileIpam" {
+		t.Fatalf("fileIpam source Name incorrect")
 	}
 }
 
 func TestGetSDNInterfaces(t *testing.T) {
 	const validFileName = "testfiles/masInterfaceConfig.json"
-	const invalidFileName = "mas_test.go"
+	const invalidFileName = "fileIpam_test.go"
 	const nonexistentFileName = "bad"
 
 	interfaces, err := getSDNInterfaces(validFileName)
@@ -166,11 +190,11 @@ func TestPopulateAddressSpaceMultipleSDNInterfaces(t *testing.T) {
 				IsPrimary:  true,
 				IPSubnets: []IPSubnet{
 					{
-						Prefix: "0.0.0.0/24",
+						Prefix:      "0.0.0.0/24",
 						IPAddresses: []IPAddress{},
 					},
 					{
-						Prefix: "0.1.0.0/24",
+						Prefix:      "0.1.0.0/24",
 						IPAddresses: []IPAddress{},
 					},
 					{
@@ -183,22 +207,22 @@ func TestPopulateAddressSpaceMultipleSDNInterfaces(t *testing.T) {
 			},
 			{
 				MacAddress: "111111111111",
-				IsPrimary: false,
+				IsPrimary:  false,
 				IPSubnets: []IPSubnet{
 					{
-						Prefix: "1.0.0.0/24",
+						Prefix:      "1.0.0.0/24",
 						IPAddresses: []IPAddress{},
 					},
 					{
-						Prefix: "1.1.0.0/24",
+						Prefix:      "1.1.0.0/24",
 						IPAddresses: []IPAddress{},
 					},
 				},
 			},
 			{
 				MacAddress: "222222222222",
-				IsPrimary: false,
-				IPSubnets: []IPSubnet{},
+				IsPrimary:  false,
+				IPSubnets:  []IPSubnet{},
 			},
 		},
 	}

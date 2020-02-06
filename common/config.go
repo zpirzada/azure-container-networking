@@ -6,10 +6,11 @@ package common
 // Command line options.
 const (
 	// Operating environment.
-	OptEnvironment      = "environment"
-	OptEnvironmentAlias = "e"
-	OptEnvironmentAzure = "azure"
-	OptEnvironmentMAS   = "mas"
+	OptEnvironment         = "environment"
+	OptEnvironmentAlias    = "e"
+	OptEnvironmentAzure    = "azure"
+	OptEnvironmentMAS      = "mas"
+	OptEnvironmentFileIpam = "fileIpam"
 
 	// API server URL.
 	OptAPIServerURL      = "api-url"

@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 )
 
@@ -18,11 +19,10 @@ const (
 	defaultLinuxFilePath   = "/etc/kubernetes/interfaces.json"
 	defaultWindowsFilePath = `c:\k\interfaces.json`
 	windows                = "windows"
-	name                   = "MAS"
 )
 
 // Microsoft Azure Stack IPAM configuration source.
-type masSource struct {
+type fileIpamSource struct {
 	name       string
 	sink       addressConfigSink
 	fileLoaded bool
@@ -50,36 +50,39 @@ type IPAddress struct {
 	IsPrimary bool
 }
 
-// Creates the MAS source.
-func newMasSource(options map[string]interface{}) (*masSource, error) {
+// Creates the MAS/fileIpam source.
+func newFileIpamSource(options map[string]interface{}) (*fileIpamSource, error) {
 	var filePath string
+	var name string
+
 	if runtime.GOOS == windows {
 		filePath = defaultWindowsFilePath
 	} else {
 		filePath = defaultLinuxFilePath
 	}
 
-	return &masSource{
-		name: name,
+	name = options[common.OptEnvironment].(string)
+	return &fileIpamSource{
+		name:     name,
 		filePath: filePath,
 	}, nil
 }
 
 // Starts the MAS source.
-func (source *masSource) start(sink addressConfigSink) error {
+func (source *fileIpamSource) start(sink addressConfigSink) error {
 	source.sink = sink
 	return nil
 }
 
 // Stops the MAS source.
-func (source *masSource) stop() {
+func (source *fileIpamSource) stop() {
 	source.sink = nil
 }
 
 // Refreshes configuration.
-func (source *masSource) refresh() error {
+func (source *fileIpamSource) refresh() error {
 	if source == nil {
-		return errors.New("masSource is nil")
+		return errors.New("fileIpamSource is nil")
 	}
 
 	if source.fileLoaded {
