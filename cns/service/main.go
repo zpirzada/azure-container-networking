@@ -38,6 +38,7 @@ var version string
 // Reports channel
 var reports = make(chan interface{})
 var telemetryStopProcessing = make(chan bool)
+var stopheartbeat = make(chan bool)
 
 // Command line arguments for CNS.
 var args = acn.ArgumentList{
@@ -308,8 +309,8 @@ func main() {
 	}
 
 	if !disableTelemetry {
-		go logger.SendCnsTelemetry(reports, cnsconfig.TelemetrySettings.HeartBeatIntervalInMins,
-			telemetryStopProcessing)
+		go logger.SendToTelemetryService(reports, telemetryStopProcessing)
+		go logger.SendHeartBeat(cnsconfig.TelemetrySettings.HeartBeatIntervalInMins, stopheartbeat)
 	}
 
 	var netPlugin network.NetPlugin
@@ -384,6 +385,7 @@ func main() {
 
 	if !disableTelemetry {
 		telemetryStopProcessing <- true
+		stopheartbeat <- true
 	}
 
 	// Cleanup.

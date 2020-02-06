@@ -27,20 +27,31 @@ const (
 
 var codeRegex = regexp.MustCompile(`Code:(\w*)`)
 
+func SendHeartBeat(heartbeatIntervalInMins int, stopheartbeat chan bool) {
+	heartbeat := time.NewTicker(time.Minute * time.Duration(heartbeatIntervalInMins)).C
+	metric := aitelemetry.Metric{
+		Name: HeartBeatMetricStr,
+		// This signifies 1 heartbeat is sent. Sum of this metric will give us number of heartbeats received
+		Value:            1.0,
+		CustomDimensions: make(map[string]string),
+	}
+	for {
+		select {
+		case <-heartbeat:
+			SendMetric(metric)
+		case <-stopheartbeat:
+			return
+		}
+	}
+}
+
 // SendCnsTelemetry - handles cns telemetry reports
-func SendCnsTelemetry(reports chan interface{}, heartbeatIntervalInMins int, telemetryStopProcessing chan bool) {
+func SendToTelemetryService(reports chan interface{}, telemetryStopProcessing chan bool) {
 
 CONNECT:
 	tb := telemetry.NewTelemetryBuffer("")
 	tb.ConnectToTelemetryService(telemetryNumRetries, telemetryWaitTimeInMilliseconds)
 	if tb.Connected {
-		heartbeat := time.NewTicker(time.Minute * time.Duration(heartbeatIntervalInMins)).C
-		metric := aitelemetry.Metric{
-			Name: HeartBeatMetricStr,
-			// This signifies 1 heartbeat is sent. Sum of this metric will give us number of heartbeats received
-			Value:            1.0,
-			CustomDimensions: make(map[string]string),
-		}
 
 		reportMgr := telemetry.ReportManager{
 			ContentType: telemetry.ContentType,
@@ -52,8 +63,6 @@ CONNECT:
 
 		for {
 			select {
-			case <-heartbeat:
-				SendMetric(metric)
 			case msg := <-reports:
 				codeStr := codeRegex.FindString(msg.(string))
 				if len(codeStr) > errorcodePrefix {
