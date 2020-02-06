@@ -117,10 +117,38 @@ func Errorf(format string, args ...interface{}) {
 
 func Request(tag string, request interface{}, err error) {
 	Log.logger.Request(tag, request, err)
+
+	if Log.th == nil || Log.DisableTraceLogging {
+		return
+	}
+
+	var msg string
+	if err == nil {
+		msg = fmt.Sprintf("[%s] Received %T %+v.", tag, request, request)
+	} else {
+		msg = fmt.Sprintf("[%s] Failed to decode %T %+v %s.", tag, request, request, err.Error())
+	}
+
+	sendTraceInternal(msg)
 }
 
 func Response(tag string, response interface{}, returnCode int, returnStr string, err error) {
 	Log.logger.Response(tag, response, returnCode, returnStr, err)
+
+	if Log.th == nil || Log.DisableTraceLogging {
+		return
+	}
+
+	var msg string
+	if err == nil && returnCode == 0 {
+		msg = fmt.Sprintf("[%s] Sent %T %+v.", tag, response, response)
+	} else if err != nil {
+		msg = fmt.Sprintf("[%s] Code:%s, %+v %s.", tag, returnStr, response, err.Error())
+	} else {
+		msg = fmt.Sprintf("[%s] Code:%s, %+v.", tag, returnStr, response)
+	}
+
+	sendTraceInternal(msg)
 }
 
 // Send AI telemetry metric
