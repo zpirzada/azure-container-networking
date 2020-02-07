@@ -234,6 +234,32 @@ func TestEndpointOperInfo(t *testing.T) {
 	}
 }
 
+func TestDeleteEndpoint(t *testing.T) {
+	var body bytes.Buffer
+	var resp remoteApi.DeleteEndpointResponse
+
+	info := &remoteApi.DeleteEndpointRequest{
+		NetworkID:  networkID,
+		EndpointID: endpointID,
+	}
+
+	json.NewEncoder(&body).Encode(info)
+
+	req, err := http.NewRequest(http.MethodGet, deleteEndpointPath, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil || resp.Response.Err != "" {
+		t.Errorf("DeleteEndpoint response is invalid %+v", resp)
+	}
+}
+
 // Tests NetworkDriver.DeleteNetwork functionality.
 func TestDeleteNetwork(t *testing.T) {
 	var body bytes.Buffer

@@ -31,7 +31,7 @@ func TestNewMasSource(t *testing.T) {
 
 func TestNewFileIpamSource(t *testing.T) {
 	options := make(map[string]interface{})
-	options[common.OptEnvironment] = common.OptEnvironmentFileIPAM
+	options[common.OptEnvironment] = common.OptEnvironmentFileIpam
 	fileIpam, _ := newFileIpamSource(options)
 
 	if runtime.GOOS == windows {
