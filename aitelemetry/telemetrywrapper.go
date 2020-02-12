@@ -15,6 +15,7 @@ const (
 	resourceGroupStr                 = "ResourceGroup"
 	vmSizeStr                        = "VMSize"
 	osVersionStr                     = "OSVersion"
+	osStr                            = "OS"
 	locationStr                      = "Region"
 	appNameStr                       = "AppName"
 	subscriptionIDStr                = "SubscriptionID"
@@ -218,6 +219,56 @@ func (th *telemetryHandle) TrackLog(report Report) {
 
 	// send to appinsights resource
 	th.client.Track(trace)
+}
+
+// TrackEvent function sends events to appinsights resource. It overrides a few of the existing columns
+// with app information.
+func (th *telemetryHandle) TrackEvent(aiEvent AiEvent) {
+
+	// Initialize new event message
+	event := appinsights.NewEventTelemetry(aiEvent.EventName)
+
+	// OperationId => resourceID (e.g.: NCID)
+	event.Tags.Operation().SetId(aiEvent.ResourceID)
+
+	// Copy the properties, if supplied
+	if aiEvent.Properties != nil {
+		for key, value := range aiEvent.Properties {
+			event.Properties[key] = value
+		}
+	}
+
+	// Acquire read lock to read metadata
+	th.rwmutex.RLock()
+	metadata := th.metadata
+
+	// Add metadata
+	if metadata.SubscriptionID != "" {
+		event.Tags.User().SetAccountId(metadata.SubscriptionID)
+
+		// AnonId => VMName
+		event.Tags.User().SetId(metadata.VMName)
+
+		// SessionId => VMID
+		event.Tags.Session().SetId(metadata.VMID)
+		event.Tags.Operation().SetParentId(th.appVersion)
+		event.Tags.User().SetAuthUserId(runtime.GOOS)
+
+		event.Properties[locationStr] = metadata.Location
+		event.Properties[resourceGroupStr] = metadata.ResourceGroupName
+		event.Properties[vmSizeStr] = metadata.VMSize
+		event.Properties[osVersionStr] = metadata.OSVersion
+		event.Properties[vmIDStr] = metadata.VMID
+		event.Properties[vmNameStr] = metadata.VMName
+		event.Properties[osStr] = runtime.GOOS
+	}
+
+	th.rwmutex.RUnlock()
+
+	event.Properties[appNameStr] = th.appName
+	event.Properties[versionStr] = th.appVersion
+
+	th.client.Track(event)
 }
 
 // TrackMetric function sends metric to appinsights resource. It overrides few of the existing columns with app information
