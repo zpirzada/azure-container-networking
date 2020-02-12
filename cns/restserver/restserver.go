@@ -32,6 +32,9 @@ import (
 var (
 	// Named Lock for accessing different states in httpRestServiceState
 	namedLock = acn.InitNamedLock()
+
+	// Network container snapshot interval in minutes.
+	ncSnapshotIntervalInMinutes = 60
 )
 
 const (
@@ -207,8 +210,8 @@ func (service *HTTPRestService) Start(config *common.ServiceConfig) error {
 	logger.SetContextDetails(service.state.OrchestratorType, service.state.NodeID)
 	logger.Printf("[Azure CNS]  Listening.")
 
-	// Setup to emit snapshot every 60 minutes.
-	go service.sendNCSnapShotPeriodically(60)
+	// Setup to emit snapshot periodically.
+	go service.sendNCSnapShotPeriodically(ncSnapshotIntervalInMinutes)
 
 	return nil
 }
@@ -1180,7 +1183,10 @@ func (service *HTTPRestService) createOrUpdateNetworkContainer(w http.ResponseWr
 	reserveResp := &cns.CreateNetworkContainerResponse{Response: resp}
 	err = service.Listener.Encode(w, &reserveResp)
 
-	logNCSnapshot(req)
+	// If the NC was created successfully, log NC snapshot.
+	if returnCode == 0 {
+		logNCSnapshot(req)
+	}
 
 	logger.Response(service.Name, reserveResp, resp.ReturnCode, ReturnCodeToString(resp.ReturnCode), err)
 }
@@ -1987,14 +1993,19 @@ func logNCSnapshot(createNetworkContainerRequest cns.CreateNetworkContainerReque
 	aiEvent.Properties["NetworkContainerType"] = createNetworkContainerRequest.NetworkContainerType
 	aiEvent.Properties["OrchestratorContext"] = fmt.Sprintf("%s", createNetworkContainerRequest.OrchestratorContext)
 
-	logger.LogNCSnapshot(aiEvent)
+	logger.LogAiEvent(aiEvent)
 }
 
+// Sends network container snapshots to App Insights telemetry.
 func (service *HTTPRestService) logNCSnapshots() {
-	logger.Printf("[Azure CNS] Logging periodic NC snapshots.")
+	ncCount := 0
+
 	for _, ncStatus := range service.state.ContainerStatus {
 		logNCSnapshot(ncStatus.CreateNetworkContainerRequest)
+		ncCount++
 	}
+
+	logger.Printf("[Azure CNS] Logging periodic NC snapshots. NC Count %d", ncCount)
 }
 
 func (service *HTTPRestService) sendNCSnapShotPeriodically(ncSnapshotIntervalInMinutes int) {

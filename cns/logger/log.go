@@ -104,7 +104,7 @@ func Debugf(format string, args ...interface{}) {
 	sendTraceInternal(msg)
 }
 
-func LogNCSnapshot(aiEvent aitelemetry.AiEvent) {
+func LogAiEvent(aiEvent aitelemetry.AiEvent) {
 	aiEvent.Properties[OrchestratorTypeStr] = Log.Orchestrator
 	aiEvent.Properties[NodeIDStr] = Log.NodeID
 	Log.th.TrackEvent(aiEvent)

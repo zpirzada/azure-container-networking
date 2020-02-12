@@ -251,20 +251,19 @@ func (th *telemetryHandle) TrackEvent(aiEvent AiEvent) {
 
 		// SessionId => VMID
 		event.Tags.Session().SetId(metadata.VMID)
-		event.Tags.Operation().SetParentId(th.appVersion)
-		event.Tags.User().SetAuthUserId(runtime.GOOS)
-
 		event.Properties[locationStr] = metadata.Location
 		event.Properties[resourceGroupStr] = metadata.ResourceGroupName
 		event.Properties[vmSizeStr] = metadata.VMSize
 		event.Properties[osVersionStr] = metadata.OSVersion
 		event.Properties[vmIDStr] = metadata.VMID
 		event.Properties[vmNameStr] = metadata.VMName
-		event.Properties[osStr] = runtime.GOOS
 	}
 
 	th.rwmutex.RUnlock()
 
+	event.Tags.Operation().SetParentId(th.appVersion)
+	event.Tags.User().SetAuthUserId(runtime.GOOS)
+	event.Properties[osStr] = runtime.GOOS
 	event.Properties[appNameStr] = th.appName
 	event.Properties[versionStr] = th.appVersion
 
