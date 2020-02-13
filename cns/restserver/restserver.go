@@ -32,9 +32,6 @@ import (
 var (
 	// Named Lock for accessing different states in httpRestServiceState
 	namedLock = acn.InitNamedLock()
-
-	// Network container snapshot interval in minutes.
-	ncSnapshotIntervalInMinutes = 60
 )
 
 const (
@@ -45,17 +42,6 @@ const (
 	detach          = "Detach"
 	// Rest service state identifier for named lock
 	stateJoinedNetworks = "JoinedNetworks"
-	// CNS Snspshot properties
-	cnsNCSnapshotEventStr         = "CNSNCSnapshot"
-	ipConfigurationStr            = "IPConfiguration"
-	localIPConfigurationStr       = "LocalIPConfiguration"
-	primaryInterfaceIdentifierStr = "PrimaryInterfaceIdentifier"
-	multiTenancyInfoStr           = "MultiTenancyInfo"
-	cnetAddressSpaceStr           = "CnetAddressSpace"
-	allowNCToHostCommunicationStr = "AllowNCToHostCommunication"
-	allowHostToNCCommunicationStr = "AllowHostToNCCommunication"
-	networkContainerTypeStr       = "NetworkContainerType"
-	orchestratorContextStr        = "OrchestratorContext"
 )
 
 // HTTPRestService represents http listener for CNS - Container Networking Service.
@@ -1987,20 +1973,20 @@ func (service *HTTPRestService) unpublishNetworkContainer(w http.ResponseWriter,
 
 func logNCSnapshot(createNetworkContainerRequest cns.CreateNetworkContainerRequest) {
 	var aiEvent = aitelemetry.Event{
-		EventName:  cnsNCSnapshotEventStr,
+		EventName:  logger.CnsNCSnapshotEventStr,
 		Properties: make(map[string]string),
 		ResourceID: createNetworkContainerRequest.NetworkContainerid,
 	}
 
-	aiEvent.Properties[ipConfigurationStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.IPConfiguration)
-	aiEvent.Properties[localIPConfigurationStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.LocalIPConfiguration)
-	aiEvent.Properties[primaryInterfaceIdentifierStr] = createNetworkContainerRequest.PrimaryInterfaceIdentifier
-	aiEvent.Properties[multiTenancyInfoStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.MultiTenancyInfo)
-	aiEvent.Properties[cnetAddressSpaceStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.CnetAddressSpace)
-	aiEvent.Properties[allowNCToHostCommunicationStr] = fmt.Sprintf("%t", createNetworkContainerRequest.AllowNCToHostCommunication)
-	aiEvent.Properties[allowHostToNCCommunicationStr] = fmt.Sprintf("%t", createNetworkContainerRequest.AllowHostToNCCommunication)
-	aiEvent.Properties[networkContainerTypeStr] = createNetworkContainerRequest.NetworkContainerType
-	aiEvent.Properties[orchestratorContextStr] = fmt.Sprintf("%s", createNetworkContainerRequest.OrchestratorContext)
+	aiEvent.Properties[logger.IpConfigurationStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.IPConfiguration)
+	aiEvent.Properties[logger.LocalIPConfigurationStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.LocalIPConfiguration)
+	aiEvent.Properties[logger.PrimaryInterfaceIdentifierStr] = createNetworkContainerRequest.PrimaryInterfaceIdentifier
+	aiEvent.Properties[logger.MultiTenancyInfoStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.MultiTenancyInfo)
+	aiEvent.Properties[logger.CnetAddressSpaceStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.CnetAddressSpace)
+	aiEvent.Properties[logger.AllowNCToHostCommunicationStr] = fmt.Sprintf("%t", createNetworkContainerRequest.AllowNCToHostCommunication)
+	aiEvent.Properties[logger.AllowHostToNCCommunicationStr] = fmt.Sprintf("%t", createNetworkContainerRequest.AllowHostToNCCommunication)
+	aiEvent.Properties[logger.NetworkContainerTypeStr] = createNetworkContainerRequest.NetworkContainerType
+	aiEvent.Properties[logger.OrchestratorContextStr] = fmt.Sprintf("%s", createNetworkContainerRequest.OrchestratorContext)
 
 	logger.LogEvent(aiEvent)
 }

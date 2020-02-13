@@ -107,7 +107,6 @@ func Debugf(format string, args ...interface{}) {
 }
 
 func LogEvent(event aitelemetry.Event) {
-
 	if Log.th == nil || Log.DisableEventLogging {
 		return
 	}

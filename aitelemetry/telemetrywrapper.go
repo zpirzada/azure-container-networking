@@ -215,6 +215,7 @@ func (th *telemetryHandle) TrackLog(report Report) {
 		trace.Properties[vmSizeStr] = metadata.VMSize
 		trace.Properties[osVersionStr] = metadata.OSVersion
 		trace.Properties[vmIDStr] = metadata.VMID
+		trace.Tags.Session().SetId(metadata.VMID)
 	}
 
 	// send to appinsights resource
@@ -277,12 +278,13 @@ func (th *telemetryHandle) TrackMetric(metric Metric) {
 
 	// Check if metadata is populated
 	if metadata.SubscriptionID != "" {
-		aimetric.Properties[locationStr] = th.metadata.Location
-		aimetric.Properties[subscriptionIDStr] = th.metadata.SubscriptionID
-		aimetric.Properties[vmNameStr] = th.metadata.VMName
+		aimetric.Properties[locationStr] = metadata.Location
+		aimetric.Properties[subscriptionIDStr] = metadata.SubscriptionID
+		aimetric.Properties[vmNameStr] = metadata.VMName
 		aimetric.Properties[versionStr] = th.appVersion
 		aimetric.Properties[resourceGroupStr] = th.metadata.ResourceGroupName
-		aimetric.Properties[vmIDStr] = th.metadata.VMID
+		aimetric.Properties[vmIDStr] = metadata.VMID
+		aimetric.Tags.Session().SetId(metadata.VMID)
 	}
 
 	// copy custom dimensions
