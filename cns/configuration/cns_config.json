@@ -5,6 +5,7 @@
         "RefreshIntervalInSecs": 15,
         "DisableAll": false,
         "HeartBeatIntervalInMins": 30,
-        "DebugMode": false
+        "DebugMode": false,
+        "SnapshotIntervalInMins": 60
     }
 }

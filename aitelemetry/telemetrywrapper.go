@@ -208,13 +208,13 @@ func (th *telemetryHandle) TrackLog(report Report) {
 	// Check if metadata is populated
 	if metadata.SubscriptionID != "" {
 		// copy metadata from wireserver to trace
-		trace.Tags.User().SetAccountId(th.metadata.SubscriptionID)
-		trace.Tags.User().SetId(th.metadata.VMName)
-		trace.Properties[locationStr] = th.metadata.Location
-		trace.Properties[resourceGroupStr] = th.metadata.ResourceGroupName
-		trace.Properties[vmSizeStr] = th.metadata.VMSize
-		trace.Properties[osVersionStr] = th.metadata.OSVersion
-		trace.Properties[vmIDStr] = th.metadata.VMID
+		trace.Tags.User().SetAccountId(metadata.SubscriptionID)
+		trace.Tags.User().SetId(metadata.VMName)
+		trace.Properties[locationStr] = metadata.Location
+		trace.Properties[resourceGroupStr] = metadata.ResourceGroupName
+		trace.Properties[vmSizeStr] = metadata.VMSize
+		trace.Properties[osVersionStr] = metadata.OSVersion
+		trace.Properties[vmIDStr] = metadata.VMID
 	}
 
 	// send to appinsights resource
@@ -223,51 +223,45 @@ func (th *telemetryHandle) TrackLog(report Report) {
 
 // TrackEvent function sends events to appinsights resource. It overrides a few of the existing columns
 // with app information.
-func (th *telemetryHandle) TrackEvent(aiEvent AiEvent) {
-
+func (th *telemetryHandle) TrackEvent(event Event) {
 	// Initialize new event message
-	event := appinsights.NewEventTelemetry(aiEvent.EventName)
-
+	aiEvent := appinsights.NewEventTelemetry(event.EventName)
 	// OperationId => resourceID (e.g.: NCID)
-	event.Tags.Operation().SetId(aiEvent.ResourceID)
+	aiEvent.Tags.Operation().SetId(event.ResourceID)
 
 	// Copy the properties, if supplied
-	if aiEvent.Properties != nil {
-		for key, value := range aiEvent.Properties {
-			event.Properties[key] = value
+	if event.Properties != nil {
+		for key, value := range event.Properties {
+			aiEvent.Properties[key] = value
 		}
 	}
 
 	// Acquire read lock to read metadata
 	th.rwmutex.RLock()
 	metadata := th.metadata
+	th.rwmutex.RUnlock()
 
 	// Add metadata
 	if metadata.SubscriptionID != "" {
-		event.Tags.User().SetAccountId(metadata.SubscriptionID)
-
+		aiEvent.Tags.User().SetAccountId(metadata.SubscriptionID)
 		// AnonId => VMName
-		event.Tags.User().SetId(metadata.VMName)
-
+		aiEvent.Tags.User().SetId(metadata.VMName)
 		// SessionId => VMID
-		event.Tags.Session().SetId(metadata.VMID)
-		event.Properties[locationStr] = metadata.Location
-		event.Properties[resourceGroupStr] = metadata.ResourceGroupName
-		event.Properties[vmSizeStr] = metadata.VMSize
-		event.Properties[osVersionStr] = metadata.OSVersion
-		event.Properties[vmIDStr] = metadata.VMID
-		event.Properties[vmNameStr] = metadata.VMName
+		aiEvent.Tags.Session().SetId(metadata.VMID)
+		aiEvent.Properties[locationStr] = metadata.Location
+		aiEvent.Properties[resourceGroupStr] = metadata.ResourceGroupName
+		aiEvent.Properties[vmSizeStr] = metadata.VMSize
+		aiEvent.Properties[osVersionStr] = metadata.OSVersion
+		aiEvent.Properties[vmIDStr] = metadata.VMID
+		aiEvent.Properties[vmNameStr] = metadata.VMName
 	}
 
-	th.rwmutex.RUnlock()
-
-	event.Tags.Operation().SetParentId(th.appVersion)
-	event.Tags.User().SetAuthUserId(runtime.GOOS)
-	event.Properties[osStr] = runtime.GOOS
-	event.Properties[appNameStr] = th.appName
-	event.Properties[versionStr] = th.appVersion
-
-	th.client.Track(event)
+	aiEvent.Tags.Operation().SetParentId(th.appVersion)
+	aiEvent.Tags.User().SetAuthUserId(runtime.GOOS)
+	aiEvent.Properties[osStr] = runtime.GOOS
+	aiEvent.Properties[appNameStr] = th.appName
+	aiEvent.Properties[versionStr] = th.appVersion
+	th.client.Track(aiEvent)
 }
 
 // TrackMetric function sends metric to appinsights resource. It overrides few of the existing columns with app information

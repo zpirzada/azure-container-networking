@@ -39,6 +39,7 @@ var version string
 var reports = make(chan interface{})
 var telemetryStopProcessing = make(chan bool)
 var stopheartbeat = make(chan bool)
+var stopSnapshots = make(chan bool)
 
 // Command line arguments for CNS.
 var args = acn.ArgumentList{
@@ -254,7 +255,7 @@ func main() {
 			DebugMode:                    ts.DebugMode,
 		}
 
-		logger.InitAI(aiConfig, ts.DisableTrace, ts.DisableMetric)
+		logger.InitAI(aiConfig, ts.DisableTrace, ts.DisableMetric, ts.DisableEvent)
 		logger.InitReportChannel(reports)
 	}
 
@@ -312,6 +313,7 @@ func main() {
 	if !disableTelemetry {
 		go logger.SendToTelemetryService(reports, telemetryStopProcessing)
 		go logger.SendHeartBeat(cnsconfig.TelemetrySettings.HeartBeatIntervalInMins, stopheartbeat)
+		go httpRestService.SendNCSnapShotPeriodically(cnsconfig.TelemetrySettings.SnapshotIntervalInMins, stopSnapshots)
 	}
 
 	var netPlugin network.NetPlugin
@@ -387,6 +389,7 @@ func main() {
 	if !disableTelemetry {
 		telemetryStopProcessing <- true
 		stopheartbeat <- true
+		stopSnapshots <- true
 	}
 
 	// Cleanup.

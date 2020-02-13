@@ -15,7 +15,7 @@ type Report struct {
 }
 
 // Application event structure
-type AiEvent struct {
+type Event struct {
 	EventName  string
 	ResourceID string
 	Properties map[string]string
@@ -63,7 +63,7 @@ type TelemetryHandle interface {
 	TrackMetric(metric Metric)
 	// TrackEvent function sends events to appinsights resource. It overrides a few of the existing columns
 	// with app information.
-	TrackEvent(aiEvent AiEvent)
+	TrackEvent(aiEvent Event)
 	// Close - should be called for each NewAITelemetry call. Will release resources acquired
 	Close(timeout int)
 }
