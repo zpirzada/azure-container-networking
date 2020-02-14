@@ -129,6 +129,18 @@ func TestTrackLog(t *testing.T) {
 	th.TrackLog(report)
 }
 
+func TestTrackEvent(t *testing.T) {
+	event := Event{
+		EventName:  "testEvent",
+		ResourceID: "SomeResourceId",
+		Properties: make(map[string]string),
+	}
+
+	event.Properties["P1"] = "V1"
+	event.Properties["P2"] = "V2"
+	th.TrackEvent(event)
+}
+
 func TestClose(t *testing.T) {
 	th.Close(10)
 }

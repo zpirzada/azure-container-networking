@@ -26,6 +26,8 @@ type TelemetrySettings struct {
 	DisableTrace bool
 	// Flag to Disable sending metric.
 	DisableMetric bool
+	// Flag to Disable sending events.
+	DisableEvent bool
 	// Configure how many bytes can be sent in one call to the data collector
 	TelemetryBatchSizeBytes int
 	// Configure the maximum delay before sending queued telemetry in milliseconds
@@ -38,6 +40,8 @@ type TelemetrySettings struct {
 	RefreshIntervalInSecs int
 	// Disable debug logging for telemetry messages
 	DebugMode bool
+	// Interval for sending snapshot events.
+	SnapshotIntervalInMins int
 }
 
 // This functions reads cns config file and save it in a structure
@@ -88,6 +92,10 @@ func setTelemetrySettingDefaults(telemetrySettings *TelemetrySettings) {
 	if telemetrySettings.HeartBeatIntervalInMins == 0 {
 		// set the default Heartbeat interval to 30 minutes
 		telemetrySettings.HeartBeatIntervalInMins = 30
+	}
+
+	if telemetrySettings.SnapshotIntervalInMins == 0 {
+		telemetrySettings.SnapshotIntervalInMins = 60
 	}
 }
 

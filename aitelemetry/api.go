@@ -14,6 +14,13 @@ type Report struct {
 	CustomDimensions map[string]string
 }
 
+// Application event structure
+type Event struct {
+	EventName  string
+	ResourceID string
+	Properties map[string]string
+}
+
 // Application metrics structure
 type Metric struct {
 	Name             string
@@ -54,6 +61,9 @@ type TelemetryHandle interface {
 	// TrackMetric function sends metric to appinsights resource. It overrides few of the existing columns with app information
 	// and for rest it uses custom dimesion
 	TrackMetric(metric Metric)
+	// TrackEvent function sends events to appinsights resource. It overrides a few of the existing columns
+	// with app information.
+	TrackEvent(aiEvent Event)
 	// Close - should be called for each NewAITelemetry call. Will release resources acquired
 	Close(timeout int)
 }

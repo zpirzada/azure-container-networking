@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-container-networking/aitelemetry"
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/common"
 	"github.com/Azure/azure-container-networking/cns/dockerclient"
@@ -88,6 +89,7 @@ type networkInfo struct {
 // HTTPService describes the min API interface that every service should have.
 type HTTPService interface {
 	common.ServiceAPI
+	SendNCSnapShotPeriodically(int, chan bool)
 }
 
 // NewHTTPRestService creates a new HTTP Service object.
@@ -205,6 +207,7 @@ func (service *HTTPRestService) Start(config *common.ServiceConfig) error {
 
 	logger.SetContextDetails(service.state.OrchestratorType, service.state.NodeID)
 	logger.Printf("[Azure CNS]  Listening.")
+
 	return nil
 }
 
@@ -1174,6 +1177,12 @@ func (service *HTTPRestService) createOrUpdateNetworkContainer(w http.ResponseWr
 
 	reserveResp := &cns.CreateNetworkContainerResponse{Response: resp}
 	err = service.Listener.Encode(w, &reserveResp)
+
+	// If the NC was created successfully, log NC snapshot.
+	if returnCode == 0 {
+		logNCSnapshot(req)
+	}
+
 	logger.Response(service.Name, reserveResp, resp.ReturnCode, ReturnCodeToString(resp.ReturnCode), err)
 }
 
@@ -1960,4 +1969,51 @@ func (service *HTTPRestService) unpublishNetworkContainer(w http.ResponseWriter,
 
 	err = service.Listener.Encode(w, &response)
 	logger.Response(service.Name, response, response.Response.ReturnCode, ReturnCodeToString(response.Response.ReturnCode), err)
+}
+
+func logNCSnapshot(createNetworkContainerRequest cns.CreateNetworkContainerRequest) {
+	var aiEvent = aitelemetry.Event{
+		EventName:  logger.CnsNCSnapshotEventStr,
+		Properties: make(map[string]string),
+		ResourceID: createNetworkContainerRequest.NetworkContainerid,
+	}
+
+	aiEvent.Properties[logger.IpConfigurationStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.IPConfiguration)
+	aiEvent.Properties[logger.LocalIPConfigurationStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.LocalIPConfiguration)
+	aiEvent.Properties[logger.PrimaryInterfaceIdentifierStr] = createNetworkContainerRequest.PrimaryInterfaceIdentifier
+	aiEvent.Properties[logger.MultiTenancyInfoStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.MultiTenancyInfo)
+	aiEvent.Properties[logger.CnetAddressSpaceStr] = fmt.Sprintf("%+v", createNetworkContainerRequest.CnetAddressSpace)
+	aiEvent.Properties[logger.AllowNCToHostCommunicationStr] = fmt.Sprintf("%t", createNetworkContainerRequest.AllowNCToHostCommunication)
+	aiEvent.Properties[logger.AllowHostToNCCommunicationStr] = fmt.Sprintf("%t", createNetworkContainerRequest.AllowHostToNCCommunication)
+	aiEvent.Properties[logger.NetworkContainerTypeStr] = createNetworkContainerRequest.NetworkContainerType
+	aiEvent.Properties[logger.OrchestratorContextStr] = fmt.Sprintf("%s", createNetworkContainerRequest.OrchestratorContext)
+
+	logger.LogEvent(aiEvent)
+}
+
+// Sends network container snapshots to App Insights telemetry.
+func (service *HTTPRestService) logNCSnapshots() {
+
+	for _, ncStatus := range service.state.ContainerStatus {
+		logNCSnapshot(ncStatus.CreateNetworkContainerRequest)
+	}
+
+	logger.Printf("[Azure CNS] Logging periodic NC snapshots. NC Count %d", len(service.state.ContainerStatus))
+}
+
+// Sets up periodic timer for sending network container snapshots
+func (service *HTTPRestService) SendNCSnapShotPeriodically(ncSnapshotIntervalInMinutes int, stopSnapshot chan bool) {
+
+	// Emit snapshot on startup and then emit it periodically.
+	service.logNCSnapshots()
+
+	snapshot := time.NewTicker(time.Minute * time.Duration(ncSnapshotIntervalInMinutes)).C
+	for {
+		select {
+		case <-snapshot:
+			service.logNCSnapshots()
+		case <-stopSnapshot:
+			return
+		}
+	}
 }

@@ -25,6 +25,7 @@ type CNSLogger struct {
 	NodeID               string
 	DisableTraceLogging  bool
 	DisableMetricLogging bool
+	DisableEventLogging  bool
 }
 
 // Initialize CNS Logger
@@ -35,7 +36,7 @@ func InitLogger(fileName string, logLevel, logTarget int, logDir string) {
 }
 
 // Intialize CNS AI telmetry instance
-func InitAI(aiConfig aitelemetry.AIConfig, disableTraceLogging, disableMetricLogging bool) {
+func InitAI(aiConfig aitelemetry.AIConfig, disableTraceLogging, disableMetricLogging bool, disableEventLogging bool) {
 	var err error
 
 	Log.th, err = aitelemetry.NewAITelemetry("", aiMetadata, aiConfig)
@@ -47,6 +48,7 @@ func InitAI(aiConfig aitelemetry.AIConfig, disableTraceLogging, disableMetricLog
 	Log.logger.Printf("AI Telemetry Handle created")
 	Log.DisableMetricLogging = disableMetricLogging
 	Log.DisableTraceLogging = disableTraceLogging
+	Log.DisableEventLogging = disableEventLogging
 }
 
 func InitReportChannel(reports chan interface{}) {
@@ -102,6 +104,16 @@ func Debugf(format string, args ...interface{}) {
 
 	msg := fmt.Sprintf(format, args...)
 	sendTraceInternal(msg)
+}
+
+func LogEvent(event aitelemetry.Event) {
+	if Log.th == nil || Log.DisableEventLogging {
+		return
+	}
+
+	event.Properties[OrchestratorTypeStr] = Log.Orchestrator
+	event.Properties[NodeIDStr] = Log.NodeID
+	Log.th.TrackEvent(event)
 }
 
 func Errorf(format string, args ...interface{}) {
