@@ -4,6 +4,7 @@ RUN wget -q https://packages.microsoft.com/config/ubuntu/16.04/packages-microsof
 RUN sudo dpkg -i packages-microsoft-prod.deb
 RUN add-apt-repository ppa:longsleep/golang-backports 
 RUN curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+RUN curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
 RUN apt-get install -y git golang-go=2:1.13~1longsleep1+xenial iptables ipset iproute2 ebtables python-pip gcc zip dotnet-sdk-2.2 azure-cli
 RUN sudo pip install coverage
 RUN if [ -f Gopkg.toml ]; then curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh ; fi 

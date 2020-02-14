@@ -3,7 +3,7 @@
    "properties": {
       "orchestratorProfile": {
          "orchestratorType": "Kubernetes",
-         "orchestratorRelease": "1.14",
+         "orchestratorRelease": "1.16",
          "kubernetesConfig": {
             "networkPlugin": "azure",
             "networkPolicy": "azure",
@@ -12,7 +12,19 @@
             "apiServerConfig": {
                "--tls-min-version": "VersionTLS12",
                "--tls-cipher-suites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"
-            }
+            },
+            "addons": [
+               {
+                  "name": "azure-npm-daemonset",
+                  "enabled": true,
+                  "containers": [
+                     {
+                        "name": "azure-npm-daemonset",
+                        "image": ""
+                     }
+                  ]
+               }
+            ]
          }
       },
       "masterProfile": {
@@ -40,9 +52,9 @@
          "enableAutomaticUpdates": false,
          "sshEnabled": true,
          "windowsPublisher": "MicrosoftWindowsServer",
-         "windowsOffer": "WindowsServer",
+         "windowsOffer": "WindowsServerSemiAnnual",
          "windowsSku": "Datacenter-Core-1809-with-Containers-smalldisk",
-         "imageVersion": "1809.0.20190603"
+         "imageVersion": "1809.0.20190826"
       },
       "linuxProfile": {
          "adminUsername": "azureuser",

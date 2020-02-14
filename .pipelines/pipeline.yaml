@@ -17,7 +17,7 @@ stages:
           demands: agent.os -equals Linux
 
         container:
-          image: containernetworking/pipeline-ci:1.0.4
+          image: containernetworking/pipeline-ci:1.0.6
           options: "--privileged"
 
         # Go setup for the vmImage:
@@ -66,9 +66,6 @@ stages:
 
           - script: |
               go get -v -t -d ./...
-              if [ -f Gopkg.toml ]; then
-                  curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-              fi
               go get github.com/docker/libnetwork/driverapi
               go get github.com/gorilla/mux
               go get github.com/jstemmer/go-junit-report
@@ -82,10 +79,14 @@ stages:
           - script: |
               echo Building in $(pwd)
               echo Build tag is $(EnvironmentalVariables.Tag)
-              export GOOS=linux
-              make all-binaries VERSION=$(EnvironmentalVariables.Tag)
               export GOOS=windows
               make all-binaries VERSION=$(EnvironmentalVariables.Tag)
+              export GOOS=linux
+              make all-binaries VERSION=$(EnvironmentalVariables.Tag)
+              sudo make azure-npm-image VERSION=$(EnvironmentalVariables.Tag)
+              echo '$(DOCKER_PASSWORD)' | docker login -u '$(DOCKER_USERNAME)' --password-stdin
+              docker tag containernetworking.azurecr.io/public/containernetworking/azure-npm:$(EnvironmentalVariables.Tag) containernetworking/azure-npm:$(EnvironmentalVariables.Tag)
+              docker push containernetworking/azure-npm:$(EnvironmentalVariables.Tag)
               cd output 
               sudo find . -mindepth 2 -type f -regextype posix-extended ! -iregex '.*\.(zip|tgz)$' -delete
               sudo find . -mindepth 2 -type f -print -exec mv {} . \;
@@ -158,7 +159,7 @@ stages:
       - template: e2e-job-template.yaml
         parameters:
           name: "ubuntu_16_04_linux_e2e"
-          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.5"
+          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.6"
           clusterDefinition: "cniLinux1604.json"
           clusterDefinitionCniTypeKey: "azureCNIURLLinux"
           clusterDefinitionCniBuildOS: "linux"
@@ -167,7 +168,7 @@ stages:
       - template: e2e-job-template.yaml
         parameters:
           name: "ubuntu_18_04_linux_e2e"
-          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.5"
+          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.6"
           clusterDefinition: "cniLinux1804.json"
           clusterDefinitionCniTypeKey: "azureCNIURLLinux"
           clusterDefinitionCniBuildOS: "linux"
@@ -176,7 +177,7 @@ stages:
       - template: e2e-job-template.yaml
         parameters:
           name: "windows_18_09_e2e"
-          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.5"
+          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.6"
           clusterDefinition: "cniWindows1809.json"
           clusterDefinitionCniTypeKey: "azureCNIURLWindows"
           clusterDefinitionCniBuildOS: "windows"
@@ -185,7 +186,7 @@ stages:
       - template: e2e-job-template.yaml
         parameters:
           name: "windows_19_03_e2e"
-          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.5"
+          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.6"
           clusterDefinition: "cniWindows1903.json"
           clusterDefinitionCniTypeKey: "azureCNIURLWindows"
           clusterDefinitionCniBuildOS: "windows"
@@ -199,7 +200,7 @@ stages:
           name: Networking-ContainerNetworking
           demands: agent.os -equals Linux
         container:
-          image: containernetworking/pipeline-ci:1.0.4
+          image: containernetworking/pipeline-ci:1.0.6
         variables:
           Tag: $[ dependencies.unit_tests.outputs['EnvironmentalVariables.Tag'] ]
         condition: always()
