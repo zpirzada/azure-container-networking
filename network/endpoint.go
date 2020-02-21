@@ -55,6 +55,7 @@ type EndpointInfo struct {
 	MacAddress               net.HardwareAddr
 	DNS                      DNSInfo
 	IPAddresses              []net.IPNet
+	IPsToRouteViaHost        []string
 	InfraVnetIP              net.IPNet
 	Routes                   []RouteInfo
 	Policies                 []policy.Policy

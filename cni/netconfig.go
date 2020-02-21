@@ -52,6 +52,7 @@ type NetworkConfig struct {
 	LogTarget                     string   `json:"logTarget,omitempty"`
 	InfraVnetAddressSpace         string   `json:"infraVnetAddressSpace,omitempty"`
 	PodNamespaceForDualNetwork    []string `json:"podNamespaceForDualNetwork,omitempty"`
+	IPsToRouteViaHost             []string `json:"ipsToRouteViaHost,omitempty"`
 	MultiTenancy                  bool     `json:"multiTenancy,omitempty"`
 	EnableSnatOnHost              bool     `json:"enableSnatOnHost,omitempty"`
 	EnableExactMatchForPodName    bool     `json:"enableExactMatchForPodName,omitempty"`

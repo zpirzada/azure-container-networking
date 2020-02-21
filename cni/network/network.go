@@ -527,6 +527,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		Data:               make(map[string]interface{}),
 		DNS:                epDNSInfo,
 		Policies:           policies,
+		IPsToRouteViaHost:  nwCfg.IPsToRouteViaHost,
 		EnableSnatOnHost:   nwCfg.EnableSnatOnHost,
 		EnableMultiTenancy: nwCfg.MultiTenancy,
 		EnableInfraVnet:    enableInfraVnet,
