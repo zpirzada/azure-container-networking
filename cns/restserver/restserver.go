@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -1819,7 +1820,17 @@ func (service *HTTPRestService) publishNetworkContainer(w http.ResponseWriter, r
 	)
 
 	err = service.Listener.Decode(w, r, &req)
-	logger.Request(service.Name, &req, err)
+
+	// reqCopy creates a copy of incoming request. It doesn't copy the authentication token info
+	// to avoid logging it.
+	reqCopy := cns.PublishNetworkContainerRequest{
+		NetworkID:                 req.NetworkID,
+		NetworkContainerID:        req.NetworkContainerID,
+		JoinNetworkURL:            req.JoinNetworkURL,
+		CreateNetworkContainerURL: strings.Split(req.CreateNetworkContainerURL, "authenticationToken")[0],
+	}
+
+	logger.Request(service.Name, &reqCopy, err)
 	if err != nil {
 		return
 	}
@@ -1902,7 +1913,17 @@ func (service *HTTPRestService) unpublishNetworkContainer(w http.ResponseWriter,
 	)
 
 	err = service.Listener.Decode(w, r, &req)
-	logger.Request(service.Name, &req, err)
+
+	// reqCopy creates a copy of incoming request. It doesn't copy the authentication token info
+	// to avoid logging it.
+	reqCopy := cns.UnpublishNetworkContainerRequest{
+		NetworkID:                 req.NetworkID,
+		NetworkContainerID:        req.NetworkContainerID,
+		JoinNetworkURL:            req.JoinNetworkURL,
+		DeleteNetworkContainerURL: strings.Split(req.DeleteNetworkContainerURL, "authenticationToken")[0],
+	}
+
+	logger.Request(service.Name, &reqCopy, err)
 	if err != nil {
 		return
 	}
