@@ -1697,7 +1697,8 @@ func (service *HTTPRestService) createHostNCApipaEndpoint(w http.ResponseWriter,
 					req.NetworkContainerID,
 					networkContainerDetails.CreateNetworkContainerRequest.LocalIPConfiguration,
 					networkContainerDetails.CreateNetworkContainerRequest.AllowNCToHostCommunication,
-					networkContainerDetails.CreateNetworkContainerRequest.AllowHostToNCCommunication); err != nil {
+					networkContainerDetails.CreateNetworkContainerRequest.AllowHostToNCCommunication,
+					networkContainerDetails.CreateNetworkContainerRequest.EndpointPolicies); err != nil {
 					returnMessage = fmt.Sprintf("CreateHostNCApipaEndpoint failed with error: %v", err)
 					returnCode = UnexpectedError
 				}
