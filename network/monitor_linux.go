@@ -8,6 +8,10 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 )
 
+const (
+	ipv6Mask = "/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"
+)
+
 // monitorNetworkState compares current ebtable nat rules with state rules and matches state.
 func (nm *networkManager) monitorNetworkState(networkMonitor *cnms.NetworkMonitor) error {
 	currentEbtableRulesMap, err := cnms.GetEbTableRulesInMap()
@@ -34,13 +38,32 @@ func (nm *networkManager) AddStateRulesToMap() map[string]string {
 		snatKey := fmt.Sprintf("-s Unicast -o %s -j snat --to-src %s --snat-arp --snat-target ACCEPT", extIf.Name, extIf.MacAddress.String())
 		rulesMap[snatKey] = ebtables.PostRouting
 
+		for _, extIP := range extIf.IPAddresses {
+			if extIP.IP.To4() != nil {
+				arpReplyKey := fmt.Sprintf("-p ARP --arp-op Request --arp-ip-dst %s -j arpreply --arpreply-mac %s", extIP.IP.String(), extIf.MacAddress.String())
+				rulesMap[arpReplyKey] = ebtables.PreRouting
+			}
+		}
+
 		for _, nw := range extIf.Networks {
 			for _, ep := range nw.Endpoints {
 				for _, ipAddr := range ep.IPAddresses {
-					arpReplyKey := fmt.Sprintf("-p ARP --arp-op Request --arp-ip-dst %s -j arpreply --arpreply-mac %s", ipAddr.IP.String(), ep.MacAddress.String())
-					rulesMap[arpReplyKey] = ebtables.PreRouting
+					if ipAddr.IP.To4() != nil {
+						arpReplyKey := fmt.Sprintf("-p ARP --arp-op Request --arp-ip-dst %s -j arpreply --arpreply-mac %s", ipAddr.IP.String(), ep.MacAddress.String())
+						rulesMap[arpReplyKey] = ebtables.PreRouting
+					}
 
-					dnatMacKey := fmt.Sprintf("-p IPv4 -i %s --ip-dst %s -j dnat --to-dst %s --dnat-target ACCEPT", extIf.Name, ipAddr.IP.String(), ep.MacAddress.String())
+					dst := "--ip-dst"
+					proto := "IPv4"
+					ipAddress := ipAddr.IP.String()
+					if ipAddr.IP.To4() == nil {
+						dst = "--ip6-dst"
+						proto = "IPv6"
+						ipAddress = ipAddr.IP.String() + ipv6Mask
+					}
+
+					dnatMacKey := fmt.Sprintf("-p %s -i %s %s %s -j dnat --to-dst %s --dnat-target ACCEPT",
+						proto, extIf.Name, dst, ipAddress, ep.MacAddress.String())
 					rulesMap[dnatMacKey] = ebtables.PreRouting
 				}
 			}
