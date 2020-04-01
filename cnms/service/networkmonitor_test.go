@@ -6,6 +6,7 @@ import (
 
 	cnms "github.com/Azure/azure-container-networking/cnms/cnmspackage"
 	"github.com/Azure/azure-container-networking/ebtables"
+	"github.com/Azure/azure-container-networking/telemetry"
 )
 
 const (
@@ -38,6 +39,7 @@ func TestAddMissingRule(t *testing.T) {
 	netMonitor := &cnms.NetworkMonitor{
 		AddRulesToBeValidated:    make(map[string]int),
 		DeleteRulesToBeValidated: make(map[string]int),
+		CNIReport:                &telemetry.CNIReport{},
 	}
 
 	currentStateRulesMap := addStateRulesToMap()
@@ -78,6 +80,7 @@ func TestDeleteInvalidRule(t *testing.T) {
 	netMonitor := &cnms.NetworkMonitor{
 		AddRulesToBeValidated:    make(map[string]int),
 		DeleteRulesToBeValidated: make(map[string]int),
+		CNIReport:                &telemetry.CNIReport{},
 	}
 
 	currentStateRulesMap := addStateRulesToMap()
