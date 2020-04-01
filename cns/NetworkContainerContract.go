@@ -2,7 +2,6 @@ package cns
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -76,6 +75,12 @@ type NetworkContainerRequestPolicies struct {
 	Type         string
 	EndpointType string
 	Settings     json.RawMessage
+}
+
+// ConfigureContainerNetworkingRequest - specifies request to attach/detach container to network.
+type ConfigureContainerNetworkingRequest struct {
+	Containerid        string
+	NetworkContainerid string
 }
 
 // KubernetesPodInfo is an OrchestratorContext that holds PodName and PodNamespace.
@@ -230,26 +235,20 @@ type UnpublishNetworkContainerResponse struct {
 
 // Validate - Validates network container request policies
 func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate() error {
-
 	// validate ACL policy
 	if strings.EqualFold(networkContainerRequestPolicy.Type, "ACLPolicy") {
-
 		var requestedAclPolicy hcn.AclPolicySetting
-
 		if err := json.Unmarshal(networkContainerRequestPolicy.Settings, &requestedAclPolicy); err != nil {
-
 			return fmt.Errorf("ACL policy failed to pass validation with error: %+v ", err)
 		}
-
-		if requestedAclPolicy.Action == "" {
-			return errors.New("Action field cannot be empty in ACL Policy")
+		if requestedAclPolicy != nil {
+			if len(strings.TrimSpace(requestedAclPolicy.Action)) == 0 {
+				return fmt.Errorf("Action field cannot be empty in ACL Policy")
+			}
+			if requestedAclPolicy.Priority == 0 {
+				return fmt.Errorf("Priority field cannot be empty in ACL Policy")
+			}
 		}
-
-		if requestedAclPolicy.Priority == 0 {
-			return errors.New("Priority field cannot be empty in ACL Policy")
-		}
-
 	}
-
 	return nil
 }

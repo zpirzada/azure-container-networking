@@ -440,26 +440,18 @@ func configureAclSettingHostNCApipaEndpoint(
 		// Iterate thru the requested endpoint policies where policy type is ACL, endpoint type is APIPA
 		// include the raw json message in the endpoint policies
 		for _, requestedPolicy := range ncRequestedPolicies {
-
 			if strings.EqualFold(requestedPolicy.Type, aclPolicyType) && strings.EqualFold(requestedPolicy.EndpointType, apipaEndpointType) {
-
 				var requestedAclPolicy hcn.AclPolicySetting
-
-				if err := json.Unmarshal(requestedPolicy.Settings, &requestedAclPolicy); err != nil {
-
+				if err = json.Unmarshal(requestedPolicy.Settings, &requestedAclPolicy); err != nil {
 					return nil, fmt.Errorf("Failed to Unmarshal requested ACL policy: %+v with error: %S", requestedPolicy.Settings, err)
 				}
-
-				logger.Printf("ACL Policy requested in NcGoalState %+v ", requestedAclPolicy)
-
+				logger.Printf("ACL Policy requested in NcGoalState %+v", requestedAclPolicy)
 				if err = addAclToEndpointPolicy(requestedAclPolicy, &endpointPolicies); err != nil {
 					return nil, err
 				}
-
 			}
 		}
 	}
-
 	return endpointPolicies, nil
 }
 
