@@ -231,8 +231,8 @@ type UnpublishNetworkContainerResponse struct {
 	UnpublishResponseBody []byte
 }
 
-// Testing
-type AclPolicyTestSetting struct {
+// ValidAclPolicySetting - Used to validate ACL policy
+type ValidAclPolicySetting struct {
 	Protocols       string `json:","`
 	Action          string `json:","`
 	Direction       string `json:","`
@@ -248,7 +248,7 @@ type AclPolicyTestSetting struct {
 func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate() error {
 	// validate ACL policy
 	if strings.EqualFold(networkContainerRequestPolicy.Type, "ACLPolicy") {
-		var requestedAclPolicy AclPolicyTestSetting
+		var requestedAclPolicy ValidAclPolicySetting
 		if err := json.Unmarshal(networkContainerRequestPolicy.Settings, &requestedAclPolicy); err != nil {
 			return fmt.Errorf("ACL policy failed to pass validation with error: %+v ", err)
 		}
