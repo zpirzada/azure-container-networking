@@ -17,7 +17,7 @@ stages:
           demands: agent.os -equals Linux
 
         container:
-          image: containernetworking/pipeline-ci:1.0.6
+          image: "$(BUILD_IMAGE)" # build image set as variable in pipeline runtime for flexibility
           options: "--privileged"
 
         # Go setup for the vmImage:
@@ -68,7 +68,7 @@ stages:
               go get github.com/jstemmer/go-junit-report
               go get github.com/axw/gocov/gocov
               go get github.com/AlekSi/gocov-xml
-              go get -u gopkg.in/matm/v1/gocov-html
+              go get github.com/matm/gocov-html
             workingDirectory: "$(modulePath)"
             name: "GoDependencies"
             displayName: "Install Go dependencies"
@@ -80,19 +80,24 @@ stages:
               make all-binaries VERSION=$(EnvironmentalVariables.Tag)
               export GOOS=linux
               make all-binaries VERSION=$(EnvironmentalVariables.Tag)
-              sudo make azure-npm-image VERSION=$(EnvironmentalVariables.Tag)
-              echo '$(DOCKER_PASSWORD)' | docker login containernetworking.azurecr.io -u '$(DOCKER_USERNAME)' --password-stdin
-              docker tag $PUSH_CONTAINER_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag) $PUSH_CONTAINER_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
-              docker push $PUSH_CONTAINER_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
-              cd output 
-              sudo find . -mindepth 2 -type f -regextype posix-extended ! -iregex '.*\.(zip|tgz)$' -delete
-              sudo find . -mindepth 2 -type f -print -exec mv {} . \;
-              sudo rm -R -- */
             workingDirectory: "$(modulePath)"
             name: "Build"
             displayName: "Build"
 
+          - script: |
+              sudo make azure-npm-image VERSION=$(EnvironmentalVariables.Tag)
+              echo '$(DOCKER_PASSWORD)' | docker login containernetworking.azurecr.io -u '$(DOCKER_USERNAME)' --password-stdin
+              docker tag $PUSH_CONTAINER_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag) $PUSH_CONTAINER_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
+              docker push $PUSH_CONTAINER_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
+            workingDirectory: "$(modulePath)"
+            name: "PushImages"
+            displayName: "PushNPMImage"
+
           - bash: |
+              cd ./output 
+              sudo find . -mindepth 2 -type f -regextype posix-extended ! -iregex '.*\.(zip|tgz)$' -delete
+              sudo find . -mindepth 2 -type f -print -exec mv {} . \;
+              sudo rm -R -- */ && cd ..
               # run test, echo exit status code to fd 3, pipe output from test to tee, which splits output to stdout and go-junit-report (which converts test output to report.xml), stdout from tee is redirected to fd 4. Take output written to fd 3 (which is the exit code of test), redirect to stdout, pipe to read from stdout then exit with that status code. Read all output from fd 4 (output from tee) and write to top stdout
               { { { { 
                     sudo -E env "PATH=$PATH" make test-all; 
@@ -168,11 +173,12 @@ stages:
                 az storage blob upload-batch -d acn-$(EnvironmentalVariables.CommitHash) -s ./output/  --account-name $(STORAGE_ACCOUNT_NAME)
               workingDirectory: "$(modulePath)"
             displayName: Create artifact storage container
+            condition: succeeded()
 
       - template: e2e-job-template.yaml
         parameters:
           name: "ubuntu_16_04_linux_e2e"
-          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.6"
+          pipelineBuildImage: "$(BUILD_IMAGE)"
           clusterDefinition: "cniLinux1604.json"
           clusterDefinitionCniTypeKey: "azureCNIURLLinux"
           clusterDefinitionCniBuildOS: "linux"
@@ -181,7 +187,7 @@ stages:
       - template: e2e-job-template.yaml
         parameters:
           name: "ubuntu_18_04_linux_e2e"
-          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.6"
+          pipelineBuildImage: "$(BUILD_IMAGE)"
           clusterDefinition: "cniLinux1804.json"
           clusterDefinitionCniTypeKey: "azureCNIURLLinux"
           clusterDefinitionCniBuildOS: "linux"
@@ -190,7 +196,7 @@ stages:
       - template: e2e-job-template.yaml
         parameters:
           name: "windows_18_09_e2e"
-          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.6"
+          pipelineBuildImage: "$(BUILD_IMAGE)"
           clusterDefinition: "cniWindows1809.json"
           clusterDefinitionCniTypeKey: "azureCNIURLWindows"
           clusterDefinitionCniBuildOS: "windows"
@@ -199,22 +205,20 @@ stages:
       - template: e2e-job-template.yaml
         parameters:
           name: "windows_19_03_e2e"
-          pipelineBuildImage: "containernetworking/pipeline-ci:1.0.6"
+          pipelineBuildImage: "$(BUILD_IMAGE)"
           clusterDefinition: "cniWindows1903.json"
           clusterDefinitionCniTypeKey: "azureCNIURLWindows"
           clusterDefinitionCniBuildOS: "windows"
           clusterDefinitionCniBuildExt: ".zip"
 
   - stage: cleanup
-    condition: always()
     jobs:
       - job: delete_remote_artifacts
         pool:
           name: Networking-ContainerNetworking
           demands: agent.os -equals Linux
         container:
-          image: containernetworking/pipeline-ci:1.0.6
-        condition: always()
+          image: "$(BUILD_IMAGE)"
         steps:
           - task: AzureCLI@1
             inputs:
@@ -226,4 +230,3 @@ stages:
                 az storage container delete -n acn-$CommitHash --account-name $(STORAGE_ACCOUNT_NAME)
               workingDirectory: "$(modulePath)"
             displayName: Cleanup remote Azure storage container
-            condition: always()

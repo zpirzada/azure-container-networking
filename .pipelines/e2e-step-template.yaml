@@ -84,7 +84,7 @@ steps:
       export CLUSTER_DEFINITION=./'${{ parameters.clusterDefinition }}'
       export ORCHESTRATOR=kubernetes 
       export CREATE_VNET=false 
-      export TIMEOUT=10m 
+      export TIMEOUT=20m 
       export CLIENT_ID=$(AKS_ENGINE_CLIENT_ID) 
       export CLIENT_SECRET=$(AKS_ENGINE_CLIENT_SECRET) 
       export TENANT_ID=$(AKS_ENGINE_TENANT_ID) 
