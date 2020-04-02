@@ -247,16 +247,18 @@ type ValidAclPolicySetting struct {
 // Validate - Validates network container request policies
 func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate() error {
 	// validate ACL policy
-	if strings.EqualFold(networkContainerRequestPolicy.Type, "ACLPolicy") {
-		var requestedAclPolicy ValidAclPolicySetting
-		if err := json.Unmarshal(networkContainerRequestPolicy.Settings, &requestedAclPolicy); err != nil {
-			return fmt.Errorf("ACL policy failed to pass validation with error: %+v ", err)
-		}
-		if len(strings.TrimSpace(string(requestedAclPolicy.Action))) == 0 {
-			return fmt.Errorf("Action field cannot be empty in ACL Policy")
-		}
-		if requestedAclPolicy.Priority == 0 {
-			return fmt.Errorf("Priority field cannot be empty in ACL Policy")
+	if networkContainerRequestPolicy != nil {
+		if strings.EqualFold(networkContainerRequestPolicy.Type, "ACLPolicy") {
+			var requestedAclPolicy ValidAclPolicySetting
+			if err := json.Unmarshal(networkContainerRequestPolicy.Settings, &requestedAclPolicy); err != nil {
+				return fmt.Errorf("ACL policy failed to pass validation with error: %+v ", err)
+			}
+			if len(strings.TrimSpace(string(requestedAclPolicy.Action))) == 0 {
+				return fmt.Errorf("Action field cannot be empty in ACL Policy")
+			}
+			if requestedAclPolicy.Priority == 0 {
+				return fmt.Errorf("Priority field cannot be empty in ACL Policy")
+			}
 		}
 	}
 	return nil
