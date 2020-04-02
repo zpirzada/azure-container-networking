@@ -67,7 +67,6 @@ type CreateNetworkContainerRequest struct {
 	Routes                     []Route
 	AllowHostToNCCommunication bool
 	AllowNCToHostCommunication bool
-	EndpointPolicies           []NetworkContainerRequestPolicies
 }
 
 // NetworkContainerRequestPolicies - specifies policies associated with create network request
