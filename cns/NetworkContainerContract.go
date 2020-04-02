@@ -241,13 +241,11 @@ func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate()
 		if err := json.Unmarshal(networkContainerRequestPolicy.Settings, &requestedAclPolicy); err != nil {
 			return fmt.Errorf("ACL policy failed to pass validation with error: %+v ", err)
 		}
-		if requestedAclPolicy != nil {
-			if len(strings.TrimSpace(requestedAclPolicy.Action)) == 0 {
-				return fmt.Errorf("Action field cannot be empty in ACL Policy")
-			}
-			if requestedAclPolicy.Priority == 0 {
-				return fmt.Errorf("Priority field cannot be empty in ACL Policy")
-			}
+		if len(strings.TrimSpace(string(requestedAclPolicy.Action))) == 0 {
+			return fmt.Errorf("Action field cannot be empty in ACL Policy")
+		}
+		if requestedAclPolicy.Priority == 0 {
+			return fmt.Errorf("Priority field cannot be empty in ACL Policy")
 		}
 	}
 	return nil
