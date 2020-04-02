@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/Microsoft/hcsshim/hcn"
 )
 
 // Container Network Service DNC Contract
@@ -233,11 +231,24 @@ type UnpublishNetworkContainerResponse struct {
 	UnpublishResponseBody []byte
 }
 
+// Testing
+type AclPolicyTestSetting struct {
+	Protocols       string `json:","`
+	Action          string `json:","`
+	Direction       string `json:","`
+	LocalAddresses  string `json:","`
+	RemoteAddresses string `json:","`
+	LocalPorts      string `json:","`
+	RemotePorts     string `json:","`
+	RuleType        string `json:","`
+	Priority        uint16 `json:","`
+}
+
 // Validate - Validates network container request policies
 func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate() error {
 	// validate ACL policy
 	if strings.EqualFold(networkContainerRequestPolicy.Type, "ACLPolicy") {
-		var requestedAclPolicy hcn.AclPolicySetting
+		var requestedAclPolicy AclPolicyTestSetting
 		if err := json.Unmarshal(networkContainerRequestPolicy.Settings, &requestedAclPolicy); err != nil {
 			return fmt.Errorf("ACL policy failed to pass validation with error: %+v ", err)
 		}
