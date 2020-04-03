@@ -248,7 +248,7 @@ type ValidAclPolicySetting struct {
 func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate() error {
 	// validate ACL policy
 	if networkContainerRequestPolicy != nil {
-		if strings.EqualFold(networkContainerRequestPolicy.Type, "ACLPolicy") {
+		if strings.EqualFold(networkContainerRequestPolicy.Type, "ACLPolicy") && strings.EqualFold(networkContainerRequestPolicy.EndpointType, "APIPA") {
 			var requestedAclPolicy ValidAclPolicySetting
 			if err := json.Unmarshal(networkContainerRequestPolicy.Settings, &requestedAclPolicy); err != nil {
 				return fmt.Errorf("ACL policy failed to pass validation with error: %+v ", err)
@@ -259,6 +259,8 @@ func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate()
 			if requestedAclPolicy.Priority == 0 {
 				return fmt.Errorf("Priority field cannot be empty in ACL Policy")
 			}
+		} else {
+			return fmt.Errorf("Only ACL Policies on APIPA endpoint supported")
 		}
 	}
 	return nil
