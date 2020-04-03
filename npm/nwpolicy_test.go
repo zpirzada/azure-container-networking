@@ -61,9 +61,11 @@ func TestAddNetworkPolicy(t *testing.T) {
 		},
 	}
 
+	npMgr.Lock()
 	if err := npMgr.AddNamespace(nsObj); err != nil {
 		t.Errorf("TestAddNetworkPolicy @ npMgr.AddNamespace")
 	}
+	npMgr.Unlock()
 
 	tcp := corev1.ProtocolTCP
 	port8000 := intstr.FromInt(8000)
@@ -82,17 +84,19 @@ func TestAddNetworkPolicy(t *testing.T) {
 					}},
 					Ports: []networkingv1.NetworkPolicyPort{{
 						Protocol: &tcp,
-						Port: &port8000,
+						Port:     &port8000,
 					}},
 				},
 			},
 		},
 	}
 
+	npMgr.Lock()
 	if err := npMgr.AddNetworkPolicy(allowIngress); err != nil {
 		t.Errorf("TestAddNetworkPolicy failed @ allowIngress AddNetworkPolicy")
 		t.Errorf("Error: %v", err)
 	}
+	npMgr.Unlock()
 
 	allowEgress := &networkingv1.NetworkPolicy{
 		ObjectMeta: metav1.ObjectMeta{
@@ -109,17 +113,19 @@ func TestAddNetworkPolicy(t *testing.T) {
 					}},
 					Ports: []networkingv1.NetworkPolicyPort{{
 						Protocol: &tcp,
-						Port: &port8000,
+						Port:     &port8000,
 					}},
 				},
 			},
 		},
 	}
 
+	npMgr.Lock()
 	if err := npMgr.AddNetworkPolicy(allowEgress); err != nil {
 		t.Errorf("TestAddNetworkPolicy failed @ allowEgress AddNetworkPolicy")
 		t.Errorf("Error: %v", err)
 	}
+	npMgr.Unlock()
 }
 
 func TestUpdateNetworkPolicy(t *testing.T) {
@@ -168,9 +174,11 @@ func TestUpdateNetworkPolicy(t *testing.T) {
 		},
 	}
 
+	npMgr.Lock()
 	if err := npMgr.AddNamespace(nsObj); err != nil {
 		t.Errorf("TestUpdateNetworkPolicy @ npMgr.AddNamespace")
 	}
+	npMgr.Unlock()
 
 	tcp, udp := corev1.ProtocolTCP, corev1.ProtocolUDP
 	allowIngress := &networkingv1.NetworkPolicy{
@@ -221,6 +229,7 @@ func TestUpdateNetworkPolicy(t *testing.T) {
 		},
 	}
 
+	npMgr.Lock()
 	if err := npMgr.AddNetworkPolicy(allowIngress); err != nil {
 		t.Errorf("TestUpdateNetworkPolicy failed @ AddNetworkPolicy")
 	}
@@ -228,6 +237,7 @@ func TestUpdateNetworkPolicy(t *testing.T) {
 	if err := npMgr.UpdateNetworkPolicy(allowIngress, allowEgress); err != nil {
 		t.Errorf("TestUpdateNetworkPolicy failed @ UpdateNetworkPolicy")
 	}
+	npMgr.Unlock()
 }
 
 func TestDeleteNetworkPolicy(t *testing.T) {
@@ -276,9 +286,11 @@ func TestDeleteNetworkPolicy(t *testing.T) {
 		},
 	}
 
+	npMgr.Lock()
 	if err := npMgr.AddNamespace(nsObj); err != nil {
 		t.Errorf("TestDeleteNetworkPolicy @ npMgr.AddNamespace")
 	}
+	npMgr.Unlock()
 
 	tcp := corev1.ProtocolTCP
 	allow := &networkingv1.NetworkPolicy{
@@ -305,6 +317,7 @@ func TestDeleteNetworkPolicy(t *testing.T) {
 		},
 	}
 
+	npMgr.Lock()
 	if err := npMgr.AddNetworkPolicy(allow); err != nil {
 		t.Errorf("TestAddNetworkPolicy failed @ AddNetworkPolicy")
 	}
@@ -312,4 +325,5 @@ func TestDeleteNetworkPolicy(t *testing.T) {
 	if err := npMgr.DeleteNetworkPolicy(allow); err != nil {
 		t.Errorf("TestDeleteNetworkPolicy failed @ DeleteNetworkPolicy")
 	}
+	npMgr.Unlock()
 }

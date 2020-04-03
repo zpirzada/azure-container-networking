@@ -25,9 +25,6 @@ func (npMgr *NetworkPolicyManager) canCleanUpNpmChains() bool {
 
 // AddNetworkPolicy handles adding network policy to iptables.
 func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkPolicy) error {
-	npMgr.Lock()
-	defer npMgr.Unlock()
-
 	var (
 		err error
 		ns  *namespace
@@ -75,9 +72,7 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 			log.Printf("Error adding policy %s to %s", npName, oldPolicy.ObjectMeta.Name)
 		}
 		npMgr.isSafeToCleanUpAzureNpmChain = false
-		npMgr.Unlock()
 		npMgr.DeleteNetworkPolicy(oldPolicy)
-		npMgr.Lock()
 		npMgr.isSafeToCleanUpAzureNpmChain = true
 	} else {
 		ns.processedNpMap[hashedSelector] = npObj
@@ -140,9 +135,6 @@ func (npMgr *NetworkPolicyManager) UpdateNetworkPolicy(oldNpObj *networkingv1.Ne
 
 // DeleteNetworkPolicy handles deleting network policy from iptables.
 func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.NetworkPolicy) error {
-	npMgr.Lock()
-	defer npMgr.Unlock()
-
 	var (
 		err error
 		ns  *namespace
