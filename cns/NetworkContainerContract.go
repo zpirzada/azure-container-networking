@@ -267,7 +267,7 @@ func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate()
 			}
 			//Deny request if ACL direction is not In or Out
 			if !strings.EqualFold(requestedAclPolicy.Direction, "In") && !strings.EqualFold(requestedAclPolicy.Direction, "Out") {
-				return fmt.Errorf("Only Allow or Deny is supported in Action field")
+				return fmt.Errorf("Only In or Out is supported in Direction field")
 			}
 			if requestedAclPolicy.Priority == 0 {
 				return fmt.Errorf("Priority field cannot be empty in ACL Policy")
