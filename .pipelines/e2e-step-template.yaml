@@ -13,7 +13,6 @@ steps:
       mkdir -p '$(GOBIN)'
       mkdir -p '$(GOPATH)/pkg'
       mkdir -p '$(modulePath)'
-
       go get github.com/onsi/ginkgo/ginkgo
       go get github.com/onsi/gomega/...
 
@@ -40,14 +39,11 @@ steps:
 
       # download binary
       wget https://github.com/Azure/aks-engine/releases/download/$aksEVersion/aks-engine-$aksEVersion-linux-amd64.tar.gz
-
       mkdir ./bin
 
       #extract binary
       tar -zxvf aks-engine-$aksEVersion-linux-amd64.tar.gz -C bin
-
       mv ./bin/aks-engine-*/* ./bin/
-
       echo '##vso[task.prependpath]$(GOBIN)'
       echo '##vso[task.prependpath]$(GOROOT)/bin'
     name: "GoEnv"
@@ -63,7 +59,7 @@ steps:
 
   - bash: |
       ls -lah
-      export CNI_URL=https://$(ARTIFACT_STORAGE).blob.core.windows.net/acn-$(CommitHash)/azure-vnet-cni-${{ parameters.clusterDefinitionCniBuildOS }}-amd64-$(Tag)${{ parameters.clusterDefinitionCniBuildExt }}
+      export CNI_URL=https://$(ARTIFACT_STORAGE).blob.core.windows.net/acn-$(StorageID)/azure-vnet-cni-${{ parameters.clusterDefinitionCniBuildOS }}-amd64-$(Tag)${{ parameters.clusterDefinitionCniBuildExt }}
       export CNI_TYPE=${{ parameters.clusterDefinitionCniTypeKey }}
       echo CNI type is $CNI_TYPE
       cat '${{ parameters.clusterDefinition }}' | jq --arg cnikey $CNI_TYPE --arg cniurl $CNI_URL '.properties.orchestratorProfile.kubernetesConfig[$cnikey]= $cniurl' > '${{ parameters.clusterDefinition }}'.tmp	      #
@@ -73,8 +69,8 @@ steps:
       echo "Running E2E tests against a cluster built with the following API model:"
       cat '${{ parameters.clusterDefinition }}'
       cp ${{ parameters.clusterDefinition }} clusterDefinition.json
-      curl -L https://dl.k8s.io/v1.16.0/kubernetes-client-linux-amd64.tar.gz | tar xvzf -
-      sudo cp kubernetes/client/bin/kubectl /usr/local/bin/kubectl
+      curl -L https://dl.k8s.io/v1.17.4/kubernetes-client-linux-amd64.tar.gz | tar xvzf -
+      sudo cp kubernetes/client/bin/kubectl /usr/local/bin/kubectl	
       sudo cp kubernetes/client/bin/kubectl /usr/local/bin/k
     displayName: Configure AKS-Engine
     workingDirectory: "$(modulePath)"

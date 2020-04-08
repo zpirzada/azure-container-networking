@@ -52,6 +52,8 @@ stages:
             displayName: "Set up the Go environment"
 
           - script: |
+              BUILD_NUMBER=$(Build.BuildNumber)
+              echo "##vso[task.setvariable variable=StorageID;isOutput=true]$(echo ${BUILD_NUMBER//./-})"
               echo "##vso[task.setvariable variable=CommitHash;isOutput=true]$(git rev-parse HEAD)"
               echo "##vso[task.setvariable variable=Tag;isOutput=true]$(git describe --tags --always --dirty)"
               export BRANCH=$(Build.SourceBranchName)
@@ -168,9 +170,9 @@ stages:
               azureSubscription: $(ARTIFACT_SUBSCRIPTION)
               scriptLocation: "inlineScript"
               inlineScript: |
-                echo Creating storage container with name acn-$(EnvironmentalVariables.CommitHash) and account name $(STORAGE_ACCOUNT_NAME)
-                az storage container create -n acn-$(EnvironmentalVariables.CommitHash) --account-name $(STORAGE_ACCOUNT_NAME) --public-access container
-                az storage blob upload-batch -d acn-$(EnvironmentalVariables.CommitHash) -s ./output/  --account-name $(STORAGE_ACCOUNT_NAME)
+                echo Creating storage container with name acn-$(EnvironmentalVariables.StorageID) and account name $(STORAGE_ACCOUNT_NAME)
+                az storage container create -n acn-$(EnvironmentalVariables.StorageID) --account-name $(STORAGE_ACCOUNT_NAME) --public-access container
+                az storage blob upload-batch -d acn-$(EnvironmentalVariables.StorageID) -s ./output/  --account-name $(STORAGE_ACCOUNT_NAME)
               workingDirectory: "$(modulePath)"
             displayName: Create artifact storage container
             condition: succeeded()
@@ -226,8 +228,9 @@ stages:
               azureSubscription: $(ARTIFACT_SUBSCRIPTION)
               scriptLocation: "inlineScript"
               inlineScript: |
-                export CommitHash=$(git rev-parse HEAD)
-                echo Deleting storage container with name acn-$CommitHash and account name $(STORAGE_ACCOUNT_NAME)
-                az storage container delete -n acn-$CommitHash --account-name $(STORAGE_ACCOUNT_NAME)
+                BUILD_NUMBER=$(Build.BuildNumber)
+                BUILD_NUMBER=${BUILD_NUMBER//./-}
+                echo Deleting storage container with name acn-$BUILD_NUMBER and account name $(STORAGE_ACCOUNT_NAME)
+                az storage container delete -n acn-$BUILD_NUMBER --account-name $(STORAGE_ACCOUNT_NAME)
               workingDirectory: "$(modulePath)"
             displayName: Cleanup remote Azure storage container

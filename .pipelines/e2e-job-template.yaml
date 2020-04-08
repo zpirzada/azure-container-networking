@@ -9,7 +9,7 @@ parameters:
 jobs:
   - job: ${{ parameters.name }}
     dependsOn: unit_tests
-    timeoutInMinutes: 90
+    timeoutInMinutes: 120
     pool:
       name: Networking-ContainerNetworking
       demands: agent.os -equals Linux
@@ -22,6 +22,7 @@ jobs:
       acnPath: "$(GOPATH)/src/github.com/Azure/azure-container-networking"
       Tag: $[ dependencies.unit_tests.outputs['EnvironmentalVariables.Tag'] ]
       CommitHash: $[ dependencies.unit_tests.outputs['EnvironmentalVariables.CommitHash'] ]
+      StorageID: $[ dependencies.unit_tests.outputs['EnvironmentalVariables.StorageID'] ]
       CLEANUP_ON_EXIT: true
       CLEANUP_IF_FAIL: true
     steps:
