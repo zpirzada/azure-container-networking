@@ -445,6 +445,14 @@ func configureAclSettingHostNCApipaEndpoint(
 				if err = json.Unmarshal(requestedPolicy.Settings, &requestedAclPolicy); err != nil {
 					return nil, fmt.Errorf("Failed to Unmarshal requested ACL policy: %+v with error: %S", requestedPolicy.Settings, err)
 				}
+				//Using {NetworkContainerIP} as a placeholder to signal using Network Container IP
+				if strings.EqualFold(requestedAclPolicy.LocalAddresses, "{NetworkContainerIP}") {
+					requestedAclPolicy.LocalAddresses = networkContainerApipaIP
+				}
+				//Using {HostApipaIP} as a placeholder to signal using Host Apipa IP
+				if strings.EqualFold(requestedAclPolicy.RemoteAddresses, "{HostApipaIP}") {
+					requestedAclPolicy.RemoteAddresses = hostApipaIP
+				}
 				logger.Printf("ACL Policy requested in NcGoalState %+v", requestedAclPolicy)
 				if err = addAclToEndpointPolicy(requestedAclPolicy, &endpointPolicies); err != nil {
 					return nil, err

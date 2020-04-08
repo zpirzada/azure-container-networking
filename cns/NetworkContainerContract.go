@@ -253,8 +253,21 @@ func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate()
 			if err := json.Unmarshal(networkContainerRequestPolicy.Settings, &requestedAclPolicy); err != nil {
 				return fmt.Errorf("ACL policy failed to pass validation with error: %+v ", err)
 			}
+			//Deny request if ACL Action is empty
 			if len(strings.TrimSpace(string(requestedAclPolicy.Action))) == 0 {
 				return fmt.Errorf("Action field cannot be empty in ACL Policy")
+			}
+			//Deny request if ACL Action is not Allow or Deny
+			if !strings.EqualFold(requestedAclPolicy.Action, "Allow") && !strings.EqualFold(requestedAclPolicy.Action, "Deny") {
+				return fmt.Errorf("Only Allow or Deny is supported in Action field")
+			}
+			//Deny request if ACL Direction is empty
+			if len(strings.TrimSpace(string(requestedAclPolicy.Direction))) == 0 {
+				return fmt.Errorf("Direction field cannot be empty in ACL Policy")
+			}
+			//Deny request if ACL direction is not In or Out
+			if !strings.EqualFold(requestedAclPolicy.Direction, "In") && !strings.EqualFold(requestedAclPolicy.Direction, "Out") {
+				return fmt.Errorf("Only Allow or Deny is supported in Action field")
 			}
 			if requestedAclPolicy.Priority == 0 {
 				return fmt.Errorf("Priority field cannot be empty in ACL Policy")
