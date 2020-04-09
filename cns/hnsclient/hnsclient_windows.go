@@ -66,6 +66,12 @@ const (
 
 	// aclPriority200 indicates the ACL priority of 200
 	aclPriority200 = 200
+
+	// aclPolicyType indicates a ACL policy
+	aclPolicyType = "ACLPolicy"
+
+	//signals a APIPA endpoint type
+	apipaEndpointType = "APIPA"
 )
 
 var (
@@ -347,7 +353,8 @@ func configureAclSettingHostNCApipaEndpoint(
 	networkContainerApipaIP string,
 	hostApipaIP string,
 	allowNCToHostCommunication bool,
-	allowHostToNCCommunication bool) ([]hcn.EndpointPolicy, error) {
+	allowHostToNCCommunication bool,
+	ncRequestedPolicies []cns.NetworkContainerRequestPolicies) ([]hcn.EndpointPolicy, error) {
 	var (
 		err              error
 		endpointPolicies []hcn.EndpointPolicy
@@ -426,8 +433,33 @@ func configureAclSettingHostNCApipaEndpoint(
 				return nil, err
 			}
 		}
+
 	}
 
+	if ncRequestedPolicies != nil {
+		// Iterate thru the requested endpoint policies where policy type is ACL, endpoint type is APIPA
+		// include the raw json message in the endpoint policies
+		for _, requestedPolicy := range ncRequestedPolicies {
+			if strings.EqualFold(requestedPolicy.Type, aclPolicyType) && strings.EqualFold(requestedPolicy.EndpointType, apipaEndpointType) {
+				var requestedAclPolicy hcn.AclPolicySetting
+				if err = json.Unmarshal(requestedPolicy.Settings, &requestedAclPolicy); err != nil {
+					return nil, fmt.Errorf("Failed to Unmarshal requested ACL policy: %+v with error: %S", requestedPolicy.Settings, err)
+				}
+				//Using {NetworkContainerIP} as a placeholder to signal using Network Container IP
+				if strings.EqualFold(requestedAclPolicy.LocalAddresses, "{NetworkContainerIP}") {
+					requestedAclPolicy.LocalAddresses = networkContainerApipaIP
+				}
+				//Using {HostApipaIP} as a placeholder to signal using Host Apipa IP
+				if strings.EqualFold(requestedAclPolicy.RemoteAddresses, "{HostApipaIP}") {
+					requestedAclPolicy.RemoteAddresses = hostApipaIP
+				}
+				logger.Printf("ACL Policy requested in NcGoalState %+v", requestedAclPolicy)
+				if err = addAclToEndpointPolicy(requestedAclPolicy, &endpointPolicies); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
 	return endpointPolicies, nil
 }
 
@@ -436,7 +468,8 @@ func configureHostNCApipaEndpoint(
 	networkID string,
 	localIPConfiguration cns.IPConfiguration,
 	allowNCToHostCommunication bool,
-	allowHostToNCCommunication bool) (*hcn.HostComputeEndpoint, error) {
+	allowHostToNCCommunication bool,
+	ncPolicies []cns.NetworkContainerRequestPolicies) (*hcn.HostComputeEndpoint, error) {
 	endpoint := &hcn.HostComputeEndpoint{
 		Name:               endpointName,
 		HostComputeNetwork: networkID,
@@ -455,7 +488,8 @@ func configureHostNCApipaEndpoint(
 		networkContainerApipaIP,
 		hostApipaIP,
 		allowNCToHostCommunication,
-		allowHostToNCCommunication)
+		allowHostToNCCommunication,
+		ncPolicies)
 
 	if err != nil {
 		logger.Errorf("[Azure CNS] Failed to configure ACL for HostNCApipaEndpoint. Error: %v", err)
@@ -490,7 +524,8 @@ func CreateHostNCApipaEndpoint(
 	networkContainerID string,
 	localIPConfiguration cns.IPConfiguration,
 	allowNCToHostCommunication bool,
-	allowHostToNCCommunication bool) (string, error) {
+	allowHostToNCCommunication bool,
+	ncPolicies []cns.NetworkContainerRequestPolicies) (string, error) {
 	var (
 		network      *hcn.HostComputeNetwork
 		endpoint     *hcn.HostComputeEndpoint
@@ -528,7 +563,8 @@ func CreateHostNCApipaEndpoint(
 		network.Id,
 		localIPConfiguration,
 		allowNCToHostCommunication,
-		allowHostToNCCommunication); err != nil {
+		allowHostToNCCommunication,
+		ncPolicies); err != nil {
 		logger.Errorf("[Azure CNS] Failed to configure HostNCApipaEndpoint: %s. Error: %v", endpointName, err)
 		return "", err
 	}

@@ -2,6 +2,8 @@ package cns
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 )
 
 // Container Network Service DNC Contract
@@ -63,6 +65,14 @@ type CreateNetworkContainerRequest struct {
 	Routes                     []Route
 	AllowHostToNCCommunication bool
 	AllowNCToHostCommunication bool
+	EndpointPolicies           []NetworkContainerRequestPolicies
+}
+
+// NetworkContainerRequestPolicies - specifies policies associated with create network request
+type NetworkContainerRequestPolicies struct {
+	Type         string
+	EndpointType string
+	Settings     json.RawMessage
 }
 
 // ConfigureContainerNetworkingRequest - specifies request to attach/detach container to network.
@@ -219,4 +229,52 @@ type UnpublishNetworkContainerResponse struct {
 	UnpublishErrorStr     string
 	UnpublishStatusCode   int
 	UnpublishResponseBody []byte
+}
+
+// ValidAclPolicySetting - Used to validate ACL policy
+type ValidAclPolicySetting struct {
+	Protocols       string `json:","`
+	Action          string `json:","`
+	Direction       string `json:","`
+	LocalAddresses  string `json:","`
+	RemoteAddresses string `json:","`
+	LocalPorts      string `json:","`
+	RemotePorts     string `json:","`
+	RuleType        string `json:","`
+	Priority        uint16 `json:","`
+}
+
+// Validate - Validates network container request policies
+func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate() error {
+	// validate ACL policy
+	if networkContainerRequestPolicy != nil {
+		if strings.EqualFold(networkContainerRequestPolicy.Type, "ACLPolicy") && strings.EqualFold(networkContainerRequestPolicy.EndpointType, "APIPA") {
+			var requestedAclPolicy ValidAclPolicySetting
+			if err := json.Unmarshal(networkContainerRequestPolicy.Settings, &requestedAclPolicy); err != nil {
+				return fmt.Errorf("ACL policy failed to pass validation with error: %+v ", err)
+			}
+			//Deny request if ACL Action is empty
+			if len(strings.TrimSpace(string(requestedAclPolicy.Action))) == 0 {
+				return fmt.Errorf("Action field cannot be empty in ACL Policy")
+			}
+			//Deny request if ACL Action is not Allow or Deny
+			if !strings.EqualFold(requestedAclPolicy.Action, "Allow") && !strings.EqualFold(requestedAclPolicy.Action, "Deny") {
+				return fmt.Errorf("Only Allow or Deny is supported in Action field")
+			}
+			//Deny request if ACL Direction is empty
+			if len(strings.TrimSpace(string(requestedAclPolicy.Direction))) == 0 {
+				return fmt.Errorf("Direction field cannot be empty in ACL Policy")
+			}
+			//Deny request if ACL direction is not In or Out
+			if !strings.EqualFold(requestedAclPolicy.Direction, "In") && !strings.EqualFold(requestedAclPolicy.Direction, "Out") {
+				return fmt.Errorf("Only In or Out is supported in Direction field")
+			}
+			if requestedAclPolicy.Priority == 0 {
+				return fmt.Errorf("Priority field cannot be empty in ACL Policy")
+			}
+		} else {
+			return fmt.Errorf("Only ACL Policies on APIPA endpoint supported")
+		}
+	}
+	return nil
 }
