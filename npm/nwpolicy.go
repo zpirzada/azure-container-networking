@@ -46,6 +46,8 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 		return nil
 	}
 
+	ns.rawNpMap[npObj.ObjectMeta.Name] = npObj
+
 	allNs := npMgr.nsMap[util.KubeAllNamespacesFlag]
 
 	if !npMgr.isAzureNpmChainCreated {
@@ -67,13 +69,16 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 	var addedPolicy *networkingv1.NetworkPolicy
 	addedPolicy = nil
 	if oldPolicy, oldPolicyExists := ns.processedNpMap[hashedSelector]; oldPolicyExists {
-		addedPolicy, err = addPolicy(oldPolicy, npObj)
-		if err != nil {
-			log.Printf("Error adding policy %s to %s", npName, oldPolicy.ObjectMeta.Name)
-		}
 		npMgr.isSafeToCleanUpAzureNpmChain = false
 		npMgr.DeleteNetworkPolicy(oldPolicy)
 		npMgr.isSafeToCleanUpAzureNpmChain = true
+
+		addedPolicy, err = addPolicy(oldPolicy, npObj)
+		if err != nil {
+			log.Printf("Error adding policy %s to %s", npName, oldPolicy.ObjectMeta.Name)
+		} else {
+			ns.processedNpMap[hashedSelector] = addedPolicy
+		}
 	} else {
 		ns.processedNpMap[hashedSelector] = npObj
 	}
@@ -116,6 +121,10 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 
 // UpdateNetworkPolicy handles updateing network policy in iptables.
 func (npMgr *NetworkPolicyManager) UpdateNetworkPolicy(oldNpObj *networkingv1.NetworkPolicy, newNpObj *networkingv1.NetworkPolicy) error {
+	if isSamePolicy(oldNpObj, newNpObj) {
+		return nil
+	}
+
 	var err error
 
 	log.Printf("NETWORK POLICY UPDATING:\n old policy:[%v]\n new policy:[%v]", oldNpObj, newNpObj)
@@ -164,6 +173,8 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 		}
 	}
 
+	delete(ns.rawNpMap, npObj.ObjectMeta.Name)
+
 	hashedSelector := HashSelector(&npObj.Spec.PodSelector)
 	if oldPolicy, oldPolicyExists := ns.processedNpMap[hashedSelector]; oldPolicyExists {
 		deductedPolicy, err := deductPolicy(oldPolicy, npObj)
@@ -179,11 +190,11 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 	}
 
 	if npMgr.canCleanUpNpmChains() {
+		npMgr.isAzureNpmChainCreated = false
 		if err = iptMgr.UninitNpmChains(); err != nil {
 			log.Errorf("Error: failed to uninitialize azure-npm chains.")
 			return err
 		}
-		npMgr.isAzureNpmChainCreated = false
 	}
 
 	return nil
