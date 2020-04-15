@@ -67,6 +67,9 @@ const (
 	// aclPriority200 indicates the ACL priority of 200
 	aclPriority200 = 200
 
+	// aclPriority1000 indicates the ACL priority of 1000
+	aclPriority1000 = 1000
+
 	// aclPolicyType indicates a ACL policy
 	aclPolicyType = "ACLPolicy"
 
@@ -394,7 +397,7 @@ func configureAclSettingHostNCApipaEndpoint(
 				LocalAddresses:  networkContainerApipaIP,
 				RemoteAddresses: hostApipaIP,
 				RuleType:        hcn.RuleTypeSwitch,
-				Priority:        aclPriority200,
+				Priority:        aclPriority1000,
 			}
 
 			if err = addAclToEndpointPolicy(outAllowToHostOnly, &endpointPolicies); err != nil {
@@ -426,7 +429,7 @@ func configureAclSettingHostNCApipaEndpoint(
 				LocalAddresses:  networkContainerApipaIP,
 				RemoteAddresses: hostApipaIP,
 				RuleType:        hcn.RuleTypeSwitch,
-				Priority:        aclPriority200,
+				Priority:        aclPriority1000,
 			}
 
 			if err = addAclToEndpointPolicy(inAllowFromHostOnly, &endpointPolicies); err != nil {
