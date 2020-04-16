@@ -245,12 +245,9 @@ type ValidAclPolicySetting struct {
 }
 
 const (
-	ActionTypeAllow string = "Allow"
-
-	ActionTypeBlock string = "Block"
-
-	DirectionTypeIn string = "In"
-
+	ActionTypeAllow  string = "Allow"
+	ActionTypeBlock  string = "Block"
+	DirectionTypeIn  string = "In"
 	DirectionTypeOut string = "Out"
 )
 
