@@ -67,6 +67,9 @@ const (
 	// aclPriority200 indicates the ACL priority of 200
 	aclPriority200 = 200
 
+	// aclPriority1000 indicates the ACL priority of 1000
+	aclPriority1000 = 1000
+
 	// aclPolicyType indicates a ACL policy
 	aclPolicyType = "ACLPolicy"
 
@@ -394,7 +397,7 @@ func configureAclSettingHostNCApipaEndpoint(
 				LocalAddresses:  networkContainerApipaIP,
 				RemoteAddresses: hostApipaIP,
 				RuleType:        hcn.RuleTypeSwitch,
-				Priority:        aclPriority200,
+				Priority:        aclPriority1000,
 			}
 
 			if err = addAclToEndpointPolicy(outAllowToHostOnly, &endpointPolicies); err != nil {
@@ -426,7 +429,7 @@ func configureAclSettingHostNCApipaEndpoint(
 				LocalAddresses:  networkContainerApipaIP,
 				RemoteAddresses: hostApipaIP,
 				RuleType:        hcn.RuleTypeSwitch,
-				Priority:        aclPriority200,
+				Priority:        aclPriority1000,
 			}
 
 			if err = addAclToEndpointPolicy(inAllowFromHostOnly, &endpointPolicies); err != nil {
@@ -443,7 +446,7 @@ func configureAclSettingHostNCApipaEndpoint(
 			if strings.EqualFold(requestedPolicy.Type, aclPolicyType) && strings.EqualFold(requestedPolicy.EndpointType, apipaEndpointType) {
 				var requestedAclPolicy hcn.AclPolicySetting
 				if err = json.Unmarshal(requestedPolicy.Settings, &requestedAclPolicy); err != nil {
-					return nil, fmt.Errorf("Failed to Unmarshal requested ACL policy: %+v with error: %S", requestedPolicy.Settings, err)
+					return nil, fmt.Errorf("Failed to Unmarshal requested ACL policy: %+v with error: %+v", requestedPolicy.Settings, err)
 				}
 				//Using {NetworkContainerIP} as a placeholder to signal using Network Container IP
 				if strings.EqualFold(requestedAclPolicy.LocalAddresses, "{NetworkContainerIP}") {

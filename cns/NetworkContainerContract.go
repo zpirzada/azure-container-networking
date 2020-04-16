@@ -244,6 +244,13 @@ type ValidAclPolicySetting struct {
 	Priority        uint16 `json:","`
 }
 
+const (
+	ActionTypeAllow  string = "Allow"
+	ActionTypeBlock  string = "Block"
+	DirectionTypeIn  string = "In"
+	DirectionTypeOut string = "Out"
+)
+
 // Validate - Validates network container request policies
 func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate() error {
 	// validate ACL policy
@@ -258,15 +265,15 @@ func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate()
 				return fmt.Errorf("Action field cannot be empty in ACL Policy")
 			}
 			//Deny request if ACL Action is not Allow or Deny
-			if !strings.EqualFold(requestedAclPolicy.Action, "Allow") && !strings.EqualFold(requestedAclPolicy.Action, "Deny") {
-				return fmt.Errorf("Only Allow or Deny is supported in Action field")
+			if !strings.EqualFold(requestedAclPolicy.Action, ActionTypeAllow) && !strings.EqualFold(requestedAclPolicy.Action, ActionTypeBlock) {
+				return fmt.Errorf("Only Allow or Block is supported in Action field")
 			}
 			//Deny request if ACL Direction is empty
 			if len(strings.TrimSpace(string(requestedAclPolicy.Direction))) == 0 {
 				return fmt.Errorf("Direction field cannot be empty in ACL Policy")
 			}
 			//Deny request if ACL direction is not In or Out
-			if !strings.EqualFold(requestedAclPolicy.Direction, "In") && !strings.EqualFold(requestedAclPolicy.Direction, "Out") {
+			if !strings.EqualFold(requestedAclPolicy.Direction, DirectionTypeIn) && !strings.EqualFold(requestedAclPolicy.Direction, DirectionTypeOut) {
 				return fmt.Errorf("Only In or Out is supported in Direction field")
 			}
 			if requestedAclPolicy.Priority == 0 {
