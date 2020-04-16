@@ -19,6 +19,10 @@ import (
 	cniTypesCurr "github.com/containernetworking/cni/pkg/types/current"
 )
 
+const (
+	ipamV6 = "azure-vnet-ipamv6"
+)
+
 var (
 	ipv4DefaultRouteDstPrefix = net.IPNet{net.IPv4zero, net.IPv4Mask(0, 0, 0, 0)}
 )
@@ -154,8 +158,13 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 		options := make(map[string]string)
 		options[ipam.OptInterfaceName] = nwCfg.Master
 
+		isIpv6 := false
+		if nwCfg.Ipam.Type == ipamV6 {
+			isIpv6 = true
+		}
+
 		// Allocate an address pool.
-		poolID, subnet, err = plugin.am.RequestPool(nwCfg.Ipam.AddrSpace, "", "", options, false)
+		poolID, subnet, err = plugin.am.RequestPool(nwCfg.Ipam.AddrSpace, "", "", options, isIpv6)
 		if err != nil {
 			err = plugin.Errorf("Failed to allocate pool: %v", err)
 			return err

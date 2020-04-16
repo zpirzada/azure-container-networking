@@ -28,6 +28,7 @@ const (
 const (
 	Filter = "filter"
 	Nat    = "nat"
+	Mangle = "mangle"
 )
 
 // target
@@ -52,7 +53,13 @@ const (
 
 const (
 	iptables    = "iptables"
+	ip6tables   = "ip6tables"
 	lockTimeout = 60
+)
+
+const (
+	V4 = "4"
+	V6 = "6"
 )
 
 var (
@@ -60,13 +67,18 @@ var (
 )
 
 // Run iptables command
-func runCmd(params string) error {
+func runCmd(version, params string) error {
 	var cmd string
 
+	iptCmd := iptables
+	if version == V6 {
+		iptCmd = ip6tables
+	}
+
 	if DisableIPTableLock {
-		cmd = fmt.Sprintf("%s %s", iptables, params)
+		cmd = fmt.Sprintf("%s %s", iptCmd, params)
 	} else {
-		cmd = fmt.Sprintf("%s -w %d %s", iptables, lockTimeout, params)
+		cmd = fmt.Sprintf("%s -w %d %s", iptCmd, lockTimeout, params)
 	}
 
 	if _, err := platform.ExecuteCommand(cmd); err != nil {
@@ -77,9 +89,9 @@ func runCmd(params string) error {
 }
 
 // check if iptable chain alreay exists
-func ChainExists(tableName, chainName string) bool {
+func ChainExists(version, tableName, chainName string) bool {
 	params := fmt.Sprintf("-t %s -L %s", tableName, chainName)
-	if err := runCmd(params); err != nil {
+	if err := runCmd(version, params); err != nil {
 		return false
 	}
 
@@ -87,12 +99,12 @@ func ChainExists(tableName, chainName string) bool {
 }
 
 // create new iptable chain under specified table name
-func CreateChain(tableName, chainName string) error {
+func CreateChain(version, tableName, chainName string) error {
 	var err error
 
-	if !ChainExists(tableName, chainName) {
+	if !ChainExists(version, tableName, chainName) {
 		params := fmt.Sprintf("-t %s -N %s", tableName, chainName)
-		err = runCmd(params)
+		err = runCmd(version, params)
 	} else {
 		log.Printf("%s Chain exists in table %s", chainName, tableName)
 	}
@@ -101,38 +113,38 @@ func CreateChain(tableName, chainName string) error {
 }
 
 // check if iptable rule alreay exists
-func RuleExists(tableName, chainName, match, target string) bool {
+func RuleExists(version, tableName, chainName, match, target string) bool {
 	params := fmt.Sprintf("-t %s -C %s %s -j %s", tableName, chainName, match, target)
-	if err := runCmd(params); err != nil {
+	if err := runCmd(version, params); err != nil {
 		return false
 	}
 	return true
 }
 
 // Insert iptable rule at beginning of iptable chain
-func InsertIptableRule(tableName, chainName, match, target string) error {
-	if RuleExists(tableName, chainName, match, target) {
+func InsertIptableRule(version, tableName, chainName, match, target string) error {
+	if RuleExists(version, tableName, chainName, match, target) {
 		log.Printf("Rule already exists")
 		return nil
 	}
 
 	params := fmt.Sprintf("-t %s -I %s 1 %s -j %s", tableName, chainName, match, target)
-	return runCmd(params)
+	return runCmd(version, params)
 }
 
 // Append iptable rule at end of iptable chain
-func AppendIptableRule(tableName, chainName, match, target string) error {
-	if RuleExists(tableName, chainName, match, target) {
+func AppendIptableRule(version, tableName, chainName, match, target string) error {
+	if RuleExists(version, tableName, chainName, match, target) {
 		log.Printf("Rule already exists")
 		return nil
 	}
 
 	params := fmt.Sprintf("-t %s -A %s %s -j %s", tableName, chainName, match, target)
-	return runCmd(params)
+	return runCmd(version, params)
 }
 
 // Delete matched iptable rule
-func DeleteIptableRule(tableName, chainName, match, target string) error {
+func DeleteIptableRule(version, tableName, chainName, match, target string) error {
 	params := fmt.Sprintf("-t %s -D %s %s -j %s", tableName, chainName, match, target)
-	return runCmd(params)
+	return runCmd(version, params)
 }

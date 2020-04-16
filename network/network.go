@@ -20,6 +20,11 @@ const (
 	opModeDefault     = opModeTunnel
 )
 
+const (
+	// ipv6 modes
+	IPV6Nat = "ipv6nat"
+)
+
 // ExternalInterface is a host network interface that bridges containers to external networks.
 type externalInterface struct {
 	Name        string
@@ -62,6 +67,8 @@ type NetworkInfo struct {
 	NetNs                         string
 	Options                       map[string]interface{}
 	DisableHairpinOnHostInterface bool
+	IPV6Mode                      string
+	ServiceCidrs                  string
 }
 
 // SubnetInfo contains subnet information for a container network.

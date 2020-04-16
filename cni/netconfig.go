@@ -51,6 +51,9 @@ type NetworkConfig struct {
 	LogLevel                      string   `json:"logLevel,omitempty"`
 	LogTarget                     string   `json:"logTarget,omitempty"`
 	InfraVnetAddressSpace         string   `json:"infraVnetAddressSpace,omitempty"`
+	IPV6Mode                      string   `json:"ipv6Mode,omitempty"`
+	ServiceCidrs                  string   `json:"serviceCidrs,omitempty"`
+	VnetCidrs                     string   `json:"vnetCidrs,omitempty"`
 	PodNamespaceForDualNetwork    []string `json:"podNamespaceForDualNetwork,omitempty"`
 	IPsToRouteViaHost             []string `json:"ipsToRouteViaHost,omitempty"`
 	MultiTenancy                  bool     `json:"multiTenancy,omitempty"`

@@ -9,8 +9,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Azure/azure-container-networking/iptables"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/netlink"
+	"github.com/Azure/azure-container-networking/network/epcommon"
 	"github.com/Azure/azure-container-networking/platform"
 	"golang.org/x/sys/unix"
 )
@@ -90,7 +92,7 @@ func (nm *networkManager) deleteNetworkImpl(nw *network) error {
 	if nw.VlanId != 0 {
 		networkClient = NewOVSClient(nw.extIf.BridgeName, nw.extIf.Name)
 	} else {
-		networkClient = NewLinuxBridgeClient(nw.extIf.BridgeName, nw.extIf.Name, nw.Mode)
+		networkClient = NewLinuxBridgeClient(nw.extIf.BridgeName, nw.extIf.Name, NetworkInfo{})
 	}
 
 	// Disconnect the interface if this was the last network using it.
@@ -287,8 +289,11 @@ func applyDnsConfig(extIf *externalInterface, ifName string) error {
 
 // ConnectExternalInterface connects the given host interface to a bridge.
 func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwInfo *NetworkInfo) error {
-	var err error
-	var networkClient NetworkClient
+	var (
+		err           error
+		networkClient NetworkClient
+	)
+
 	log.Printf("[net] Connecting interface %v.", extIf.Name)
 	defer func() { log.Printf("[net] Connecting interface %v completed with err:%v.", extIf.Name, err) }()
 
@@ -314,24 +319,17 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 	if opt != nil && opt[VlanIDKey] != nil {
 		networkClient = NewOVSClient(bridgeName, extIf.Name)
 	} else {
-		networkClient = NewLinuxBridgeClient(bridgeName, extIf.Name, nwInfo.Mode)
+		networkClient = NewLinuxBridgeClient(bridgeName, extIf.Name, *nwInfo)
 	}
 
 	// Check if the bridge already exists.
 	bridge, err := net.InterfaceByName(bridgeName)
 	if err != nil {
 		// Create the bridge.
-		if err := networkClient.CreateBridge(); err != nil {
+		if err = networkClient.CreateBridge(); err != nil {
 			log.Printf("Error while creating bridge %+v", err)
 			return err
 		}
-
-		// On failure, delete the bridge.
-		defer func() {
-			if err != nil {
-				networkClient.DeleteBridge()
-			}
-		}()
 
 		bridge, err = net.InterfaceByName(bridgeName)
 		if err != nil {
@@ -342,6 +340,13 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 		log.Printf("[net] Found existing bridge %v.", bridgeName)
 	}
 
+	defer func() {
+		if err != nil {
+			log.Printf("[net] cleanup network")
+			nm.disconnectExternalInterface(extIf, networkClient)
+		}
+	}()
+
 	// Save host IP configuration.
 	err = nm.saveIPConfig(hostIf, extIf)
 	if err != nil {
@@ -351,7 +356,7 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 	isGreaterOrEqualUbuntu17 := isGreaterOrEqaulUbuntuVersion(ubuntuVersion17)
 	if isGreaterOrEqualUbuntu17 {
 		log.Printf("[net] Saving dns config from %v", extIf.Name)
-		if err := saveDnsConfig(extIf); err != nil {
+		if err = saveDnsConfig(extIf); err != nil {
 			log.Printf("[net] Failed to save dns config: %v", err)
 			return err
 		}
@@ -366,7 +371,7 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 
 	// Connect the external interface to the bridge.
 	log.Printf("[net] Setting link %v master %v.", hostIf.Name, bridgeName)
-	if err := networkClient.SetBridgeMasterToHostInterface(); err != nil {
+	if err = networkClient.SetBridgeMasterToHostInterface(); err != nil {
 		return err
 	}
 
@@ -393,7 +398,7 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 	// External interface hairpin on.
 	if !nwInfo.DisableHairpinOnHostInterface {
 		log.Printf("[net] Setting link %v hairpin on.", hostIf.Name)
-		if err := networkClient.SetHairpinOnHostInterface(true); err != nil {
+		if err = networkClient.SetHairpinOnHostInterface(true); err != nil {
 			return err
 		}
 	}
@@ -408,12 +413,32 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 	if isGreaterOrEqualUbuntu17 {
 		log.Printf("[net] Applying dns config on %v", bridgeName)
 
-		if err := applyDnsConfig(extIf, bridgeName); err != nil {
+		if err = applyDnsConfig(extIf, bridgeName); err != nil {
 			log.Printf("[net] Failed to apply DNS configuration: %v.", err)
 			return err
 		}
 
 		log.Printf("[net] Applied dns config %v on %v", extIf.DNSInfo, bridgeName)
+	}
+
+	if nwInfo.IPV6Mode == IPV6Nat {
+		// adds pod cidr gateway ip to bridge
+		if err = addIpv6NatGateway(nwInfo); err != nil {
+			log.Errorf("[net] Adding IPv6 Nat Gateway failed:%v", err)
+			return err
+		}
+
+		if err = addIpv6SnatRule(extIf, nwInfo); err != nil {
+			log.Errorf("[net] Adding IPv6 Snat Rule failed:%v", err)
+			return err
+		}
+
+		// unmark packet if set by kube-proxy to skip kube-postrouting rule and processed
+		// by cni snat rule
+		if err = iptables.InsertIptableRule(iptables.V6, iptables.Mangle, iptables.Postrouting, "", "MARK --set-mark 0x0"); err != nil {
+			log.Errorf("[net] Adding Iptable mangle rule failed:%v", err)
+			return err
+		}
 	}
 
 	extIf.BridgeName = bridgeName
@@ -448,6 +473,36 @@ func (nm *networkManager) disconnectExternalInterface(extIf *externalInterface, 
 	extIf.Routes = nil
 
 	log.Printf("[net] Disconnected interface %v.", extIf.Name)
+}
+
+// Add ipv6 nat gateway IP on bridge
+func addIpv6NatGateway(nwInfo *NetworkInfo) error {
+	log.Printf("[net] Adding ipv6 nat gateway on azure bridge")
+	for _, subnetInfo := range nwInfo.Subnets {
+		if subnetInfo.Family == platform.AfINET6 {
+			ipAddr := []net.IPNet{{
+				IP:   subnetInfo.Gateway,
+				Mask: subnetInfo.Prefix.Mask,
+			}}
+			return epcommon.AssignIPToInterface(nwInfo.BridgeName, ipAddr)
+		}
+	}
+
+	return nil
+}
+
+// snat ipv6 traffic to secondary ipv6 ip before leaving VM
+func addIpv6SnatRule(extIf *externalInterface, nwInfo *NetworkInfo) error {
+	log.Printf("[net] Adding ipv6 snat rule")
+	for _, ipAddr := range extIf.IPAddresses {
+		if ipAddr.IP.To4() == nil {
+			if err := epcommon.AddSnatRule("", ipAddr.IP); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func getNetworkInfoImpl(nwInfo *NetworkInfo, nw *network) {

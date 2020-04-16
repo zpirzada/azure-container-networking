@@ -18,10 +18,18 @@ const (
 	// Ebtable tables.
 	Nat    = "nat"
 	Broute = "broute"
+	Filter = "filter"
 	// Ebtable chains.
 	PreRouting  = "PREROUTING"
 	PostRouting = "POSTROUTING"
 	Brouting    = "BROUTING"
+	Forward     = "FORWARD"
+	// Ebtable Protocols
+	IPV4 = "IPv4"
+	IPV6 = "IPv6"
+	// Ebtable Targets
+	Accept         = "ACCEPT"
+	RedirectAccept = "redirect --redirect-target ACCEPT"
 )
 
 // SetSnatForInterface sets a MAC SNAT rule for an interface.
@@ -84,10 +92,28 @@ func SetVepaMode(bridgeName string, downstreamIfNamePrefix string, upstreamMacAd
 
 // SetDnatForIPAddress sets a MAC DNAT rule for an IP address.
 func SetDnatForIPAddress(interfaceName string, ipAddress net.IP, macAddress net.HardwareAddr, action string) error {
+	protocol := "IPv4"
+	dst := "--ip-dst"
+	if ipAddress.To4() == nil {
+		protocol = "IPv6"
+		dst = "--ip6-dst"
+	}
+
 	table := Nat
 	chain := PreRouting
-	rule := fmt.Sprintf("-p IPv4 -i %s --ip-dst %s -j dnat --to-dst %s --dnat-target ACCEPT",
-		interfaceName, ipAddress.String(), macAddress.String())
+	rule := fmt.Sprintf("-p %s -i %s %s %s -j dnat --to-dst %s --dnat-target ACCEPT",
+		protocol, interfaceName, dst, ipAddress.String(), macAddress.String())
+
+	return runEbCmd(table, action, chain, rule)
+}
+
+// Drop Icmpv6 discovery messages going out of interface
+func DropICMPv6Solicitation(interfaceName string, action string) error {
+	table := Filter
+	chain := Forward
+
+	rule := fmt.Sprintf("-p IPv6 --ip6-proto ipv6-icmp --ip6-icmp-type neighbour-solicitation -o %s -j DROP",
+		interfaceName)
 
 	return runEbCmd(table, action, chain, rule)
 }
@@ -131,6 +157,41 @@ func GetEbtableRules(tableName, chainName string) ([]string, error) {
 	}
 
 	return rules, nil
+}
+
+// SetBrouteAcceptCidr - broute chain MAC redirect rule. Will change mac target address to bridge port
+// that receives the frame.
+func SetBrouteAcceptByCidr(ipNet *net.IPNet, protocol, action, target string) error {
+	dst := "--ip-dst"
+	if protocol == IPV6 {
+		dst = "--ip6-dst"
+	}
+
+	var rule string
+	table := Broute
+	chain := Brouting
+	if ipNet != nil {
+		rule = fmt.Sprintf("-p %s %s %s -j %s",
+			protocol, dst, ipNet.String(), target)
+	} else {
+		rule = fmt.Sprintf("-p %s -j %s",
+			protocol, target)
+	}
+
+	return runEbCmd(table, action, chain, rule)
+}
+
+func SetBrouteAcceptByInterface(ifName string, protocol, action, target string) error {
+	var rule string
+	table := Broute
+	chain := Brouting
+	if protocol == "" {
+		rule = fmt.Sprintf("-i %s -j %s", ifName, target)
+	} else {
+		rule = fmt.Sprintf("-p %s -i %s -j %s", protocol, ifName, target)
+	}
+
+	return runEbCmd(table, action, chain, rule)
 }
 
 // EbTableRuleExists checks if eb rule exists in table and chain.

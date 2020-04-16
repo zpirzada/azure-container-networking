@@ -124,6 +124,7 @@ func TestMain(m *testing.M) {
 	}
 
 	tb.Cleanup(FdName)
+	ipamAgent.Stop()
 	os.Exit(exitCode)
 }
 

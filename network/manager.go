@@ -58,7 +58,7 @@ type NetworkManager interface {
 
 	CreateNetwork(nwInfo *NetworkInfo) error
 	DeleteNetwork(networkId string) error
-	GetNetworkInfo(networkId string) (*NetworkInfo, error)
+	GetNetworkInfo(networkId string) (NetworkInfo, error)
 
 	CreateEndpoint(networkId string, epInfo *EndpointInfo) error
 	DeleteEndpoint(networkId string, endpointId string) error
@@ -174,7 +174,7 @@ func (nm *networkManager) restore() error {
 
 				extIf.BridgeName = ""
 
-				_, err = nm.newNetworkImpl(nwInfo, extIf)
+				_, err = nm.newNetworkImpl(&nwInfo, extIf)
 				if err != nil {
 					log.Printf("[net] Restoring network failed for nwInfo %v extif %v. This should not happen %v", nwInfo, extIf, err)
 					return err
@@ -274,16 +274,16 @@ func (nm *networkManager) DeleteNetwork(networkId string) error {
 }
 
 // GetNetworkInfo returns information about the given network.
-func (nm *networkManager) GetNetworkInfo(networkId string) (*NetworkInfo, error) {
+func (nm *networkManager) GetNetworkInfo(networkId string) (NetworkInfo, error) {
 	nm.Lock()
 	defer nm.Unlock()
 
 	nw, err := nm.getNetwork(networkId)
 	if err != nil {
-		return nil, err
+		return NetworkInfo{}, err
 	}
 
-	nwInfo := &NetworkInfo{
+	nwInfo := NetworkInfo{
 		Id:               networkId,
 		Subnets:          nw.Subnets,
 		Mode:             nw.Mode,
@@ -292,7 +292,7 @@ func (nm *networkManager) GetNetworkInfo(networkId string) (*NetworkInfo, error)
 		Options:          make(map[string]interface{}),
 	}
 
-	getNetworkInfoImpl(nwInfo, nw)
+	getNetworkInfoImpl(&nwInfo, nw)
 
 	if nw.extIf != nil {
 		nwInfo.BridgeName = nw.extIf.BridgeName

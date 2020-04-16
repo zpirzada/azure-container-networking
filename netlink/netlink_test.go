@@ -244,12 +244,12 @@ func TestAddRemoveStaticArp(t *testing.T) {
 	ip := net.ParseIP("192.168.0.2")
 	mac, _ := net.ParseMAC("aa:b3:4d:5e:e2:4a")
 
-	err = AddOrRemoveStaticArp(ADD, ifName, ip, mac)
+	err = AddOrRemoveStaticArp(ADD, ifName, ip, mac, false)
 	if err != nil {
 		t.Errorf("ret val %v", err)
 	}
 
-	err = AddOrRemoveStaticArp(REMOVE, ifName, ip, mac)
+	err = AddOrRemoveStaticArp(REMOVE, ifName, ip, mac, false)
 	if err != nil {
 		t.Errorf("ret val %v", err)
 	}

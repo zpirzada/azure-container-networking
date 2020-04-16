@@ -25,7 +25,7 @@ const (
 )
 
 // handleConsecutiveAdd is a dummy function for Linux platform.
-func handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId string, nwInfo *network.NetworkInfo, nwCfg *cni.NetworkConfig) (*cniTypesCurr.Result, error) {
+func handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId string, nwInfo network.NetworkInfo, nwCfg *cni.NetworkConfig) (*cniTypesCurr.Result, error) {
 	return nil, nil
 }
 

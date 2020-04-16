@@ -391,7 +391,7 @@ func SetLinkHairpin(bridgeName string, on bool) error {
 }
 
 // AddOrRemoveStaticArp sets/removes static arp entry based on mode
-func AddOrRemoveStaticArp(mode int, name string, ipaddr net.IP, mac net.HardwareAddr) error {
+func AddOrRemoveStaticArp(mode int, name string, ipaddr net.IP, mac net.HardwareAddr, isProxy bool) error {
 	s, err := getSocket()
 	if err != nil {
 		return err
@@ -413,13 +413,23 @@ func AddOrRemoveStaticArp(mode int, name string, ipaddr net.IP, mac net.Hardware
 	}
 
 	msg := neighMsg{
-		Family: uint8(unix.AF_INET),
+		Family: uint8(GetIpAddressFamily(ipaddr)),
 		Index:  uint32(iface.Index),
 		State:  uint16(state),
 	}
+
+	// NTF_PROXY is for setting neighbor proxy
+	if isProxy {
+		msg.Flags = msg.Flags | NTF_PROXY
+	}
+
 	req.addPayload(&msg)
 
 	ipData := ipaddr.To4()
+	if ipData == nil {
+		ipData = ipaddr.To16()
+	}
+
 	dstData := newRtAttr(NDA_DST, ipData)
 	req.addPayload(dstData)
 

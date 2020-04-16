@@ -258,11 +258,17 @@ func addRoutes(interfaceName string, routes []RouteInfo) error {
 			ifIndex = interfaceIf.Index
 		}
 
+		family := netlink.GetIpAddressFamily(route.Gw)
+		if route.Gw == nil {
+			family = netlink.GetIpAddressFamily(route.Dst.IP)
+		}
+
 		nlRoute := &netlink.Route{
-			Family:    netlink.GetIpAddressFamily(route.Gw),
+			Family:    family,
 			Dst:       &route.Dst,
 			Gw:        route.Gw,
 			LinkIndex: ifIndex,
+			Priority:  route.Priority,
 		}
 
 		if err := netlink.AddIpRoute(nlRoute); err != nil {

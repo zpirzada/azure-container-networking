@@ -62,6 +62,7 @@ func TestMain(m *testing.M) {
 	}
 
 	log.Close()
+	hostAgent.Stop()
 	os.Exit(exitCode)
 }
 

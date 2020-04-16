@@ -6,18 +6,23 @@ import (
 	"github.com/Azure/azure-container-networking/ebtables"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/netlink"
+	"github.com/Azure/azure-container-networking/network/epcommon"
+)
+
+const (
+	multicastSolicitPrefix = "ff02::1:ff00:0/104"
 )
 
 type LinuxBridgeClient struct {
 	bridgeName        string
 	hostInterfaceName string
-	mode              string
+	nwInfo            NetworkInfo
 }
 
-func NewLinuxBridgeClient(bridgeName string, hostInterfaceName string, mode string) *LinuxBridgeClient {
+func NewLinuxBridgeClient(bridgeName string, hostInterfaceName string, nwInfo NetworkInfo) *LinuxBridgeClient {
 	client := &LinuxBridgeClient{
 		bridgeName:        bridgeName,
-		mode:              mode,
+		nwInfo:            nwInfo,
 		hostInterfaceName: hostInterfaceName,
 	}
 
@@ -80,8 +85,32 @@ func (client *LinuxBridgeClient) AddL2Rules(extIf *externalInterface) error {
 		return err
 	}
 
+	if client.nwInfo.IPV6Mode != "" {
+		// for ipv6 node cidr set broute accept
+		if err := ebtables.SetBrouteAcceptByCidr(&client.nwInfo.Subnets[1].Prefix, ebtables.IPV6, ebtables.Append, ebtables.Accept); err != nil {
+			return err
+		}
+
+		_, mIpNet, _ := net.ParseCIDR(multicastSolicitPrefix)
+		if err := ebtables.SetBrouteAcceptByCidr(mIpNet, ebtables.IPV6, ebtables.Append, ebtables.Accept); err != nil {
+			return err
+		}
+
+		if err := ebtables.DropICMPv6Solicitation(client.hostInterfaceName, ebtables.Append); err != nil {
+			return err
+		}
+
+		if err := client.setBrouteRedirect(ebtables.Append); err != nil {
+			return err
+		}
+
+		if err := epcommon.EnableIPV6Forwarding(); err != nil {
+			return err
+		}
+	}
+
 	// Enable VEPA for host policy enforcement if necessary.
-	if client.mode == opModeTunnel {
+	if client.nwInfo.Mode == opModeTunnel {
 		log.Printf("[net] Enabling VEPA mode for %v.", client.hostInterfaceName)
 		if err := ebtables.SetVepaMode(client.bridgeName, commonInterfacePrefix, virtualMacAddress, ebtables.Append); err != nil {
 			return err
@@ -96,6 +125,15 @@ func (client *LinuxBridgeClient) DeleteL2Rules(extIf *externalInterface) {
 	ebtables.SetDnatForArpReplies(extIf.Name, ebtables.Delete)
 	ebtables.SetArpReply(extIf.IPAddresses[0].IP, extIf.MacAddress, ebtables.Delete)
 	ebtables.SetSnatForInterface(extIf.Name, extIf.MacAddress, ebtables.Delete)
+	if client.nwInfo.IPV6Mode != "" {
+		if len(extIf.IPAddresses) > 1 {
+			ebtables.SetBrouteAcceptByCidr(extIf.IPAddresses[1], ebtables.IPV6, ebtables.Delete, ebtables.Accept)
+		}
+		_, mIpNet, _ := net.ParseCIDR(multicastSolicitPrefix)
+		ebtables.SetBrouteAcceptByCidr(mIpNet, ebtables.IPV6, ebtables.Delete, ebtables.Accept)
+		client.setBrouteRedirect(ebtables.Delete)
+		ebtables.DropICMPv6Solicitation(extIf.Name, ebtables.Delete)
+	}
 }
 
 func (client *LinuxBridgeClient) SetBridgeMasterToHostInterface() error {
@@ -104,4 +142,18 @@ func (client *LinuxBridgeClient) SetBridgeMasterToHostInterface() error {
 
 func (client *LinuxBridgeClient) SetHairpinOnHostInterface(enable bool) error {
 	return netlink.SetLinkHairpin(client.hostInterfaceName, enable)
+}
+
+func (client *LinuxBridgeClient) setBrouteRedirect(action string) error {
+	if client.nwInfo.ServiceCidrs != "" {
+		if err := ebtables.SetBrouteAcceptByCidr(nil, ebtables.IPV4, ebtables.Append, ebtables.RedirectAccept); err != nil {
+			return err
+		}
+
+		if err := ebtables.SetBrouteAcceptByCidr(nil, ebtables.IPV6, ebtables.Append, ebtables.RedirectAccept); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -75,6 +75,7 @@ ROOT_DIR = $(shell pwd)
 CNM_DIR = cnm/plugin
 CNI_NET_DIR = cni/network/plugin
 CNI_IPAM_DIR = cni/ipam/plugin
+CNI_IPAMV6_DIR = cni/ipam/pluginv6
 CNI_TELEMETRY_DIR = cni/telemetry/service
 TELEMETRY_CONF_DIR = telemetry
 CNS_DIR = cns/service
@@ -144,7 +145,8 @@ ENSURE_OUTPUT_DIR_EXISTS := $(shell mkdir -p $(OUTPUT_DIR))
 azure-cnm-plugin: $(CNM_BUILD_DIR)/azure-vnet-plugin$(EXE_EXT) cnm-archive
 azure-vnet: $(CNI_BUILD_DIR)/azure-vnet$(EXE_EXT)
 azure-vnet-ipam: $(CNI_BUILD_DIR)/azure-vnet-ipam$(EXE_EXT)
-azure-cni-plugin: azure-vnet azure-vnet-ipam azure-vnet-telemetry cni-archive
+azure-vnet-ipamv6: $(CNI_BUILD_DIR)/azure-vnet-ipamv6$(EXE_EXT)
+azure-cni-plugin: azure-vnet azure-vnet-ipam azure-vnet-ipamv6 azure-vnet-telemetry cni-archive
 azure-cns: $(CNS_BUILD_DIR)/azure-cns$(EXE_EXT) cns-archive
 azure-vnet-telemetry: $(CNI_BUILD_DIR)/azure-vnet-telemetry$(EXE_EXT)
 
@@ -183,6 +185,10 @@ $(CNI_BUILD_DIR)/azure-vnet$(EXE_EXT): $(CNIFILES)
 # Build the Azure CNI IPAM plugin.
 $(CNI_BUILD_DIR)/azure-vnet-ipam$(EXE_EXT): $(CNIFILES)
 	go build -v -o $(CNI_BUILD_DIR)/azure-vnet-ipam$(EXE_EXT) -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_IPAM_DIR)/*.go
+
+# Build the Azure CNI IPAMV6 plugin.
+$(CNI_BUILD_DIR)/azure-vnet-ipamv6$(EXE_EXT): $(CNIFILES)
+	go build -v -o $(CNI_BUILD_DIR)/azure-vnet-ipamv6$(EXE_EXT) -ldflags "-X main.version=$(VERSION) -s -w" $(CNI_IPAMV6_DIR)/*.go
 
 # Build the Azure CNI telemetry plugin.
 $(CNI_BUILD_DIR)/azure-vnet-telemetry$(EXE_EXT): $(CNIFILES)
@@ -314,8 +320,8 @@ publish-azure-cns-image:
 cni-archive:
 	cp cni/azure-$(GOOS).conflist $(CNI_BUILD_DIR)/10-azure.conflist
 	cp telemetry/azure-vnet-telemetry.config $(CNI_BUILD_DIR)/azure-vnet-telemetry.config
-	chmod 0755 $(CNI_BUILD_DIR)/azure-vnet$(EXE_EXT) $(CNI_BUILD_DIR)/azure-vnet-ipam$(EXE_EXT) $(CNI_BUILD_DIR)/azure-vnet-telemetry$(EXE_EXT)
-	cd $(CNI_BUILD_DIR) && $(ARCHIVE_CMD) $(CNI_ARCHIVE_NAME) azure-vnet$(EXE_EXT) azure-vnet-ipam$(EXE_EXT) azure-vnet-telemetry$(EXE_EXT) 10-azure.conflist azure-vnet-telemetry.config
+	chmod 0755 $(CNI_BUILD_DIR)/azure-vnet$(EXE_EXT) $(CNI_BUILD_DIR)/azure-vnet-ipam$(EXE_EXT) $(CNI_BUILD_DIR)/azure-vnet-ipamv6$(EXE_EXT) $(CNI_BUILD_DIR)/azure-vnet-telemetry$(EXE_EXT)
+	cd $(CNI_BUILD_DIR) && $(ARCHIVE_CMD) $(CNI_ARCHIVE_NAME) azure-vnet$(EXE_EXT) azure-vnet-ipam$(EXE_EXT) azure-vnet-ipamv6$(EXE_EXT) azure-vnet-telemetry$(EXE_EXT) 10-azure.conflist azure-vnet-telemetry.config
 	chown $(BUILD_USER):$(BUILD_USER) $(CNI_BUILD_DIR)/$(CNI_ARCHIVE_NAME)
 	mkdir -p $(CNI_MULTITENANCY_BUILD_DIR)
 	cp cni/azure-$(GOOS)-multitenancy.conflist $(CNI_MULTITENANCY_BUILD_DIR)/10-azure.conflist
@@ -371,5 +377,6 @@ test-all:
         ./cnm/network/ \
         ./cni/ipam/ \
         ./cns/ipamclient/ \
+        ./cnms/service/ \
         ./npm/iptm/ \
         ./npm/ipsm/

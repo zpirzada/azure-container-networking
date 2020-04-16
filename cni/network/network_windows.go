@@ -33,7 +33,7 @@ var (
  * We can delete this if statement once they fix it.
  * Issue link: https://github.com/kubernetes/kubernetes/issues/57253
  */
-func handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId string, nwInfo *network.NetworkInfo, nwCfg *cni.NetworkConfig) (*cniTypesCurr.Result, error) {
+func handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId string, nwInfo network.NetworkInfo, nwCfg *cni.NetworkConfig) (*cniTypesCurr.Result, error) {
 	// Return in case of HNSv2 as consecutive add call doesn't need to be handled
 	if useHnsV2, err := network.UseHnsV2(args.Netns); useHnsV2 {
 		return nil, err

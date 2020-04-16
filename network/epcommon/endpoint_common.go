@@ -28,7 +28,9 @@ RFC for Link Local Addresses: https://tools.ietf.org/html/rfc3927
 */
 
 const (
-	enableIPForwardCmd = "sysctl -w net.ipv4.ip_forward=1"
+	enableIPForwardCmd   = "sysctl -w net.ipv4.ip_forward=1"
+	toggleIPV6Cmd        = "sysctl -w net.ipv6.conf.all.disable_ipv6=%d"
+	enableIPV6ForwardCmd = "sysctl -w net.ipv6.conf.all.forwarding=1"
 )
 
 func getPrivateIPSpace() []string {
@@ -115,11 +117,11 @@ func addOrDeleteFilterRule(bridgeName string, action string, ipAddress string, c
 
 	switch action {
 	case iptables.Insert:
-		err = iptables.InsertIptableRule(iptables.Filter, chainName, matchCondition, target)
+		err = iptables.InsertIptableRule(iptables.V4, iptables.Filter, chainName, matchCondition, target)
 	case iptables.Append:
-		err = iptables.AppendIptableRule(iptables.Filter, chainName, matchCondition, target)
+		err = iptables.AppendIptableRule(iptables.V4, iptables.Filter, chainName, matchCondition, target)
 	case iptables.Delete:
-		err = iptables.DeleteIptableRule(iptables.Filter, chainName, matchCondition, target)
+		err = iptables.DeleteIptableRule(iptables.V4, iptables.Filter, chainName, matchCondition, target)
 	}
 
 	return err
@@ -173,9 +175,7 @@ func BlockIPAddresses(bridgeName string, action string) error {
 	return nil
 }
 
-/**
- This fucntion enables ip forwarding in VM and allow forwarding packets from the interface
-**/
+// This fucntion enables ip forwarding in VM and allow forwarding packets from the interface
 func EnableIPForwarding(ifName string) error {
 	// Enable ip forwading on linux vm.
 	// sysctl -w net.ipv4.ip_forward=1
@@ -187,10 +187,44 @@ func EnableIPForwarding(ifName string) error {
 	}
 
 	// Append a rule in forward chain to allow forwarding from bridge
-	if err := iptables.AppendIptableRule(iptables.Filter, iptables.Forward, "", iptables.Accept); err != nil {
+	if err := iptables.AppendIptableRule(iptables.V4, iptables.Filter, iptables.Forward, "", iptables.Accept); err != nil {
 		log.Printf("[net] Appending forward chain rule: allow traffic coming from snatbridge failed with: %v", err)
 		return err
 	}
 
 	return nil
+}
+
+func EnableIPV6Forwarding() error {
+	cmd := fmt.Sprintf(enableIPV6ForwardCmd)
+	_, err := platform.ExecuteCommand(cmd)
+	if err != nil {
+		log.Printf("[net] Enable ipv6 forwarding failed with: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// This functions enables/disables ipv6 setting based on enable parameter passed.
+func UpdateIPV6Setting(disable int) error {
+	// sysctl -w net.ipv6.conf.all.disable_ipv6=0/1
+	cmd := fmt.Sprintf(toggleIPV6Cmd, disable)
+	_, err := platform.ExecuteCommand(cmd)
+	if err != nil {
+		log.Printf("[net] Update IPV6 Setting failed with: %v", err)
+	}
+
+	return err
+}
+
+// This fucntion adds rule which snat to ip passed filtered by match string.
+func AddSnatRule(match string, ip net.IP) error {
+	version := iptables.V4
+	if ip.To4() == nil {
+		version = iptables.V6
+	}
+
+	target := fmt.Sprintf("SNAT --to %s", ip.String())
+	return iptables.InsertIptableRule(version, iptables.Nat, iptables.Postrouting, match, target)
 }
