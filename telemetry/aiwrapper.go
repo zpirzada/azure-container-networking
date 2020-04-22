@@ -47,8 +47,10 @@ func SendAITelemetry(cnireport CNIReport) {
 	var msg string
 	if cnireport.ErrorMessage != "" {
 		msg = cnireport.ErrorMessage
-	} else {
+	} else if cnireport.EventMessage != "" {
 		msg = cnireport.EventMessage
+	} else {
+		return
 	}
 
 	report := aitelemetry.Report{
