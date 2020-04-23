@@ -259,10 +259,11 @@ func main() {
 	reflect.ValueOf(reportManager.Report).Elem().FieldByName("CniSucceeded").SetBool(true)
 	reflect.ValueOf(reportManager.Report).Elem().FieldByName("OperationDuration").SetInt(executionTimeMs)
 
-	if err = reportManager.SendReport(tb); err != nil {
-		log.Errorf("SendReport failed due to %v", err)
-	} else {
-		log.Printf("Sending report succeeded")
+	if cniReport.ErrorMessage != "" || cniReport.EventMessage != "" {
+		if err = reportManager.SendReport(tb); err != nil {
+			log.Errorf("SendReport failed due to %v", err)
+		} else {
+			log.Printf("Sending report succeeded")
+		}
 	}
-
 }
