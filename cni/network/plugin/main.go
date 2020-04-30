@@ -242,13 +242,16 @@ func main() {
 	}
 
 	executionTimeMs := time.Since(startTime).Milliseconds()
-	cnimetric.Metric = aitelemetry.Metric{
-		Name:             telemetry.CNIExecutimeMetricStr,
-		Value:            float64(executionTimeMs),
-		CustomDimensions: make(map[string]string),
+
+	if cniReport.ErrorMessage != "" || cniReport.EventMessage != "" {
+		cnimetric.Metric = aitelemetry.Metric{
+			Name:             telemetry.CNIExecutimeMetricStr,
+			Value:            float64(executionTimeMs),
+			CustomDimensions: make(map[string]string),
+		}
+		network.SetCustomDimensions(&cnimetric, nil, err)
+		telemetry.SendCNIMetric(&cnimetric, tb)
 	}
-	network.SetCustomDimensions(&cnimetric, nil, err)
-	telemetry.SendCNIMetric(&cnimetric, tb)
 
 	if err != nil {
 		reportPluginError(reportManager, tb, err)
@@ -259,10 +262,11 @@ func main() {
 	reflect.ValueOf(reportManager.Report).Elem().FieldByName("CniSucceeded").SetBool(true)
 	reflect.ValueOf(reportManager.Report).Elem().FieldByName("OperationDuration").SetInt(executionTimeMs)
 
-	if err = reportManager.SendReport(tb); err != nil {
-		log.Errorf("SendReport failed due to %v", err)
-	} else {
-		log.Printf("Sending report succeeded")
+	if cniReport.ErrorMessage != "" || cniReport.EventMessage != "" {
+		if err = reportManager.SendReport(tb); err != nil {
+			log.Errorf("SendReport failed due to %v", err)
+		} else {
+			log.Printf("Sending report succeeded")
+		}
 	}
-
 }
