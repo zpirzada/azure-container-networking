@@ -49,7 +49,7 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 	}
 
 	if !npMgr.isAzureNpmChainCreated {
-		if err = allNs.ipsMgr.CreateSet(util.KubeSystemFlag); err != nil {
+		if err = allNs.ipsMgr.CreateSet(util.KubeSystemFlag, util.IpsetNetHashFlag); err != nil {
 			log.Errorf("Error: failed to initialize kube-system ipset.")
 			return err
 		}
@@ -63,10 +63,11 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 	}
 
 	var (
-		hashedSelector = HashSelector(&npObj.Spec.PodSelector)
-		addedPolicy    *networkingv1.NetworkPolicy
-		sets, lists    []string
-		iptEntries     []*iptm.IptEntry
+		hashedSelector          = HashSelector(&npObj.Spec.PodSelector)
+		addedPolicy             *networkingv1.NetworkPolicy
+		sets, namedPorts, lists []string
+		iptEntries              []*iptm.IptEntry
+		ipsMgr                  = allNs.ipsMgr
 	)
 
 	// Remove the existing policy from processed (merged) network policy map
@@ -92,30 +93,31 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 
 	ns.rawNpMap[npObj.ObjectMeta.Name] = npObj
 
-	sets, lists, iptEntries = translatePolicy(npObj)
-	ipsMgr := allNs.ipsMgr
+	sets, namedPorts, lists, iptEntries = translatePolicy(npObj)
 	for _, set := range sets {
 		log.Printf("Creating set: %v, hashedSet: %v", set, util.GetHashedName(set))
-		if err = ipsMgr.CreateSet(set); err != nil {
+		if err = ipsMgr.CreateSet(set, util.IpsetNetHashFlag); err != nil {
 			log.Printf("Error creating ipset %s", set)
-			return err
+		}
+	}
+	for _, set := range namedPorts {
+		log.Printf("Creating set: %v, hashedSet: %v", set, util.GetHashedName(set))
+		if err = ipsMgr.CreateSet(set, util.IpsetIPPortHashFlag); err != nil {
+			log.Printf("Error creating ipset named port %s", set)
 		}
 	}
 	for _, list := range lists {
 		if err = ipsMgr.CreateList(list); err != nil {
 			log.Printf("Error creating ipset list %s", list)
-			return err
 		}
 	}
 	if err = npMgr.InitAllNsList(); err != nil {
 		log.Printf("Error initializing all-namespace ipset list.")
-		return err
 	}
 	iptMgr := allNs.iptMgr
 	for _, iptEntry := range iptEntries {
 		if err = iptMgr.Add(iptEntry); err != nil {
 			log.Errorf("Error: failed to apply iptables rule. Rule: %+v", iptEntry)
-			return err
 		}
 	}
 
@@ -135,8 +137,10 @@ func (npMgr *NetworkPolicyManager) UpdateNetworkPolicy(oldNpObj *networkingv1.Ne
 // DeleteNetworkPolicy handles deleting network policy from iptables.
 func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.NetworkPolicy) error {
 	var (
-		err error
-		ns  *namespace
+		err    error
+		ns     *namespace
+		allNs  = npMgr.nsMap[util.KubeAllNamespacesFlag]
+		ipsMgr = allNs.ipsMgr
 	)
 
 	npNs, npName := "ns-"+npObj.ObjectMeta.Namespace, npObj.ObjectMeta.Name
@@ -151,19 +155,26 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 		npMgr.nsMap[npNs] = ns
 	}
 
-	allNs := npMgr.nsMap[util.KubeAllNamespacesFlag]
-
-	_, _, iptEntries := translatePolicy(npObj)
+	sets, namedPorts, lists, iptEntries := translatePolicy(npObj)
 
 	iptMgr := allNs.iptMgr
 	for _, iptEntry := range iptEntries {
 		if err = iptMgr.Delete(iptEntry); err != nil {
 			log.Errorf("Error: failed to apply iptables rule. Rule: %+v", iptEntry)
-			return err
 		}
 	}
 
 	delete(ns.rawNpMap, npObj.ObjectMeta.Name)
+
+	for _, set := range sets {
+		ipsMgr.DeleteSet(set)
+	}
+	for _, set := range namedPorts {
+		ipsMgr.DeleteSet(set)
+	}
+	for _, list := range lists {
+		ipsMgr.DeleteList(list)
+	}
 
 	hashedSelector := HashSelector(&npObj.Spec.PodSelector)
 	if oldPolicy, oldPolicyExists := ns.processedNpMap[hashedSelector]; oldPolicyExists {
