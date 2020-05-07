@@ -33,7 +33,7 @@ var (
  * We can delete this if statement once they fix it.
  * Issue link: https://github.com/kubernetes/kubernetes/issues/57253
  */
-func handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId string, nwInfo network.NetworkInfo, nwCfg *cni.NetworkConfig) (*cniTypesCurr.Result, error) {
+func handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId string, nwInfo network.NetworkInfo, epInfo *network.EndpointInfo, nwCfg *cni.NetworkConfig) (*cniTypesCurr.Result, error) {
 	// Return in case of HNSv2 as consecutive add call doesn't need to be handled
 	if useHnsV2, err := network.UseHnsV2(args.Netns); useHnsV2 {
 		return nil, err
@@ -73,9 +73,21 @@ func handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId string, nwInfo netwo
 			},
 		}
 
+		if nwCfg.IPV6Mode != "" && len(epInfo.IPAddresses) > 1 {
+			ipv6Config := &cniTypesCurr.IPConfig{
+				Version: "6",
+				Address: epInfo.IPAddresses[1],
+			}
+
+			if len(nwInfo.Subnets) > 1 {
+				ipv6Config.Gateway = nwInfo.Subnets[1].Gateway
+			}
+
+			result.IPs = append(result.IPs, ipv6Config)
+		}
+
 		// Populate DNS servers.
 		result.DNS.Nameservers = nwCfg.DNS.Nameservers
-
 		return result, nil
 	}
 
@@ -245,6 +257,31 @@ func getPoliciesFromRuntimeCfg(nwCfg *cni.NetworkConfig) []policy.Policy {
 	}
 
 	return policies
+}
+
+func addIPV6EndpointPolicy(nwInfo network.NetworkInfo) (policy.Policy, error) {
+	var (
+		eppolicy policy.Policy
+	)
+
+	if len(nwInfo.Subnets) < 2 {
+		return eppolicy, fmt.Errorf("network state doesn't have ipv6 subnet")
+	}
+
+    // Everything should be snat'd except podcidr
+	exceptionList := []string{nwInfo.Subnets[1].Prefix.String()}
+	rawPolicy, _ := json.Marshal(&hcsshim.OutboundNatPolicy{
+		Policy:     hcsshim.Policy{Type: hcsshim.OutboundNat},
+		Exceptions: exceptionList,
+	})
+
+	eppolicy = policy.Policy{
+		Type: policy.EndpointPolicy,
+		Data: rawPolicy,
+	}
+
+	log.Printf("[net] ipv6 outboundnat policy: %+v", eppolicy)
+	return eppolicy, nil
 }
 
 func getCustomDNS(nwCfg *cni.NetworkConfig) network.DNSInfo {

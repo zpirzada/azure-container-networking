@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/cnsclient"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network/policy"
+	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 )
@@ -25,6 +26,12 @@ const (
 
 	// hcnIpamTypeStatic indicates the static type of ipam
 	hcnIpamTypeStatic = "Static"
+
+	// Default gateway Mac
+	defaultGwMac = "12-34-56-78-9a-bc"
+
+	// Container interface name prefix
+	containerIfNamePrefix = "vEthernet"
 )
 
 // HotAttachEndpoint is a wrapper of hcsshim's HotAttachEndpoint.
@@ -90,11 +97,21 @@ func (nw *network) newEndpointImplHnsV1(epInfo *EndpointInfo) (*endpoint, error)
 		Policies:       policy.SerializePolicies(policy.EndpointPolicy, epInfo.Policies, epInfo.Data, epInfo.EnableSnatForDns, epInfo.EnableMultiTenancy),
 	}
 
-	// HNS currently supports only one IP address per endpoint.
-	if epInfo.IPAddresses != nil {
-		hnsEndpoint.IPAddress = epInfo.IPAddresses[0].IP
-		pl, _ := epInfo.IPAddresses[0].Mask.Size()
-		hnsEndpoint.PrefixLength = uint8(pl)
+	// HNS currently supports one IP address and one IPv6 address per endpoint.
+
+	for _, ipAddr := range epInfo.IPAddresses {
+		if ipAddr.IP.To4() != nil {
+			hnsEndpoint.IPAddress = ipAddr.IP
+			pl, _ := ipAddr.Mask.Size()
+			hnsEndpoint.PrefixLength = uint8(pl)
+		} else {
+			hnsEndpoint.IPv6Address = ipAddr.IP
+			pl, _ := ipAddr.Mask.Size()
+			hnsEndpoint.IPv6PrefixLength = uint8(pl)
+			if len(nw.Subnets) > 1 {
+				hnsEndpoint.GatewayAddressV6 = nw.Subnets[1].Gateway.String()
+			}
+		}
 	}
 
 	// Marshal the request.
@@ -133,6 +150,11 @@ func (nw *network) newEndpointImplHnsV1(epInfo *EndpointInfo) (*endpoint, error)
 		}
 	}
 
+	// add ipv6 neighbor entry for gateway IP to default mac in container
+	if err := nw.addIPv6NeighborEntryForGateway(epInfo); err != nil {
+		return nil, err
+	}
+
 	// Create the endpoint object.
 	ep := &endpoint{
 		Id:               infraEpName,
@@ -154,6 +176,29 @@ func (nw *network) newEndpointImplHnsV1(epInfo *EndpointInfo) (*endpoint, error)
 	ep.MacAddress, _ = net.ParseMAC(hnsResponse.MacAddress)
 
 	return ep, nil
+}
+
+func (nw *network) addIPv6NeighborEntryForGateway(epInfo *EndpointInfo) error {
+	var (
+		err error
+		out string
+	)
+
+	if epInfo.IPV6Mode == IPV6Nat {
+		if len(nw.Subnets) < 2 {
+			return fmt.Errorf("Ipv6 subnet not found in network state")
+		}
+
+		// run powershell cmd to set neighbor entry for gw ip to 12-34-56-78-9a-bc
+		cmd := fmt.Sprintf("New-NetNeighbor -IPAddress %s -InterfaceAlias \"%s (%s)\" -LinkLayerAddress \"%s\"",
+			nw.Subnets[1].Gateway.String(), containerIfNamePrefix, epInfo.Id, defaultGwMac)
+		if out, err = platform.ExecutePowershellCommand(cmd); err != nil {
+			log.Errorf("[net] Adding ipv6 gw neigh entry failed %v:%v", out, err)
+			return err
+		}
+	}
+
+	return err
 }
 
 // configureHcnEndpoint configures hcn endpoint for creation

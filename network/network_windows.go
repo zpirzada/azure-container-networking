@@ -12,6 +12,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network/policy"
+	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	"github.com/google/uuid"
@@ -26,6 +27,12 @@ const (
 	baseDecimal            = 10
 	bitSize                = 32
 	defaultRouteCIDR       = "0.0.0.0/0"
+	// prefix for interface name created by azure network
+	ifNamePrefix = "vEthernet"
+	// ipv6 default hop
+	ipv6DefaultHop = "::"
+	// ipv6 route cmd
+	routeCmd = "netsh interface ipv6 %s route \"%s\" \"%s\" \"%s\" store=persistent"
 )
 
 // Windows implementation of route.
@@ -50,7 +57,11 @@ func UseHnsV2(netNs string) (bool, error) {
 
 // newNetworkImplHnsV1 creates a new container network for HNSv1.
 func (nm *networkManager) newNetworkImplHnsV1(nwInfo *NetworkInfo, extIf *externalInterface) (*network, error) {
-	var vlanid int
+	var (
+		vlanid int
+		err    error
+	)
+
 	networkAdapterName := extIf.Name
 	// FixMe: Find a better way to check if a nic that is selected is not part of a vSwitch
 	if strings.HasPrefix(networkAdapterName, vEthernetAdapterPrefix) {
@@ -114,6 +125,19 @@ func (nm *networkManager) newNetworkImplHnsV1(nwInfo *NetworkInfo, extIf *extern
 		return nil, err
 	}
 
+	defer func() {
+		if err != nil {
+			log.Printf("[net] HNSNetworkRequest DELETE id:%v", hnsResponse.Id)
+			hnsResponse, err := hcsshim.HNSNetworkRequest("DELETE", hnsResponse.Id, "")
+			log.Printf("[net] HNSNetworkRequest DELETE response:%+v err:%v.", hnsResponse, err)
+		}
+	}()
+
+	// route entry for pod cidr
+	if err = appIPV6RouteEntry(nwInfo); err != nil {
+		return nil, err
+	}
+
 	// Create the network object.
 	nw := &network{
 		Id:               nwInfo.Id,
@@ -135,6 +159,39 @@ func (nm *networkManager) newNetworkImplHnsV1(nwInfo *NetworkInfo, extIf *extern
 	}
 
 	return nw, nil
+}
+
+func appIPV6RouteEntry(nwInfo *NetworkInfo) error {
+	var (
+		err error
+		out string
+	)
+
+	if nwInfo.IPV6Mode == IPV6Nat {
+		if len(nwInfo.Subnets) < 2 {
+			return fmt.Errorf("Ipv6 subnet not found in network state")
+		}
+
+		// get interface name of VM adapter
+		ifName := nwInfo.MasterIfName
+		if !strings.Contains(nwInfo.MasterIfName, ifNamePrefix) {
+			ifName = fmt.Sprintf("%s (%s)", ifNamePrefix, nwInfo.MasterIfName)
+		}
+
+		cmd := fmt.Sprintf(routeCmd, "delete", nwInfo.Subnets[1].Prefix.String(),
+			ifName, ipv6DefaultHop)
+		if out, err = platform.ExecuteCommand(cmd); err != nil {
+			log.Printf("[net] Deleting ipv6 route failed: %v:%v", out, err)
+		}
+
+		cmd = fmt.Sprintf(routeCmd, "add", nwInfo.Subnets[1].Prefix.String(),
+			ifName, ipv6DefaultHop)
+		if out, err = platform.ExecuteCommand(cmd); err != nil {
+			log.Printf("[net] Adding ipv6 route failed: %v:%v", out, err)
+		}
+	}
+
+	return err
 }
 
 // configureHcnEndpoint configures hcn endpoint for creation

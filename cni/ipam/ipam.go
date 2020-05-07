@@ -213,11 +213,16 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 		return err
 	}
 
+	version := "4"
+	if ipAddress.IP.To4() == nil {
+		version = "6"
+	}
+
 	// Populate result.
 	result = &cniTypesCurr.Result{
 		IPs: []*cniTypesCurr.IPConfig{
 			{
-				Version: "4",
+				Version: version,
 				Address: *ipAddress,
 				Gateway: apInfo.Gateway,
 			},

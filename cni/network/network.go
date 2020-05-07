@@ -21,6 +21,7 @@ import (
 	"github.com/Azure/azure-container-networking/iptables"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network"
+	"github.com/Azure/azure-container-networking/network/policy"
 	"github.com/Azure/azure-container-networking/platform"
 	"github.com/Azure/azure-container-networking/telemetry"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
@@ -471,7 +472,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		 */
 		epInfo, _ := plugin.nm.GetEndpointInfo(networkId, endpointId)
 		if epInfo != nil {
-			resultConsAdd, errConsAdd := handleConsecutiveAdd(args, endpointId, nwInfo, nwCfg)
+			resultConsAdd, errConsAdd := handleConsecutiveAdd(args, endpointId, nwInfo, epInfo, nwCfg)
 			if errConsAdd != nil {
 				log.Printf("handleConsecutiveAdd failed with error %v", errConsAdd)
 				result = resultConsAdd
@@ -537,7 +538,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		}
 
 		// Create the network.
-		nwInfo := network.NetworkInfo{
+		nwInfo = network.NetworkInfo{
 			Id:           networkId,
 			Mode:         nwCfg.Mode,
 			MasterIfName: masterIfName,
@@ -593,6 +594,18 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	if err != nil {
 		err = plugin.Errorf("Failed to getEndpointDNSSettings: %v", err)
 		return err
+	}
+
+	if nwCfg.IPV6Mode == network.IPV6Nat {
+		var ipv6Policy policy.Policy
+
+		ipv6Policy, err = addIPV6EndpointPolicy(nwInfo)
+		if err != nil {
+			err = plugin.Errorf("Failed to set ipv6 endpoint policy: %v", err)
+			return err
+		}
+
+		policies = append(policies, ipv6Policy)
 	}
 
 	epInfo = &network.EndpointInfo{

@@ -25,7 +25,7 @@ const (
 )
 
 // handleConsecutiveAdd is a dummy function for Linux platform.
-func handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId string, nwInfo network.NetworkInfo, nwCfg *cni.NetworkConfig) (*cniTypesCurr.Result, error) {
+func handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId string, nwInfo network.NetworkInfo, epInfo *network.EndpointInfo, nwCfg *cni.NetworkConfig) (*cniTypesCurr.Result, error) {
 	return nil, nil
 }
 
@@ -123,6 +123,10 @@ func getEndpointDNSSettings(nwCfg *cni.NetworkConfig, result *cniTypesCurr.Resul
 // getPoliciesFromRuntimeCfg is a dummy function for Linux platform.
 func getPoliciesFromRuntimeCfg(nwCfg *cni.NetworkConfig) []policy.Policy {
 	return nil
+}
+
+func addIPV6EndpointPolicy(nwInfo network.NetworkInfo) (policy.Policy, error) {
+	return policy.Policy{}, nil
 }
 
 func updateSubnetPrefix(cnsNetworkConfig *cns.GetNetworkContainerResponse, subnetPrefix *net.IPNet) error {
