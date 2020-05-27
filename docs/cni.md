@@ -111,7 +111,7 @@ $ kubectl get nodes -o name | cut -d / -f 2 | xargs -I{}  -n1 ssh -tt {} -t 'wge
 $ kubectl get nodes -o name | cut -d / -f 2 |  xargs -I{} -n1 kubectl uncordon  {}
 ```
 
-## Things to Consider Using CNI in Non-AKS Environment
+## Using CNI in Non-AKS Environment (Linux)
 ### Outbound Connectivity from pods
 If you have deployed kubernetes cluster via other sources(not using aks/aks-engine), you have to add following iptable command to allow outbound(internet) connectivity from pod
 ```bash
