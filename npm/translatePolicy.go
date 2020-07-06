@@ -787,7 +787,7 @@ func translateIngress(ns string, policyName string, targetSelector metav1.LabelS
 		entries = append(entries, entry)
 	}
 
-	log.Printf("finished parsing ingress rule")
+	log.Logf("finished parsing ingress rule")
 	return util.DropEmptyFields(sets), util.DropEmptyFields(namedPorts), util.DropEmptyFields(lists), ipCidrs, entries
 }
 
@@ -802,7 +802,7 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 		addedEgressToEntry, addedPortEntry bool // add drop entry when there are non ALLOW-ALL* rules
 	)
 
-	log.Printf("started parsing egress rule")
+	log.Logf("started parsing egress rule")
 
 	labelsWithOps, _, _ := parseSelector(&targetSelector)
 	ops, labels := GetOperatorsAndLabels(labelsWithOps)
@@ -1430,7 +1430,7 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 		entries = append(entries, entry)
 	}
 
-	log.Printf("finished parsing egress rule")
+	log.Logf("finished parsing egress rule")
 	return util.DropEmptyFields(sets), util.DropEmptyFields(namedPorts), util.DropEmptyFields(lists), ipCidrs, entries
 }
 
@@ -1500,15 +1500,13 @@ func translatePolicy(npObj *networkingv1.NetworkPolicy) ([]string, []string, []s
 		hasIngress, hasEgress bool
 	)
 
-	log.Printf("Translating network policy:\n %+v", npObj)
-
 	defer func() {
-		log.Printf("Finished translatePolicy")
-		log.Printf("sets: %v", resultSets)
-		log.Printf("lists: %v", resultLists)
-		log.Printf("entries: ")
+		log.Logf("Finished translatePolicy")
+		log.Logf("sets: %v", resultSets)
+		log.Logf("lists: %v", resultLists)
+		log.Logf("entries: ")
 		for _, entry := range entries {
-			log.Printf("entry: %+v", entry)
+			log.Logf("entry: %+v", entry)
 		}
 	}()
 
@@ -1574,7 +1572,6 @@ func translatePolicy(npObj *networkingv1.NetworkPolicy) ([]string, []string, []s
 	}
 
 	entries = append(entries, getDefaultDropEntries(npNs, npObj.Spec.PodSelector, hasIngress, hasEgress)...)
-	log.Printf("Translating Policy: %+v", npObj)
 	resultSets, resultLists = util.UniqueStrSlice(resultSets), util.UniqueStrSlice(resultLists)
 
 	return resultSets, resultNamedPorts, resultLists, resultIngressIPCidrs, resultEgressIPCidrs, entries
