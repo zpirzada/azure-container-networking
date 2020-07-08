@@ -211,8 +211,19 @@ func createCidrsRule(ingressOrEgress, policyName, ns string, ipsetEntries [][]st
 			log.Printf("Error creating ipset %s", ipCidrSet)
 		}
 		for _, ipCidrEntry := range util.DropEmptyFields(ipCidrSet) {
-			if err := ipsMgr.AddToSet(setName, ipCidrEntry, util.IpsetNetHashFlag); err != nil {
-				log.Printf("Error adding ip cidrs %s into ipset %s", ipCidrEntry, ipCidrSet)
+			// Ipset doesn't allow 0.0.0.0/0 to be added. A general solution is split 0.0.0.0/1 in half which convert to 
+			// 1.0.0.0/1 and 128.0.0.0/1
+			if (ipCidrEntry == "0.0.0.0/0") {
+				splitEntry := [2]string{"1.0.0.0/1", "128.0.0.0/1"}
+				for _, entry := range splitEntry {
+					if err := ipsMgr.AddToSet(setName, entry, util.IpsetNetHashFlag); err != nil {
+						log.Printf("Error adding ip cidrs %s into ipset %s", entry, ipCidrSet)
+					}
+				}
+			} else {
+				if err := ipsMgr.AddToSet(setName, ipCidrEntry, util.IpsetNetHashFlag); err != nil {
+					log.Printf("Error adding ip cidrs %s into ipset %s", ipCidrEntry, ipCidrSet)
+				}
 			}
 		}
 	}
