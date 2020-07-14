@@ -48,15 +48,22 @@ const (
 // HTTPRestService represents http listener for CNS - Container Networking Service.
 type HTTPRestService struct {
 	*cns.Service
-	dockerClient     *dockerclient.DockerClient
-	imdsClient       *imdsclient.ImdsClient
-	ipamClient       *ipamclient.IpamClient
-	networkContainer *networkcontainers.NetworkContainers
-	routingTable     *routes.RoutingTable
-	store            store.KeyValueStore
-	state            *httpRestServiceState
-	lock             sync.Mutex
-	dncPartitionKey  string
+	dockerClient                 *dockerclient.DockerClient
+	imdsClient                   *imdsclient.ImdsClient
+	ipamClient                   *ipamclient.IpamClient
+	networkContainer             *networkcontainers.NetworkContainers
+	PodIPIDByOrchestratorContext map[string]string                      // OrchestratorContext is key and value is Pod IP uuid.
+	PodIPConfigState             map[string]*cns.ContainerIPConfigState // seondaryipid(uuid) is key
+	AllocatedIPCount             map[string]allocatedIPCount            // key - ncid
+	routingTable                 *routes.RoutingTable
+	store                        store.KeyValueStore
+	state                        *httpRestServiceState
+	sync.RWMutex
+	dncPartitionKey string
+}
+
+type allocatedIPCount struct {
+	Count int
 }
 
 // containerstatus is used to save status of an existing container
@@ -118,15 +125,22 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 	serviceState.Networks = make(map[string]*networkInfo)
 	serviceState.joinedNetworks = make(map[string]struct{})
 
+	podIPIDByOrchestratorContext := make(map[string]string)
+	podIPConfigState := make(map[string]*cns.ContainerIPConfigState)
+	allocatedIPCount := make(map[string]allocatedIPCount) // key - ncid
+
 	return &HTTPRestService{
-		Service:          service,
-		store:            service.Service.Store,
-		dockerClient:     dc,
-		imdsClient:       imdsClient,
-		ipamClient:       ic,
-		networkContainer: nc,
-		routingTable:     routingTable,
-		state:            serviceState,
+		Service:                      service,
+		store:                        service.Service.Store,
+		dockerClient:                 dc,
+		imdsClient:                   imdsClient,
+		ipamClient:                   ic,
+		networkContainer:             nc,
+		PodIPIDByOrchestratorContext: podIPIDByOrchestratorContext,
+		PodIPConfigState:             podIPConfigState,
+		AllocatedIPCount:             allocatedIPCount,
+		routingTable:                 routingTable,
+		state:                        serviceState,
 	}, nil
 }
 
@@ -177,6 +191,8 @@ func (service *HTTPRestService) Start(config *common.ServiceConfig) error {
 	listener.AddHandler(cns.DeleteHostNCApipaEndpointPath, service.deleteHostNCApipaEndpoint)
 	listener.AddHandler(cns.PublishNetworkContainer, service.publishNetworkContainer)
 	listener.AddHandler(cns.UnpublishNetworkContainer, service.unpublishNetworkContainer)
+	listener.AddHandler(cns.RequestIPConfig, service.requestIPConfigHandler)
+	listener.AddHandler(cns.ReleaseIPConfig, service.releaseIPConfigHandler)
 
 	// handlers for v0.2
 	listener.AddHandler(cns.V2Prefix+cns.SetEnvironmentPath, service.setEnvironment)
@@ -220,16 +236,16 @@ func (service *HTTPRestService) Stop() {
 
 // GetPartitionKey - Get dnc/service partition key
 func (service *HTTPRestService) GetPartitionKey() (dncPartitionKey string) {
-	service.lock.Lock()
+	service.RLock()
 	dncPartitionKey = service.dncPartitionKey
-	service.lock.Unlock()
+	service.RUnlock()
 	return
 }
 
 // Get the network info from the service network state
 func (service *HTTPRestService) getNetworkInfo(networkName string) (*networkInfo, bool) {
-	service.lock.Lock()
-	defer service.lock.Unlock()
+	service.RLock()
+	defer service.RUnlock()
 	networkInfo, found := service.state.Networks[networkName]
 
 	return networkInfo, found
@@ -237,8 +253,8 @@ func (service *HTTPRestService) getNetworkInfo(networkName string) (*networkInfo
 
 // Set the network info in the service network state
 func (service *HTTPRestService) setNetworkInfo(networkName string, networkInfo *networkInfo) {
-	service.lock.Lock()
-	defer service.lock.Unlock()
+	service.Lock()
+	defer service.Unlock()
 	service.state.Networks[networkName] = networkInfo
 
 	return
@@ -246,8 +262,8 @@ func (service *HTTPRestService) setNetworkInfo(networkName string, networkInfo *
 
 // Remove the network info from the service network state
 func (service *HTTPRestService) removeNetworkInfo(networkName string) {
-	service.lock.Lock()
-	defer service.lock.Unlock()
+	service.Lock()
+	defer service.Unlock()
 	delete(service.state.Networks, networkName)
 
 	return
@@ -996,7 +1012,7 @@ func (service *HTTPRestService) setOrchestratorType(w http.ResponseWriter, r *ht
 		return
 	}
 
-	service.lock.Lock()
+	service.Lock()
 
 	service.dncPartitionKey = req.DncPartitionKey
 	nodeID = service.state.NodeID
@@ -1027,7 +1043,7 @@ func (service *HTTPRestService) setOrchestratorType(w http.ResponseWriter, r *ht
 		returnCode = InvalidRequest
 	}
 
-	service.lock.Unlock()
+	service.Unlock()
 
 	resp := cns.Response{
 		ReturnCode: returnCode,
@@ -1040,8 +1056,8 @@ func (service *HTTPRestService) setOrchestratorType(w http.ResponseWriter, r *ht
 
 func (service *HTTPRestService) saveNetworkContainerGoalState(req cns.CreateNetworkContainerRequest) (int, string) {
 	// we don't want to overwrite what other calls may have written
-	service.lock.Lock()
-	defer service.lock.Unlock()
+	service.Lock()
+	defer service.Unlock()
 
 	existing, ok := service.state.ContainerStatus[req.NetworkContainerid]
 	var hostVersion string
@@ -1214,8 +1230,8 @@ func (service *HTTPRestService) getNetworkContainerResponse(req cns.GetNetworkCo
 	var containerID string
 	var getNetworkContainerResponse cns.GetNetworkContainerResponse
 
-	service.lock.Lock()
-	defer service.lock.Unlock()
+	service.RLock()
+	defer service.RUnlock()
 
 	switch service.state.OrchestratorType {
 	case cns.Kubernetes:
@@ -1334,8 +1350,8 @@ func (service *HTTPRestService) deleteNetworkContainer(w http.ResponseWriter, r 
 			}
 		}
 
-		service.lock.Lock()
-		defer service.lock.Unlock()
+		service.Lock()
+		defer service.Unlock()
 
 		if service.state.ContainerStatus != nil {
 			delete(service.state.ContainerStatus, req.NetworkContainerid)
@@ -1380,8 +1396,8 @@ func (service *HTTPRestService) getNetworkContainerStatus(w http.ResponseWriter,
 		return
 	}
 
-	service.lock.Lock()
-	defer service.lock.Unlock()
+	service.RLock()
+	defer service.RUnlock()
 	var ok bool
 	var containerDetails containerstatus
 
@@ -1659,8 +1675,8 @@ func (service *HTTPRestService) getNumberOfCPUCores(w http.ResponseWriter, r *ht
 }
 
 func (service *HTTPRestService) getNetworkContainerDetails(networkContainerID string) (containerstatus, bool) {
-	service.lock.Lock()
-	defer service.lock.Unlock()
+	service.RLock()
+	defer service.RUnlock()
 
 	containerDetails, containerExists := service.state.ContainerStatus[networkContainerID]
 

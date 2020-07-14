@@ -18,6 +18,8 @@ const (
 	GetNetworkContainerByOrchestratorContext = "/network/getnetworkcontainerbyorchestratorcontext"
 	AttachContainerToNetwork                 = "/network/attachcontainertonetwork"
 	DetachContainerFromNetwork               = "/network/detachcontainerfromnetwork"
+	RequestIPConfig                          = "/network/requestipconfig"
+	ReleaseIPConfig                          = "/network/releaseipconfig"
 )
 
 // NetworkContainer Prefixes
@@ -48,6 +50,13 @@ const (
 const (
 	Vlan  = "Vlan"
 	Vxlan = "Vxlan"
+)
+
+// IPConfig States for CNS IPAM
+const (
+	Available      = "Available"
+	Allocated      = "Allocated"
+	PendingRelease = "PendingRelease"
 )
 
 // CreateNetworkContainerRequest specifies request to create a network container or network isolation boundary.
@@ -87,6 +96,11 @@ type KubernetesPodInfo struct {
 	PodNamespace string
 }
 
+// GetOrchestratorContext will return the orchestratorcontext as a string
+func (podinfo *KubernetesPodInfo) GetOrchestratorContextKey() string {
+	return podinfo.PodName + ":" + podinfo.PodNamespace
+}
+
 // MultiTenancyInfo contains encap type and id.
 type MultiTenancyInfo struct {
 	EncapType string
@@ -98,6 +112,19 @@ type IPConfiguration struct {
 	IPSubnet         IPSubnet
 	DNSServers       []string
 	GatewayIPAddress string
+}
+
+type SecondaryIPConfig struct {
+	UUID     string
+	IPConfig IPSubnet
+}
+
+type ContainerIPConfigState struct {
+	IPConfig            IPSubnet
+	ID                  string //uuid
+	NCID                string
+	State               string
+	OrchestratorContext json.RawMessage
 }
 
 // IPSubnet contains ip subnet.
@@ -156,6 +183,16 @@ type GetNetworkContainerResponse struct {
 	Response                   Response
 	AllowHostToNCCommunication bool
 	AllowNCToHostCommunication bool
+}
+
+type GetIPConfigRequest struct {
+	DesiredIPConfig     IPSubnet
+	OrchestratorContext json.RawMessage
+}
+
+type GetIPConfigResponse struct {
+	IPConfiguration IPConfiguration
+	Response        Response
 }
 
 // DeleteNetworkContainerRequest specifies the details about the request to delete a specifc network container.

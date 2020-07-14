@@ -17,6 +17,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/common"
+	"github.com/Azure/azure-container-networking/cns/logger"
 	acncommon "github.com/Azure/azure-container-networking/common"
 )
 
@@ -90,6 +91,7 @@ func nmagentHandler(w http.ResponseWriter, r *http.Request) {
 func TestMain(m *testing.M) {
 	var config common.ServiceConfig
 	var err error
+	logger.InitLogger("testlogs", 0, 0, "./")
 
 	// Create the service.
 	service, err = NewHTTPRestService(&config)
