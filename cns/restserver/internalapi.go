@@ -20,7 +20,8 @@ func (service *HTTPRestService) GetPartitionKey() (dncPartitionKey string) {
 	return
 }
 
-func (service *HTTPRestService) CreateOrUpdateNetworkContainer(req cns.CreateNetworkContainerRequest) int {
+// This API will be called by CNS RequestController on CRD update.
+func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.CreateNetworkContainerRequest) int {
 	if req.NetworkContainerid == "" {
 		logger.Errorf("[Azure CNS] Error. NetworkContainerid is empty")
 		return NetworkContainerNotSpecified
