@@ -103,22 +103,17 @@ func (service *HTTPRestService) saveNetworkContainerGoalState(req cns.CreateNetw
 	service.Lock()
 	defer service.Unlock()
 
-	existing, ok := service.state.ContainerStatus[req.NetworkContainerid]
+	existingNCStatus, ok := service.state.ContainerStatus[req.NetworkContainerid]
 	var hostVersion string
+	var existingSecondaryIPConfigs map[string]cns.SecondaryIPConfig //uuid is key
 	if ok {
-		hostVersion = existing.HostVersion
+		hostVersion = existingNCStatus.HostVersion
+		existingSecondaryIPConfigs = existingNCStatus.CreateNetworkContainerRequest.SecondaryIPConfigs
 	}
 
 	if service.state.ContainerStatus == nil {
 		service.state.ContainerStatus = make(map[string]containerstatus)
 	}
-
-	service.state.ContainerStatus[req.NetworkContainerid] =
-		containerstatus{
-			ID:                            req.NetworkContainerid,
-			VMVersion:                     req.Version,
-			CreateNetworkContainerRequest: req,
-			HostVersion:                   hostVersion}
 
 	switch req.NetworkContainerType {
 	case cns.AzureContainerInstance:
@@ -143,7 +138,7 @@ func (service *HTTPRestService) saveNetworkContainerGoalState(req cns.CreateNetw
 			fallthrough
 		case cns.AzureFirstParty:
 			fallthrough
-		case cns.WebApps:
+		case cns.WebApps: // todo: Is WebApps an OrchastratorType or ContainerType?
 			var podInfo cns.KubernetesPodInfo
 			err := json.Unmarshal(req.OrchestratorContext, &podInfo)
 			if err != nil {
@@ -160,18 +155,164 @@ func (service *HTTPRestService) saveNetworkContainerGoalState(req cns.CreateNetw
 			service.state.ContainerIDByOrchestratorContext[podInfo.PodName+podInfo.PodNamespace] = req.NetworkContainerid
 			break
 
+		case cns.KubernetesCRD:
+			// Validate and Update the SecondaryIpConfig state
+			returnCode, returnMesage := service.updateIpConfigsStateUntransacted(req, existingSecondaryIPConfigs)
+			if returnCode != 0 {
+				return returnCode, returnMesage
+			}
 		default:
 			errMsg := fmt.Sprintf("Unsupported orchestrator type: %s", service.state.OrchestratorType)
 			logger.Errorf(errMsg)
 			return UnsupportedOrchestratorType, errMsg
 		}
+
 	default:
 		errMsg := fmt.Sprintf("Unsupported network container type %s", req.NetworkContainerType)
 		logger.Errorf(errMsg)
 		return UnsupportedNetworkContainerType, errMsg
 	}
 
+	service.state.ContainerStatus[req.NetworkContainerid] =
+		containerstatus{
+			ID:                            req.NetworkContainerid,
+			VMVersion:                     req.Version,
+			CreateNetworkContainerRequest: req,
+			HostVersion:                   hostVersion}
+
 	service.saveState()
+	return 0, ""
+}
+
+// This func will compute the deltaIpConfigState which needs to be updated (Added or Deleted)
+// from the inmemory map
+// Note: Also this func is an untransacted API as the caller will take a Service lock
+func (service *HTTPRestService) updateIpConfigsStateUntransacted(req cns.CreateNetworkContainerRequest, existingSecondaryIPConfigs map[string]cns.SecondaryIPConfig) (int, string) {
+	// parse the existingSecondaryIpConfigState to find the deleted Ips
+	newIPConfigs := req.SecondaryIPConfigs
+	var tobeDeletedIpConfigs = make(map[string]cns.SecondaryIPConfig)
+
+	// Populate the ToBeDeleted list, Secondary IPs which doesnt exist in New request anymore.
+	// We will later remove them from the in-memory cache
+	if existingSecondaryIPConfigs != nil {
+		for secondaryIpId, existingIPConfig := range existingSecondaryIPConfigs {
+			_, exists := newIPConfigs[secondaryIpId]
+			if !exists {
+				// IP got removed in the updated request, add it in tobeDeletedIps
+				tobeDeletedIpConfigs[secondaryIpId] = existingIPConfig
+			}
+		}
+	}
+
+	// Validate TobeDeletedIps are ready to be deleted.
+	for ipId, _ := range tobeDeletedIpConfigs {
+		ipConfigStatus, exists := service.PodIPConfigState[ipId]
+		if exists {
+			// pod ip exists, validate if state is not allocated, else fail
+			if ipConfigStatus.State == cns.Allocated {
+				errMsg := fmt.Sprintf("Failed to delete an Allocated IP %v", ipConfigStatus)
+				return InconsistentIPConfigState, errMsg
+			}
+		}
+	}
+
+	// now actually remove the deletedIPs
+	for ipId, _ := range tobeDeletedIpConfigs {
+		service.removeToBeDeletedIpsStateUntransacted(ipId, true)
+	}
+
+	// Add the newIpConfigs, ignore if ip state is already in the map
+	service.addIPConfigStateUntransacted(req.NetworkContainerid, newIPConfigs)
+
+	return 0, ""
+}
+
+//AddIPConfigsToState takes a lock on the service object, and will add an array of ipconfigs to the CNS Service.
+//Used to add IPConfigs to the CNS pool, specifically in the scenario of rebatching.
+func (service *HTTPRestService) addIPConfigStateUntransacted(ncId string, ipconfigs map[string]cns.SecondaryIPConfig) {
+	// add ipconfigs to state
+	for ipId, ipconfig := range ipconfigs {
+		err := validateIPConfig(ipId, ipconfig)
+		if err != nil {
+			// todo panic crash, we have already updated some state until this point,
+			// this validation is required before we process the request
+			logger.Errorf("PanicCrash: SecondaryIPConfig is not valid")
+		}
+
+		// if this IPConfig already exists in the map, then ignore as this is an idempotent state
+		if _, exists := service.PodIPConfigState[ipId]; exists {
+			continue
+		}
+
+		// add the new State
+		ipconfigStatus := IpConfigurationStatus{
+			NCID:                ncId,
+			ID:                  ipId,
+			IPConfig:            ipconfig,
+			State:               cns.Available,
+			OrchestratorContext: nil,
+		}
+
+		service.PodIPConfigState[ipId] = ipconfigStatus
+
+		// Todo Update batch API and maintain the count
+	}
+}
+
+// Todo: call this when request is received
+func validateIPConfig(ipId string, ipconfig cns.SecondaryIPConfig) error {
+	if ipId == "" {
+		return fmt.Errorf("Failed to add IPConfig to state: empty IP ID")
+	}
+	if ipconfig.IPSubnet.IPAddress == "" {
+		return fmt.Errorf("Failed to add IPConfig to state: %+v, empty IPSubnet.IPAddress", ipconfig)
+	}
+	if ipconfig.IPSubnet.PrefixLength == 0 {
+		return fmt.Errorf("Failed to add IPConfig to state: %+v, empty IPSubnet.PrefixLength", ipconfig)
+	}
+	return nil
+}
+
+//cleanupIpConfigState takes a lock on the service object, and will remove an array of ipconfigs to the CNS Service.
+//Used to add IPConfigs to the CNS pool, specifically in the scenario of rebatching.
+func (service *HTTPRestService) cleanupIpConfigState(ipconfigs []IpConfigurationStatus) error {
+	service.Lock()
+	defer service.Unlock()
+
+	for _, ipconfig := range ipconfigs {
+		delete(service.PodIPConfigState, ipconfig.ID)
+		var podInfo cns.KubernetesPodInfo
+		err := json.Unmarshal(ipconfig.OrchestratorContext, &podInfo)
+
+		// if batch delete failed return
+		if err != nil {
+			return err
+		}
+
+		delete(service.PodIPIDByOrchestratorContext, podInfo.GetOrchestratorContextKey())
+	}
+	return nil
+}
+
+//removeUnallocatedIp takes a lock on the service object, and will remove an array of ipconfigs to the CNS Service.
+//Used to add IPConfigs to the CNS pool, specifically in the scenario of rebatching.
+func (service *HTTPRestService) removeToBeDeletedIpsStateUntransacted(ipId string, skipValidation bool) (int, string) {
+
+	// this is set if caller has already done the validation
+	if !skipValidation {
+		ipConfigStatus, exists := service.PodIPConfigState[ipId]
+		if exists {
+			// pod ip exists, validate if state is not allocated, else fail
+			if ipConfigStatus.State == cns.Allocated {
+				errMsg := fmt.Sprintf("Failed to delete an Allocated IP %v", ipConfigStatus)
+				return InconsistentIPConfigState, errMsg
+			}
+		}
+	}
+
+	// Delete this ip from PODIpConfigState Map
+	logger.Printf("[Azure-Cns] Delete the PodIpConfigState, IpId: %s, IPConfigStatus: %v", ipId, service.PodIPConfigState[ipId])
+	delete(service.PodIPConfigState, ipId)
 	return 0, ""
 }
 
@@ -410,6 +551,8 @@ func logNCSnapshot(createNetworkContainerRequest cns.CreateNetworkContainerReque
 	aiEvent.Properties[logger.AllowHostToNCCommunicationStr] = fmt.Sprintf("%t", createNetworkContainerRequest.AllowHostToNCCommunication)
 	aiEvent.Properties[logger.NetworkContainerTypeStr] = createNetworkContainerRequest.NetworkContainerType
 	aiEvent.Properties[logger.OrchestratorContextStr] = fmt.Sprintf("%s", createNetworkContainerRequest.OrchestratorContext)
+
+	// TODO - Add for SecondaryIPs (Task: https://msazure.visualstudio.com/One/_workitems/edit/7711831)
 
 	logger.LogEvent(aiEvent)
 }

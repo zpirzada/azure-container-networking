@@ -4,6 +4,7 @@
 package restserver
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 // all HTTP APIs - api.go and/or ipam.go
 // APIs for internal consumption - internalapi.go
 // All helper/utility functions - util.go
+// Constants - const.go
 
 var (
 	// Named Lock for accessing different states in httpRestServiceState
@@ -36,9 +38,9 @@ type HTTPRestService struct {
 	imdsClient                   *imdsclient.ImdsClient
 	ipamClient                   *ipamclient.IpamClient
 	networkContainer             *networkcontainers.NetworkContainers
-	PodIPIDByOrchestratorContext map[string]string                     // OrchestratorContext is key and value is Pod IP uuid.
-	PodIPConfigState             map[string]cns.ContainerIPConfigState // seondaryipid(uuid) is key
-	AllocatedIPCount             map[string]allocatedIPCount           // key - ncid
+	PodIPIDByOrchestratorContext map[string]string                // OrchestratorContext is key and value is Pod IP uuid.
+	PodIPConfigState             map[string]IpConfigurationStatus // seondaryipid(uuid) is key
+	AllocatedIPCount             map[string]allocatedIPCount      // key - ncid
 	routingTable                 *routes.RoutingTable
 	store                        store.KeyValueStore
 	state                        *httpRestServiceState
@@ -48,6 +50,16 @@ type HTTPRestService struct {
 
 type allocatedIPCount struct {
 	Count int
+}
+
+// This is used for KubernetesCRD orchastrator Type where NC has multiple ips.
+// This struct captures the state for SecondaryIPs associated to a given NC
+type IpConfigurationStatus struct {
+	NCID                string
+	ID                  string //uuid
+	IPConfig            cns.SecondaryIPConfig
+	State               string
+	OrchestratorContext json.RawMessage
 }
 
 // containerstatus is used to save status of an existing container
@@ -110,7 +122,7 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 	serviceState.joinedNetworks = make(map[string]struct{})
 
 	podIPIDByOrchestratorContext := make(map[string]string)
-	podIPConfigState := make(map[string]cns.ContainerIPConfigState)
+	podIPConfigState := make(map[string]IpConfigurationStatus)
 	allocatedIPCount := make(map[string]allocatedIPCount) // key - ncid
 
 	return &HTTPRestService{
