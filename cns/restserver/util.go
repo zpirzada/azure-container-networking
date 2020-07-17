@@ -232,13 +232,6 @@ func (service *HTTPRestService) updateIpConfigsStateUntransacted(req cns.CreateN
 func (service *HTTPRestService) addIPConfigStateUntransacted(ncId string, ipconfigs map[string]cns.SecondaryIPConfig) {
 	// add ipconfigs to state
 	for ipId, ipconfig := range ipconfigs {
-		err := validateIPConfig(ipId, ipconfig)
-		if err != nil {
-			// todo panic crash, we have already updated some state until this point,
-			// this validation is required before we process the request
-			logger.Errorf("PanicCrash: SecondaryIPConfig is not valid")
-		}
-
 		// if this IPConfig already exists in the map, then ignore as this is an idempotent state
 		if _, exists := service.PodIPConfigState[ipId]; exists {
 			continue
@@ -260,15 +253,12 @@ func (service *HTTPRestService) addIPConfigStateUntransacted(ncId string, ipconf
 }
 
 // Todo: call this when request is received
-func validateIPConfig(ipId string, ipconfig cns.SecondaryIPConfig) error {
-	if ipId == "" {
-		return fmt.Errorf("Failed to add IPConfig to state: empty IP ID")
+func validateIPConfig(ipSubnet cns.IPSubnet) error {
+	if ipSubnet.IPAddress == "" {
+		return fmt.Errorf("Failed to add IPConfig to state: %+v, empty IPSubnet.IPAddress", ipSubnet)
 	}
-	if ipconfig.IPSubnet.IPAddress == "" {
-		return fmt.Errorf("Failed to add IPConfig to state: %+v, empty IPSubnet.IPAddress", ipconfig)
-	}
-	if ipconfig.IPSubnet.PrefixLength == 0 {
-		return fmt.Errorf("Failed to add IPConfig to state: %+v, empty IPSubnet.PrefixLength", ipconfig)
+	if ipSubnet.PrefixLength == 0 {
+		return fmt.Errorf("Failed to add IPConfig to state: %+v, empty IPSubnet.PrefixLength", ipSubnet)
 	}
 	return nil
 }

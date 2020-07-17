@@ -35,9 +35,20 @@ func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.C
 	}
 
 	// Validate PrimaryCA must never be empty
-	if req.PrimaryInterfaceIdentifier == "" {
-		logger.Errorf("[Azure CNS] Error. PrimaryCA is empty, NCId %s", req.NetworkContainerid)
-		return PrimaryCANotSpecified
+	err := validateIPConfig(req.IPConfiguration.IPSubnet)
+	if err != nil {
+		logger.Errorf("[Azure CNS] Error. PrimaryCA is invalid, NC Req: %v", req)
+		return InvalidPrimaryIPConfig
+	}
+
+	// Validate SecondaryIPConfig
+	for ipId, ipconfig := range req.SecondaryIPConfigs {
+		// Validate Ipconfig
+		err := validateIPConfig(ipconfig.IPSubnet)
+		if err != nil {
+			logger.Errorf("[Azure CNS] Error. SecondaryIpConfig, Id:%s is invalid, NC Req: %v", ipId, req)
+			return InvalidSecndaryIPConfig
+		}
 	}
 
 	// Validate if state exists already
