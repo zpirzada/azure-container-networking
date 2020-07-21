@@ -238,10 +238,10 @@ func (service *HTTPRestService) addIPConfigStateUntransacted(ncId string, ipconf
 		}
 
 		// add the new State
-		ipconfigStatus := IpConfigurationStatus{
+		ipconfigStatus := ipConfigurationStatus{
 			NCID:                ncId,
 			ID:                  ipId,
-			IPConfig:            ipconfig,
+			IPSubnet:            ipconfig.IPSubnet,
 			State:               cns.Available,
 			OrchestratorContext: nil,
 		}
@@ -265,7 +265,7 @@ func validateIPConfig(ipSubnet cns.IPSubnet) error {
 
 //cleanupIpConfigState takes a lock on the service object, and will remove an array of ipconfigs to the CNS Service.
 //Used to add IPConfigs to the CNS pool, specifically in the scenario of rebatching.
-func (service *HTTPRestService) cleanupIpConfigState(ipconfigs []IpConfigurationStatus) error {
+func (service *HTTPRestService) cleanupIpConfigState(ipconfigs []ipConfigurationStatus) error {
 	service.Lock()
 	defer service.Unlock()
 

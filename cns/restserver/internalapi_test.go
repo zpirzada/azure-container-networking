@@ -142,8 +142,8 @@ func validateNetworkRequest(t *testing.T, req cns.CreateNetworkContainerRequest)
 				t.Errorf("PodIpConfigState has stale ipId: %s, config: %+v", ipid, ipStatus)
 				t.Fatal()
 			} else {
-				if ipStatus.IPConfig.IPSubnet != secondaryIpConfig.IPSubnet {
-					t.Errorf("IPId: %s IPSubnet doesnt match: expected %+v, actual: %+v", ipid, secondaryIpConfig.IPSubnet, ipStatus.IPConfig.IPSubnet)
+				if ipStatus.IPSubnet != secondaryIpConfig.IPSubnet {
+					t.Errorf("IPId: %s IPSubnet doesnt match: expected %+v, actual: %+v", ipid, secondaryIpConfig.IPSubnet, ipStatus.IPSubnet)
 					t.Fatal()
 				}
 
@@ -153,12 +153,12 @@ func validateNetworkRequest(t *testing.T, req cns.CreateNetworkContainerRequest)
 					t.Fatal()
 				}
 
-				alreadyValidated[ipid] = ipStatus.IPConfig.IPSubnet.IPAddress
+				alreadyValidated[ipid] = ipStatus.IPSubnet.IPAddress
 			}
 		} else {
 			// if ipaddress is not same, then fail
-			if ipaddress != ipStatus.IPConfig.IPSubnet.IPAddress {
-				t.Errorf("Added the same IP guid :%s with different ipaddress, expected:%s, actual %s", ipid, ipStatus.IPConfig.IPSubnet.IPAddress, ipaddress)
+			if ipaddress != ipStatus.IPSubnet.IPAddress {
+				t.Errorf("Added the same IP guid :%s with different ipaddress, expected:%s, actual %s", ipid, ipStatus.IPSubnet.IPAddress, ipaddress)
 				t.Fatal()
 			}
 		}

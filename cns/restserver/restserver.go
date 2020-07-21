@@ -39,7 +39,7 @@ type HTTPRestService struct {
 	ipamClient                   *ipamclient.IpamClient
 	networkContainer             *networkcontainers.NetworkContainers
 	PodIPIDByOrchestratorContext map[string]string                // OrchestratorContext is key and value is Pod IP uuid.
-	PodIPConfigState             map[string]IpConfigurationStatus // seondaryipid(uuid) is key
+	PodIPConfigState             map[string]ipConfigurationStatus // seondaryipid(uuid) is key
 	AllocatedIPCount             map[string]allocatedIPCount      // key - ncid
 	routingTable                 *routes.RoutingTable
 	store                        store.KeyValueStore
@@ -54,10 +54,10 @@ type allocatedIPCount struct {
 
 // This is used for KubernetesCRD orchastrator Type where NC has multiple ips.
 // This struct captures the state for SecondaryIPs associated to a given NC
-type IpConfigurationStatus struct {
+type ipConfigurationStatus struct {
 	NCID                string
 	ID                  string //uuid
-	IPConfig            cns.SecondaryIPConfig
+	IPSubnet            cns.IPSubnet
 	State               string
 	OrchestratorContext json.RawMessage
 }
@@ -122,7 +122,7 @@ func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
 	serviceState.joinedNetworks = make(map[string]struct{})
 
 	podIPIDByOrchestratorContext := make(map[string]string)
-	podIPConfigState := make(map[string]IpConfigurationStatus)
+	podIPConfigState := make(map[string]ipConfigurationStatus)
 	allocatedIPCount := make(map[string]allocatedIPCount) // key - ncid
 
 	return &HTTPRestService{
