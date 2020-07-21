@@ -52,7 +52,7 @@ func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.C
 	}
 
 	// Validate if state exists already
-	existing, ok := service.getNetworkContainerDetails(cns.SwiftPrefix + req.NetworkContainerid)
+	existing, ok := service.getNetworkContainerDetails(req.NetworkContainerid)
 
 	if ok {
 		existingReq := existing.CreateNetworkContainerRequest
