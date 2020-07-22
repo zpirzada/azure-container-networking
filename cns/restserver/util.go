@@ -216,7 +216,10 @@ func (service *HTTPRestService) updateIpConfigsStateUntransacted(req cns.CreateN
 
 	// now actually remove the deletedIPs
 	for ipId, _ := range tobeDeletedIpConfigs {
-		service.removeToBeDeletedIpsStateUntransacted(ipId, true)
+		returncode, errMsg := service.removeToBeDeletedIpsStateUntransacted(ipId, true)
+		if returncode != Success {
+			return returncode, errMsg
+		}
 	}
 
 	// Add the newIpConfigs, ignore if ip state is already in the map
@@ -258,27 +261,6 @@ func validateIPConfig(ipSubnet cns.IPSubnet) error {
 	}
 	if ipSubnet.PrefixLength == 0 {
 		return fmt.Errorf("Failed to add IPConfig to state: %+v, empty IPSubnet.PrefixLength", ipSubnet)
-	}
-	return nil
-}
-
-//cleanupIpConfigState takes a lock on the service object, and will remove an array of ipconfigs to the CNS Service.
-//Used to add IPConfigs to the CNS pool, specifically in the scenario of rebatching.
-func (service *HTTPRestService) cleanupIpConfigState(ipconfigs []ipConfigurationStatus) error {
-	service.Lock()
-	defer service.Unlock()
-
-	for _, ipconfig := range ipconfigs {
-		delete(service.PodIPConfigState, ipconfig.ID)
-		var podInfo cns.KubernetesPodInfo
-		err := json.Unmarshal(ipconfig.OrchestratorContext, &podInfo)
-
-		// if batch delete failed return
-		if err != nil {
-			return err
-		}
-
-		delete(service.PodIPIDByOrchestratorContext, podInfo.GetOrchestratorContextKey())
 	}
 	return nil
 }
