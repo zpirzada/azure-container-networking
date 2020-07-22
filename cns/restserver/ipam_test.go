@@ -30,6 +30,7 @@ var (
 		PodNamespace: "testpod2namespace",
 	}
 
+	testIP3      = "10.0.0.3"
 	testPod3GUID = "718e04ac-5a13-4dce-84b3-040accaa9b41"
 	testPod3Info = cns.KubernetesPodInfo{
 		PodName:      "testpod3",
@@ -396,6 +397,7 @@ func TestIPAMAllocateIPIdempotency(t *testing.T) {
 	svc := getTestService()
 	// set state as already allocated
 	state1, _ := NewPodStateWithOrchestratorContext(testIP1, 24, testPod1GUID, testNCID, cns.Allocated, testPod1Info)
+
 	ipconfigs := map[string]ipConfigurationStatus{
 		state1.ID: state1,
 	}
@@ -408,5 +410,74 @@ func TestIPAMAllocateIPIdempotency(t *testing.T) {
 	err = UpdatePodIpConfigState(svc, ipconfigs)
 	if err != nil {
 		t.Fatalf("Expected to not fail adding IP's to state: %+v", err)
+	}
+}
+
+func TestAvailableIPConfigs(t *testing.T) {
+	svc := getTestService()
+
+	state1 := NewPodState(testIP1, 24, testPod1GUID, testNCID, cns.Available)
+	state2 := NewPodState(testIP2, 24, testPod2GUID, testNCID, cns.Available)
+	state3 := NewPodState(testIP3, 24, testPod3GUID, testNCID, cns.Available)
+
+	ipconfigs := map[string]ipConfigurationStatus{
+		state1.ID: state1,
+		state2.ID: state2,
+		state3.ID: state3,
+	}
+	UpdatePodIpConfigState(svc, ipconfigs)
+
+	desiredAvailableIps := map[string]ipConfigurationStatus{
+		state1.ID: state1,
+		state2.ID: state2,
+		state3.ID: state3,
+	}
+	availableIps := svc.GetAvailableIPConfigs()
+	validateIpState(t, availableIps, desiredAvailableIps)
+
+	desiredAllocatedIpConfigs := make(map[string]ipConfigurationStatus)
+	allocatedIps := svc.GetAllocatedIPConfigs()
+	validateIpState(t, allocatedIps, desiredAllocatedIpConfigs)
+
+	req := cns.GetIPConfigRequest{}
+	b, _ := json.Marshal(testPod1Info)
+	req.OrchestratorContext = b
+	req.DesiredIPConfig = state1.IPSubnet
+
+	_, err := requestIPConfigHelper(svc, req)
+	if err != nil {
+		t.Fatal("Expected IP retrieval to be nil")
+	}
+
+	delete(desiredAvailableIps, state1.ID)
+	availableIps = svc.GetAvailableIPConfigs()
+	validateIpState(t, availableIps, desiredAvailableIps)
+
+	desiredState := NewPodState(testIP1, 24, testPod1GUID, testNCID, cns.Allocated)
+	desiredState.OrchestratorContext = b
+	desiredAllocatedIpConfigs[desiredState.ID] = desiredState
+	allocatedIps = svc.GetAllocatedIPConfigs()
+	validateIpState(t, allocatedIps, desiredAllocatedIpConfigs)
+
+}
+
+func validateIpState(t *testing.T, actualIps []ipConfigurationStatus, expectedList map[string]ipConfigurationStatus) {
+	if len(actualIps) != len(expectedList) {
+		t.Fatalf("Actual and expected  count doesnt match, expected %d, actual %d", len(actualIps), len(expectedList))
+	}
+
+	for _, actualIp := range actualIps {
+		var expectedIp ipConfigurationStatus
+		var found bool
+		for _, expectedIp = range expectedList {
+			if reflect.DeepEqual(actualIp, expectedIp) == true {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Fatalf("Actual and expected list doesnt match actual: %+v, expected: %+v", actualIp, expectedIp)
+		}
 	}
 }
