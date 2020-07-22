@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"fmt"
+
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/restserver"
 )
@@ -12,10 +14,10 @@ type Client struct {
 
 // CreateOrUpdateNC updates cns state
 func (client *Client) CreateOrUpdateNC(ncRequest *cns.CreateNetworkContainerRequest) error {
-	returnCode := client.RestService.CreateOrUpdateNetworkContainerInternal(ncRequest)
+	returnCode := client.RestService.CreateOrUpdateNetworkContainerInternal(*ncRequest)
 
 	if returnCode != 0 {
-		return false
+		return fmt.Errorf("Failed to Create NC request: %+v, errorCode: %d", *ncRequest, returnCode)
 	}
 
 	return nil
