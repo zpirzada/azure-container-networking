@@ -92,27 +92,27 @@ func (service *HTTPRestService) releaseIPConfigHandler(w http.ResponseWriter, r 
 	return
 }
 
-func (service *HTTPRestService) GetAllocatedIPConfigs() []*ipConfigurationStatus {
+func (service *HTTPRestService) GetAllocatedIPConfigs() []ipConfigurationStatus {
 	service.RLock()
 	defer service.RUnlock()
-	return filterIPConfigMap(service.PodIPConfigState, func(ipconfig *ipConfigurationStatus) bool {
+	return filterIPConfigMap(service.PodIPConfigState, func(ipconfig ipConfigurationStatus) bool {
 		return ipconfig.State == cns.Allocated
 	})
 }
 
-func (service *HTTPRestService) GetAvailableIPConfigs() []*ipConfigurationStatus {
+func (service *HTTPRestService) GetAvailableIPConfigs() []ipConfigurationStatus {
 	service.RLock()
 	defer service.RUnlock()
-	return filterIPConfigMap(service.PodIPConfigState, func(ipconfig *ipConfigurationStatus) bool {
+	return filterIPConfigMap(service.PodIPConfigState, func(ipconfig ipConfigurationStatus) bool {
 		return ipconfig.State == cns.Available
 	})
 }
 
-func filterIPConfigMap(toBeAdded map[string]ipConfigurationStatus, f func(*ipConfigurationStatus) bool) []*ipConfigurationStatus {
-	vsf := make([]*ipConfigurationStatus, 0)
+func filterIPConfigMap(toBeAdded map[string]ipConfigurationStatus, f func(ipConfigurationStatus) bool) []ipConfigurationStatus {
+	vsf := make([]ipConfigurationStatus, 0)
 	for _, v := range toBeAdded {
-		if f(&v) {
-			vsf = append(vsf, &v)
+		if f(v) {
+			vsf = append(vsf, v)
 		}
 	}
 	return vsf
