@@ -24,11 +24,7 @@ func TestCreateOrUpdateNetworkContainerInternal(t *testing.T) {
 	setEnv(t)
 	setOrchestratorTypeInternal(cns.KubernetesCRD)
 
-	err := createOrUpdateNetworkContainerInternal(t, 2)
-	if err != nil {
-		t.Fatalf("Failed to save the goal state for network container of type JobObject "+
-			" due to error: %+v", err)
-	}
+	validateCreateOrUpdateNCInternal(t, 2)
 }
 
 func setOrchestratorTypeInternal(orchestratorType string) {
@@ -36,7 +32,7 @@ func setOrchestratorTypeInternal(orchestratorType string) {
 	svc.state.OrchestratorType = orchestratorType
 }
 
-func createOrUpdateNetworkContainerInternal(t *testing.T, secondaryIpCount int) {
+func validateCreateOrUpdateNCInternal(t *testing.T, secondaryIpCount int) {
 	secondaryIPConfigs := make(map[string]cns.SecondaryIPConfig)
 
 	var startingIndex = 6
