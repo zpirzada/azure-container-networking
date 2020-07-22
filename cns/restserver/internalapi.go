@@ -47,7 +47,7 @@ func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.C
 		err := validateIPConfig(ipconfig.IPSubnet)
 		if err != nil {
 			logger.Errorf("[Azure CNS] Error. SecondaryIpConfig, Id:%s is invalid, NC Req: %v", ipId, req)
-			return InvalidSecndaryIPConfig
+			return InvalidSecondaryIPConfig
 		}
 	}
 

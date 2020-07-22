@@ -30,7 +30,7 @@ const (
 	InvalidPrimaryIPConfig          = 27
 	PrimaryCANotSame                = 28
 	InconsistentIPConfigState       = 29
-	InvalidSecndaryIPConfig         = 30
+	InvalidSecondaryIPConfig        = 30
 	UnexpectedError                 = 99
 )
 
