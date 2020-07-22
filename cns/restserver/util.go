@@ -194,13 +194,11 @@ func (service *HTTPRestService) updateIpConfigsStateUntransacted(req cns.CreateN
 
 	// Populate the ToBeDeleted list, Secondary IPs which doesnt exist in New request anymore.
 	// We will later remove them from the in-memory cache
-	if existingSecondaryIPConfigs != nil {
-		for secondaryIpId, existingIPConfig := range existingSecondaryIPConfigs {
-			_, exists := newIPConfigs[secondaryIpId]
-			if !exists {
-				// IP got removed in the updated request, add it in tobeDeletedIps
-				tobeDeletedIpConfigs[secondaryIpId] = existingIPConfig
-			}
+	for secondaryIpId, existingIPConfig := range existingSecondaryIPConfigs {
+		_, exists := newIPConfigs[secondaryIpId]
+		if !exists {
+			// IP got removed in the updated request, add it in tobeDeletedIps
+			tobeDeletedIpConfigs[secondaryIpId] = existingIPConfig
 		}
 	}
 
@@ -227,8 +225,9 @@ func (service *HTTPRestService) updateIpConfigsStateUntransacted(req cns.CreateN
 	return 0, ""
 }
 
-//AddIPConfigsToState takes a lock on the service object, and will add an array of ipconfigs to the CNS Service.
-//Used to add IPConfigs to the CNS pool, specifically in the scenario of rebatching.
+// addIPConfigStateUntransacted adds the IPConfis to the PodIpConfigState map with Available state
+// If the IP is already added then it will be an idempotent call. Also note, caller will
+// acquire/release the service lock.
 func (service *HTTPRestService) addIPConfigStateUntransacted(ncId string, ipconfigs map[string]cns.SecondaryIPConfig) {
 	// add ipconfigs to state
 	for ipId, ipconfig := range ipconfigs {
@@ -284,8 +283,8 @@ func (service *HTTPRestService) cleanupIpConfigState(ipconfigs []ipConfiguration
 	return nil
 }
 
-//removeUnallocatedIp takes a lock on the service object, and will remove an array of ipconfigs to the CNS Service.
-//Used to add IPConfigs to the CNS pool, specifically in the scenario of rebatching.
+// removeToBeDeletedIpsStateUntransacted removes the IPConfis from the PodIpConfigState map
+// Caller will acquire/release the service lock.
 func (service *HTTPRestService) removeToBeDeletedIpsStateUntransacted(ipId string, skipValidation bool) (int, string) {
 
 	// this is set if caller has already done the validation
