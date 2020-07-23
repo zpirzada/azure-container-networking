@@ -255,7 +255,7 @@ func (service *HTTPRestService) addIPConfigStateUntransacted(ncId string, ipconf
 }
 
 // Todo: call this when request is received
-func validateIPConfig(ipSubnet cns.IPSubnet) error {
+func validateIPSubnet(ipSubnet cns.IPSubnet) error {
 	if ipSubnet.IPAddress == "" {
 		return fmt.Errorf("Failed to add IPConfig to state: %+v, empty IPSubnet.IPAddress", ipSubnet)
 	}
@@ -265,7 +265,7 @@ func validateIPConfig(ipSubnet cns.IPSubnet) error {
 	return nil
 }
 
-// removeToBeDeletedIpsStateUntransacted removes the IPConfis from the PodIpConfigState map
+// removeToBeDeletedIpsStateUntransacted removes IPConfigs from the PodIpConfigState map
 // Caller will acquire/release the service lock.
 func (service *HTTPRestService) removeToBeDeletedIpsStateUntransacted(ipId string, skipValidation bool) (int, string) {
 

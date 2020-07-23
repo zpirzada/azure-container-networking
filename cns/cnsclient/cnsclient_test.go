@@ -91,7 +91,7 @@ func getIPConfigFromGetNetworkContainerResponse(resp *cns.GetIPConfigResponse) (
 func TestMain(m *testing.M) {
 	var (
 		info = &cns.SetOrchestratorTypeRequest{
-			OrchestratorType: cns.Kubernetes}
+			OrchestratorType: cns.KubernetesCRD}
 		body bytes.Buffer
 		res  *http.Response
 	)
@@ -152,13 +152,13 @@ func TestCNSClientRequestAndRelease(t *testing.T) {
 	podNamespace := "testpodnamespace"
 	desiredIpAddress := "10.0.0.5"
 	ip := net.ParseIP(desiredIpAddress)
-	_, ipnet, _ := net.ParseCIDR("10.0.0.5/24")
+	_, ipnet, _ := net.ParseCIDR("10.0.0.5/32")
 	desired := net.IPNet{
 		IP:   ip,
 		Mask: ipnet.Mask,
 	}
 
-	secondaryIps := make([]string, 1)
+	secondaryIps := make([]string, 0)
 	secondaryIps = append(secondaryIps, desiredIpAddress)
 	cnsClient, _ := InitCnsClient("")
 
@@ -170,10 +170,10 @@ func TestCNSClientRequestAndRelease(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// no IP reservation found with that context, expect fail
+	// no IP reservation found with that context, expect no failure.
 	err = cnsClient.ReleaseIPAddress(orchestratorContext)
-	if err == nil {
-		t.Fatalf("Expected failure to release when no IP reservation found with context: %+v", err)
+	if err != nil {
+		t.Fatalf("Release ip idempotent call failed: %+v", err)
 	}
 
 	// request IP address

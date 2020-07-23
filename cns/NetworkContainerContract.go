@@ -118,6 +118,7 @@ type IPConfiguration struct {
 	GatewayIPAddress string
 }
 
+// SecondaryIPConfig contains IP info of SecondaryIP
 type SecondaryIPConfig struct {
 	IPSubnet IPSubnet
 }
