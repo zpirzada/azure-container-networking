@@ -106,8 +106,6 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	svc = service.(*HTTPRestService)
-
-	svc := service.(*HTTPRestService)
 	svc.Name = "cns-test-server"
 	if err != nil {
 		logger.Errorf("Failed to create CNS object, err:%v.\n", err)
