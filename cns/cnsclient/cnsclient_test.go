@@ -144,7 +144,8 @@ func TestMain(m *testing.M) {
 	}
 	fmt.Println(res)
 
-	m.Run()
+	exitCode := m.Run()
+	os.Exit(exitCode)
 }
 
 func TestCNSClientRequestAndRelease(t *testing.T) {
