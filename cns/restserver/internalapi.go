@@ -58,7 +58,7 @@ func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.C
 
 	if ok {
 		existingReq := existingNCInfo.CreateNetworkContainerRequest
-		if reflect.DeepEqual(existingReq.IPConfiguration, req.PrimaryInterfaceIdentifier) != true {
+		if reflect.DeepEqual(existingReq.IPConfiguration, req.IPConfiguration) != true {
 			logger.Errorf("[Azure CNS] Error. PrimaryCA is not same, NCId %s, old CA %s, new CA %s", req.NetworkContainerid, existingReq.PrimaryInterfaceIdentifier, req.PrimaryInterfaceIdentifier)
 			return PrimaryCANotSame
 		}
