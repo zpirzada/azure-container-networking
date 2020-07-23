@@ -39,11 +39,7 @@ func validateCreateOrUpdateNCInternal(t *testing.T, secondaryIpCount int) {
 	for i := 0; i < secondaryIpCount; i++ {
 		ipaddress := "10.0.0." + strconv.Itoa(startingIndex)
 		secIpConfig := newSecondaryIPConfig(ipaddress, 32)
-		ipId, err := uuid.NewUUID()
-
-		if err != nil {
-			t.Fatalf("Failed to generate UUID for secondaryipconfig, err:%s", err)
-		}
+		ipId := uuid.New()
 		secondaryIPConfigs[ipId.String()] = secIpConfig
 		startingIndex++
 	}
@@ -55,11 +51,7 @@ func validateCreateOrUpdateNCInternal(t *testing.T, secondaryIpCount int) {
 	for i := 0; i < secondaryIpCount; i++ {
 		ipaddress := "10.0.0." + strconv.Itoa(startingIndex)
 		secIpConfig := newSecondaryIPConfig(ipaddress, 32)
-		ipId, err := uuid.NewUUID()
-
-		if (err != nil) {
-			t.Fatalf("Failed to generate UUID for secondaryipconfig, err:%s", err)
-		}
+		ipId := uuid.New()
 		secondaryIPConfigs[ipId.String()] = secIpConfig
 		startingIndex++
 	}

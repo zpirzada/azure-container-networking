@@ -47,10 +47,7 @@ func addTestStateToRestServer(t *testing.T, secondaryIps []string) {
 				PrefixLength: 32,
 			},
 		}
-		ipId, err := uuid.NewUUID()
-		if err != nil {
-			t.Fatalf("Failed to generate UUID for secondaryipconfig, err:%s", err)
-		}
+		ipId := uuid.New()
 		secondaryIPConfigs[ipId.String()] = secIpConfig
 	}
 
