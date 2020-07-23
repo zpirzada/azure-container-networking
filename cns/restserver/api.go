@@ -824,7 +824,7 @@ func (service *HTTPRestService) createOrUpdateNetworkContainer(w http.ResponseWr
 	err = service.Listener.Encode(w, &reserveResp)
 
 	// If the NC was created successfully, log NC snapshot.
-	if returnCode == 0 {
+	if returnCode == Success {
 		logNCSnapshot(req)
 	}
 
@@ -972,8 +972,6 @@ func (service *HTTPRestService) getNetworkContainerStatus(w http.ResponseWriter,
 	containerInfo := service.state.ContainerStatus
 	if containerInfo != nil {
 		containerDetails, ok = containerInfo[req.NetworkContainerid]
-	} else {
-		ok = false
 	}
 
 	var hostVersion string

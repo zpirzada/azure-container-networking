@@ -79,13 +79,13 @@ const (
 )
 
 func getInterfaceInfo(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/xml")
+	w.Header().Set(acncommon.ContentType, "application/xml")
 	output, _ := xml.Marshal(hostQueryResponse)
 	w.Write(output)
 }
 
 func nmagentHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.Header().Set(acncommon.ContentType, acncommon.JsonContent)
 	w.WriteHeader(http.StatusOK)
 
 	if strings.Contains(r.RequestURI, "networkContainers") {
@@ -248,7 +248,7 @@ func TestGetNetworkContainerByOrchestratorContext(t *testing.T) {
 	setEnv(t)
 	setOrchestratorType(t, cns.Kubernetes)
 
-	err := creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "11.0.0.5", "AzureContainerInstance")
+	err := creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "11.0.0.5", cns.AzureContainerInstance)
 	if err != nil {
 		t.Errorf("creatOrUpdateNetworkContainerWithName failed Err:%+v", err)
 		t.Fatal(err)
@@ -283,7 +283,7 @@ func TestGetNetworkContainerStatus(t *testing.T) {
 	setEnv(t)
 	setOrchestratorType(t, cns.Kubernetes)
 
-	err := creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "11.0.0.5", "WebApps")
+	err := creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "11.0.0.5", cns.AzureContainerInstance)
 	if err != nil {
 		t.Errorf("creatOrUpdateWebAppContainerWithName failed Err:%+v", err)
 		t.Fatal(err)
@@ -597,7 +597,7 @@ func getNetworkContainerStatus(t *testing.T, name string) error {
 	var resp cns.GetNetworkContainerStatusResponse
 
 	getReq := &cns.GetNetworkContainerStatusRequest{
-		NetworkContainerid: "ethWebApp",
+		NetworkContainerid: name,
 	}
 
 	json.NewEncoder(&body).Encode(getReq)
@@ -624,7 +624,7 @@ func getInterfaceForContainer(t *testing.T, name string) error {
 	var resp cns.GetInterfaceForContainerResponse
 
 	getReq := &cns.GetInterfaceForContainerRequest{
-		NetworkContainerID: "ethWebApp",
+		NetworkContainerID: name,
 	}
 
 	json.NewEncoder(&body).Encode(getReq)

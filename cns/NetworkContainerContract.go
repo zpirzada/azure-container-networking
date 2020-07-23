@@ -61,6 +61,13 @@ const (
 	PendingRelease = "PendingRelease"
 )
 
+// ChannelMode :- CNS channel modes
+const (
+	Direct  = "Direct"
+	Managed = "Managed"
+	CRD     = "CRD"
+)
+
 // CreateNetworkContainerRequest specifies request to create a network container or network isolation boundary.
 type CreateNetworkContainerRequest struct {
 	Version                    string
@@ -317,4 +324,10 @@ func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate()
 		}
 	}
 	return nil
+}
+
+// NodeInfoResponse - Struct to hold the node info response.
+type NodeInfoResponse struct {
+	NetworkContainers  []CreateNetworkContainerRequest
+	GetNCVersionURLFmt string
 }

@@ -29,6 +29,8 @@ import (
 var (
 	// Named Lock for accessing different states in httpRestServiceState
 	namedLock = acn.InitNamedLock()
+	// map of NC to their respective NMA getVersion URLs
+	ncVersionURLs sync.Map
 )
 
 // HTTPRestService represents http listener for CNS - Container Networking Service.
@@ -68,6 +70,7 @@ type containerstatus struct {
 	VMVersion                     string
 	HostVersion                   string
 	CreateNetworkContainerRequest cns.CreateNetworkContainerRequest
+	WaitingForUpdate              bool // True when NC is waiting for NMA to sync versions/rules
 }
 
 // httpRestServiceState contains the state we would like to persist.
@@ -94,11 +97,13 @@ type networkInfo struct {
 type HTTPService interface {
 	common.ServiceAPI
 	SendNCSnapShotPeriodically(int, chan bool)
+	SetNodeOrchestrator(*cns.SetOrchestratorTypeRequest)
+	SyncNodeStatus(string, string, string, json.RawMessage) (int, string)
 }
 
 // NewHTTPRestService creates a new HTTP Service object.
 func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
-	service, err := cns.NewService(config.Name, config.Version, config.Store)
+	service, err := cns.NewService(config.Name, config.Version, config.ChannelMode, config.Store)
 	if err != nil {
 		return nil, err
 	}
