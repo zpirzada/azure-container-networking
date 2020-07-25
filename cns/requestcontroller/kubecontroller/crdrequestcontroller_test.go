@@ -23,13 +23,15 @@ const (
 	existingNNCName      = "nodenetconfig_1"
 	existingPodName      = "pod_1"
 	hostNetworkPodName   = "pod_hostNet"
-	allocatedPodIP       = "10.0.0.1"
+	allocatedPodIP       = "10.0.0.1/32"
 	allocatedUUID        = "539970a2-c2dd-11ea-b3de-0242ac130004"
+	allocatedUUID2       = "01a5dd00-cd5d-11ea-87d0-0242ac130003"
 	networkContainerID   = "24fcd232-0364-41b0-8027-6e6ef9aeabc6"
 	existingNamespace    = k8sNamespace
 	nonexistingNNCName   = "nodenetconfig_nonexisting"
 	nonexistingPodName   = "pod_nonexisting"
 	nonexistingNamespace = "namespace_nonexisting"
+	ncPrimaryIP          = "10.0.0.1/32"
 )
 
 // MockAPI is a mock of kubernete's API server
@@ -96,7 +98,7 @@ type MockCNSClient struct {
 }
 
 // we're just testing that reconciler interacts with CNS on Reconcile().
-func (mi *MockCNSClient) CreateOrUpdateNC(ncRequest *cns.CreateNetworkContainerRequest) error {
+func (mi *MockCNSClient) CreateOrUpdateNC(ncRequest cns.CreateNetworkContainerRequest) error {
 	mi.MockCNSUpdated = true
 	return nil
 }
@@ -363,16 +365,27 @@ func TestUpdateSpecOnNonExistingNodeNetConfig(t *testing.T) {
 	}
 	logger.InitLogger("Azure CNS RequestController", 0, 0, "")
 
-	uuids := make([]string, 3)
-	uuids[0] = "uuid0"
-	uuids[1] = "uuid1"
-	uuids[2] = "uuid2"
-	newCount := int64(5)
-
-	spec := &nnc.NodeNetworkConfigSpec{
-		RequestedIPCount: newCount,
-		IPsNotInUse:      uuids,
+	ipConfig1 := cns.SecondaryIPConfig{
+		IPSubnet: cns.IPSubnet{
+			IPAddress:    "10.0.0.1",
+			PrefixLength: 32,
+		},
 	}
+
+	ipConfig2 := cns.SecondaryIPConfig{
+		IPSubnet: cns.IPSubnet{
+			IPAddress:    "10.0.0.2",
+			PrefixLength: 32,
+		},
+	}
+
+	secondaryIPConfigs := map[string]cns.SecondaryIPConfig{
+		allocatedUUID:  ipConfig1,
+		allocatedUUID2: ipConfig2,
+	}
+	ipCount := 10
+
+	spec, _ := CNSToCRDSpec(secondaryIPConfigs, ipCount)
 
 	//Test updating spec for existing NodeNetworkConfig
 	err := rc.UpdateCRDSpec(context.Background(), spec)
@@ -407,16 +420,28 @@ func TestUpdateSpecOnExistingNodeNetConfig(t *testing.T) {
 	}
 	logger.InitLogger("Azure CNS RequestController", 0, 0, "")
 
-	uuids := make([]string, 3)
-	uuids[0] = "uuid0"
-	uuids[1] = "uuid1"
-	uuids[2] = "uuid2"
-	newCount := int64(5)
-
-	spec := &nnc.NodeNetworkConfigSpec{
-		RequestedIPCount: newCount,
-		IPsNotInUse:      uuids,
+	ipConfig1 := cns.SecondaryIPConfig{
+		IPSubnet: cns.IPSubnet{
+			IPAddress:    "10.0.0.1",
+			PrefixLength: 32,
+		},
 	}
+
+	ipConfig2 := cns.SecondaryIPConfig{
+		IPSubnet: cns.IPSubnet{
+			IPAddress:    "10.0.0.2",
+			PrefixLength: 32,
+		},
+	}
+
+	secondaryIPConfigs := map[string]cns.SecondaryIPConfig{
+		allocatedUUID:  ipConfig1,
+		allocatedUUID2: ipConfig2,
+	}
+
+	ipCount := 10
+
+	spec, _ := CNSToCRDSpec(secondaryIPConfigs, ipCount)
 
 	//Test update spec for existing NodeNetworkConfig
 	err := rc.UpdateCRDSpec(context.Background(), spec)
@@ -425,7 +450,7 @@ func TestUpdateSpecOnExistingNodeNetConfig(t *testing.T) {
 		t.Fatalf("Expected no error when updating spec on existing crd, got :%v", err)
 	}
 
-	if !reflect.DeepEqual(mockAPI.nodeNetConfigs[mockNNCKey].Spec, *spec) {
+	if !reflect.DeepEqual(mockAPI.nodeNetConfigs[mockNNCKey].Spec, spec) {
 		t.Fatalf("Expected Spec to equal requested spec update")
 	}
 }
@@ -583,6 +608,20 @@ func TestInitRequestController(t *testing.T) {
 			Name:      existingNNCName,
 			Namespace: existingNamespace,
 		},
+		Status: nnc.NodeNetworkConfigStatus{
+			NetworkContainers: []nnc.NetworkContainer{
+				{
+					PrimaryIP: ncPrimaryIP,
+					ID:        networkContainerID,
+					IPAssignments: []nnc.IPAssignment{
+						{
+							Name: allocatedUUID,
+							IP:   allocatedPodIP,
+						},
+					},
+				},
+			},
+		},
 	}
 	mockNNCKey := MockKey{
 		Namespace: existingNamespace,
@@ -656,6 +695,10 @@ func TestInitRequestController(t *testing.T) {
 
 	if _, ok := mockCNSClient.Pods[mockPod.Status.PodIP]; !ok {
 		t.Fatalf("Init should pass cns pods that aren't part of host network")
+	}
+
+	if _, ok := mockCNSClient.NCRequest.SecondaryIPConfigs[allocatedUUID]; !ok {
+		t.Fatalf("Expected secondary ip config to be in ncrequest")
 	}
 
 }
