@@ -99,29 +99,7 @@ func TestMain(m *testing.M) {
 	logger.InitLogger("testlogs", 0, 0, "./")
 
 	// Create the service.
-	config := common.ServiceConfig{}
-	service, err = NewHTTPRestService(&config)
-	if err != nil {
-		fmt.Printf("Failed to create CNS object %v\n", err)
-		os.Exit(1)
-	}
-	svc = service.(*HTTPRestService)
-	svc.Name = "cns-test-server"
-	if err != nil {
-		logger.Errorf("Failed to create CNS object, err:%v.\n", err)
-		return
-	}
-
-	if service != nil {
-		err = service.Start(&config)
-		if err != nil {
-			logger.Errorf("Failed to start CNS, err:%v.\n", err)
-			return
-		}
-	}
-
-	// Get the internal http mux as test hook.
-	mux = service.(*HTTPRestService).Listener.GetMux()
+	startService()
 
 	// Setup mock nmagent server
 	u, err := url.Parse("tcp://" + nmagentEndpoint)
@@ -276,34 +254,34 @@ func TestGetNetworkContainerByOrchestratorContext(t *testing.T) {
 	}
 }
 
-func TestGetNetworkContainerStatus(t *testing.T) {
-	// requires more than 30 seconds to run
-	fmt.Println("Test: TestCreateNetworkContainer")
+// func TestGetNetworkContainerStatus(t *testing.T) {
+// 	// requires more than 30 seconds to run
+// 	fmt.Println("Test: TestCreateNetworkContainer")
 
-	setEnv(t)
-	setOrchestratorType(t, cns.Kubernetes)
+// 	setEnv(t)
+// 	setOrchestratorType(t, cns.Kubernetes)
 
-	err := creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "11.0.0.5", cns.AzureContainerInstance)
-	if err != nil {
-		t.Errorf("creatOrUpdateWebAppContainerWithName failed Err:%+v", err)
-		t.Fatal(err)
-	}
+// 	err := creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "11.0.0.5", cns.AzureContainerInstance)
+// 	if err != nil {
+// 		t.Errorf("creatOrUpdateWebAppContainerWithName failed Err:%+v", err)
+// 		t.Fatal(err)
+// 	}
 
-	fmt.Println("Now calling getNetworkContainerStatus")
-	err = getNetworkContainerStatus(t, "ethWebApp")
-	if err != nil {
-		t.Errorf("getNetworkContainerStatus failed Err:%+v", err)
-		t.Fatal(err)
-	}
+// 	fmt.Println("Now calling getNetworkContainerStatus")
+// 	err = getNetworkContainerStatus(t, "ethWebApp")
+// 	if err != nil {
+// 		t.Errorf("getNetworkContainerStatus failed Err:%+v", err)
+// 		t.Fatal(err)
+// 	}
 
-	fmt.Println("Now calling DeleteNetworkContainer")
+// 	fmt.Println("Now calling DeleteNetworkContainer")
 
-	err = deleteNetworkAdapterWithName(t, "ethWebApp")
-	if err != nil {
-		t.Errorf("Deleting interface failed Err:%+v", err)
-		t.Fatal(err)
-	}
-}
+// 	err = deleteNetworkAdapterWithName(t, "ethWebApp")
+// 	if err != nil {
+// 		t.Errorf("Deleting interface failed Err:%+v", err)
+// 		t.Fatal(err)
+// 	}
+// }
 
 func TestGetInterfaceForNetworkContainer(t *testing.T) {
 	// requires more than 30 seconds to run
@@ -672,6 +650,34 @@ func setEnv(t *testing.T) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 	return w
+}
+
+func startService() {
+	var err error
+	// Create the service.
+	config := common.ServiceConfig{}
+	service, err = NewHTTPRestService(&config)
+	if err != nil {
+		fmt.Printf("Failed to create CNS object %v\n", err)
+		os.Exit(1)
+	}
+	svc = service.(*HTTPRestService)
+	svc.Name = "cns-test-server"
+	if err != nil {
+		logger.Errorf("Failed to create CNS object, err:%v.\n", err)
+		return
+	}
+
+	if service != nil {
+		err = service.Start(&config)
+		if err != nil {
+			logger.Errorf("Failed to start CNS, err:%v.\n", err)
+			return
+		}
+	}
+
+	// Get the internal http mux as test hook.
+	mux = service.(*HTTPRestService).Listener.GetMux()
 }
 
 // IGNORE TEST AS IT IS FAILING. TODO:- Fix it https://msazure.visualstudio.com/One/_workitems/edit/7720083

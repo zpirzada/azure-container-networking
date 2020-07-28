@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/cns/nmagentclient"
 	"github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/log"
 )
 
 // This file contains the internal functions called by either HTTP APIs (api.go) or
@@ -147,6 +148,54 @@ func (service *HTTPRestService) SyncNodeStatus(dncEP, infraVnet, nodeID string, 
 	}
 
 	return
+}
+
+// This API will be called by CNS RequestController on CRD update.
+func (service *HTTPRestService) ReconcileNCState(ncRequest *cns.CreateNetworkContainerRequest, podInfoByIp map[string]cns.KubernetesPodInfo) int {
+	// check if ncRequest is null, then return as there is no CRD state yet
+	if ncRequest == nil {
+		log.Logf("CNS starting with no NC state, podInfoMap count %d", len(podInfoByIp))
+		return Success
+	}
+
+	returnCode := service.CreateOrUpdateNetworkContainerInternal(*ncRequest)
+
+	// If the NC was created successfully, then reconcile the allocated pod state
+	if returnCode != Success {
+		return returnCode
+	}
+
+	// now parse the secondaryIP list, if it exists in PodInfo list, then allocate that ip
+	for _, secIpConfig := range ncRequest.SecondaryIPConfigs {
+		if podInfo, exists := podInfoByIp[secIpConfig.IPSubnet.IPAddress]; exists {
+			log.Logf("SecondaryIP %+v is allocated to Pod. %+v, ncId: %s", secIpConfig, podInfo, ncRequest.NetworkContainerid)
+
+			desiredIPConfig := cns.IPSubnet{
+				IPAddress:    secIpConfig.IPSubnet.IPAddress,
+				PrefixLength: secIpConfig.IPSubnet.PrefixLength,
+			}
+
+			kubernetesPodInfo := cns.KubernetesPodInfo{
+				PodName:      podInfo.PodName,
+				PodNamespace: podInfo.PodNamespace,
+			}
+			jsonContext, _ := json.Marshal(kubernetesPodInfo)
+
+			ipconfigRequest := cns.GetIPConfigRequest{
+				DesiredIPConfig:     desiredIPConfig,
+				OrchestratorContext: jsonContext,
+			}
+
+			if _, err := requestIPConfigHelper(service, ipconfigRequest); err != nil {
+				log.Errorf("AllocateIPConfig failed for SecondaryIP %+v, podInfo %+v, ncId %s, error: %v", secIpConfig, podInfo, ncRequest.NetworkContainerid, err)
+				return FailedToAllocateIpConfig
+			}
+		} else {
+			log.Logf("SecondaryIP %+v is not allocated. ncId: %s", secIpConfig, ncRequest.NetworkContainerid)
+		}
+	}
+
+	return 0
 }
 
 // This API will be called by CNS RequestController on CRD update.

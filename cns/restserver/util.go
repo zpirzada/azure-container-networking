@@ -217,7 +217,11 @@ func (service *HTTPRestService) updateIpConfigsStateUntransacted(req cns.CreateN
 		if exists {
 			// pod ip exists, validate if state is not allocated, else fail
 			if ipConfigStatus.State == cns.Allocated {
-				errMsg := fmt.Sprintf("Failed to delete an Allocated IP %v", ipConfigStatus)
+				var expectedPodInfo cns.KubernetesPodInfo
+				if len(ipConfigStatus.OrchestratorContext) != 0 {
+					json.Unmarshal(ipConfigStatus.OrchestratorContext, &expectedPodInfo)
+				}
+				errMsg := fmt.Sprintf("Failed to delete an Allocated IP %v, PodInfo %+v", ipConfigStatus, expectedPodInfo)
 				return InconsistentIPConfigState, errMsg
 			}
 		}

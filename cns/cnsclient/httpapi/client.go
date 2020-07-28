@@ -23,12 +23,13 @@ func (client *Client) CreateOrUpdateNC(ncRequest cns.CreateNetworkContainerReque
 	return nil
 }
 
-// InitCNSState initializes cns state
-func (client *Client) InitCNSState(ncRequest *cns.CreateNetworkContainerRequest, podInfoByIP map[string]*cns.KubernetesPodInfo) error {
-	// client.RestService.Lock()
-	// client.RestService.ReadyToIPAM = true
-	// client.RestService.Unlock()
+// ReconcileNCState initializes cns state
+func (client *Client) ReconcileNCState(ncRequest *cns.CreateNetworkContainerRequest, podInfoByIP map[string]cns.KubernetesPodInfo) error {
+	returnCode := client.RestService.ReconcileNCState(ncRequest, podInfoByIP)
 
-	// return client.RestService.AddIPConfigsToState(ipConfigs)
+	if returnCode != 0 {
+		return fmt.Errorf("Failed to Reconcile ncState: ncRequest %+v, podInfoMap: %+v, errorCode: %d", *ncRequest, podInfoByIP, returnCode)
+	}
+
 	return nil
 }

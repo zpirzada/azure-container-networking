@@ -93,7 +93,7 @@ func (mc MockKubeClient) Update(ctx context.Context, obj runtime.Object, opts ..
 type MockCNSClient struct {
 	MockCNSUpdated     bool
 	MockCNSInitialized bool
-	Pods               map[string]*cns.KubernetesPodInfo
+	Pods               map[string]cns.KubernetesPodInfo
 	NCRequest          *cns.CreateNetworkContainerRequest
 }
 
@@ -103,7 +103,7 @@ func (mi *MockCNSClient) CreateOrUpdateNC(ncRequest cns.CreateNetworkContainerRe
 	return nil
 }
 
-func (mi *MockCNSClient) InitCNSState(ncRequest *cns.CreateNetworkContainerRequest, podInfoByIP map[string]*cns.KubernetesPodInfo) error {
+func (mi *MockCNSClient) ReconcileNCState(ncRequest *cns.CreateNetworkContainerRequest, podInfoByIP map[string]cns.KubernetesPodInfo) error {
 	mi.MockCNSInitialized = true
 	mi.Pods = podInfoByIP
 	mi.NCRequest = ncRequest

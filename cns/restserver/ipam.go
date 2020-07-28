@@ -30,7 +30,7 @@ func (service *HTTPRestService) requestIPConfigHandler(w http.ResponseWriter, r 
 
 	// retrieve ipconfig from nc
 	if ipState, err = requestIPConfigHelper(service, ipconfigRequest); err != nil {
-		returnCode = UnexpectedError
+		returnCode = FailedToAllocateIpConfig
 		returnMessage = fmt.Sprintf("AllocateIPConfig failed: %v", err)
 	}
 

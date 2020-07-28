@@ -171,9 +171,9 @@ func (crdRC *crdRequestController) initCNS() error {
 	var (
 		pods          *corev1.PodList
 		pod           corev1.Pod
-		podInfo       *cns.KubernetesPodInfo
+		podInfo       cns.KubernetesPodInfo
 		nodeNetConfig *nnc.NodeNetworkConfig
-		podInfoByIP   map[string]*cns.KubernetesPodInfo
+		podInfoByIP   map[string]cns.KubernetesPodInfo
 		cntxt         context.Context
 		ncRequest     cns.CreateNetworkContainerRequest
 		err           error
@@ -191,7 +191,7 @@ func (crdRC *crdRequestController) initCNS() error {
 
 		// If instance of crd is not found, pass nil to CNSClient
 		if client.IgnoreNotFound(err) == nil {
-			return crdRC.CNSClient.InitCNSState(nil, nil)
+			return crdRC.CNSClient.ReconcileNCState(nil, nil)
 		}
 
 		// If it's any other error, log it and return
@@ -201,7 +201,7 @@ func (crdRC *crdRequestController) initCNS() error {
 
 	// If there are no NCs, pass nil to CNSClient
 	if len(nodeNetConfig.Status.NetworkContainers) == 0 {
-		return crdRC.CNSClient.InitCNSState(nil, nil)
+		return crdRC.CNSClient.ReconcileNCState(nil, nil)
 	}
 
 	// Convert to CreateNetworkContainerRequest
@@ -218,11 +218,11 @@ func (crdRC *crdRequestController) initCNS() error {
 
 	// Convert pod list to map of pod ip -> kubernetes pod info
 	if len(pods.Items) != 0 {
-		podInfoByIP = make(map[string]*cns.KubernetesPodInfo)
+		podInfoByIP = make(map[string]cns.KubernetesPodInfo)
 		for _, pod = range pods.Items {
 			//Only add pods that aren't on the host network
 			if !pod.Spec.HostNetwork {
-				podInfo = &cns.KubernetesPodInfo{
+				podInfo = cns.KubernetesPodInfo{
 					PodName:      pod.Name,
 					PodNamespace: pod.Namespace,
 				}
@@ -231,7 +231,9 @@ func (crdRC *crdRequestController) initCNS() error {
 		}
 	}
 
-	return crdRC.CNSClient.InitCNSState(&ncRequest, podInfoByIP)
+	// Call cnsclient init cns passing those two things
+	return crdRC.CNSClient.ReconcileNCState(&ncRequest, podInfoByIP)
+
 }
 
 // UpdateCRDSpec updates the CRD spec
