@@ -69,6 +69,7 @@ type NetworkConfig struct {
 		Subnet        string `json:"subnet,omitempty"`
 		Address       string `json:"ipAddress,omitempty"`
 		QueryInterval string `json:"queryInterval,omitempty"`
+		EndpointID    string
 	}
 	DNS            cniTypes.DNS  `json:"dns"`
 	RuntimeConfig  RuntimeConfig `json:"runtimeConfig"`

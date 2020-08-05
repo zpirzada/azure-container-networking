@@ -1,6 +1,7 @@
 package ipam
 
 import (
+	"github.com/google/uuid"
 	"net"
 	"testing"
 
@@ -654,7 +655,7 @@ var (
 						Addresses: map[string]*addressRecord{},
 					}
 					as.Pools["10.1.0.0/16"] = &addressPool{
-						Id:        "10.1.0.0/16",
+						Id: "10.1.0.0/16",
 						Addresses: map[string]*addressRecord{
 							"10.1.0.1/16": &addressRecord{},
 						},
@@ -823,6 +824,43 @@ var (
 					options := map[string]string{}
 					options[OptAddressID] = arId
 					addr, err := ap.requestAddress("10.0.0.1/16", options)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(addr).NotTo(BeEmpty())
+					Expect(ap.addrsByID[arId].ID).To(Equal(arId))
+				})
+			})
+
+			Context("When id is not found and a address is available", func() {
+				It("Should return a new address", func() {
+					ap := &addressPool{
+						Addresses: map[string]*addressRecord{},
+						addrsByID: map[string]*addressRecord{},
+						Subnet:    subnet1,
+					}
+					arId := uuid.New().String()
+
+					ap.Addresses["0"] = &addressRecord{
+						ID:    "",
+						Addr:  addr11,
+						InUse: false,
+					}
+
+					ap.Addresses["1"] = &addressRecord{
+						ID:    "",
+						Addr:  addr12,
+						InUse: false,
+					}
+
+					ap.Addresses["3"] = &addressRecord{
+						ID:    "",
+						Addr:  addr13,
+						InUse: false,
+					}
+
+					options := map[string]string{}
+					options[OptAddressID] = arId
+
+					addr, err := ap.requestAddress("", options)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(addr).NotTo(BeEmpty())
 					Expect(ap.addrsByID[arId].ID).To(Equal(arId))

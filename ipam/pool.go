@@ -159,6 +159,8 @@ func (am *addressManager) setAddressSpace(as *addressSpace) error {
 	if !ok {
 		am.AddrSpaces[as.Id] = as
 	} else {
+		//merges the address set refreshed from the source
+		//and the ones we have currently this address space
 		as1.merge(as)
 	}
 
@@ -177,6 +179,9 @@ func (am *addressManager) setAddressSpace(as *addressSpace) error {
 // Merges a new address space to an existing one.
 func (as *addressSpace) merge(newas *addressSpace) {
 	// The new epoch after the merge.
+	//epoch is essentially the count of invocations
+	// used to ensure if certain addresses refreshed from the source
+	// are still relevant
 	as.epoch++
 
 	// Add new pools and addresses.
@@ -278,7 +283,7 @@ func (as *addressSpace) newAddressPool(ifName string, priority int, subnet *net.
 func (as *addressSpace) getAddressPool(poolId string) (*addressPool, error) {
 	ap := as.Pools[poolId]
 	if ap == nil {
-		return nil, errInvalidPoolId
+		return nil, ErrAddressPoolNotFound
 	}
 
 	return ap, nil
@@ -308,6 +313,11 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 			// Skip if pool is already in use.
 			if pool.isInUse() {
 				log.Printf("[ipam] Pool is in use.")
+
+				// in the case we
+				if !pool.IsAnyRecordInUse() {
+					as.releasePool(poolId)
+				}
 				continue
 			}
 
@@ -361,18 +371,18 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 func (as *addressSpace) releasePool(poolId string) error {
 	var err error
 
-	log.Printf("[ipam] Releasing pool with poolId:%v.", poolId)
+	log.Printf("[ipam] Attempting to releasing pool with poolId:%v.", poolId)
 
 	ap, ok := as.Pools[poolId]
 	if !ok {
 		err = errAddressPoolNotFound
-	} else {
-		if !ap.isInUse() {
-			err = errAddressPoolNotInUse
-		}
+	} else if ap.IsAnyRecordInUse() {
+		err = errAddressPoolAddressesInUse
+		log.Printf("[ipam] Skip releasing pool with poolId:%v. due to: %v",
+			poolId, errAddressPoolAddressesInUse)
 	}
 
-	if err != nil {
+	if err != nil && err != errAddressPoolAddressesInUse {
 		log.Printf("[ipam] Failed to release pool, err:%v.", err)
 		return err
 	}
@@ -380,7 +390,7 @@ func (as *addressSpace) releasePool(poolId string) error {
 	ap.RefCount--
 
 	// Delete address pool if it is no longer available.
-	if ap.epoch < as.epoch && !ap.isInUse() {
+	if !ap.isInUse() {
 		log.Printf("[ipam] Deleting stale pool with poolId:%v.", poolId)
 		delete(as.Pools, poolId)
 	}
@@ -421,6 +431,16 @@ func (ap *addressPool) getInfo() *AddressPoolInfo {
 // Returns if an address pool is currently in use.
 func (ap *addressPool) isInUse() bool {
 	return ap.RefCount > 0
+}
+
+// Returns if any address in the pool is currently in use.
+func (ap *addressPool) IsAnyRecordInUse() bool {
+	for _, address := range ap.Addresses {
+		if address.InUse || address.ID != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // Creates a new addressRecord object.
@@ -484,7 +504,7 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 	// If no address was found, return any available address.
 	if ar == nil {
 		for _, ar = range ap.Addresses {
-			if !ar.InUse && ar.ID == "" {
+			if !ar.InUse {
 				break
 			}
 			ar = nil
@@ -498,6 +518,7 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 	if id != "" {
 		ap.addrsByID[id] = ar
 		ar.ID = id
+		ar.InUse = true
 	} else {
 		ar.InUse = true
 	}
@@ -546,7 +567,7 @@ func (ap *addressPool) releaseAddress(address string, options map[string]string)
 		return nil
 	}
 
-	if !ar.InUse {
+	if !ar.InUse && ar.ID == "" {
 		log.Printf("Address not in use. Not Returning error")
 		return nil
 	}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypesCurr "github.com/containernetworking/cni/pkg/types/current"
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"net/http"
@@ -49,25 +50,27 @@ func parseResult(stdinData []byte) (*cniTypesCurr.Result, error) {
 	return result, nil
 }
 
-func getStdinData(cniversion, subnet, ipAddress string) []byte {
+func getStdinData(cniversion, subnet, ipAddress, endPointId string) []byte {
 	stdinData := fmt.Sprintf(
 		`{
 			"cniversion": "%s",
 			"ipam": {
 				"type": "internal",
 				"subnet": "%s",
-				"ipAddress": "%s"
+				"ipAddress": "%s",
+				"EndpointID": "%s"
 			}
-		}`, cniversion, subnet, ipAddress)
+		}`, cniversion, subnet, ipAddress, endPointId)
+
 	return []byte(stdinData)
 }
 
 var (
-
-	plugin *ipamPlugin
-	testAgent *common.Listener
-	arg *cniSkel.CmdArgs
-	err error
+	plugin      *ipamPlugin
+	testAgent   *common.Listener
+	arg         *cniSkel.CmdArgs
+	err         error
+	endpointID1 = uuid.New().String()
 
 	_ = BeforeSuite(func() {
 		// TODO: Ensure that the other testAgent has bees released.
@@ -120,7 +123,7 @@ var (
 
 			Context("When ADD with nothing, call for ipam triggering request pool and address", func() {
 				It("Request pool and ADD successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "", "")
+					arg.StdinData = getStdinData("0.4.0", "", "", endpointID1)
 					err = plugin.Add(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 					result, err = parseResult(arg.StdinData)
@@ -134,7 +137,7 @@ var (
 
 			Context("When DELETE with subnet and address, call for ipam triggering release address", func() {
 				It("DELETE address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", result.IPs[0].Address.IP.String())
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", result.IPs[0].Address.IP.String(), endpointID1)
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 				})
@@ -142,7 +145,7 @@ var (
 
 			Context("When DELETE with subnet, call for ipam triggering releasing pool", func() {
 				It("DELETE pool successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "")
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "", endpointID1)
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 				})
@@ -153,7 +156,7 @@ var (
 
 			Context("When address is given", func() {
 				It("Request pool and address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "", "10.0.0.6")
+					arg.StdinData = getStdinData("0.4.0", "", "10.0.0.6", "")
 					err = plugin.Add(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 					result, err := parseResult(arg.StdinData)
@@ -166,8 +169,9 @@ var (
 
 			Context("When subnet is given", func() {
 				It("Request a usable address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "")
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "", endpointID1)
 					err = plugin.Add(arg)
+
 					Expect(err).ShouldNot(HaveOccurred())
 					result, err := parseResult(arg.StdinData)
 					Expect(err).ShouldNot(HaveOccurred())
@@ -182,7 +186,7 @@ var (
 
 			Context("When address and subnet is given", func() {
 				It("Release address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.5")
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.5", endpointID1)
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 				})
@@ -190,7 +194,7 @@ var (
 
 			Context("When address and subnet is given", func() {
 				It("Release address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.6")
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.6", endpointID1)
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 				})
@@ -198,7 +202,15 @@ var (
 
 			Context("When subnet is given", func() {
 				It("Release pool successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "")
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "", endpointID1)
+					err = plugin.Delete(arg)
+					Expect(err).ShouldNot(HaveOccurred())
+				})
+			})
+
+			Context("When subnet is given and no Id", func() {
+				It("Release pool successfully", func() {
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "", "")
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 				})
