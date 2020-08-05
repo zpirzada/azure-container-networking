@@ -205,6 +205,11 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 
 		// Allocate the address as we just got a pool for the address
 		err, apInfo, ipAddress = plugin.RequestAddress(options, nwCfg)
+
+		if err != nil {
+			err = plugin.Errorf("Failed to allocate address: %v", err)
+			return err
+		}
 	}
 
 	version := "4"
