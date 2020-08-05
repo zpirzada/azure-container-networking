@@ -1,0 +1,32 @@
+- job_name: "azure-npm-node-metrics-from-pod-config"
+  metrics_path: /node-metrics
+  kubernetes_sd_configs:
+  - role: pod
+  relabel_configs:
+  - source_labels: [__meta_kubernetes_namespace]
+    regex: kube-system
+    action: keep
+  - source_labels: [__meta_kubernetes_pod_annotationpresent_azure_npm_scrapeable]
+    action: keep
+  - source_labels: [__address__]
+    action: replace
+    regex: ([^:]+)(?::\d+)?
+    replacement: "$1:10091"
+    target_label: __address__
+
+- job_name: "azure-npm-cluster-metrics"
+  metrics_path: /cluster-metrics
+  kubernetes_sd_configs:
+  - role: service
+  relabel_configs:
+  - source_labels: [__meta_kubernetes_namespace]
+    regex: kube-system
+    action: keep
+  - source_labels: [__meta_kubernetes_service_name]
+    regex: npm-metrics-cluster-service
+    action: keep
+# Comment from here to the end to collect advanced metrics: number of entries for each IPSet
+  metric_relabel_configs:
+  - source_labels: [__name__]
+    regex: npm_ipset_counts
+    action: drop

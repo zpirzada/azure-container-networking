@@ -19,7 +19,10 @@ var (
 	AddIPTableRuleExecTime prometheus.Summary
 	NumIPSets              prometheus.Gauge
 	AddIPSetExecTime       prometheus.Summary
-	IPSetInventory         *prometheus.GaugeVec
+	NumIPSetEntries        prometheus.Gauge
+
+	// IPSetInventory should not be referenced directly. Use the functions in ipset-inventory.go
+	IPSetInventory *prometheus.GaugeVec
 )
 
 // Constants for metric names and descriptions as well as exported labels for Vector metrics
@@ -42,37 +45,51 @@ const (
 	addIPSetExecTimeName = "add_ipset_exec_time"
 	addIPSetExecTimeHelp = "Execution time in milliseconds for creating an IP set"
 
+	numIPSetEntriesName = "num_ipset_entries"
+	numIPSetEntriesHelp = "The total number of entries in every IPSet"
+
 	ipsetInventoryName = "ipset_counts"
-	ipsetInventoryHelp = "Number of entries in each individual IPSet"
+	ipsetInventoryHelp = "The number of entries in each individual IPSet"
 	SetNameLabel       = "set_name"
+	SetHashLabel       = "set_hash"
 )
 
-var registry = prometheus.NewRegistry()
+var nodeLevelRegistry = prometheus.NewRegistry()
+var clusterLevelRegistry = prometheus.NewRegistry()
 var haveInitialized = false
 
 // InitializeAll creates all the Prometheus Metrics. The metrics will be nil before this method is called.
 func InitializeAll() {
 	if !haveInitialized {
-		NumPolicies = createGauge(numPoliciesName, numPoliciesHelp)
-		AddPolicyExecTime = createSummary(addPolicyExecTimeName, addPolicyExecTimeHelp)
-		NumIPTableRules = createGauge(numIPTableRulesName, numIPTableRulesHelp)
-		AddIPTableRuleExecTime = createSummary(addIPTableRuleExecTimeName, addIPTableRuleExecTimeHelp)
-		NumIPSets = createGauge(numIPSetsName, numIPSetsHelp)
-		AddIPSetExecTime = createSummary(addIPSetExecTimeName, addIPSetExecTimeHelp)
-		IPSetInventory = createGaugeVec(ipsetInventoryName, ipsetInventoryHelp, SetNameLabel)
+		NumPolicies = createGauge(numPoliciesName, numPoliciesHelp, false)
+		AddPolicyExecTime = createSummary(addPolicyExecTimeName, addPolicyExecTimeHelp, true)
+		NumIPTableRules = createGauge(numIPTableRulesName, numIPTableRulesHelp, false)
+		AddIPTableRuleExecTime = createSummary(addIPTableRuleExecTimeName, addIPTableRuleExecTimeHelp, true)
+		NumIPSets = createGauge(numIPSetsName, numIPSetsHelp, false)
+		AddIPSetExecTime = createSummary(addIPSetExecTimeName, addIPSetExecTimeHelp, true)
+		NumIPSetEntries = createGauge(numIPSetEntriesName, numIPSetEntriesHelp, false)
+		IPSetInventory = createGaugeVec(ipsetInventoryName, ipsetInventoryHelp, false, SetNameLabel, SetHashLabel)
 		log.Logf("Finished initializing all Prometheus metrics")
 		haveInitialized = true
 	}
 }
 
-func register(collector prometheus.Collector, name string) {
-	err := registry.Register(collector)
+func register(collector prometheus.Collector, name string, isNodeLevel bool) {
+	err := getRegistry(isNodeLevel).Register(collector)
 	if err != nil {
 		log.Errorf("Error creating metric %s", name)
 	}
 }
 
-func createGauge(name string, helpMessage string) prometheus.Gauge {
+func getRegistry(isNodeLevel bool) *prometheus.Registry {
+	registry := clusterLevelRegistry
+	if isNodeLevel {
+		registry = nodeLevelRegistry
+	}
+	return registry
+}
+
+func createGauge(name string, helpMessage string, isNodeLevel bool) prometheus.Gauge {
 	gauge := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -80,11 +97,11 @@ func createGauge(name string, helpMessage string) prometheus.Gauge {
 			Help:      helpMessage,
 		},
 	)
-	register(gauge, name)
+	register(gauge, name, isNodeLevel)
 	return gauge
 }
 
-func createGaugeVec(name string, helpMessage string, labels ...string) *prometheus.GaugeVec {
+func createGaugeVec(name string, helpMessage string, isNodeLevel bool, labels ...string) *prometheus.GaugeVec {
 	gaugeVec := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -93,11 +110,11 @@ func createGaugeVec(name string, helpMessage string, labels ...string) *promethe
 		},
 		labels,
 	)
-	register(gaugeVec, name)
+	register(gaugeVec, name, isNodeLevel)
 	return gaugeVec
 }
 
-func createSummary(name string, helpMessage string) prometheus.Summary {
+func createSummary(name string, helpMessage string, isNodeLevel bool) prometheus.Summary {
 	summary := prometheus.NewSummary(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
@@ -107,6 +124,6 @@ func createSummary(name string, helpMessage string) prometheus.Summary {
 			// quantiles e.g. the "0.5 quantile" will actually be the phi quantile for some phi in [0.5 - 0.05, 0.5 + 0.05]
 		},
 	)
-	register(summary, name)
+	register(summary, name, isNodeLevel)
 	return summary
 }

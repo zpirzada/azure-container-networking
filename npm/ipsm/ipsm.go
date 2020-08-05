@@ -11,7 +11,6 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/util"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type ipsEntry struct {
@@ -215,7 +214,7 @@ func (ipsMgr *IpsetManager) CreateSet(setName string, spec []string) error {
 
 	metrics.NumIPSets.Inc()
 	timer.StopAndRecord(metrics.AddIPSetExecTime)
-	metrics.IPSetInventory.With(prometheus.Labels{metrics.SetNameLabel: setName}).Set(0)
+	metrics.SetIPSetInventory(setName, 0)
 
 	return nil
 }
@@ -244,7 +243,8 @@ func (ipsMgr *IpsetManager) DeleteSet(setName string) error {
 	delete(ipsMgr.setMap, setName)
 
 	metrics.NumIPSets.Dec()
-	metrics.IPSetInventory.With(prometheus.Labels{metrics.SetNameLabel: setName}).Set(0)
+	metrics.NumIPSetEntries.Add(float64(-metrics.GetIPSetInventory(setName)))
+	metrics.SetIPSetInventory(setName, 0)
 
 	return nil
 }
@@ -292,7 +292,8 @@ func (ipsMgr *IpsetManager) AddToSet(setName, ip, spec, podUid string) error {
 	// Stores the podUid as the context for this ip.
 	ipsMgr.setMap[setName].elements[ip] = podUid
 
-	metrics.IPSetInventory.With(prometheus.Labels{metrics.SetNameLabel: setName}).Inc()
+	metrics.NumIPSetEntries.Inc()
+	metrics.IncIPSetInventory(setName)
 
 	return nil
 }
@@ -335,7 +336,8 @@ func (ipsMgr *IpsetManager) DeleteFromSet(setName, ip, podUid string) error {
 	// Now cleanup the cache
 	delete(ipsMgr.setMap[setName].elements, ip)
 
-	metrics.IPSetInventory.With(prometheus.Labels{metrics.SetNameLabel: setName}).Dec()
+	metrics.NumIPSetEntries.Dec()
+	metrics.DecIPSetInventory(setName)
 
 	if len(ipsMgr.setMap[setName].elements) == 0 {
 		ipsMgr.DeleteSet(setName)
@@ -387,7 +389,7 @@ func (ipsMgr *IpsetManager) Destroy() error {
 		return err
 	}
 
-	//TODO set metrics.IPSetInventory to 0 for all set names
+	//TODO set IPSetInventory to 0 for all set names
 
 	return nil
 }
@@ -453,7 +455,7 @@ func (ipsMgr *IpsetManager) Restore(configFile string) error {
 	}
 	cmd.Wait()
 
-	//TODO based on the set name and number of entries in the config file, update metrics.IPSetInventory
+	//TODO based on the set name and number of entries in the config file, update IPSetInventory
 
 	return nil
 }

@@ -67,8 +67,7 @@ spec:
         k8s-app: azure-npm
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
-        prometheus.io/scrape: "true"
-        prometheus.io/port:   "8000"
+        azure.npm/scrapeable: ''
     spec:
       priorityClassName: system-node-critical
       tolerations:
@@ -83,7 +82,7 @@ spec:
         kubernetes.io/role: agent
       containers:
         - name: azure-npm
-          image: mcr.microsoft.com/containernetworking/azure-npm:v1.1.4
+          image: mcr.microsoft.com/containernetworking/azure-npm:v1.1.5
           securityContext:
             privileged: true
           env:
@@ -114,3 +113,17 @@ spec:
           path: /etc/protocols
           type: File
       serviceAccountName: azure-npm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: npm-metrics-cluster-service
+  namespace: kube-system
+  labels:
+    app: npm-metrics
+spec:
+  selector:
+    k8s-app: azure-npm
+  ports:
+    - port: 9000
+      targetPort: 10091

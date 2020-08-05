@@ -35,7 +35,7 @@ func GetValue(gaugeMetric prometheus.Gauge) (int, error) {
 	return int(dtoMetric.Gauge.GetValue()), nil
 }
 
-// GetVecValue is used for validation. It returns a Gauge Vec metric's value.
+// GetVecValue is used for validation. It returns a Gauge Vec metric's value, or 0 if the label doesn't exist for the metric.
 func GetVecValue(gaugeVecMetric *prometheus.GaugeVec, labels prometheus.Labels) (int, error) {
 	return GetValue(gaugeVecMetric.With(labels))
 }

@@ -9,15 +9,12 @@ import (
 )
 
 const (
-	// HTTPPort is the port used by the HTTP server (includes a preceding colon)
-	HTTPPort = ":8000"
-
-	//MetricsPath is the path for the Prometheus metrics endpoint (includes preceding slash)
-	MetricsPath = "/metrics"
+	httpPort           = ":10091"
+	nodeMetricsPath    = "/node-metrics"
+	clusterMetricsPath = "/cluster-metrics"
 )
 
 var started = false
-var handler http.Handler
 
 // StartHTTP starts a HTTP server in a Go routine with endpoint on port 8000. Metrics are exposed on the endpoint /metrics.
 // By being exposed, the metrics can be scraped by a Prometheus Server or Container Insights.
@@ -28,16 +25,14 @@ func StartHTTP(delayAmountAfterStart int) {
 	}
 	started = true
 
-	http.Handle(MetricsPath, getHandler())
+	http.Handle(nodeMetricsPath, getHandler(true))
+	http.Handle(clusterMetricsPath, getHandler(false))
 	log.Logf("Starting Prometheus HTTP Server")
-	go http.ListenAndServe(HTTPPort, nil)
+	go http.ListenAndServe(httpPort, nil)
 	time.Sleep(time.Second * time.Duration(delayAmountAfterStart))
 }
 
 // getHandler returns the HTTP handler for the metrics endpoint
-func getHandler() http.Handler {
-	if handler == nil {
-		handler = promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
-	}
-	return handler
+func getHandler(isNodeLevel bool) http.Handler {
+	return promhttp.HandlerFor(getRegistry(isNodeLevel), promhttp.HandlerOpts{})
 }
