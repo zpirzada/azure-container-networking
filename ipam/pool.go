@@ -370,29 +370,31 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 // Releases a previously requested address pool back to its address space.
 func (as *addressSpace) releasePool(poolId string) error {
 	var err error
+	var addressesInUse bool
 
 	log.Printf("[ipam] Attempting to releasing pool with poolId:%v.", poolId)
 
 	ap, ok := as.Pools[poolId]
 	if !ok {
 		err = errAddressPoolNotFound
-	} else if ap.IsAnyRecordInUse() {
-		err = errAddressPoolAddressesInUse
-		log.Printf("[ipam] Skip releasing pool with poolId:%v. due to: %v",
-			poolId, errAddressPoolAddressesInUse)
+	} else if addressesInUse = ap.IsAnyRecordInUse(); addressesInUse {
+		log.Printf("[ipam] Skip releasing pool with poolId:%v. due to address being in use",
+			poolId)
 	}
 
-	if err != nil && err != errAddressPoolAddressesInUse {
+	if err != nil {
 		log.Printf("[ipam] Failed to release pool, err:%v.", err)
 		return err
 	}
 
-	ap.RefCount--
+	if !addressesInUse {
+		ap.RefCount--
 
-	// Delete address pool if it is no longer available.
-	if !ap.isInUse() {
-		log.Printf("[ipam] Deleting stale pool with poolId:%v.", poolId)
-		delete(as.Pools, poolId)
+		// Delete address pool if it is no longer available.
+		if !ap.isInUse() {
+			log.Printf("[ipam] Deleting stale pool with poolId:%v.", poolId)
+			delete(as.Pools, poolId)
+		}
 	}
 
 	return nil
