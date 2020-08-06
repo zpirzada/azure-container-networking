@@ -510,7 +510,7 @@ var (
 						Pools: map[string]*addressPool{},
 					}
 					pool, err := as.getAddressPool("10.0.0.0/16")
-					Expect(err).To(Equal(errInvalidPoolId))
+					Expect(err).To(Equal(errAddressPoolNotFound))
 					Expect(pool).To(BeNil())
 				})
 			})
@@ -679,22 +679,7 @@ var (
 				})
 			})
 
-			Context("When pool is not in use", func() {
-				It("Should raise an error", func() {
-					poolId := "10.0.0.0/16"
-					as := &addressSpace{
-						Pools: map[string]*addressPool{},
-					}
-					as.Pools[poolId] = &addressPool{
-						RefCount: 0,
-					}
-					err := as.releasePool("10.0.0.0/16")
-					Expect(err).To(Equal(errAddressPoolNotInUse))
-					Expect(as.Pools[poolId]).NotTo(BeNil())
-				})
-			})
-
-			Context("When pool's epoch is less than the space's epoch and pool is never in use", func() {
+			Context("When pool's addresses are all not in use", func() {
 				It("Should release the pool ", func() {
 					poolId := "10.0.0.0/16"
 					as := &addressSpace{
@@ -702,16 +687,31 @@ var (
 						Pools: map[string]*addressPool{},
 					}
 					as.Pools[poolId] = &addressPool{
-						epoch:    1,
-						RefCount: 1,
+						epoch:     1,
+						RefCount:  1,
+						Addresses: map[string]*addressRecord{},
 					}
+
+					as.Pools[poolId].Addresses["10.0.0.1"] = &addressRecord{
+						InUse: false,
+						Addr:  net.IPv4zero,
+					}
+					as.Pools[poolId].Addresses["10.0.0.2"] = &addressRecord{
+						InUse: false,
+						Addr:  net.IPv4zero,
+					}
+					as.Pools[poolId].Addresses["10.0.0.3"] = &addressRecord{
+						InUse: false,
+						Addr:  net.IPv4zero,
+					}
+
 					err := as.releasePool("10.0.0.0/16")
 					Expect(err).NotTo(HaveOccurred())
 					Expect(as.Pools[poolId]).To(BeNil())
 				})
 			})
 
-			Context("When the epoch of pool is equal to the epoch of addressSpace", func() {
+			Context("When the pool has in use addresses", func() {
 				It("Should not delete the pool", func() {
 					poolId := "10.0.0.0/16"
 					as := &addressSpace{
@@ -719,9 +719,24 @@ var (
 						Pools: map[string]*addressPool{},
 					}
 					as.Pools[poolId] = &addressPool{
-						epoch:    1,
-						RefCount: 1,
+						epoch:     1,
+						RefCount:  1,
+						Addresses: map[string]*addressRecord{},
 					}
+
+					as.Pools[poolId].Addresses["10.0.0.1"] = &addressRecord{
+						InUse: true,
+						Addr:  net.IPv4zero,
+					}
+					as.Pools[poolId].Addresses["10.0.0.2"] = &addressRecord{
+						InUse: false,
+						Addr:  net.IPv4zero,
+					}
+					as.Pools[poolId].Addresses["10.0.0.3"] = &addressRecord{
+						InUse: false,
+						Addr:  net.IPv4zero,
+					}
+
 					err := as.releasePool("10.0.0.0/16")
 					Expect(err).NotTo(HaveOccurred())
 					Expect(as.Pools[poolId]).NotTo(BeNil())
