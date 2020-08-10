@@ -363,6 +363,7 @@ func (am *addressManager) RequestAddress(asId, poolId, address string, options m
 
 	err = am.save()
 	if err != nil {
+		ap.releaseAddress(addr, options)
 		return "", err
 	}
 

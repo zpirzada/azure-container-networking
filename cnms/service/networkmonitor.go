@@ -152,7 +152,7 @@ func main() {
 			return
 		}
 
-		if err := nm.Initialize(&config); err != nil {
+		if err := nm.Initialize(&config, false); err != nil {
 			log.Printf("[monitor] Failed while initializing network manager %+v", err)
 		}
 

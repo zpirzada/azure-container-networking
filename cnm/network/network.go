@@ -71,7 +71,7 @@ func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 	}
 
 	// Initialize network manager.
-	err = plugin.nm.Initialize(config)
+	err = plugin.nm.Initialize(config, true)
 	if err != nil {
 		log.Printf("[net] Failed to initialize network manager, err:%v.", err)
 		return err

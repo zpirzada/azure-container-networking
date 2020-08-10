@@ -51,7 +51,7 @@ type networkManager struct {
 
 // NetworkManager API.
 type NetworkManager interface {
-	Initialize(config *common.PluginConfig) error
+	Initialize(config *common.PluginConfig, isRehydrationRequired bool) error
 	Uninitialize()
 
 	AddExternalInterface(ifName string, subnet string) error
@@ -81,12 +81,12 @@ func NewNetworkManager() (NetworkManager, error) {
 }
 
 // Initialize configures network manager.
-func (nm *networkManager) Initialize(config *common.PluginConfig) error {
+func (nm *networkManager) Initialize(config *common.PluginConfig, isRehydrationRequired bool) error {
 	nm.Version = config.Version
 	nm.store = config.Store
 
 	// Restore persisted state.
-	err := nm.restore()
+	err := nm.restore(isRehydrationRequired)
 	return err
 }
 
@@ -95,7 +95,7 @@ func (nm *networkManager) Uninitialize() {
 }
 
 // Restore reads network manager state from persistent store.
-func (nm *networkManager) restore() error {
+func (nm *networkManager) restore(isRehydrationRequired bool) error {
 	// Skip if a store is not provided.
 	if nm.store == nil {
 		log.Printf("[net] network store is nil")
@@ -107,9 +107,6 @@ func (nm *networkManager) restore() error {
 	// Ignore the persisted state if it is older than the last reboot time.
 
 	// Read any persisted state.
-	nm.Lock()
-	defer nm.Unlock()
-
 	err := nm.store.Read(storeKey, nm)
 	if err != nil {
 		if err == store.ErrKeyNotFound {
@@ -122,38 +119,39 @@ func (nm *networkManager) restore() error {
 		}
 	}
 
-	modTime, err := nm.store.GetModificationTime()
-	if err == nil {
-		rebootTime, err := platform.GetLastRebootTime()
-		log.Printf("[net] reboot time %v store mod time %v", rebootTime, modTime)
-		if err == nil && rebootTime.After(modTime) {
-			log.Printf("[net] Detected Reboot")
-			rebooted = true
-			if clearNwConfig, err := platform.ClearNetworkConfiguration(); clearNwConfig {
-				if err != nil {
-					log.Printf("[net] Failed to clear network configuration, err:%v\n", err)
-					return err
-				}
-
-				// Delete the networks left behind after reboot
-				for _, extIf := range nm.ExternalInterfaces {
-					for _, nw := range extIf.Networks {
-						log.Printf("[net] Deleting the network %s on reboot\n", nw.Id)
-						nm.deleteNetwork(nw.Id)
+	if isRehydrationRequired {
+		modTime, err := nm.store.GetModificationTime()
+		if err == nil {
+			rebootTime, err := platform.GetLastRebootTime()
+			log.Printf("[net] reboot time %v store mod time %v", rebootTime, modTime)
+			if err == nil && rebootTime.After(modTime) {
+				log.Printf("[net] Detected Reboot")
+				rebooted = true
+				if clearNwConfig, err := platform.ClearNetworkConfiguration(); clearNwConfig {
+					if err != nil {
+						log.Printf("[net] Failed to clear network configuration, err:%v\n", err)
+						return err
 					}
-				}
 
-				// Clear networkManager contents
-				nm.TimeStamp = time.Time{}
-				for extIfName := range nm.ExternalInterfaces {
-					delete(nm.ExternalInterfaces, extIfName)
-				}
+					// Delete the networks left behind after reboot
+					for _, extIf := range nm.ExternalInterfaces {
+						for _, nw := range extIf.Networks {
+							log.Printf("[net] Deleting the network %s on reboot\n", nw.Id)
+							nm.deleteNetwork(nw.Id)
+						}
+					}
 
-				return nil
+					// Clear networkManager contents
+					nm.TimeStamp = time.Time{}
+					for extIfName := range nm.ExternalInterfaces {
+						delete(nm.ExternalInterfaces, extIfName)
+					}
+
+					return nil
+				}
 			}
 		}
 	}
-
 	// Populate pointers.
 	for _, extIf := range nm.ExternalInterfaces {
 		for _, nw := range extIf.Networks {

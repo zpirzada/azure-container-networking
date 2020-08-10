@@ -51,7 +51,7 @@ var (
 			Context("When restore is nil", func() {
 				It("Should return nil", func() {
 					nm := &networkManager{}
-					err := nm.restore()
+					err := nm.restore(false)
 					Expect(err).NotTo(HaveOccurred())
 				})
 			})
@@ -63,7 +63,7 @@ var (
 							ReadError: store.ErrKeyNotFound,
 						},
 					}
-					err := nm.restore()
+					err := nm.restore(false)
 					Expect(err).NotTo(HaveOccurred())
 				})
 			})
@@ -75,7 +75,7 @@ var (
 							ReadError: errors.New("error for test"),
 						},
 					}
-					err := nm.restore()
+					err := nm.restore(false)
 					Expect(err).To(HaveOccurred())
 				})
 			})
@@ -91,11 +91,11 @@ var (
 						ExternalInterfaces: map[string]*externalInterface{},
 					}
 					nm.ExternalInterfaces[extIfName] = &externalInterface{
-						Name: extIfName,
+						Name:     extIfName,
 						Networks: map[string]*network{},
 					}
 					nm.ExternalInterfaces[extIfName].Networks[nwId] = &network{}
-					err := nm.restore()
+					err := nm.restore(false)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(nm.ExternalInterfaces[extIfName].Networks[nwId].extIf.Name).To(Equal(extIfName))
 				})
@@ -104,7 +104,7 @@ var (
 
 		Describe("Test save", func() {
 			Context("When store is nil", func() {
-				It("Should return nil", func(){
+				It("Should return nil", func() {
 					nm := &networkManager{}
 					err := nm.save()
 					Expect(err).NotTo(HaveOccurred())
@@ -112,7 +112,7 @@ var (
 				})
 			})
 			Context("When store.Write return error", func() {
-				It("Should raise error", func(){
+				It("Should raise error", func() {
 					nm := &networkManager{
 						store: &testutils.KeyValueStoreMock{
 							WriteError: errors.New("error for test"),
@@ -120,7 +120,8 @@ var (
 					}
 					err := nm.save()
 					Expect(err).To(HaveOccurred())
-					Expect(nm.TimeStamp).NotTo(Equal(time.Time{}))})
+					Expect(nm.TimeStamp).NotTo(Equal(time.Time{}))
+				})
 			})
 		})
 
@@ -198,9 +199,9 @@ var (
 					}
 					nm.ExternalInterfaces[ifName].Networks[nwId] = &network{
 						Endpoints: map[string]*endpoint{
-							"ep1":&endpoint{},
-							"ep2":&endpoint{},
-							"ep3":&endpoint{},
+							"ep1": &endpoint{},
+							"ep2": &endpoint{},
+							"ep3": &endpoint{},
 						},
 					}
 					num := nm.GetNumberOfEndpoints(ifName, nwId)
@@ -220,9 +221,9 @@ var (
 					}
 					nm.ExternalInterfaces[ifName].Networks[nwId] = &network{
 						Endpoints: map[string]*endpoint{
-							"ep1":&endpoint{},
-							"ep2":&endpoint{},
-							"ep3":&endpoint{},
+							"ep1": &endpoint{},
+							"ep2": &endpoint{},
+							"ep3": &endpoint{},
 						},
 					}
 					num := nm.GetNumberOfEndpoints("", nwId)
