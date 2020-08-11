@@ -20,6 +20,10 @@ const (
 	dockerContainerType = cns.Docker
 )
 
+var (
+	dnsservers = []string{"8.8.8.8", "8.8.4.4"}
+)
+
 func TestCreateOrUpdateNetworkContainerInternal(t *testing.T) {
 	restartService()
 
@@ -181,11 +185,11 @@ func createAndValidateNCRequest(t *testing.T, secondaryIPConfigs map[string]cns.
 	if returnCode != 0 {
 		t.Fatalf("Failed to createNetworkContainerRequest, req: %+v, err: %d", req, returnCode)
 	}
-	validateNetworkRequest(t, req, false)
+	validateNetworkRequest(t, req)
 }
 
 // Validate the networkRequest is persisted.
-func validateNetworkRequest(t *testing.T, req cns.CreateNetworkContainerRequest, skipAvailableCheck bool) {
+func validateNetworkRequest(t *testing.T, req cns.CreateNetworkContainerRequest) {
 	containerStatus := svc.state.ContainerStatus[req.NetworkContainerid]
 
 	if containerStatus.ID != req.NetworkContainerid {
@@ -217,8 +221,21 @@ func validateNetworkRequest(t *testing.T, req cns.CreateNetworkContainerRequest,
 				}
 
 				// Validate IP state
-				if !skipAvailableCheck &&
-					ipStatus.State != cns.Available {
+				if ipStatus.OrchestratorContext != nil {
+					var podInfo cns.KubernetesPodInfo
+					if err := json.Unmarshal(ipStatus.OrchestratorContext, &podInfo); err != nil {
+						t.Fatalf("Failed to add IPConfig to state: %+v with error: %v", ipStatus, err)
+					}
+
+					if _, exists := svc.PodIPIDByOrchestratorContext[podInfo.GetOrchestratorContextKey()]; exists {
+						if ipStatus.State != cns.Allocated {
+							t.Fatalf("IPId: %s State is not Allocated, ipStatus: %+v", ipid, ipStatus)
+						}
+					} else {
+						t.Fatalf("Failed to find podContext for allocated ip: %+v, podinfo :%+v", ipStatus, podInfo)
+					}
+				} else if ipStatus.State != cns.Available {
+					// Todo: Validate for pendingRelease as well
 					t.Fatalf("IPId: %s State is not Available, ipStatus: %+v", ipid, ipStatus)
 				}
 
@@ -235,7 +252,7 @@ func validateNetworkRequest(t *testing.T, req cns.CreateNetworkContainerRequest,
 
 func generateNetworkContainerRequest(secondaryIps map[string]cns.SecondaryIPConfig, ncId string) cns.CreateNetworkContainerRequest {
 	var ipConfig cns.IPConfiguration
-	ipConfig.DNSServers = []string{"8.8.8.8", "8.8.4.4"}
+	ipConfig.DNSServers = dnsservers
 	ipConfig.GatewayIPAddress = gatewayIp
 	var ipSubnet cns.IPSubnet
 	ipSubnet.IPAddress = primaryIp
@@ -265,7 +282,7 @@ func validateNCStateAfterReconcile(t *testing.T, ncRequest *cns.CreateNetworkCon
 			t.Fatalf("CNS has some stale ContainerStatus, count: %d, state: %+v", len(svc.state.ContainerStatus), svc.state.ContainerStatus)
 		}
 	} else {
-		validateNetworkRequest(t, *ncRequest, true)
+		validateNetworkRequest(t, *ncRequest)
 	}
 
 	if len(expectedAllocatedPods) != len(svc.PodIPIDByOrchestratorContext) {

@@ -30,9 +30,13 @@ const (
 	dockerContainerType = cns.Docker
 )
 
+var (
+	dnsservers = []string{"8.8.8.8", "8.8.4.4"}
+)
+
 func addTestStateToRestServer(t *testing.T, secondaryIps []string) {
 	var ipConfig cns.IPConfiguration
-	ipConfig.DNSServers = []string{"8.8.8.8", "8.8.4.4"}
+	ipConfig.DNSServers = dnsservers
 	ipConfig.GatewayIPAddress = gatewayIp
 	var ipSubnet cns.IPSubnet
 	ipSubnet.IPAddress = primaryIp
@@ -64,7 +68,7 @@ func addTestStateToRestServer(t *testing.T, secondaryIps []string) {
 	}
 }
 
-func getIPConfigFromGetNetworkContainerResponse(resp *cns.GetIPConfigResponse) (net.IPNet, error) {
+func getIPNetFromResponse(resp *cns.GetIPConfigResponse) (net.IPNet, error) {
 	var (
 		resultIPnet net.IPNet
 		err         error
@@ -180,7 +184,16 @@ func TestCNSClientRequestAndRelease(t *testing.T) {
 		t.Fatalf("get IP from CNS failed with %+v", err)
 	}
 
-	resultIPnet, err := getIPConfigFromGetNetworkContainerResponse(resp)
+	// validate gateway and dnsservers
+	if reflect.DeepEqual(resp.IPConfiguration.DNSServers, dnsservers) != true {
+		t.Fatalf("DnsServer is not added as expected ipConfig %+v, expected dnsServers: %+v", resp.IPConfiguration, dnsservers)
+	}
+
+	if reflect.DeepEqual(resp.IPConfiguration.GatewayIPAddress, gatewayIp) != true {
+		t.Fatalf("Gateway is not added as expected ipConfig %+v, expected GatewayIp: %+v", resp.IPConfiguration, gatewayIp)
+	}
+
+	resultIPnet, err := getIPNetFromResponse(resp)
 
 	if reflect.DeepEqual(desired, resultIPnet) != true {
 		t.Fatalf("Desired result not matching actual result, expected: %+v, actual: %+v", desired, resultIPnet)
