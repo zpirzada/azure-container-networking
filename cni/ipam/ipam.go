@@ -149,36 +149,14 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 		return err
 	}
 
-	options := make(map[string]string)
-	options[ipam.OptAddressID] = nwCfg.Ipam.EndpointID
-	options[ipam.OptInterfaceName] = nwCfg.Master
-
-	var requestPool bool
-
-	// Allocate an address for the endpoint.
-	err, apInfo, ipAddress := plugin.RequestAddress(options, nwCfg)
-
-	defer func() {
-		if err != nil && ipAddress != nil {
-			log.Printf("[cni-ipam] Releasing address %v.", ipAddress)
-			plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, ipAddress.IP.String(), nil)
-		}
-	}()
-
-	if err != nil {
-		if err == ipam.ErrAddressPoolNotFound {
-			requestPool = true
-		} else {
-			err = plugin.Errorf("Failed to allocate address: %v", err)
-			return err
-		}
-	}
-
-	// Check if an address pool is needed to be created
-	// if so attempt to create to address pool
-	if requestPool {
+	// Check if an address pool is specified.
+	if nwCfg.Ipam.Subnet == "" {
 		var poolID string
 		var subnet string
+
+		// Select the requested interface.
+		options := make(map[string]string)
+		options[ipam.OptInterfaceName] = nwCfg.Master
 
 		isIpv6 := false
 		if nwCfg.Ipam.Type == ipamV6 {
@@ -202,14 +180,37 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 
 		nwCfg.Ipam.Subnet = subnet
 		log.Printf("[cni-ipam] Allocated address poolID %v with subnet %v.", poolID, subnet)
+	}
 
-		// Allocate the address as we just got a pool for the address
-		err, apInfo, ipAddress = plugin.RequestAddress(options, nwCfg)
+	// Allocate an address for the endpoint.
+	address, err := plugin.am.RequestAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address, nil)
+	if err != nil {
+		err = plugin.Errorf("Failed to allocate address: %v", err)
+		return err
+	}
 
-		if err != nil {
-			err = plugin.Errorf("Failed to allocate address: %v", err)
-			return err
+	// On failure, release the address.
+	defer func() {
+		if err != nil && address != "" {
+			log.Printf("[cni-ipam] Releasing address %v.", address)
+			plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, address, nil)
 		}
+	}()
+
+	log.Printf("[cni-ipam] Allocated address %v.", address)
+
+	// Parse IP address.
+	ipAddress, err := platform.ConvertStringToIPNet(address)
+	if err != nil {
+		err = plugin.Errorf("Failed to parse address: %v", err)
+		return err
+	}
+
+	// Query pool information for gateways and DNS servers.
+	apInfo, err := plugin.am.GetPoolInfo(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet)
+	if err != nil {
+		err = plugin.Errorf("Failed to get pool information: %v", err)
+		return err
 	}
 
 	version := "4"
@@ -279,25 +280,21 @@ func (plugin *ipamPlugin) Delete(args *cniSkel.CmdArgs) error {
 		return err
 	}
 
-	// If an address or endpoint id is specified, release that record. Otherwise, release the pool.
-	if nwCfg.Ipam.Address != "" || nwCfg.Ipam.EndpointID != "" {
+	// If an address is specified, release that address. Otherwise, release the pool.
+	if nwCfg.Ipam.Address != "" {
 		// Release the address.
-
-		options := make(map[string]string)
-		options[ipam.OptAddressID] = nwCfg.Ipam.EndpointID
-
-		err := plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address, options)
+		err := plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address, nil)
 		if err != nil {
 			err = plugin.Errorf("Failed to release address: %v", err)
 			return err
 		}
-	}
-
-	// Release the pool.
-	err = plugin.am.ReleasePool(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet)
-	if err != nil {
-		err = plugin.Errorf("Failed to release pool: %v", err)
-		return err
+	} else {
+		// Release the pool.
+		err := plugin.am.ReleasePool(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet)
+		if err != nil {
+			err = plugin.Errorf("Failed to release pool: %v", err)
+			return err
+		}
 	}
 
 	return nil
@@ -306,35 +303,4 @@ func (plugin *ipamPlugin) Delete(args *cniSkel.CmdArgs) error {
 // Update handles CNI update command.
 func (plugin *ipamPlugin) Update(args *cniSkel.CmdArgs) error {
 	return nil
-}
-
-// Request Address for CNI IPAM
-func (plugin *ipamPlugin) RequestAddress(options map[string]string, nwCfg *cni.NetworkConfig) (error, *ipam.AddressPoolInfo, *net.IPNet) {
-	var err error
-	var address string
-	var ipAddress *net.IPNet
-
-	address, err = plugin.am.RequestAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address, options)
-
-	if err != nil {
-		return err, nil, nil
-	}
-
-	log.Printf("[cni-ipam] Allocated address %v.", address)
-
-	// Parse IP address.
-	ipAddress, err = platform.ConvertStringToIPNet(address)
-	if err != nil {
-		err = plugin.Errorf("Failed to parse address: %v", err)
-		return err, nil, nil
-	}
-
-	// Query pool information for gateways and DNS servers.
-	apInfo, err := plugin.am.GetPoolInfo(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet)
-	if err != nil {
-		err = plugin.Errorf("Failed to get pool information: %v", err)
-		return err, nil, nil
-	}
-
-	return err, apInfo, ipAddress
 }

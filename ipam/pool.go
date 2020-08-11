@@ -314,7 +314,8 @@ func (as *addressSpace) requestPool(poolId string, subPoolId string, options map
 			if pool.isInUse() {
 				log.Printf("[ipam] Pool is in use.")
 
-				// in the case we
+				// in case the pool is actually not in use,
+				// attempt to release it
 				if !pool.IsAnyRecordInUse() {
 					as.releasePool(poolId)
 				}
