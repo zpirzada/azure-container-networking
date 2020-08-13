@@ -59,7 +59,7 @@ type allocatedIPCount struct {
 type ipConfigurationStatus struct {
 	NCID                string
 	ID                  string //uuid
-	IPSubnet            cns.IPSubnet
+	IPAddress           string
 	State               string
 	OrchestratorContext json.RawMessage
 }

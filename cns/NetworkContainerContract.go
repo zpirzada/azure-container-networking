@@ -127,7 +127,7 @@ type IPConfiguration struct {
 
 // SecondaryIPConfig contains IP info of SecondaryIP
 type SecondaryIPConfig struct {
-	IPSubnet IPSubnet
+	IPAddress string
 }
 
 // IPSubnet contains ip subnet.

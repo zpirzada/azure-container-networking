@@ -366,17 +366,11 @@ func TestUpdateSpecOnNonExistingNodeNetConfig(t *testing.T) {
 	logger.InitLogger("Azure CNS RequestController", 0, 0, "")
 
 	ipConfig1 := cns.SecondaryIPConfig{
-		IPSubnet: cns.IPSubnet{
-			IPAddress:    "10.0.0.1",
-			PrefixLength: 32,
-		},
+		IPAddress: "10.0.0.1",
 	}
 
 	ipConfig2 := cns.SecondaryIPConfig{
-		IPSubnet: cns.IPSubnet{
-			IPAddress:    "10.0.0.2",
-			PrefixLength: 32,
-		},
+		IPAddress: "10.0.0.2",
 	}
 
 	secondaryIPConfigs := map[string]cns.SecondaryIPConfig{
@@ -421,17 +415,11 @@ func TestUpdateSpecOnExistingNodeNetConfig(t *testing.T) {
 	logger.InitLogger("Azure CNS RequestController", 0, 0, "")
 
 	ipConfig1 := cns.SecondaryIPConfig{
-		IPSubnet: cns.IPSubnet{
-			IPAddress:    "10.0.0.1",
-			PrefixLength: 32,
-		},
+		IPAddress: "10.0.0.1",
 	}
 
 	ipConfig2 := cns.SecondaryIPConfig{
-		IPSubnet: cns.IPSubnet{
-			IPAddress:    "10.0.0.2",
-			PrefixLength: 32,
-		},
+		IPAddress: "10.0.0.2",
 	}
 
 	secondaryIPConfigs := map[string]cns.SecondaryIPConfig{

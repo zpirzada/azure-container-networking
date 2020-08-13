@@ -169,8 +169,7 @@ func (service *HTTPRestService) GetExistingIPConfig(podInfo cns.KubernetesPodInf
 	ipID := service.PodIPIDByOrchestratorContext[podInfo.GetOrchestratorContextKey()]
 	if ipID != "" {
 		if ipState, isExist := service.PodIPConfigState[ipID]; isExist {
-			ipConfiguration.IPSubnet = ipState.IPSubnet
-			err := service.populateIpConfigInfoFromNCUntransacted(ipState.NCID, &ipConfiguration)
+			err := service.populateIpConfigInfoUntransacted(ipState, &ipConfiguration)
 			return ipConfiguration, isExist, err
 		}
 
@@ -188,7 +187,7 @@ func (service *HTTPRestService) AllocateDesiredIPConfig(podInfo cns.KubernetesPo
 
 	found := false
 	for _, ipState := range service.PodIPConfigState {
-		if ipState.IPSubnet.IPAddress == desiredIPAddress {
+		if ipState.IPAddress == desiredIPAddress {
 			if ipState.State == cns.Allocated {
 				// This IP has already been allocated, if it is allocated to same pod, then return the same
 				// IPconfiguration
@@ -207,13 +206,8 @@ func (service *HTTPRestService) AllocateDesiredIPConfig(podInfo cns.KubernetesPo
 			}
 
 			if found {
-				err := service.populateIpConfigInfoFromNCUntransacted(ipState.NCID, &ipConfiguration)
-				if err != nil {
-					return ipConfiguration, err
-				}
-
-				ipConfiguration.IPSubnet = ipState.IPSubnet
-				return ipConfiguration, nil
+				err := service.populateIpConfigInfoUntransacted(ipState, &ipConfiguration)
+				return ipConfiguration, err
 			}
 		}
 	}
@@ -228,10 +222,10 @@ func (service *HTTPRestService) AllocateAnyAvailableIPConfig(podInfo cns.Kuberne
 
 	for _, ipState := range service.PodIPConfigState {
 		if ipState.State == cns.Available {
-			service.setIPConfigAsAllocated(ipState, podInfo, orchestratorContext)
-
-			ipConfiguration.IPSubnet = ipState.IPSubnet
-			err := service.populateIpConfigInfoFromNCUntransacted(ipState.NCID, &ipConfiguration)
+			err := service.populateIpConfigInfoUntransacted(ipState, &ipConfiguration)
+			if err == nil {
+				service.setIPConfigAsAllocated(ipState, podInfo, orchestratorContext)
+			}
 			return ipConfiguration, err
 		}
 	}

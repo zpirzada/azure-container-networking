@@ -47,23 +47,20 @@ func getTestService() *HTTPRestService {
 	return svc
 }
 
-func newSecondaryIPConfig(ipAddress string, prefixLength uint8) cns.SecondaryIPConfig {
+func newSecondaryIPConfig(ipAddress string) cns.SecondaryIPConfig {
 	return cns.SecondaryIPConfig{
-		IPSubnet: cns.IPSubnet{
-			IPAddress:    ipAddress,
-			PrefixLength: prefixLength,
-		},
+		IPAddress: ipAddress,
 	}
 }
 
 func NewPodState(ipaddress string, prefixLength uint8, id, ncid, state string) ipConfigurationStatus {
-	ipconfig := newSecondaryIPConfig(ipaddress, prefixLength)
+	ipconfig := newSecondaryIPConfig(ipaddress)
 
 	return ipConfigurationStatus{
-		IPSubnet: ipconfig.IPSubnet,
-		ID:       id,
-		NCID:     ncid,
-		State:    state,
+		IPAddress: ipconfig.IPAddress,
+		ID:        id,
+		NCID:      ncid,
+		State:     state,
 	}
 }
 
@@ -88,6 +85,7 @@ func requestIpAddressAndGetState(t *testing.T, req cns.GetIPConfigRequest) (ipCo
 	if reflect.DeepEqual(ipConfig.GatewayIPAddress, gatewayIp) != true {
 		t.Fatalf("Gateway is not added as expected ipConfig %+v, expected GatewayIp: %+v", ipConfig, gatewayIp)
 	}
+
 	// retrieve podinfo from orchestrator context
 	if err := json.Unmarshal(req.OrchestratorContext, &podInfo); err != nil {
 		return ipState, err
@@ -100,10 +98,10 @@ func requestIpAddressAndGetState(t *testing.T, req cns.GetIPConfigRequest) (ipCo
 }
 
 func NewPodStateWithOrchestratorContext(ipaddress string, prefixLength uint8, id, ncid, state string, orchestratorContext cns.KubernetesPodInfo) (ipConfigurationStatus, error) {
-	ipconfig := newSecondaryIPConfig(ipaddress, prefixLength)
+	ipconfig := newSecondaryIPConfig(ipaddress)
 	b, err := json.Marshal(orchestratorContext)
 	return ipConfigurationStatus{
-		IPSubnet:            ipconfig.IPSubnet,
+		IPAddress:           ipconfig.IPAddress,
 		ID:                  id,
 		NCID:                ncid,
 		State:               state,
@@ -117,10 +115,7 @@ func UpdatePodIpConfigState(t *testing.T, svc *HTTPRestService, ipconfigs map[st
 	secondaryIPConfigs := make(map[string]cns.SecondaryIPConfig)
 	for _, ipconfig := range ipconfigs {
 		secIpConfig := cns.SecondaryIPConfig{
-			IPSubnet: cns.IPSubnet{
-				IPAddress:    ipconfig.IPSubnet.IPAddress,
-				PrefixLength: ipconfig.IPSubnet.PrefixLength,
-			},
+			IPAddress: ipconfig.IPAddress,
 		}
 
 		ipId := ipconfig.ID
@@ -406,7 +401,7 @@ func TestIPAMRequestThenReleaseThenRequestAgain(t *testing.T) {
 
 	desiredState, _ := NewPodStateWithOrchestratorContext(testIP1, 24, testPod1GUID, testNCID, cns.Allocated, testPod1Info)
 	// want first available Pod IP State
-	desiredState.IPSubnet = desiredIPConfig
+	desiredState.IPAddress = desiredIPConfig.IPAddress
 	desiredState.OrchestratorContext = b
 
 	if reflect.DeepEqual(desiredState, actualstate) != true {
@@ -489,7 +484,10 @@ func TestAvailableIPConfigs(t *testing.T) {
 	req := cns.GetIPConfigRequest{}
 	b, _ := json.Marshal(testPod1Info)
 	req.OrchestratorContext = b
-	req.DesiredIPConfig = state1.IPSubnet
+	req.DesiredIPConfig = cns.IPSubnet{
+		IPAddress:    state1.IPAddress,
+		PrefixLength: 32,
+	}
 
 	_, err := requestIpAddressAndGetState(t, req)
 	if err != nil {

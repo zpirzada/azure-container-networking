@@ -58,7 +58,7 @@ func TestReconcileNCWithExistingState(t *testing.T) {
 	var startingIndex = 6
 	for i := 0; i < 4; i++ {
 		ipaddress := "10.0.0." + strconv.Itoa(startingIndex)
-		secIpConfig := newSecondaryIPConfig(ipaddress, 32)
+		secIpConfig := newSecondaryIPConfig(ipaddress)
 		ipId := uuid.New()
 		secondaryIPConfigs[ipId.String()] = secIpConfig
 		startingIndex++
@@ -95,7 +95,7 @@ func TestReconcileNCWithSystemPods(t *testing.T) {
 	var startingIndex = 6
 	for i := 0; i < 4; i++ {
 		ipaddress := "10.0.0." + strconv.Itoa(startingIndex)
-		secIpConfig := newSecondaryIPConfig(ipaddress, 32)
+		secIpConfig := newSecondaryIPConfig(ipaddress)
 		ipId := uuid.New()
 		secondaryIPConfigs[ipId.String()] = secIpConfig
 		startingIndex++
@@ -136,7 +136,7 @@ func validateCreateOrUpdateNCInternal(t *testing.T, secondaryIpCount int) {
 	var startingIndex = 6
 	for i := 0; i < secondaryIpCount; i++ {
 		ipaddress := "10.0.0." + strconv.Itoa(startingIndex)
-		secIpConfig := newSecondaryIPConfig(ipaddress, 32)
+		secIpConfig := newSecondaryIPConfig(ipaddress)
 		ipId := uuid.New()
 		secondaryIPConfigs[ipId.String()] = secIpConfig
 		startingIndex++
@@ -148,7 +148,7 @@ func validateCreateOrUpdateNCInternal(t *testing.T, secondaryIpCount int) {
 	fmt.Println("Validate Scaleup")
 	for i := 0; i < secondaryIpCount; i++ {
 		ipaddress := "10.0.0." + strconv.Itoa(startingIndex)
-		secIpConfig := newSecondaryIPConfig(ipaddress, 32)
+		secIpConfig := newSecondaryIPConfig(ipaddress)
 		ipId := uuid.New()
 		secondaryIPConfigs[ipId.String()] = secIpConfig
 		startingIndex++
@@ -216,8 +216,8 @@ func validateNetworkRequest(t *testing.T, req cns.CreateNetworkContainerRequest)
 			if secondaryIpConfig, ok := req.SecondaryIPConfigs[ipid]; !ok {
 				t.Fatalf("PodIpConfigState has stale ipId: %s, config: %+v", ipid, ipStatus)
 			} else {
-				if ipStatus.IPSubnet != secondaryIpConfig.IPSubnet {
-					t.Fatalf("IPId: %s IPSubnet doesnt match: expected %+v, actual: %+v", ipid, secondaryIpConfig.IPSubnet, ipStatus.IPSubnet)
+				if ipStatus.IPAddress != secondaryIpConfig.IPAddress {
+					t.Fatalf("IPId: %s IPSubnet doesnt match: expected %+v, actual: %+v", ipid, secondaryIpConfig.IPAddress, ipStatus.IPAddress)
 				}
 
 				// Validate IP state
@@ -239,12 +239,12 @@ func validateNetworkRequest(t *testing.T, req cns.CreateNetworkContainerRequest)
 					t.Fatalf("IPId: %s State is not Available, ipStatus: %+v", ipid, ipStatus)
 				}
 
-				alreadyValidated[ipid] = ipStatus.IPSubnet.IPAddress
+				alreadyValidated[ipid] = ipStatus.IPAddress
 			}
 		} else {
 			// if ipaddress is not same, then fail
-			if ipaddress != ipStatus.IPSubnet.IPAddress {
-				t.Fatalf("Added the same IP guid :%s with different ipaddress, expected:%s, actual %s", ipid, ipStatus.IPSubnet.IPAddress, ipaddress)
+			if ipaddress != ipStatus.IPAddress {
+				t.Fatalf("Added the same IP guid :%s with different ipaddress, expected:%s, actual %s", ipid, ipStatus.IPAddress, ipaddress)
 			}
 		}
 	}
@@ -298,7 +298,7 @@ func validateNCStateAfterReconcile(t *testing.T, ncRequest *cns.CreateNetworkCon
 		}
 
 		// Validate if IPAddress matches
-		if ipConfigstate.IPSubnet.IPAddress != ipaddress {
+		if ipConfigstate.IPAddress != ipaddress {
 			t.Fatalf("IpAddress %s is not same, for Pod: %+v, actual ipState: %+v", ipaddress, podInfo, ipConfigstate)
 		}
 
@@ -319,7 +319,7 @@ func validateNCStateAfterReconcile(t *testing.T, ncRequest *cns.CreateNetworkCon
 	// validate rest of Secondary IPs in Available state
 	if ncRequest != nil {
 		for secIpId, secIpConfig := range ncRequest.SecondaryIPConfigs {
-			if _, exists := expectedAllocatedPods[secIpConfig.IPSubnet.IPAddress]; exists {
+			if _, exists := expectedAllocatedPods[secIpConfig.IPAddress]; exists {
 				continue
 			}
 

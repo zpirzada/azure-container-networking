@@ -167,12 +167,12 @@ func (service *HTTPRestService) ReconcileNCState(ncRequest *cns.CreateNetworkCon
 
 	// now parse the secondaryIP list, if it exists in PodInfo list, then allocate that ip
 	for _, secIpConfig := range ncRequest.SecondaryIPConfigs {
-		if podInfo, exists := podInfoByIp[secIpConfig.IPSubnet.IPAddress]; exists {
+		if podInfo, exists := podInfoByIp[secIpConfig.IPAddress]; exists {
 			log.Logf("SecondaryIP %+v is allocated to Pod. %+v, ncId: %s", secIpConfig, podInfo, ncRequest.NetworkContainerid)
 
 			desiredIPConfig := cns.IPSubnet{
-				IPAddress:    secIpConfig.IPSubnet.IPAddress,
-				PrefixLength: secIpConfig.IPSubnet.PrefixLength,
+				IPAddress:    secIpConfig.IPAddress,
+				PrefixLength: 32, //todo: remove PrefixLenght in
 			}
 
 			kubernetesPodInfo := cns.KubernetesPodInfo{
@@ -220,11 +220,10 @@ func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.C
 	}
 
 	// Validate SecondaryIPConfig
-	for ipId, secIpconfig := range req.SecondaryIPConfigs {
+	for _, secIpconfig := range req.SecondaryIPConfigs {
 		// Validate Ipconfig
-		err := validateIPSubnet(secIpconfig.IPSubnet)
-		if err != nil {
-			logger.Errorf("[Azure CNS] Error. SecondaryIpConfig, Id:%s is invalid, SecondaryIPConfig: %v, ncId: %s", ipId, secIpconfig, req.NetworkContainerid)
+		if secIpconfig.IPAddress == "" {
+			logger.Errorf("Failed to add IPConfig to state: %+v, empty IPSubnet.IPAddress", secIpconfig)
 			return InvalidSecondaryIPConfig
 		}
 	}

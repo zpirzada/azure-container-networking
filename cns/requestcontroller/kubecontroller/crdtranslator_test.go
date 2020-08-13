@@ -195,12 +195,8 @@ func TestStatusToNCRequestSuccess(t *testing.T) {
 		t.Fatalf("Expected there to be a secondary ip with the key %v but found nothing", allocatedUUID)
 	}
 
-	if secondaryIP.IPSubnet.IPAddress != ipCIDRString {
-		t.Fatalf("Expected %v as the secondary IP config but got %v", ipCIDRString, secondaryIP.IPSubnet.IPAddress)
-	}
-
-	if secondaryIP.IPSubnet.PrefixLength != ipCIDRMaskLength {
-		t.Fatalf("Expected %v as the prefix length for the secondary IP config but got %v", ipCIDRMaskLength, secondaryIP.IPSubnet.PrefixLength)
+	if secondaryIP.IPAddress != ipCIDRString {
+		t.Fatalf("Expected %v as the secondary IP config but got %v", ipCIDRString, secondaryIP.IPAddress)
 	}
 }
 
@@ -233,10 +229,7 @@ func TestSecondaryIPsToCRDSpecSuccess(t *testing.T) {
 
 	secondaryIPs = map[string]cns.SecondaryIPConfig{
 		allocatedUUID: {
-			IPSubnet: cns.IPSubnet{
-				IPAddress:    ipCIDRString,
-				PrefixLength: ipCIDRMaskLength,
-			},
+			IPAddress: ipCIDRString,
 		},
 	}
 

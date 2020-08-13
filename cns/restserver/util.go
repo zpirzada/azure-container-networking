@@ -241,7 +241,7 @@ func (service *HTTPRestService) updateIpConfigsStateUntransacted(req cns.CreateN
 	return 0, ""
 }
 
-// addIPConfigStateUntransacted adds the IPConfis to the PodIpConfigState map with Available state
+// addIPConfigStateUntransacted adds the IPConfigs to the PodIpConfigState map with Available state
 // If the IP is already added then it will be an idempotent call. Also note, caller will
 // acquire/release the service lock.
 func (service *HTTPRestService) addIPConfigStateUntransacted(ncId string, ipconfigs map[string]cns.SecondaryIPConfig) {
@@ -256,7 +256,7 @@ func (service *HTTPRestService) addIPConfigStateUntransacted(ncId string, ipconf
 		ipconfigStatus := ipConfigurationStatus{
 			NCID:                ncId,
 			ID:                  ipId,
-			IPSubnet:            ipconfig.IPSubnet,
+			IPAddress:           ipconfig.IPAddress,
 			State:               cns.Available,
 			OrchestratorContext: nil,
 		}
@@ -640,19 +640,24 @@ func (service *HTTPRestService) validateIpConfigRequest(ipConfigRequest cns.GetI
 	return Success, ""
 }
 
-func (service *HTTPRestService) populateIpConfigInfoFromNCUntransacted(ncId string, ipConfiguration *cns.IPConfiguration) error {
+func (service *HTTPRestService) populateIpConfigInfoUntransacted(ipConfigStatus ipConfigurationStatus, ipConfiguration *cns.IPConfiguration) error {
 	var (
 		ncStatus containerstatus
 		exists   bool
 	)
 
-	if ncStatus, exists = service.state.ContainerStatus[ncId]; !exists {
-		return fmt.Errorf("Failed to get NC Configuration for NcId: %s", ncId)
+	if ncStatus, exists = service.state.ContainerStatus[ipConfigStatus.NCID]; !exists {
+		return fmt.Errorf("Failed to get NC Configuration for NcId: %s", ipConfigStatus.NCID)
 	}
 
 	ipConfiguration.DNSServers = ncStatus.CreateNetworkContainerRequest.IPConfiguration.DNSServers
 	ipConfiguration.GatewayIPAddress = ncStatus.CreateNetworkContainerRequest.IPConfiguration.GatewayIPAddress
 
+	// TODO: This will be changed soon, and prefix length will be set as Subnetprefix length
+	ipConfiguration.IPSubnet = cns.IPSubnet{
+		IPAddress:    ipConfigStatus.IPAddress,
+		PrefixLength: 32,
+	}
 	return nil
 }
 

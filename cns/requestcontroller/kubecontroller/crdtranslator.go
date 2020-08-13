@@ -37,7 +37,8 @@ func CRDStatusToNCRequest(crdStatus nnc.NodeNetworkConfigStatus) (cns.CreateNetw
 		ncRequest.NetworkContainerid = nc.ID
 		ncRequest.NetworkContainerType = cns.Docker
 
-		// Convert "10.0.0.1/32" into "10.0.0.1" and 32
+		// Convert "10.0.0.1/32" into "10.0.0.1" and prefix length
+		// Todo, this will be changed soon and only ipaddress will be passed
 		if ip, ipNet, err = net.ParseCIDR(nc.PrimaryIP); err != nil {
 			return ncRequest, err
 		}
@@ -49,16 +50,12 @@ func CRDStatusToNCRequest(crdStatus nnc.NodeNetworkConfigStatus) (cns.CreateNetw
 		ncRequest.IPConfiguration.GatewayIPAddress = nc.DefaultGateway
 
 		for _, ipAssignment = range nc.IPAssignments {
-			if ip, ipNet, err = net.ParseCIDR(ipAssignment.IP); err != nil {
+			if ip, _, err = net.ParseCIDR(ipAssignment.IP); err != nil {
 				return ncRequest, err
 			}
 
-			_, bits = ipNet.Mask.Size()
-
-			ipSubnet.IPAddress = ip.String()
-			ipSubnet.PrefixLength = uint8(bits)
 			secondaryIPConfig = cns.SecondaryIPConfig{
-				IPSubnet: ipSubnet,
+				IPAddress: ip.String(),
 			}
 			ncRequest.SecondaryIPConfigs[ipAssignment.Name] = secondaryIPConfig
 		}
