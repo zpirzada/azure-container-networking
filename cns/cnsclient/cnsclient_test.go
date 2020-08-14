@@ -105,11 +105,15 @@ func TestMain(m *testing.M) {
 	defer os.RemoveAll(tmpLogDir)
 	defer os.Remove(tmpFileState.Name())
 
+	logName := "azure-cns.log"
+	fmt.Printf("Test logger file: %v", tmpLogDir+"/"+logName)
+	fmt.Printf("Test state :%v", tmpFileState.Name())
+
 	if err != nil {
 		panic(err)
 	}
 
-	logger.InitLogger("azure-cns.log", 0, 0, tmpLogDir)
+	logger.InitLogger(logName, 0, 0, tmpLogDir+"/")
 	config := common.ServiceConfig{}
 
 	httpRestService, err := restserver.NewHTTPRestService(&config)

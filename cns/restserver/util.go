@@ -622,22 +622,23 @@ func (service *HTTPRestService) SendNCSnapShotPeriodically(ncSnapshotIntervalInM
 	}
 }
 
-func (service *HTTPRestService) validateIpConfigRequest(ipConfigRequest cns.GetIPConfigRequest) (int, string) {
+func (service *HTTPRestService) validateIpConfigRequest(ipConfigRequest cns.GetIPConfigRequest) (cns.KubernetesPodInfo, int, string) {
+	var podInfo cns.KubernetesPodInfo
+
 	if service.state.OrchestratorType != cns.KubernetesCRD {
-		return UnsupportedOrchestratorType, fmt.Sprintf("ReleaseIPConfig API supported only for kubernetes orchestrator")
+		return podInfo, UnsupportedOrchestratorType, fmt.Sprintf("ReleaseIPConfig API supported only for kubernetes orchestrator")
 	}
 
 	if ipConfigRequest.OrchestratorContext == nil {
-		return EmptyOrchestratorContext, fmt.Sprintf("OrchastratorContext is not set in the req: %+v", ipConfigRequest)
+		return podInfo, EmptyOrchestratorContext, fmt.Sprintf("OrchastratorContext is not set in the req: %+v", ipConfigRequest)
 	}
 
 	// retrieve podinfo  from orchestrator context
-	var podInfo cns.KubernetesPodInfo
 	if err := json.Unmarshal(ipConfigRequest.OrchestratorContext, &podInfo); err != nil {
-		return UnsupportedOrchestratorContext, err.Error()
+		return podInfo, UnsupportedOrchestratorContext, err.Error()
 	}
 
-	return Success, ""
+	return podInfo, Success, ""
 }
 
 func (service *HTTPRestService) populateIpConfigInfoUntransacted(ipConfigStatus ipConfigurationStatus, ipConfiguration *cns.IPConfiguration) error {
