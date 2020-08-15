@@ -462,9 +462,6 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 	endpointId := GetEndpointID(args)
 	policies := cni.GetPoliciesFromNwCfg(nwCfg.AdditionalArgs)
 
-	// add endpoint ID to leverage in failure cases
-	nwCfg.Ipam.EndpointID = endpointId
-
 	// Check whether the network already exists.
 	nwInfo, nwInfoErr := plugin.nm.GetNetworkInfo(networkId)
 	if nwInfoErr == nil {
@@ -837,8 +834,6 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	}
 
 	endpointId := GetEndpointID(args)
-	// add endpoint ID to leverage in failure cases
-	nwCfg.Ipam.EndpointID = endpointId
 
 	// Query the network.
 	if nwInfo, err = plugin.nm.GetNetworkInfo(networkId); err != nil {

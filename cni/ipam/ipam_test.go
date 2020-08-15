@@ -11,13 +11,13 @@ import (
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"net"
 	"net/http"
 	"net/url"
 	"testing"
 	"time"
 
 	"github.com/Azure/azure-container-networking/common"
-	"github.com/Azure/azure-container-networking/platform"
 )
 
 var ipamQueryUrl = "localhost:42424"
@@ -28,6 +28,7 @@ var ipamQueryResponse = "" +
 	"			<IPAddress Address=\"10.0.0.4\" IsPrimary=\"true\"/>" +
 	"			<IPAddress Address=\"10.0.0.5\" IsPrimary=\"false\"/>" +
 	"			<IPAddress Address=\"10.0.0.6\" IsPrimary=\"false\"/>" +
+	"			<IPAddress Address=\"10.0.0.7\" IsPrimary=\"false\"/>" +
 	"		</IPSubnet>" +
 	"	</Interface>" +
 	"</Interfaces>"
@@ -50,17 +51,16 @@ func parseResult(stdinData []byte) (*cniTypesCurr.Result, error) {
 	return result, nil
 }
 
-func getStdinData(cniversion, subnet, ipAddress, endPointId string) []byte {
+func getStdinData(cniversion, subnet, ipAddress string) []byte {
 	stdinData := fmt.Sprintf(
 		`{
 			"cniversion": "%s",
 			"ipam": {
 				"type": "internal",
 				"subnet": "%s",
-				"ipAddress": "%s",
-				"EndpointID": "%s"
+				"ipAddress": "%s"
 			}
-		}`, cniversion, subnet, ipAddress, endPointId)
+		}`, cniversion, subnet, ipAddress)
 
 	return []byte(stdinData)
 }
@@ -71,6 +71,14 @@ var (
 	arg         *cniSkel.CmdArgs
 	err         error
 	endpointID1 = uuid.New().String()
+
+	//this usedAddresses map is to test not duplicate IP's
+	// have been provided throughout this test execution
+	UsedAddresses = map[string]string{}
+
+	//below is the network,used to test if the IP's provided by IPAM
+	// is in the the space requested.
+	network = net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(16, 32)}
 
 	_ = BeforeSuite(func() {
 		// TODO: Ensure that the other testAgent has bees released.
@@ -123,29 +131,40 @@ var (
 
 			Context("When ADD with nothing, call for ipam triggering request pool and address", func() {
 				It("Request pool and ADD successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "", "", endpointID1)
+					arg.StdinData = getStdinData("0.4.0", "", "")
 					err = plugin.Add(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 					result, err = parseResult(arg.StdinData)
 					Expect(err).ShouldNot(HaveOccurred())
-					address1, _ := platform.ConvertStringToIPNet("10.0.0.5/16")
-					address2, _ := platform.ConvertStringToIPNet("10.0.0.6/16")
-					Expect(result.IPs[0].Address.IP).Should(Or(Equal(address1.IP), Equal(address2.IP)))
-					Expect(result.IPs[0].Address.Mask).Should(Equal(address1.Mask))
+
+					//confirm if IP is in use by other invocation
+					_, exists := UsedAddresses[result.IPs[0].Address.IP.String()]
+
+					Expect(exists).Should(BeFalse())
+
+					// set the IP as in use
+					UsedAddresses[result.IPs[0].Address.IP.String()] = result.IPs[0].Address.IP.String()
+
+					//validate the IP is part of this network IP space
+					Expect(network.Contains(result.IPs[0].Address.IP)).Should(Equal(true))
+					Expect(result.IPs[0].Address.Mask).Should(Equal(network.Mask))
 				})
 			})
 
 			Context("When DELETE with subnet and address, call for ipam triggering release address", func() {
 				It("DELETE address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", result.IPs[0].Address.IP.String(), endpointID1)
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", result.IPs[0].Address.IP.String())
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
+
+					delete(UsedAddresses, result.IPs[0].Address.IP.String())
+
 				})
 			})
 
 			Context("When DELETE with subnet, call for ipam triggering releasing pool", func() {
 				It("DELETE pool successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "", endpointID1)
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "")
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 				})
@@ -156,62 +175,139 @@ var (
 
 			Context("When address is given", func() {
 				It("Request pool and address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "", "10.0.0.6", "")
+					arg.StdinData = getStdinData("0.4.0", "", "10.0.0.6")
 					err = plugin.Add(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 					result, err := parseResult(arg.StdinData)
 					Expect(err).ShouldNot(HaveOccurred())
-					address, _ := platform.ConvertStringToIPNet("10.0.0.6/16")
-					Expect(result.IPs[0].Address.IP).Should(Equal(address.IP))
-					Expect(result.IPs[0].Address.Mask).Should(Equal(address.Mask))
+
+					//confirm if IP is in use by other invocation
+					_, exists := UsedAddresses[result.IPs[0].Address.IP.String()]
+
+					Expect(exists).Should(BeFalse())
+
+					// set the IP as in use
+					UsedAddresses[result.IPs[0].Address.IP.String()] = result.IPs[0].Address.IP.String()
+
+					//validate the IP is part of this network IP space
+					Expect(network.Contains(result.IPs[0].Address.IP)).Should(Equal(true))
+					Expect(result.IPs[0].Address.Mask).Should(Equal(network.Mask))
 				})
 			})
 
 			Context("When subnet is given", func() {
 				It("Request a usable address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "", endpointID1)
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "")
 					err = plugin.Add(arg)
 
 					Expect(err).ShouldNot(HaveOccurred())
 					result, err := parseResult(arg.StdinData)
 					Expect(err).ShouldNot(HaveOccurred())
-					address, _ := platform.ConvertStringToIPNet("10.0.0.5/16")
-					Expect(result.IPs[0].Address.IP).Should(Equal(address.IP))
-					Expect(result.IPs[0].Address.Mask).Should(Equal(address.Mask))
+
+					//confirm if IP is in use by other invocation
+					_, exists := UsedAddresses[result.IPs[0].Address.IP.String()]
+
+					Expect(exists).Should(BeFalse())
+
+					// set the IP as in use
+					UsedAddresses[result.IPs[0].Address.IP.String()] = result.IPs[0].Address.IP.String()
+
+					//validate the IP is part of this network IP space
+					Expect(network.Contains(result.IPs[0].Address.IP)).Should(Equal(true))
+					Expect(result.IPs[0].Address.Mask).Should(Equal(network.Mask))
+				})
+			})
+
+			Context("When container id is given with subnet", func() {
+				It("Request a usable address successfully", func() {
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "")
+					arg.ContainerID = endpointID1
+					err = plugin.Add(arg)
+
+					Expect(err).ShouldNot(HaveOccurred())
+					result, err := parseResult(arg.StdinData)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					//confirm if IP is in use by other invocation
+					_, exists := UsedAddresses[result.IPs[0].Address.IP.String()]
+
+					Expect(exists).Should(BeFalse())
+
+					// set the IP as in use and the container ID is using it
+					UsedAddresses[result.IPs[0].Address.IP.String()] = result.IPs[0].Address.IP.String()
+					UsedAddresses[arg.ContainerID] = result.IPs[0].Address.IP.String()
+
+					//validate the IP is part of this network IP space
+					Expect(network.Contains(result.IPs[0].Address.IP)).Should(Equal(true))
+					Expect(result.IPs[0].Address.Mask).Should(Equal(network.Mask))
+
+					//release the container ID for not test
+					arg.ContainerID = ""
 				})
 			})
 		})
 
 		Describe("Test IPAM DELETE", func() {
 
-			Context("When address and subnet is given", func() {
-				It("Release address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.5", endpointID1)
+			Context("Delete when only container id is given", func() {
+				It("Deleted", func() {
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "")
+					arg.ContainerID = endpointID1
+
 					err = plugin.Delete(arg)
+
+					addressKey := UsedAddresses[arg.ContainerID]
+
+					// set IP and container ID as not in use
+					delete(UsedAddresses, addressKey)
+					delete(UsedAddresses, arg.ContainerID)
+
 					Expect(err).ShouldNot(HaveOccurred())
+					arg.ContainerID = ""
 				})
 			})
 
 			Context("When address and subnet is given", func() {
 				It("Release address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.6", endpointID1)
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.5")
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
+
+					// set IP as not in use
+					delete(UsedAddresses, "10.0.0.5")
+				})
+			})
+
+			Context("When pool is in use", func() {
+				It("Fail to request pool", func() {
+					arg.StdinData = getStdinData("0.4.0", "", "")
+					err = plugin.Add(arg)
+					Expect(err).Should(HaveOccurred())
+				})
+			})
+
+			Context("When address and subnet is given", func() {
+				It("Release address successfully", func() {
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.6")
+					err = plugin.Delete(arg)
+					Expect(err).ShouldNot(HaveOccurred())
+					// set IP as not in use
+					delete(UsedAddresses, "10.0.0.6")
 				})
 			})
 
 			Context("When subnet is given", func() {
 				It("Release pool successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "", endpointID1)
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "")
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 				})
 			})
 
-			Context("When subnet is given and no Id", func() {
-				It("Release pool successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "", "")
-					err = plugin.Delete(arg)
+			Context("When pool is not use", func() {
+				It("Confirm pool was released by succesfully requesting pool", func() {
+					arg.StdinData = getStdinData("0.4.0", "", "")
+					err = plugin.Add(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 				})
 			})

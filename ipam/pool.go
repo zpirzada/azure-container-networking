@@ -521,10 +521,9 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 	if id != "" {
 		ap.addrsByID[id] = ar
 		ar.ID = id
-		ar.InUse = true
-	} else {
-		ar.InUse = true
 	}
+
+	ar.InUse = true
 
 	// Return address in CIDR notation.
 	addr = &net.IPNet{
@@ -576,6 +575,7 @@ func (ap *addressPool) releaseAddress(address string, options map[string]string)
 	}
 
 	ar.InUse = false
+	ar.ID = ""
 
 	if id != "" && ar.ID == id {
 		delete(ap.addrsByID, ar.ID)
