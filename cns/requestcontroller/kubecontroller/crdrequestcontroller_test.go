@@ -23,7 +23,7 @@ const (
 	existingNNCName      = "nodenetconfig_1"
 	existingPodName      = "pod_1"
 	hostNetworkPodName   = "pod_hostNet"
-	allocatedPodIP       = "10.0.0.1/32"
+	allocatedPodIP       = "10.0.0.2"
 	allocatedUUID        = "539970a2-c2dd-11ea-b3de-0242ac130004"
 	allocatedUUID2       = "01a5dd00-cd5d-11ea-87d0-0242ac130003"
 	networkContainerID   = "24fcd232-0364-41b0-8027-6e6ef9aeabc6"
@@ -31,7 +31,8 @@ const (
 	nonexistingNNCName   = "nodenetconfig_nonexisting"
 	nonexistingPodName   = "pod_nonexisting"
 	nonexistingNamespace = "namespace_nonexisting"
-	ncPrimaryIP          = "10.0.0.1/32"
+	ncPrimaryIP          = "10.0.0.1"
+	subnetRange          = "10.0.0.0/24"
 )
 
 // MockAPI is a mock of kubernete's API server
@@ -607,6 +608,7 @@ func TestInitRequestController(t *testing.T) {
 							IP:   allocatedPodIP,
 						},
 					},
+					SubnetAddressSpace: subnetRange,
 				},
 			},
 		},

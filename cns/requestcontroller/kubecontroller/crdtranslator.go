@@ -19,7 +19,7 @@ func CRDStatusToNCRequest(crdStatus nnc.NodeNetworkConfigStatus) (cns.CreateNetw
 		err               error
 		ip                net.IP
 		ipNet             *net.IPNet
-		bits              int
+		size              int
 		numNCsSupported   int
 		numNCs            int
 	)
@@ -37,21 +37,23 @@ func CRDStatusToNCRequest(crdStatus nnc.NodeNetworkConfigStatus) (cns.CreateNetw
 		ncRequest.NetworkContainerid = nc.ID
 		ncRequest.NetworkContainerType = cns.Docker
 
-		// Convert "10.0.0.1/32" into "10.0.0.1" and prefix length
-		// Todo, this will be changed soon and only ipaddress will be passed
-		if ip, ipNet, err = net.ParseCIDR(nc.PrimaryIP); err != nil {
-			return ncRequest, err
+		if ip = net.ParseIP(nc.PrimaryIP); ip == nil {
+			return ncRequest, fmt.Errorf("Invalid PrimaryIP %s:", nc.PrimaryIP)
 		}
-		_, bits = ipNet.Mask.Size()
 
+		if _, ipNet, err = net.ParseCIDR(nc.SubnetAddressSpace); err != nil {
+			return ncRequest, fmt.Errorf("Invalid SubnetAddressSpace %s:, err:%s", nc.SubnetAddressSpace, err)
+		}
+
+		size, _ = ipNet.Mask.Size()
 		ipSubnet.IPAddress = ip.String()
-		ipSubnet.PrefixLength = uint8(bits)
+		ipSubnet.PrefixLength = uint8(size)
 		ncRequest.IPConfiguration.IPSubnet = ipSubnet
 		ncRequest.IPConfiguration.GatewayIPAddress = nc.DefaultGateway
 
 		for _, ipAssignment = range nc.IPAssignments {
-			if ip, _, err = net.ParseCIDR(ipAssignment.IP); err != nil {
-				return ncRequest, err
+			if ip = net.ParseIP(ipAssignment.IP); ip == nil {
+				return ncRequest, fmt.Errorf("Invalid SecondaryIP %s:", ipAssignment.IP)
 			}
 
 			secondaryIPConfig = cns.SecondaryIPConfig{

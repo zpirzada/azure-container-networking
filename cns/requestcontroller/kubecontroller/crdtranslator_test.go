@@ -8,14 +8,15 @@ import (
 )
 
 const (
-	ncID             = "160005ba-cd02-11ea-87d0-0242ac130003"
-	ipCIDR           = "10.0.0.1/32"
-	ipCIDRString     = "10.0.0.1"
-	ipCIDRMaskLength = 32
-	ipNotCIDR        = "10.0.0.1"
-	ipMalformed      = "10.0.0.0.0"
-	defaultGateway   = "10.0.0.2"
-	subnetName       = "subnet1"
+	ncID               = "160005ba-cd02-11ea-87d0-0242ac130003"
+	primaryIp          = "10.0.0.1"
+	ipInCIDR           = "10.0.0.1/32"
+	ipMalformed        = "10.0.0.0.0"
+	defaultGateway     = "10.0.0.2"
+	subnetName         = "subnet1"
+	subnetAddressSpace = "10.0.0.0/24"
+	subnetPrefixLen    = 24
+	testSecIp1         = "10.0.0.2"
 )
 
 func TestStatusToNCRequestMalformedPrimaryIP(t *testing.T) {
@@ -32,9 +33,10 @@ func TestStatusToNCRequestMalformedPrimaryIP(t *testing.T) {
 				IPAssignments: []nnc.IPAssignment{
 					{
 						Name: allocatedUUID,
-						IP:   ipCIDR,
+						IP:   testSecIp1,
 					},
 				},
+				SubnetAddressSpace: subnetAddressSpace,
 			},
 		},
 	}
@@ -56,7 +58,7 @@ func TestStatusToNCRequestMalformedIPAssignment(t *testing.T) {
 	status = nnc.NodeNetworkConfigStatus{
 		NetworkContainers: []nnc.NetworkContainer{
 			{
-				PrimaryIP: ipCIDR,
+				PrimaryIP: primaryIp,
 				ID:        ncID,
 				IPAssignments: []nnc.IPAssignment{
 					{
@@ -64,6 +66,7 @@ func TestStatusToNCRequestMalformedIPAssignment(t *testing.T) {
 						IP:   ipMalformed,
 					},
 				},
+				SubnetAddressSpace: subnetAddressSpace,
 			},
 		},
 	}
@@ -76,7 +79,7 @@ func TestStatusToNCRequestMalformedIPAssignment(t *testing.T) {
 	}
 }
 
-func TestStatusToNCRequestPrimaryIPNotCIDR(t *testing.T) {
+func TestStatusToNCRequestPrimaryIPInCIDR(t *testing.T) {
 	var (
 		status nnc.NodeNetworkConfigStatus
 		err    error
@@ -85,14 +88,15 @@ func TestStatusToNCRequestPrimaryIPNotCIDR(t *testing.T) {
 	status = nnc.NodeNetworkConfigStatus{
 		NetworkContainers: []nnc.NetworkContainer{
 			{
-				PrimaryIP: ipNotCIDR,
+				PrimaryIP: ipInCIDR,
 				ID:        ncID,
 				IPAssignments: []nnc.IPAssignment{
 					{
 						Name: allocatedUUID,
-						IP:   ipCIDR,
+						IP:   testSecIp1,
 					},
 				},
+				SubnetAddressSpace: subnetAddressSpace,
 			},
 		},
 	}
@@ -114,14 +118,45 @@ func TestStatusToNCRequestIPAssignmentNotCIDR(t *testing.T) {
 	status = nnc.NodeNetworkConfigStatus{
 		NetworkContainers: []nnc.NetworkContainer{
 			{
-				PrimaryIP: ipCIDR,
+				PrimaryIP: primaryIp,
 				ID:        ncID,
 				IPAssignments: []nnc.IPAssignment{
 					{
 						Name: allocatedUUID,
-						IP:   ipNotCIDR,
+						IP:   ipInCIDR,
 					},
 				},
+				SubnetAddressSpace: subnetAddressSpace,
+			},
+		},
+	}
+
+	// Test with ip assignment not in CIDR form
+	_, err = CRDStatusToNCRequest(status)
+
+	if err == nil {
+		t.Fatalf("Expected translation of CRD status with ip assignment not CIDR, to fail.")
+	}
+}
+
+func TestStatusToNCRequestWithIncorrectSubnetAddressSpace(t *testing.T) {
+	var (
+		status nnc.NodeNetworkConfigStatus
+		err    error
+	)
+
+	status = nnc.NodeNetworkConfigStatus{
+		NetworkContainers: []nnc.NetworkContainer{
+			{
+				PrimaryIP: primaryIp,
+				ID:        ncID,
+				IPAssignments: []nnc.IPAssignment{
+					{
+						Name: allocatedUUID,
+						IP:   testSecIp1,
+					},
+				},
+				SubnetAddressSpace: "10.0.0.0", // not a cidr range
 			},
 		},
 	}
@@ -147,17 +182,17 @@ func TestStatusToNCRequestSuccess(t *testing.T) {
 	status = nnc.NodeNetworkConfigStatus{
 		NetworkContainers: []nnc.NetworkContainer{
 			{
-				PrimaryIP: ipCIDR,
+				PrimaryIP: primaryIp,
 				ID:        ncID,
 				IPAssignments: []nnc.IPAssignment{
 					{
 						Name: allocatedUUID,
-						IP:   ipCIDR,
+						IP:   testSecIp1,
 					},
 				},
 				SubnetName:         subnetName,
 				DefaultGateway:     defaultGateway,
-				SubnetAddressSpace: "", // Not currently set by DNC Request Controller
+				SubnetAddressSpace: subnetAddressSpace,
 			},
 		},
 	}
@@ -169,12 +204,12 @@ func TestStatusToNCRequestSuccess(t *testing.T) {
 		t.Fatalf("Expected translation of CRD status to succeed, got error :%v", err)
 	}
 
-	if ncRequest.IPConfiguration.IPSubnet.IPAddress != ipCIDRString {
-		t.Fatalf("Expected ncRequest's ipconfiguration to have the ip %v but got %v", ipCIDRString, ncRequest.IPConfiguration.IPSubnet.IPAddress)
+	if ncRequest.IPConfiguration.IPSubnet.IPAddress != primaryIp {
+		t.Fatalf("Expected ncRequest's ipconfiguration to have the ip %v but got %v", primaryIp, ncRequest.IPConfiguration.IPSubnet.IPAddress)
 	}
 
-	if ncRequest.IPConfiguration.IPSubnet.PrefixLength != uint8(ipCIDRMaskLength) {
-		t.Fatalf("Expected ncRequest's ipconfiguration prefix length to be %v but got %v", ipCIDRMaskLength, ncRequest.IPConfiguration.IPSubnet.PrefixLength)
+	if ncRequest.IPConfiguration.IPSubnet.PrefixLength != uint8(subnetPrefixLen) {
+		t.Fatalf("Expected ncRequest's ipconfiguration prefix length to be %v but got %v", subnetPrefixLen, ncRequest.IPConfiguration.IPSubnet.PrefixLength)
 	}
 
 	if ncRequest.IPConfiguration.GatewayIPAddress != defaultGateway {
@@ -195,8 +230,8 @@ func TestStatusToNCRequestSuccess(t *testing.T) {
 		t.Fatalf("Expected there to be a secondary ip with the key %v but found nothing", allocatedUUID)
 	}
 
-	if secondaryIP.IPAddress != ipCIDRString {
-		t.Fatalf("Expected %v as the secondary IP config but got %v", ipCIDRString, secondaryIP.IPAddress)
+	if secondaryIP.IPAddress != testSecIp1 {
+		t.Fatalf("Expected %v as the secondary IP config but got %v", testSecIp1, secondaryIP.IPAddress)
 	}
 }
 
@@ -229,7 +264,7 @@ func TestSecondaryIPsToCRDSpecSuccess(t *testing.T) {
 
 	secondaryIPs = map[string]cns.SecondaryIPConfig{
 		allocatedUUID: {
-			IPAddress: ipCIDRString,
+			IPAddress: testSecIp1,
 		},
 	}
 

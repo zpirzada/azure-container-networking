@@ -643,21 +643,23 @@ func (service *HTTPRestService) validateIpConfigRequest(ipConfigRequest cns.GetI
 
 func (service *HTTPRestService) populateIpConfigInfoUntransacted(ipConfigStatus ipConfigurationStatus, ipConfiguration *cns.IPConfiguration) error {
 	var (
-		ncStatus containerstatus
-		exists   bool
+		ncStatus               containerstatus
+		exists                 bool
+		primaryIpConfiguration cns.IPConfiguration
 	)
 
 	if ncStatus, exists = service.state.ContainerStatus[ipConfigStatus.NCID]; !exists {
 		return fmt.Errorf("Failed to get NC Configuration for NcId: %s", ipConfigStatus.NCID)
 	}
 
-	ipConfiguration.DNSServers = ncStatus.CreateNetworkContainerRequest.IPConfiguration.DNSServers
-	ipConfiguration.GatewayIPAddress = ncStatus.CreateNetworkContainerRequest.IPConfiguration.GatewayIPAddress
+	primaryIpConfiguration = ncStatus.CreateNetworkContainerRequest.IPConfiguration
 
-	// TODO: This will be changed soon, and prefix length will be set as Subnetprefix length
+	ipConfiguration.DNSServers = primaryIpConfiguration.DNSServers
+	ipConfiguration.GatewayIPAddress = primaryIpConfiguration.GatewayIPAddress
+
 	ipConfiguration.IPSubnet = cns.IPSubnet{
 		IPAddress:    ipConfigStatus.IPAddress,
-		PrefixLength: 32,
+		PrefixLength: primaryIpConfiguration.IPSubnet.PrefixLength,
 	}
 	return nil
 }

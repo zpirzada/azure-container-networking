@@ -145,7 +145,7 @@ func (service *HTTPRestService) releaseIPConfig(podInfo cns.KubernetesPodInfo) e
 	if ipID != "" {
 		if ipconfig, isExist := service.PodIPConfigState[ipID]; isExist {
 			service.setIPConfigAsAvailable(ipconfig, podInfo)
-			logger.Printf("Released IP %+v for pod %+v", ipconfig.IPSubnet, podInfo)
+			logger.Printf("Released IP %+v for pod %+v", ipconfig.IPAddress, podInfo)
 
 		} else {
 			logger.Errorf("Failed to get release ipconfig. Pod to IPID exists, but IPID to IPConfig doesn't exist, CNS State potentially corrupt")
