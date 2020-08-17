@@ -575,7 +575,6 @@ func (ap *addressPool) releaseAddress(address string, options map[string]string)
 	}
 
 	ar.InUse = false
-	ar.ID = ""
 
 	if id != "" && ar.ID == id {
 		delete(ap.addrsByID, ar.ID)
