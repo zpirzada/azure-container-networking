@@ -510,7 +510,7 @@ var (
 						Pools: map[string]*addressPool{},
 					}
 					pool, err := as.getAddressPool("10.0.0.0/16")
-					Expect(err).To(Equal(errAddressPoolNotFound))
+					Expect(err).To(Equal(errInvalidPoolId))
 					Expect(pool).To(BeNil())
 				})
 			})

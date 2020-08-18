@@ -283,7 +283,7 @@ func (as *addressSpace) newAddressPool(ifName string, priority int, subnet *net.
 func (as *addressSpace) getAddressPool(poolId string) (*addressPool, error) {
 	ap := as.Pools[poolId]
 	if ap == nil {
-		return nil, ErrAddressPoolNotFound
+		return nil, errInvalidPoolId
 	}
 
 	return ap, nil
@@ -507,7 +507,7 @@ func (ap *addressPool) requestAddress(address string, options map[string]string)
 	// If no address was found, return any available address.
 	if ar == nil {
 		for _, ar = range ap.Addresses {
-			if !ar.InUse {
+			if !ar.InUse && ar.ID == "" {
 				break
 			}
 			ar = nil
@@ -569,7 +569,7 @@ func (ap *addressPool) releaseAddress(address string, options map[string]string)
 		return nil
 	}
 
-	if !ar.InUse && ar.ID == "" {
+	if !ar.InUse {
 		log.Printf("Address not in use. Not Returning error")
 		return nil
 	}
