@@ -66,24 +66,36 @@ func NewPodState(ipaddress string, prefixLength uint8, id, ncid, state string) i
 
 func requestIpAddressAndGetState(t *testing.T, req cns.GetIPConfigRequest) (ipConfigurationStatus, error) {
 	var (
-		podInfo  cns.KubernetesPodInfo
-		ipState  ipConfigurationStatus
-		ipConfig cns.IPConfiguration
-		err      error
+		podInfo   cns.KubernetesPodInfo
+		ipState   ipConfigurationStatus
+		PodIpInfo cns.PodIpInfo
+		err       error
 	)
 
-	ipConfig, err = requestIPConfigHelper(svc, req)
+	PodIpInfo, err = requestIPConfigHelper(svc, req)
 	if err != nil {
 		return ipState, err
 	}
 
-	// validate DnsServer and Gateway Ip as the same configured for Primary IP
-	if reflect.DeepEqual(ipConfig.DNSServers, dnsservers) != true {
-		t.Fatalf("DnsServer is not added as expected ipConfig %+v, expected dnsServers: %+v", ipConfig, dnsservers)
+	if reflect.DeepEqual(PodIpInfo.NetworkContainerPrimaryIPConfig.IPSubnet.IPAddress, primaryIp) != true {
+		t.Fatalf("PrimarIP is not added as expected ipConfig %+v, expected primaryIP: %+v", PodIpInfo.NetworkContainerPrimaryIPConfig, primaryIp)
 	}
 
-	if reflect.DeepEqual(ipConfig.GatewayIPAddress, gatewayIp) != true {
-		t.Fatalf("Gateway is not added as expected ipConfig %+v, expected GatewayIp: %+v", ipConfig, gatewayIp)
+	if PodIpInfo.NetworkContainerPrimaryIPConfig.IPSubnet.PrefixLength != subnetPrfixLength {
+		t.Fatalf("Primary IP Prefix length is not added as expected ipConfig %+v, expected: %+v", PodIpInfo.NetworkContainerPrimaryIPConfig, subnetPrfixLength)
+	}
+
+	// validate DnsServer and Gateway Ip as the same configured for Primary IP
+	if reflect.DeepEqual(PodIpInfo.NetworkContainerPrimaryIPConfig.DNSServers, dnsservers) != true {
+		t.Fatalf("DnsServer is not added as expected ipConfig %+v, expected dnsServers: %+v", PodIpInfo.NetworkContainerPrimaryIPConfig, dnsservers)
+	}
+
+	if reflect.DeepEqual(PodIpInfo.NetworkContainerPrimaryIPConfig.GatewayIPAddress, gatewayIp) != true {
+		t.Fatalf("Gateway is not added as expected ipConfig %+v, expected GatewayIp: %+v", PodIpInfo.NetworkContainerPrimaryIPConfig, gatewayIp)
+	}
+
+	if PodIpInfo.PodIPConfig.PrefixLength != subnetPrfixLength {
+		t.Fatalf("Pod IP Prefix length is not added as expected ipConfig %+v, expected: %+v", PodIpInfo.PodIPConfig, subnetPrfixLength)
 	}
 
 	// retrieve podinfo from orchestrator context
@@ -247,10 +259,7 @@ func TestIPAMAttemptToRequestIPNotFoundInPool(t *testing.T) {
 	req := cns.GetIPConfigRequest{}
 	b, _ := json.Marshal(testPod2Info)
 	req.OrchestratorContext = b
-	req.DesiredIPConfig = cns.IPSubnet{
-		IPAddress:    testIP2,
-		PrefixLength: 24,
-	}
+	req.DesiredIPAddress = testIP2
 
 	_, err = requestIpAddressAndGetState(t, req)
 	if err == nil {
@@ -275,10 +284,7 @@ func TestIPAMGetDesiredIPConfigWithSpecfiedIP(t *testing.T) {
 	req := cns.GetIPConfigRequest{}
 	b, _ := json.Marshal(testPod1Info)
 	req.OrchestratorContext = b
-	req.DesiredIPConfig = cns.IPSubnet{
-		IPAddress:    testIP1,
-		PrefixLength: 24,
-	}
+	req.DesiredIPAddress = testIP1
 
 	actualstate, err := requestIpAddressAndGetState(t, req)
 	if err != nil {
@@ -310,10 +316,7 @@ func TestIPAMFailToGetDesiredIPConfigWithAlreadyAllocatedSpecfiedIP(t *testing.T
 	req := cns.GetIPConfigRequest{}
 	b, _ := json.Marshal(testPod2Info)
 	req.OrchestratorContext = b
-	req.DesiredIPConfig = cns.IPSubnet{
-		IPAddress:    testIP1,
-		PrefixLength: 24,
-	}
+	req.DesiredIPAddress = testIP1
 
 	_, err = requestIpAddressAndGetState(t, req)
 	if err == nil {
@@ -366,16 +369,13 @@ func TestIPAMRequestThenReleaseThenRequestAgain(t *testing.T) {
 		t.Fatalf("Expected to not fail adding IP's to state: %+v", err)
 	}
 
-	desiredIPConfig := cns.IPSubnet{
-		IPAddress:    testIP1,
-		PrefixLength: 24,
-	}
+	desiredIpAddress := testIP1
 
 	// Use TestPodInfo2 to request TestIP1, which has already been allocated
 	req := cns.GetIPConfigRequest{}
 	b, _ := json.Marshal(testPod2Info)
 	req.OrchestratorContext = b
-	req.DesiredIPConfig = desiredIPConfig
+	req.DesiredIPAddress = desiredIpAddress
 
 	_, err = requestIpAddressAndGetState(t, req)
 	if err == nil {
@@ -392,7 +392,7 @@ func TestIPAMRequestThenReleaseThenRequestAgain(t *testing.T) {
 	req = cns.GetIPConfigRequest{}
 	b, _ = json.Marshal(testPod2Info)
 	req.OrchestratorContext = b
-	req.DesiredIPConfig = desiredIPConfig
+	req.DesiredIPAddress = desiredIpAddress
 
 	actualstate, err := requestIpAddressAndGetState(t, req)
 	if err != nil {
@@ -401,7 +401,7 @@ func TestIPAMRequestThenReleaseThenRequestAgain(t *testing.T) {
 
 	desiredState, _ := NewPodStateWithOrchestratorContext(testIP1, 24, testPod1GUID, testNCID, cns.Allocated, testPod1Info)
 	// want first available Pod IP State
-	desiredState.IPAddress = desiredIPConfig.IPAddress
+	desiredState.IPAddress = desiredIpAddress
 	desiredState.OrchestratorContext = b
 
 	if reflect.DeepEqual(desiredState, actualstate) != true {
@@ -484,10 +484,7 @@ func TestAvailableIPConfigs(t *testing.T) {
 	req := cns.GetIPConfigRequest{}
 	b, _ := json.Marshal(testPod1Info)
 	req.OrchestratorContext = b
-	req.DesiredIPConfig = cns.IPSubnet{
-		IPAddress:    state1.IPAddress,
-		PrefixLength: 32,
-	}
+	req.DesiredIPAddress = state1.IPAddress
 
 	_, err := requestIpAddressAndGetState(t, req)
 	if err != nil {

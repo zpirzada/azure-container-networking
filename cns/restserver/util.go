@@ -641,7 +641,7 @@ func (service *HTTPRestService) validateIpConfigRequest(ipConfigRequest cns.GetI
 	return podInfo, Success, ""
 }
 
-func (service *HTTPRestService) populateIpConfigInfoUntransacted(ipConfigStatus ipConfigurationStatus, ipConfiguration *cns.IPConfiguration) error {
+func (service *HTTPRestService) populateIpConfigInfoUntransacted(ipConfigStatus ipConfigurationStatus, podIpInfo *cns.PodIpInfo) error {
 	var (
 		ncStatus               containerstatus
 		exists                 bool
@@ -654,13 +654,15 @@ func (service *HTTPRestService) populateIpConfigInfoUntransacted(ipConfigStatus 
 
 	primaryIpConfiguration = ncStatus.CreateNetworkContainerRequest.IPConfiguration
 
-	ipConfiguration.DNSServers = primaryIpConfiguration.DNSServers
-	ipConfiguration.GatewayIPAddress = primaryIpConfiguration.GatewayIPAddress
-
-	ipConfiguration.IPSubnet = cns.IPSubnet{
+	podIpInfo.PodIPConfig = cns.IPSubnet{
 		IPAddress:    ipConfigStatus.IPAddress,
 		PrefixLength: primaryIpConfiguration.IPSubnet.PrefixLength,
 	}
+
+	podIpInfo.NetworkContainerPrimaryIPConfig = primaryIpConfiguration
+
+	// TODO Add Host Primary ipinfo
+
 	return nil
 }
 

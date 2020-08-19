@@ -27,6 +27,7 @@ var (
 const (
 	primaryIp           = "10.0.0.5"
 	gatewayIp           = "10.0.0.1"
+	subnetPrfixLength   = 24
 	dockerContainerType = cns.Docker
 )
 
@@ -40,7 +41,7 @@ func addTestStateToRestServer(t *testing.T, secondaryIps []string) {
 	ipConfig.GatewayIPAddress = gatewayIp
 	var ipSubnet cns.IPSubnet
 	ipSubnet.IPAddress = primaryIp
-	ipSubnet.PrefixLength = 32
+	ipSubnet.PrefixLength = subnetPrfixLength
 	ipConfig.IPSubnet = ipSubnet
 	secondaryIPConfigs := make(map[string]cns.SecondaryIPConfig)
 
@@ -72,8 +73,8 @@ func getIPNetFromResponse(resp *cns.GetIPConfigResponse) (net.IPNet, error) {
 	)
 
 	// set result ipconfig from CNS Response Body
-	prefix := strconv.Itoa(int(resp.IPConfiguration.IPSubnet.PrefixLength))
-	ip, ipnet, err := net.ParseCIDR(resp.IPConfiguration.IPSubnet.IPAddress + "/" + prefix)
+	prefix := strconv.Itoa(int(resp.PodIpInfo.PodIPConfig.PrefixLength))
+	ip, ipnet, err := net.ParseCIDR(resp.PodIpInfo.PodIPConfig.IPAddress + "/" + prefix)
 	if err != nil {
 		return resultIPnet, err
 	}
@@ -155,7 +156,7 @@ func TestCNSClientRequestAndRelease(t *testing.T) {
 	podNamespace := "testpodnamespace"
 	desiredIpAddress := "10.0.0.5"
 	ip := net.ParseIP(desiredIpAddress)
-	_, ipnet, _ := net.ParseCIDR("10.0.0.5/32")
+	_, ipnet, _ := net.ParseCIDR("10.0.0.5/24")
 	desired := net.IPNet{
 		IP:   ip,
 		Mask: ipnet.Mask,
@@ -185,13 +186,22 @@ func TestCNSClientRequestAndRelease(t *testing.T) {
 		t.Fatalf("get IP from CNS failed with %+v", err)
 	}
 
-	// validate gateway and dnsservers
-	if reflect.DeepEqual(resp.IPConfiguration.DNSServers, dnsservers) != true {
-		t.Fatalf("DnsServer is not added as expected ipConfig %+v, expected dnsServers: %+v", resp.IPConfiguration, dnsservers)
+	podIPInfo := resp.PodIpInfo
+	if reflect.DeepEqual(podIPInfo.NetworkContainerPrimaryIPConfig.IPSubnet.IPAddress, primaryIp) != true {
+		t.Fatalf("PrimarIP is not added as expected ipConfig %+v, expected primaryIP: %+v", podIPInfo.NetworkContainerPrimaryIPConfig, primaryIp)
 	}
 
-	if reflect.DeepEqual(resp.IPConfiguration.GatewayIPAddress, gatewayIp) != true {
-		t.Fatalf("Gateway is not added as expected ipConfig %+v, expected GatewayIp: %+v", resp.IPConfiguration, gatewayIp)
+	if podIPInfo.NetworkContainerPrimaryIPConfig.IPSubnet.PrefixLength != subnetPrfixLength {
+		t.Fatalf("Primary IP Prefix length is not added as expected ipConfig %+v, expected: %+v", podIPInfo.NetworkContainerPrimaryIPConfig, subnetPrfixLength)
+	}
+
+	// validate DnsServer and Gateway Ip as the same configured for Primary IP
+	if reflect.DeepEqual(podIPInfo.NetworkContainerPrimaryIPConfig.DNSServers, dnsservers) != true {
+		t.Fatalf("DnsServer is not added as expected ipConfig %+v, expected dnsServers: %+v", podIPInfo.NetworkContainerPrimaryIPConfig, dnsservers)
+	}
+
+	if reflect.DeepEqual(podIPInfo.NetworkContainerPrimaryIPConfig.GatewayIPAddress, gatewayIp) != true {
+		t.Fatalf("Gateway is not added as expected ipConfig %+v, expected GatewayIp: %+v", podIPInfo.NetworkContainerPrimaryIPConfig, gatewayIp)
 	}
 
 	resultIPnet, err := getIPNetFromResponse(resp)

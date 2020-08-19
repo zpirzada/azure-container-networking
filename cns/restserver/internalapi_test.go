@@ -17,6 +17,7 @@ import (
 const (
 	primaryIp           = "10.0.0.5"
 	gatewayIp           = "10.0.0.1"
+	subnetPrfixLength   = 24
 	dockerContainerType = cns.Docker
 )
 
@@ -256,7 +257,7 @@ func generateNetworkContainerRequest(secondaryIps map[string]cns.SecondaryIPConf
 	ipConfig.GatewayIPAddress = gatewayIp
 	var ipSubnet cns.IPSubnet
 	ipSubnet.IPAddress = primaryIp
-	ipSubnet.PrefixLength = 32
+	ipSubnet.PrefixLength = subnetPrfixLength
 	ipConfig.IPSubnet = ipSubnet
 
 	req := cns.CreateNetworkContainerRequest{

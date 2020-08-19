@@ -189,13 +189,25 @@ type GetNetworkContainerResponse struct {
 }
 
 type GetIPConfigRequest struct {
-	DesiredIPConfig     IPSubnet
+	DesiredIPAddress    string
 	OrchestratorContext json.RawMessage
 }
 
 type GetIPConfigResponse struct {
-	IPConfiguration IPConfiguration
-	Response        Response
+	PodIpInfo PodIpInfo
+	Response  Response
+}
+
+// DeleteNetworkContainerRequest specifies the details about the request to delete a specifc network container.
+type PodIpInfo struct {
+	PodIPConfig                     IPSubnet
+	NetworkContainerPrimaryIPConfig IPConfiguration
+	HostPrimaryIPInfo               HostIPInfo
+}
+
+// DeleteNetworkContainerRequest specifies the details about the request to delete a specifc network container.
+type HostIPInfo struct {
+	IPConfig IPSubnet
 }
 
 // DeleteNetworkContainerRequest specifies the details about the request to delete a specifc network container.

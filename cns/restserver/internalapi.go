@@ -170,11 +170,6 @@ func (service *HTTPRestService) ReconcileNCState(ncRequest *cns.CreateNetworkCon
 		if podInfo, exists := podInfoByIp[secIpConfig.IPAddress]; exists {
 			log.Logf("SecondaryIP %+v is allocated to Pod. %+v, ncId: %s", secIpConfig, podInfo, ncRequest.NetworkContainerid)
 
-			desiredIPConfig := cns.IPSubnet{
-				IPAddress:    secIpConfig.IPAddress,
-				PrefixLength: 32, //todo: remove PrefixLenght in
-			}
-
 			kubernetesPodInfo := cns.KubernetesPodInfo{
 				PodName:      podInfo.PodName,
 				PodNamespace: podInfo.PodNamespace,
@@ -182,7 +177,7 @@ func (service *HTTPRestService) ReconcileNCState(ncRequest *cns.CreateNetworkCon
 			jsonContext, _ := json.Marshal(kubernetesPodInfo)
 
 			ipconfigRequest := cns.GetIPConfigRequest{
-				DesiredIPConfig:     desiredIPConfig,
+				DesiredIPAddress:    secIpConfig.IPAddress,
 				OrchestratorContext: jsonContext,
 			}
 
