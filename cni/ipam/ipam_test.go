@@ -137,17 +137,11 @@ var (
 					result, err = parseResult(arg.StdinData)
 					Expect(err).ShouldNot(HaveOccurred())
 
-					//confirm if IP is in use by other invocation
-					_, exists := UsedAddresses[result.IPs[0].Address.IP.String()]
+					AssertAddressNotInUse(result.IPs[0].Address.IP.String())
 
-					Expect(exists).Should(BeFalse())
+					TrackAddressUsage(result.IPs[0].Address.IP.String(), "")
 
-					// set the IP as in use
-					UsedAddresses[result.IPs[0].Address.IP.String()] = result.IPs[0].Address.IP.String()
-
-					//validate the IP is part of this network IP space
-					Expect(network.Contains(result.IPs[0].Address.IP)).Should(Equal(true))
-					Expect(result.IPs[0].Address.Mask).Should(Equal(network.Mask))
+					AssertProperAddressSpace(result.IPs[0].Address)
 				})
 			})
 
@@ -181,17 +175,11 @@ var (
 					result, err := parseResult(arg.StdinData)
 					Expect(err).ShouldNot(HaveOccurred())
 
-					//confirm if IP is in use by other invocation
-					_, exists := UsedAddresses[result.IPs[0].Address.IP.String()]
+					AssertAddressNotInUse(result.IPs[0].Address.IP.String())
 
-					Expect(exists).Should(BeFalse())
+					TrackAddressUsage(result.IPs[0].Address.IP.String(), "")
 
-					// set the IP as in use
-					UsedAddresses[result.IPs[0].Address.IP.String()] = result.IPs[0].Address.IP.String()
-
-					//validate the IP is part of this network IP space
-					Expect(network.Contains(result.IPs[0].Address.IP)).Should(Equal(true))
-					Expect(result.IPs[0].Address.Mask).Should(Equal(network.Mask))
+					AssertProperAddressSpace(result.IPs[0].Address)
 				})
 			})
 
@@ -204,17 +192,11 @@ var (
 					result, err := parseResult(arg.StdinData)
 					Expect(err).ShouldNot(HaveOccurred())
 
-					//confirm if IP is in use by other invocation
-					_, exists := UsedAddresses[result.IPs[0].Address.IP.String()]
+					AssertAddressNotInUse(result.IPs[0].Address.IP.String())
 
-					Expect(exists).Should(BeFalse())
+					TrackAddressUsage(result.IPs[0].Address.IP.String(), "")
 
-					// set the IP as in use
-					UsedAddresses[result.IPs[0].Address.IP.String()] = result.IPs[0].Address.IP.String()
-
-					//validate the IP is part of this network IP space
-					Expect(network.Contains(result.IPs[0].Address.IP)).Should(Equal(true))
-					Expect(result.IPs[0].Address.Mask).Should(Equal(network.Mask))
+					AssertProperAddressSpace(result.IPs[0].Address)
 				})
 			})
 
@@ -228,20 +210,13 @@ var (
 					result, err := parseResult(arg.StdinData)
 					Expect(err).ShouldNot(HaveOccurred())
 
-					//confirm if IP is in use by other invocation
-					_, exists := UsedAddresses[result.IPs[0].Address.IP.String()]
+					AssertAddressNotInUse(result.IPs[0].Address.IP.String())
 
-					Expect(exists).Should(BeFalse())
+					TrackAddressUsage(result.IPs[0].Address.IP.String(), arg.ContainerID)
 
-					// set the IP as in use and the container ID is using it
-					UsedAddresses[result.IPs[0].Address.IP.String()] = result.IPs[0].Address.IP.String()
-					UsedAddresses[arg.ContainerID] = result.IPs[0].Address.IP.String()
+					AssertProperAddressSpace(result.IPs[0].Address)
 
-					//validate the IP is part of this network IP space
-					Expect(network.Contains(result.IPs[0].Address.IP)).Should(Equal(true))
-					Expect(result.IPs[0].Address.Mask).Should(Equal(network.Mask))
-
-					//release the container ID for not test
+					//release the container ID for next test
 					arg.ContainerID = ""
 				})
 			})
@@ -255,26 +230,24 @@ var (
 					arg.ContainerID = endpointID1
 
 					err = plugin.Delete(arg)
-
-					addressKey := UsedAddresses[arg.ContainerID]
-
-					// set IP and container ID as not in use
-					delete(UsedAddresses, addressKey)
-					delete(UsedAddresses, arg.ContainerID)
-
 					Expect(err).ShouldNot(HaveOccurred())
-					arg.ContainerID = ""
+
+					address := UsedAddresses[arg.ContainerID]
+
+					RemoveAddressUsage(address, arg.ContainerID)
+
 				})
 			})
 
 			Context("When address and subnet is given", func() {
 				It("Release address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.5")
+
+					nextAddress := GetFirstAddress()
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", nextAddress)
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
 
-					// set IP as not in use
-					delete(UsedAddresses, "10.0.0.5")
+					RemoveAddressUsage(nextAddress, "")
 				})
 			})
 
@@ -288,11 +261,12 @@ var (
 
 			Context("When address and subnet is given", func() {
 				It("Release address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.6")
+					nextAddress := GetFirstAddress()
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", nextAddress)
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
-					// set IP as not in use
-					delete(UsedAddresses, "10.0.0.6")
+
+					RemoveAddressUsage(nextAddress, "")
 				})
 			})
 
@@ -314,3 +288,43 @@ var (
 		})
 	})
 )
+
+func GetFirstAddress() string {
+	//return first value
+	for a := range UsedAddresses {
+		return a
+	}
+	return ""
+}
+
+func AssertAddressNotInUse(address string) {
+	//confirm if IP is in use by other invocation
+	_, exists := UsedAddresses[address]
+
+	Expect(exists).Should(BeFalse())
+}
+
+func TrackAddressUsage(address, containerId string) {
+	// set the IP as in use
+	// this is just for tracking in this test
+	UsedAddresses[address] = address
+
+	if containerId != "" {
+		// set the container as in use
+		UsedAddresses[containerId] = address
+	}
+}
+
+func RemoveAddressUsage(address, containerId string) {
+	delete(UsedAddresses, address)
+	if containerId != "" {
+		delete(UsedAddresses, arg.ContainerID)
+		arg.ContainerID = ""
+	}
+}
+
+func AssertProperAddressSpace(address net.IPNet) {
+	//validate the IP is part of this network IP space
+	Expect(network.Contains(address.IP)).Should(Equal(true))
+	Expect(address.Mask).Should(Equal(network.Mask))
+}
