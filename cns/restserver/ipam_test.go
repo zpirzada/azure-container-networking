@@ -11,6 +11,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/common"
+	"github.com/Azure/azure-container-networking/cns/fakes"
 )
 
 var (
@@ -40,7 +41,7 @@ var (
 
 func getTestService() *HTTPRestService {
 	var config common.ServiceConfig
-	httpsvc, _ := NewHTTPRestService(&config)
+	httpsvc, _ := NewHTTPRestService(&config, fakes.NewFakeImdsClient())
 	svc = httpsvc.(*HTTPRestService)
 	setOrchestratorTypeInternal(cns.KubernetesCRD)
 
@@ -96,6 +97,14 @@ func requestIpAddressAndGetState(t *testing.T, req cns.GetIPConfigRequest) (ipCo
 
 	if PodIpInfo.PodIPConfig.PrefixLength != subnetPrfixLength {
 		t.Fatalf("Pod IP Prefix length is not added as expected ipConfig %+v, expected: %+v", PodIpInfo.PodIPConfig, subnetPrfixLength)
+	}
+
+	if reflect.DeepEqual(PodIpInfo.HostPrimaryIPInfo.PrimaryIP, fakes.HostPrimaryIpTest) != true {
+		t.Fatalf("Host PrimaryIP is not added as expected ipConfig %+v, expected primaryIP: %+v", PodIpInfo.HostPrimaryIPInfo, fakes.HostPrimaryIpTest)
+	}
+
+	if reflect.DeepEqual(PodIpInfo.HostPrimaryIPInfo.Subnet, fakes.HostSubnetTest) != true {
+		t.Fatalf("Host Subnet is not added as expected ipConfig %+v, expected Host subnet: %+v", PodIpInfo.HostPrimaryIPInfo, fakes.HostSubnetTest)
 	}
 
 	// retrieve podinfo from orchestrator context

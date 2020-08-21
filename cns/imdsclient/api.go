@@ -68,3 +68,10 @@ type ContainerVersion struct {
 	NetworkContainerID string
 	ProgrammedVersion  string
 }
+
+// An ImdsInterface performs CRUD operations on IP reservations
+type ImdsClientInterface interface {
+	GetNetworkContainerInfoFromHost(networkContainerID string, primaryAddress string, authToken string, apiVersion string) (*ContainerVersion, error)
+	GetPrimaryInterfaceInfoFromHost() (*InterfaceInfo, error)
+	GetPrimaryInterfaceInfoFromMemory() (*InterfaceInfo, error)
+}

@@ -25,19 +25,19 @@ const (
 // DockerClient specifies a client to connect to docker.
 type DockerClient struct {
 	connectionURL string
-	imdsClient    *imdsclient.ImdsClient
+	imdsClient    imdsclient.ImdsClientInterface
 }
 
 // NewDockerClient create a new docker client.
 func NewDockerClient(url string) (*DockerClient, error) {
 	return &DockerClient{
 		connectionURL: url,
-		imdsClient:    &imdsclient.ImdsClient{},
+		imdsClient:    new(imdsclient.ImdsClient),
 	}, nil
 }
 
 // NewDefaultDockerClient create a new docker client.
-func NewDefaultDockerClient(imdsClient *imdsclient.ImdsClient) (*DockerClient, error) {
+func NewDefaultDockerClient(imdsClient imdsclient.ImdsClientInterface) (*DockerClient, error) {
 	return &DockerClient{
 		connectionURL: defaultDockerConnectionURL,
 		imdsClient:    imdsClient,

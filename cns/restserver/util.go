@@ -661,7 +661,13 @@ func (service *HTTPRestService) populateIpConfigInfoUntransacted(ipConfigStatus 
 
 	podIpInfo.NetworkContainerPrimaryIPConfig = primaryIpConfiguration
 
-	// TODO Add Host Primary ipinfo
+	hostInterfaceInfo, err := service.imdsClient.GetPrimaryInterfaceInfoFromMemory()
+	if err != nil {
+		return fmt.Errorf("Failed to get the HostInterfaceInfo %s", err)
+	}
+
+	podIpInfo.HostPrimaryIPInfo.PrimaryIP = hostInterfaceInfo.PrimaryIP
+	podIpInfo.HostPrimaryIPInfo.Subnet = hostInterfaceInfo.Subnet
 
 	return nil
 }

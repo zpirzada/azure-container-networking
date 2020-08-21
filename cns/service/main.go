@@ -23,6 +23,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/common"
 	"github.com/Azure/azure-container-networking/cns/configuration"
 	"github.com/Azure/azure-container-networking/cns/hnsclient"
+	"github.com/Azure/azure-container-networking/cns/imdsclient"
 	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/cns/requestcontroller"
 	"github.com/Azure/azure-container-networking/cns/requestcontroller/kubecontroller"
@@ -367,7 +368,7 @@ func main() {
 	}
 
 	// Create CNS object.
-	httpRestService, err := restserver.NewHTTPRestService(&config)
+	httpRestService, err := restserver.NewHTTPRestService(&config, new(imdsclient.ImdsClient))
 	if err != nil {
 		logger.Errorf("Failed to create CNS object, err:%v.\n", err)
 		return

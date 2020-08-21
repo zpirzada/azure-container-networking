@@ -37,7 +37,7 @@ var (
 type HTTPRestService struct {
 	*cns.Service
 	dockerClient                 *dockerclient.DockerClient
-	imdsClient                   *imdsclient.ImdsClient
+	imdsClient                   imdsclient.ImdsClientInterface
 	ipamClient                   *ipamclient.IpamClient
 	networkContainer             *networkcontainers.NetworkContainers
 	PodIPIDByOrchestratorContext map[string]string                // OrchestratorContext is key and value is Pod IP uuid.
@@ -102,16 +102,16 @@ type HTTPService interface {
 }
 
 // NewHTTPRestService creates a new HTTP Service object.
-func NewHTTPRestService(config *common.ServiceConfig) (HTTPService, error) {
+func NewHTTPRestService(config *common.ServiceConfig, imdsClientInterface imdsclient.ImdsClientInterface) (HTTPService, error) {
 	service, err := cns.NewService(config.Name, config.Version, config.ChannelMode, config.Store)
 	if err != nil {
 		return nil, err
 	}
 
-	imdsClient := &imdsclient.ImdsClient{}
+	imdsClient := imdsClientInterface
 	routingTable := &routes.RoutingTable{}
 	nc := &networkcontainers.NetworkContainers{}
-	dc, err := dockerclient.NewDefaultDockerClient(imdsClient)
+	dc, err := dockerclient.NewDefaultDockerClient(imdsClientInterface)
 
 	if err != nil {
 		return nil, err
