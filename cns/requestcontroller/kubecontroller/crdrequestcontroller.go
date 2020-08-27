@@ -177,6 +177,7 @@ func (crdRC *crdRequestController) initCNS() error {
 		cntxt         context.Context
 		ncRequest     cns.CreateNetworkContainerRequest
 		err           error
+		scalarUnits   cns.ScalarUnits
 	)
 
 	cntxt = context.Background()
@@ -189,9 +190,15 @@ func (crdRC *crdRequestController) initCNS() error {
 			os.Exit(1)
 		}
 
+		scalarUnits = cns.ScalarUnits{
+			BatchSize:               nodeNetConfig.Status.Scaler.BatchSize,
+			RequestThresholdPercent: nodeNetConfig.Status.Scaler.RequestThresholdPercent,
+			ReleaseThresholdPercent: nodeNetConfig.Status.Scaler.ReleaseThresholdPercent,
+		}
+
 		// If instance of crd is not found, pass nil to CNSClient
 		if client.IgnoreNotFound(err) == nil {
-			return crdRC.CNSClient.ReconcileNCState(nil, nil)
+			return crdRC.CNSClient.ReconcileNCState(nil, nil, scalarUnits)
 		}
 
 		// If it's any other error, log it and return
@@ -201,7 +208,7 @@ func (crdRC *crdRequestController) initCNS() error {
 
 	// If there are no NCs, pass nil to CNSClient
 	if len(nodeNetConfig.Status.NetworkContainers) == 0 {
-		return crdRC.CNSClient.ReconcileNCState(nil, nil)
+		return crdRC.CNSClient.ReconcileNCState(nil, nil, scalarUnits)
 	}
 
 	// Convert to CreateNetworkContainerRequest
@@ -232,7 +239,7 @@ func (crdRC *crdRequestController) initCNS() error {
 	}
 
 	// Call cnsclient init cns passing those two things
-	return crdRC.CNSClient.ReconcileNCState(&ncRequest, podInfoByIP)
+	return crdRC.CNSClient.ReconcileNCState(&ncRequest, podInfoByIP, scalarUnits)
 
 }
 
