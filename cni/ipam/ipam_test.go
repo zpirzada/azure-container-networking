@@ -242,7 +242,7 @@ var (
 			Context("When address and subnet is given", func() {
 				It("Release address successfully", func() {
 
-					nextAddress := GetFirstAddress()
+					nextAddress := GetNextAddress()
 					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", nextAddress)
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
@@ -261,7 +261,7 @@ var (
 
 			Context("When address and subnet is given", func() {
 				It("Release address successfully", func() {
-					nextAddress := GetFirstAddress()
+					nextAddress := GetNextAddress()
 					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", nextAddress)
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
@@ -289,7 +289,7 @@ var (
 	})
 )
 
-func GetFirstAddress() string {
+func GetNextAddress() string {
 	//return first value
 	for a := range UsedAddresses {
 		return a

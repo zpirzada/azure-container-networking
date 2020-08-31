@@ -164,6 +164,7 @@ func (am *addressManager) restore() error {
 func (am *addressManager) save() error {
 	// Skip if a store is not provided.
 	if am.store == nil {
+		log.Printf("[ipam] ipam store is nil.\n")
 		return nil
 	}
 
