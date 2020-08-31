@@ -170,6 +170,7 @@ func (am *addressManager) save() error {
 	// Update time stamp.
 	am.TimeStamp = time.Now()
 
+	log.Printf("[ipam] saving ipam state.\n")
 	err := am.store.Write(storeKey, am)
 	if err == nil {
 		log.Printf("[ipam] Save succeeded.\n")

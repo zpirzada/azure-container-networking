@@ -159,8 +159,9 @@ func (am *addressManager) setAddressSpace(as *addressSpace) error {
 	if !ok {
 		am.AddrSpaces[as.Id] = as
 	} else {
-		//merges the address set refreshed from the source
-		//and the ones we have currently this address space
+		// merges the address set refreshed from the source
+		// and the ones we have currently in this address space
+		log.Printf("[ipam] merging address space")
 		as1.merge(as)
 	}
 
@@ -179,7 +180,7 @@ func (am *addressManager) setAddressSpace(as *addressSpace) error {
 // Merges a new address space to an existing one.
 func (as *addressSpace) merge(newas *addressSpace) {
 	// The new epoch after the merge.
-	//epoch is essentially the count of invocations
+	// epoch is essentially the count of invocations
 	// used to ensure if certain addresses refreshed from the source
 	// are still relevant
 	as.epoch++
@@ -373,13 +374,13 @@ func (as *addressSpace) releasePool(poolId string) error {
 	var err error
 	var addressesInUse bool
 
-	log.Printf("[ipam] Attempting to releasing pool with poolId:%v.", poolId)
+	//merges the address set refreshed from the source	log.Printf("[ipam] Attempting to release pool with poolId:%v.", poolId)
 
 	ap, ok := as.Pools[poolId]
 	if !ok {
 		err = errAddressPoolNotFound
 	} else if addressesInUse = ap.IsAnyRecordInUse(); addressesInUse {
-		log.Printf("[ipam] Skip releasing pool with poolId:%v. due to address being in use",
+		log.Printf("[ipam] Skip releasing pool with poolId:%s. due to address being in use",
 			poolId)
 	}
 
@@ -389,11 +390,11 @@ func (as *addressSpace) releasePool(poolId string) error {
 	}
 
 	if !addressesInUse {
-		ap.RefCount--
+		ap.RefCount = 0
 
 		// Delete address pool if it is no longer available.
 		if !ap.isInUse() {
-			log.Printf("[ipam] Deleting stale pool with poolId:%v.", poolId)
+			log.Printf("[ipam] Deleting stale pool with poolId:%s.", poolId)
 			delete(as.Pools, poolId)
 		}
 	}

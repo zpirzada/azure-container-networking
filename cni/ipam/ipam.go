@@ -149,10 +149,8 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 		return err
 	}
 
-	// Select the requested interface.
 	// assign the container id
 	options := make(map[string]string)
-	options[ipam.OptInterfaceName] = nwCfg.Master
 	options[ipam.OptAddressID] = args.ContainerID
 
 	// Check if an address pool is specified.
@@ -164,6 +162,9 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 		if nwCfg.Ipam.Type == ipamV6 {
 			isIpv6 = true
 		}
+
+		// Select the requested interface.
+		options[ipam.OptInterfaceName] = nwCfg.Master
 
 		// Allocate an address pool.
 		poolID, subnet, err = plugin.am.RequestPool(nwCfg.Ipam.AddrSpace, "", "", options, isIpv6)
