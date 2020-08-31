@@ -390,7 +390,7 @@ func (as *addressSpace) releasePool(poolId string) error {
 	}
 
 	if !addressesInUse {
-		ap.RefCount = 0
+		ap.RefCount--
 
 		// Delete address pool if it is no longer available.
 		if !ap.isInUse() {
