@@ -234,6 +234,32 @@ func TestRequestAddress(t *testing.T) {
 	address1 = address.String()
 }
 
+// Tests IpamDriver.GetPoolInfo functionality.
+func TestGetPoolInfo(t *testing.T) {
+	var body bytes.Buffer
+	var resp GetPoolInfoResponse
+
+	payload := &GetPoolInfoRequest{
+		PoolID: poolId1,
+	}
+
+	json.NewEncoder(&body).Encode(payload)
+
+	req, err := http.NewRequest(http.MethodGet, GetPoolInfoPath, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+
+	err = decodeResponse(w, &resp)
+
+	if err != nil || resp.Err != "" {
+		t.Errorf("GetPoolInfo response is invalid %+v", resp)
+	}
+}
+
 // Tests IpamDriver.ReleaseAddress functionality.
 func TestReleaseAddress(t *testing.T) {
 	var body bytes.Buffer
@@ -284,32 +310,6 @@ func TestReleasePool(t *testing.T) {
 
 	if err != nil || resp.Err != "" {
 		t.Errorf("ReleasePool response is invalid %+v", resp)
-	}
-}
-
-// Tests IpamDriver.GetPoolInfo functionality.
-func TestGetPoolInfo(t *testing.T) {
-	var body bytes.Buffer
-	var resp GetPoolInfoResponse
-
-	payload := &GetPoolInfoRequest{
-		PoolID: poolId1,
-	}
-
-	json.NewEncoder(&body).Encode(payload)
-
-	req, err := http.NewRequest(http.MethodGet, GetPoolInfoPath, &body)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
-	err = decodeResponse(w, &resp)
-
-	if err != nil || resp.Err != "" {
-		t.Errorf("GetPoolInfo response is invalid %+v", resp)
 	}
 }
 

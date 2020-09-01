@@ -8,15 +8,16 @@ import (
 	"fmt"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypesCurr "github.com/containernetworking/cni/pkg/types/current"
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"net"
 	"net/http"
 	"net/url"
 	"testing"
 	"time"
 
 	"github.com/Azure/azure-container-networking/common"
-	"github.com/Azure/azure-container-networking/platform"
 )
 
 var ipamQueryUrl = "localhost:42424"
@@ -27,6 +28,7 @@ var ipamQueryResponse = "" +
 	"			<IPAddress Address=\"10.0.0.4\" IsPrimary=\"true\"/>" +
 	"			<IPAddress Address=\"10.0.0.5\" IsPrimary=\"false\"/>" +
 	"			<IPAddress Address=\"10.0.0.6\" IsPrimary=\"false\"/>" +
+	"			<IPAddress Address=\"10.0.0.7\" IsPrimary=\"false\"/>" +
 	"		</IPSubnet>" +
 	"	</Interface>" +
 	"</Interfaces>"
@@ -59,15 +61,24 @@ func getStdinData(cniversion, subnet, ipAddress string) []byte {
 				"ipAddress": "%s"
 			}
 		}`, cniversion, subnet, ipAddress)
+
 	return []byte(stdinData)
 }
 
 var (
+	plugin      *ipamPlugin
+	testAgent   *common.Listener
+	arg         *cniSkel.CmdArgs
+	err         error
+	endpointID1 = uuid.New().String()
 
-	plugin *ipamPlugin
-	testAgent *common.Listener
-	arg *cniSkel.CmdArgs
-	err error
+	//this usedAddresses map is to test not duplicate IP's
+	// have been provided throughout this test execution
+	UsedAddresses = map[string]string{}
+
+	//below is the network,used to test if the IP's provided by IPAM
+	// is in the the space requested.
+	network = net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(16, 32)}
 
 	_ = BeforeSuite(func() {
 		// TODO: Ensure that the other testAgent has bees released.
@@ -125,10 +136,12 @@ var (
 					Expect(err).ShouldNot(HaveOccurred())
 					result, err = parseResult(arg.StdinData)
 					Expect(err).ShouldNot(HaveOccurred())
-					address1, _ := platform.ConvertStringToIPNet("10.0.0.5/16")
-					address2, _ := platform.ConvertStringToIPNet("10.0.0.6/16")
-					Expect(result.IPs[0].Address.IP).Should(Or(Equal(address1.IP), Equal(address2.IP)))
-					Expect(result.IPs[0].Address.Mask).Should(Equal(address1.Mask))
+
+					AssertAddressNotInUse(result.IPs[0].Address.IP.String())
+
+					TrackAddressUsage(result.IPs[0].Address.IP.String(), "")
+
+					AssertProperAddressSpace(result.IPs[0].Address)
 				})
 			})
 
@@ -137,6 +150,9 @@ var (
 					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", result.IPs[0].Address.IP.String())
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
+
+					delete(UsedAddresses, result.IPs[0].Address.IP.String())
+
 				})
 			})
 
@@ -158,9 +174,12 @@ var (
 					Expect(err).ShouldNot(HaveOccurred())
 					result, err := parseResult(arg.StdinData)
 					Expect(err).ShouldNot(HaveOccurred())
-					address, _ := platform.ConvertStringToIPNet("10.0.0.6/16")
-					Expect(result.IPs[0].Address.IP).Should(Equal(address.IP))
-					Expect(result.IPs[0].Address.Mask).Should(Equal(address.Mask))
+
+					AssertAddressNotInUse(result.IPs[0].Address.IP.String())
+
+					TrackAddressUsage(result.IPs[0].Address.IP.String(), "")
+
+					AssertProperAddressSpace(result.IPs[0].Address)
 				})
 			})
 
@@ -168,31 +187,86 @@ var (
 				It("Request a usable address successfully", func() {
 					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "")
 					err = plugin.Add(arg)
+
 					Expect(err).ShouldNot(HaveOccurred())
 					result, err := parseResult(arg.StdinData)
 					Expect(err).ShouldNot(HaveOccurred())
-					address, _ := platform.ConvertStringToIPNet("10.0.0.5/16")
-					Expect(result.IPs[0].Address.IP).Should(Equal(address.IP))
-					Expect(result.IPs[0].Address.Mask).Should(Equal(address.Mask))
+
+					AssertAddressNotInUse(result.IPs[0].Address.IP.String())
+
+					TrackAddressUsage(result.IPs[0].Address.IP.String(), "")
+
+					AssertProperAddressSpace(result.IPs[0].Address)
+				})
+			})
+
+			Context("When container id is given with subnet", func() {
+				It("Request a usable address successfully", func() {
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "")
+					arg.ContainerID = endpointID1
+					err = plugin.Add(arg)
+
+					Expect(err).ShouldNot(HaveOccurred())
+					result, err := parseResult(arg.StdinData)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					AssertAddressNotInUse(result.IPs[0].Address.IP.String())
+
+					TrackAddressUsage(result.IPs[0].Address.IP.String(), arg.ContainerID)
+
+					AssertProperAddressSpace(result.IPs[0].Address)
+
+					//release the container ID for next test
+					arg.ContainerID = ""
 				})
 			})
 		})
 
 		Describe("Test IPAM DELETE", func() {
 
-			Context("When address and subnet is given", func() {
-				It("Release address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.5")
+			Context("Delete when only container id is given", func() {
+				It("Deleted", func() {
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "")
+					arg.ContainerID = endpointID1
+
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
+
+					address := UsedAddresses[arg.ContainerID]
+
+					RemoveAddressUsage(address, arg.ContainerID)
+
 				})
 			})
 
 			Context("When address and subnet is given", func() {
 				It("Release address successfully", func() {
-					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", "10.0.0.6")
+
+					nextAddress := GetNextAddress()
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", nextAddress)
 					err = plugin.Delete(arg)
 					Expect(err).ShouldNot(HaveOccurred())
+
+					RemoveAddressUsage(nextAddress, "")
+				})
+			})
+
+			Context("When pool is in use", func() {
+				It("Fail to request pool", func() {
+					arg.StdinData = getStdinData("0.4.0", "", "")
+					err = plugin.Add(arg)
+					Expect(err).Should(HaveOccurred())
+				})
+			})
+
+			Context("When address and subnet is given", func() {
+				It("Release address successfully", func() {
+					nextAddress := GetNextAddress()
+					arg.StdinData = getStdinData("0.4.0", "10.0.0.0/16", nextAddress)
+					err = plugin.Delete(arg)
+					Expect(err).ShouldNot(HaveOccurred())
+
+					RemoveAddressUsage(nextAddress, "")
 				})
 			})
 
@@ -203,6 +277,54 @@ var (
 					Expect(err).ShouldNot(HaveOccurred())
 				})
 			})
+
+			Context("When pool is not use", func() {
+				It("Confirm pool was released by succesfully requesting pool", func() {
+					arg.StdinData = getStdinData("0.4.0", "", "")
+					err = plugin.Add(arg)
+					Expect(err).ShouldNot(HaveOccurred())
+				})
+			})
 		})
 	})
 )
+
+func GetNextAddress() string {
+	//return first value
+	for a := range UsedAddresses {
+		return a
+	}
+	return ""
+}
+
+func AssertAddressNotInUse(address string) {
+	//confirm if IP is in use by other invocation
+	_, exists := UsedAddresses[address]
+
+	Expect(exists).Should(BeFalse())
+}
+
+func TrackAddressUsage(address, containerId string) {
+	// set the IP as in use
+	// this is just for tracking in this test
+	UsedAddresses[address] = address
+
+	if containerId != "" {
+		// set the container as in use
+		UsedAddresses[containerId] = address
+	}
+}
+
+func RemoveAddressUsage(address, containerId string) {
+	delete(UsedAddresses, address)
+	if containerId != "" {
+		delete(UsedAddresses, arg.ContainerID)
+		arg.ContainerID = ""
+	}
+}
+
+func AssertProperAddressSpace(address net.IPNet) {
+	//validate the IP is part of this network IP space
+	Expect(network.Contains(address.IP)).Should(Equal(true))
+	Expect(address.Mask).Should(Equal(network.Mask))
+}

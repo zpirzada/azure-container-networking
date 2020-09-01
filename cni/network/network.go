@@ -837,6 +837,13 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 
 	// Query the network.
 	if nwInfo, err = plugin.nm.GetNetworkInfo(networkId); err != nil {
+
+		// attempt to release address associated with this Endpoint id
+		// This is to ensure clean up is done even in failure cases
+		if err = plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg); err != nil {
+			log.Printf("Network not found, attempted to release address with error:  %v", err)
+		}
+
 		// Log the error but return success if the endpoint being deleted is not found.
 		plugin.Errorf("[cni-net] Failed to query network: %v", err)
 		err = nil
@@ -845,6 +852,13 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 
 	// Query the endpoint.
 	if epInfo, err = plugin.nm.GetEndpointInfo(networkId, endpointId); err != nil {
+
+		// attempt to release address associated with this Endpoint id
+		// This is to ensure clean up is done even in failure cases
+		if err = plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg); err != nil {
+			log.Printf("Endpoint not found, attempted to release address with error: %v", err)
+		}
+
 		// Log the error but return success if the endpoint being deleted is not found.
 		plugin.Errorf("[cni-net] Failed to query endpoint: %v", err)
 		err = nil

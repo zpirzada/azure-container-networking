@@ -4,11 +4,11 @@
 package ipam
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"testing"
 	"time"
-	"encoding/json"
 
 	cniTypesCurr "github.com/containernetworking/cni/pkg/types/current"
 	. "github.com/onsi/ginkgo"
@@ -54,8 +54,8 @@ var (
 
 		var (
 			testAgent *common.Listener
-			source *azureSource
-			err error
+			source    *azureSource
+			err       error
 		)
 
 		BeforeSuite(func() {
@@ -111,11 +111,11 @@ var (
 					options := make(map[string]interface{})
 					options[common.OptEnvironment] = common.OptEnvironmentAzure
 					options[common.OptAPIServerURL] = "null"
-					options[common.OptIpamQueryUrl] = "http://"+ipamQueryUrl
+					options[common.OptIpamQueryUrl] = "http://" + ipamQueryUrl
 					source, err = newAzureSource(options)
 					Expect(err).ShouldNot(HaveOccurred())
 					Expect(source.name).Should(Equal("Azure"))
-					Expect(source.queryUrl).Should(Equal("http://"+ipamQueryUrl))
+					Expect(source.queryUrl).Should(Equal("http://" + ipamQueryUrl))
 					Expect(source.queryInterval).Should(Equal(azureQueryInterval))
 				})
 			})
@@ -139,6 +139,12 @@ var (
 					err = source.start(sink)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(source.sink).NotTo(BeNil())
+					// this is to avoid a race condition that fails this test
+					//source.queryInterval defaults to 1 nanosecond
+					// if this test moves fast enough, it will have the refresh method
+					// return on this check if time.Since(s.lastRefresh) < s.queryInterval
+
+					source.lastRefresh = time.Now().Add(-1 * time.Second)
 					err = source.refresh()
 					Expect(err).To(HaveOccurred())
 				})
@@ -153,6 +159,14 @@ var (
 					err = source.start(sink)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(source.sink).NotTo(BeNil())
+
+					// this is to avoid a race condition that fails this test
+					//source.queryInterval defaults to 1 nanosecond
+					// if this test moves fast enough, it will have the refresh method
+					// return on this check if time.Since(s.lastRefresh) < s.queryInterval
+
+					source.lastRefresh = time.Now().Add(-1 * time.Second)
+
 					err = source.refresh()
 					Expect(err).To(HaveOccurred())
 				})
@@ -163,7 +177,7 @@ var (
 					options := make(map[string]interface{})
 					options[common.OptEnvironment] = common.OptEnvironmentAzure
 					options[common.OptAPIServerURL] = "null"
-					options[common.OptIpamQueryUrl] = "http://"+ipamQueryUrl
+					options[common.OptIpamQueryUrl] = "http://" + ipamQueryUrl
 
 					am, err := createAddressManager(options)
 					Expect(err).ToNot(HaveOccurred())

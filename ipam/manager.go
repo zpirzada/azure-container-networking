@@ -164,12 +164,14 @@ func (am *addressManager) restore() error {
 func (am *addressManager) save() error {
 	// Skip if a store is not provided.
 	if am.store == nil {
+		log.Printf("[ipam] ipam store is nil.\n")
 		return nil
 	}
 
 	// Update time stamp.
 	am.TimeStamp = time.Now()
 
+	log.Printf("[ipam] saving ipam state.\n")
 	err := am.store.Write(storeKey, am)
 	if err == nil {
 		log.Printf("[ipam] Save succeeded.\n")

@@ -102,6 +102,9 @@ func setupTestAddressSpace(am AddressManager) error {
 	ap, err := localAs.newAddressPool(anyInterface, anyPriority, &subnet1)
 	ap.newAddressRecord(&addr11)
 	ap.newAddressRecord(&addr12)
+	ap.newAddressRecord(&addr13)
+	ap.newAddressRecord(&addr22)
+	ap.newAddressRecord(&addr32)
 
 	// Add subnet2 with addr21.
 	ap, err = localAs.newAddressPool(anyInterface, anyPriority, &subnet2)
@@ -233,17 +236,17 @@ var (
 						ModificationTime: timeReboot.Add(time.Hour),
 					}
 					ap := &addressPool{
-						Id:			"ap-test",
-						RefCount: 	1,
-						Addresses: 	make(map[string]*addressRecord),
+						Id:        "ap-test",
+						RefCount:  1,
+						Addresses: make(map[string]*addressRecord),
 					}
 					ap.Addresses["ar-test"] = &addressRecord{
-						ID:		"ar-test",
-						InUse: 	true,
+						ID:    "ar-test",
+						InUse: true,
 					}
 					as := &addressSpace{
-						Id:		"as-test",
-						Pools: 	make(map[string]*addressPool),
+						Id:    "as-test",
+						Pools: make(map[string]*addressPool),
 					}
 					as.Pools["ap-test"] = ap
 					am.AddrSpaces["as-test"] = as
@@ -267,17 +270,17 @@ var (
 						GetModificationTimeError: errors.New("Error"),
 					}
 					ap := &addressPool{
-						Id:			"ap-test",
-						RefCount: 	1,
-						Addresses: 	make(map[string]*addressRecord),
+						Id:        "ap-test",
+						RefCount:  1,
+						Addresses: make(map[string]*addressRecord),
 					}
 					ap.Addresses["ar-test"] = &addressRecord{
-						ID:		"ar-test",
-						InUse: 	true,
+						ID:    "ar-test",
+						InUse: true,
 					}
 					as := &addressSpace{
-						Id:		"as-test",
-						Pools: 	make(map[string]*addressPool),
+						Id:    "as-test",
+						Pools: make(map[string]*addressPool),
 					}
 					as.Pools["ap-test"] = ap
 					am.AddrSpaces["as-test"] = as
@@ -299,17 +302,17 @@ var (
 					}
 					am.store = &testutils.KeyValueStoreMock{}
 					ap := &addressPool{
-						Id:			"ap-test",
-						RefCount: 	1,
-						Addresses: 	make(map[string]*addressRecord),
+						Id:        "ap-test",
+						RefCount:  1,
+						Addresses: make(map[string]*addressRecord),
 					}
 					ap.Addresses["ar-test"] = &addressRecord{
-						ID:		"ar-test",
-						InUse: 	true,
+						ID:    "ar-test",
+						InUse: true,
 					}
 					as := &addressSpace{
-						Id:		"as-test",
-						Pools: 	make(map[string]*addressPool),
+						Id:    "as-test",
+						Pools: make(map[string]*addressPool),
 					}
 					as.Pools["ap-test"] = ap
 					am.AddrSpaces["as-test"] = as
@@ -409,8 +412,8 @@ var (
 					am := &addressManager{
 						AddrSpaces: make(map[string]*addressSpace),
 					}
-					am.AddrSpaces[LocalDefaultAddressSpaceId] = &addressSpace{Id:"localId"}
-					am.AddrSpaces[GlobalDefaultAddressSpaceId] = &addressSpace{Id:"globalId"}
+					am.AddrSpaces[LocalDefaultAddressSpaceId] = &addressSpace{Id: "localId"}
+					am.AddrSpaces[GlobalDefaultAddressSpaceId] = &addressSpace{Id: "globalId"}
 					localId, globalId := am.GetDefaultAddressSpaces()
 					Expect(localId).To(Equal("localId"))
 					Expect(globalId).To(Equal("globalId"))

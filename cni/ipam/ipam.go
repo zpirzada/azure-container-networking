@@ -149,19 +149,22 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 		return err
 	}
 
+	// assign the container id
+	options := make(map[string]string)
+	options[ipam.OptAddressID] = args.ContainerID
+
 	// Check if an address pool is specified.
 	if nwCfg.Ipam.Subnet == "" {
 		var poolID string
 		var subnet string
 
-		// Select the requested interface.
-		options := make(map[string]string)
-		options[ipam.OptInterfaceName] = nwCfg.Master
-
 		isIpv6 := false
 		if nwCfg.Ipam.Type == ipamV6 {
 			isIpv6 = true
 		}
+
+		// Select the requested interface.
+		options[ipam.OptInterfaceName] = nwCfg.Master
 
 		// Allocate an address pool.
 		poolID, subnet, err = plugin.am.RequestPool(nwCfg.Ipam.AddrSpace, "", "", options, isIpv6)
@@ -183,7 +186,7 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	}
 
 	// Allocate an address for the endpoint.
-	address, err := plugin.am.RequestAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address, nil)
+	address, err := plugin.am.RequestAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address, options)
 	if err != nil {
 		err = plugin.Errorf("Failed to allocate address: %v", err)
 		return err
@@ -193,7 +196,7 @@ func (plugin *ipamPlugin) Add(args *cniSkel.CmdArgs) error {
 	defer func() {
 		if err != nil && address != "" {
 			log.Printf("[cni-ipam] Releasing address %v.", address)
-			plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, address, nil)
+			plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, address, options)
 		}
 	}()
 
@@ -280,22 +283,19 @@ func (plugin *ipamPlugin) Delete(args *cniSkel.CmdArgs) error {
 		return err
 	}
 
-	// If an address is specified, release that address. Otherwise, release the pool.
-	if nwCfg.Ipam.Address != "" {
-		// Release the address.
-		err := plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address, nil)
-		if err != nil {
-			err = plugin.Errorf("Failed to release address: %v", err)
-			return err
-		}
-	} else {
-		// Release the pool.
-		err := plugin.am.ReleasePool(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet)
-		if err != nil {
-			err = plugin.Errorf("Failed to release pool: %v", err)
-			return err
-		}
+	// Select the requested interface.
+	options := make(map[string]string)
+	options[ipam.OptAddressID] = args.ContainerID
+
+	err = plugin.am.ReleaseAddress(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet, nwCfg.Ipam.Address, options)
+
+	if err != nil {
+		err = plugin.Errorf("Failed to release address: %v", err)
+		return err
 	}
+
+	// Release the pool.
+	plugin.am.ReleasePool(nwCfg.Ipam.AddrSpace, nwCfg.Ipam.Subnet)
 
 	return nil
 }

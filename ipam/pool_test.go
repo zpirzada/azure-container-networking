@@ -1,6 +1,7 @@
 package ipam
 
 import (
+	"github.com/google/uuid"
 	"net"
 	"testing"
 
@@ -654,7 +655,7 @@ var (
 						Addresses: map[string]*addressRecord{},
 					}
 					as.Pools["10.1.0.0/16"] = &addressPool{
-						Id:        "10.1.0.0/16",
+						Id: "10.1.0.0/16",
 						Addresses: map[string]*addressRecord{
 							"10.1.0.1/16": &addressRecord{},
 						},
@@ -678,22 +679,7 @@ var (
 				})
 			})
 
-			Context("When pool is not in use", func() {
-				It("Should raise an error", func() {
-					poolId := "10.0.0.0/16"
-					as := &addressSpace{
-						Pools: map[string]*addressPool{},
-					}
-					as.Pools[poolId] = &addressPool{
-						RefCount: 0,
-					}
-					err := as.releasePool("10.0.0.0/16")
-					Expect(err).To(Equal(errAddressPoolNotInUse))
-					Expect(as.Pools[poolId]).NotTo(BeNil())
-				})
-			})
-
-			Context("When pool's epoch is less than the space's epoch and pool is never in use", func() {
+			Context("When pool's addresses are all not in use", func() {
 				It("Should release the pool ", func() {
 					poolId := "10.0.0.0/16"
 					as := &addressSpace{
@@ -701,16 +687,31 @@ var (
 						Pools: map[string]*addressPool{},
 					}
 					as.Pools[poolId] = &addressPool{
-						epoch:    1,
-						RefCount: 1,
+						epoch:     1,
+						RefCount:  1,
+						Addresses: map[string]*addressRecord{},
 					}
+
+					as.Pools[poolId].Addresses["10.0.0.1"] = &addressRecord{
+						InUse: false,
+						Addr:  net.IPv4zero,
+					}
+					as.Pools[poolId].Addresses["10.0.0.2"] = &addressRecord{
+						InUse: false,
+						Addr:  net.IPv4zero,
+					}
+					as.Pools[poolId].Addresses["10.0.0.3"] = &addressRecord{
+						InUse: false,
+						Addr:  net.IPv4zero,
+					}
+
 					err := as.releasePool("10.0.0.0/16")
 					Expect(err).NotTo(HaveOccurred())
 					Expect(as.Pools[poolId]).To(BeNil())
 				})
 			})
 
-			Context("When the epoch of pool is equal to the epoch of addressSpace", func() {
+			Context("When the pool has in use addresses", func() {
 				It("Should not delete the pool", func() {
 					poolId := "10.0.0.0/16"
 					as := &addressSpace{
@@ -718,9 +719,24 @@ var (
 						Pools: map[string]*addressPool{},
 					}
 					as.Pools[poolId] = &addressPool{
-						epoch:    1,
-						RefCount: 1,
+						epoch:     1,
+						RefCount:  1,
+						Addresses: map[string]*addressRecord{},
 					}
+
+					as.Pools[poolId].Addresses["10.0.0.1"] = &addressRecord{
+						InUse: true,
+						Addr:  net.IPv4zero,
+					}
+					as.Pools[poolId].Addresses["10.0.0.2"] = &addressRecord{
+						InUse: false,
+						Addr:  net.IPv4zero,
+					}
+					as.Pools[poolId].Addresses["10.0.0.3"] = &addressRecord{
+						InUse: false,
+						Addr:  net.IPv4zero,
+					}
+
 					err := as.releasePool("10.0.0.0/16")
 					Expect(err).NotTo(HaveOccurred())
 					Expect(as.Pools[poolId]).NotTo(BeNil())
@@ -823,6 +839,43 @@ var (
 					options := map[string]string{}
 					options[OptAddressID] = arId
 					addr, err := ap.requestAddress("10.0.0.1/16", options)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(addr).NotTo(BeEmpty())
+					Expect(ap.addrsByID[arId].ID).To(Equal(arId))
+				})
+			})
+
+			Context("When id is not found and a address is available", func() {
+				It("Should return a new address", func() {
+					ap := &addressPool{
+						Addresses: map[string]*addressRecord{},
+						addrsByID: map[string]*addressRecord{},
+						Subnet:    subnet1,
+					}
+					arId := uuid.New().String()
+
+					ap.Addresses["0"] = &addressRecord{
+						ID:    "",
+						Addr:  addr11,
+						InUse: false,
+					}
+
+					ap.Addresses["1"] = &addressRecord{
+						ID:    "",
+						Addr:  addr12,
+						InUse: false,
+					}
+
+					ap.Addresses["3"] = &addressRecord{
+						ID:    "",
+						Addr:  addr13,
+						InUse: false,
+					}
+
+					options := map[string]string{}
+					options[OptAddressID] = arId
+
+					addr, err := ap.requestAddress("", options)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(addr).NotTo(BeEmpty())
 					Expect(ap.addrsByID[arId].ID).To(Equal(arId))
