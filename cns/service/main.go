@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Azure/azure-container-networking/cns/ipampoolmonitor"
+
 	"github.com/Azure/azure-container-networking/aitelemetry"
 	"github.com/Azure/azure-container-networking/cnm/ipam"
 	"github.com/Azure/azure-container-networking/cnm/network"
@@ -469,6 +471,10 @@ func main() {
 				return
 			}
 		}()
+
+		poolMonitor := ipampoolmonitor.NewCNSIPAMPoolMonitor(httpRestService, requestController)
+
+		httpRestServiceImplementation.PoolMonitor = poolMonitor
 	}
 
 	var netPlugin network.NetPlugin
