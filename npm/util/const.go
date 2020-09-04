@@ -22,7 +22,7 @@ const (
 //iptables related constants.
 const (
 	Iptables                  string = "iptables"
-	Ip6tables                 string = "ip6tables"
+	IP6tables                 string = "ip6tables"
 	IptablesSave              string = "iptables-save"
 	IptablesRestore           string = "iptables-restore"
 	IptablesConfigFile        string = "/var/log/iptables.conf"
@@ -90,10 +90,10 @@ const (
 	IpsetFlushFlag      string = "-F"
 	IpsetDestroyFlag    string = "-X"
 
-	IpsetExistFlag string = "-exist"
-	IpsetFileFlag  string = "-file"
+	IpsetExistFlag     string = "-exist"
+	IpsetFileFlag      string = "-file"
 	IPsetCheckListFlag string = "list"
-	IpsetTestFlag  string = "test"
+	IpsetTestFlag      string = "test"
 
 	IpsetSetListFlag    string = "setlist"
 	IpsetNetHashFlag    string = "nethash"
@@ -124,4 +124,28 @@ const (
 	AddNetworkPolicyEvent    string = "Add network policy"
 	UpdateNetworkPolicyEvent string = "Update network policy"
 	DeleteNetworkPolicyEvent string = "Delete network policy"
+
+	ErrorMetric  string = "ErrorMetric"
+	PackageName  string = "PackageName"
+	FunctionName string = "FunctionName"
+	ErrorCode    string = "ErrorCode"
+
+	// Default batch size in AI telemetry
+	// Defined here https://docs.microsoft.com/en-us/azure/azure-monitor/app/pricing
+	BatchSizeInBytes          int = 32768
+	BatchIntervalInSecs       int = 30
+	RefreshTimeoutInSecs      int = 15
+	GetEnvRetryCount          int = 5
+	GetEnvRetryWaitTimeInSecs int = 3
+	AiInitializeRetryCount    int = 3
+	AiInitializeRetryInMin    int = 1
+	// These ID represents where did the error log generate from.
+	// It's for better query purpose.
+	NpmID  int = 1
+	IpsmID int = 2
+	IptmID int = 3
+
+	DebugMode bool = true
+
+	ErrorValue float64 = 1
 )

@@ -1,4 +1,4 @@
-// Copyright 2018 Microsoft. All rights reserved.
+// Package npm Copyright 2018 Microsoft. All rights reserved.
 // MIT License
 package npm
 
@@ -12,6 +12,7 @@ import (
 	"github.com/Azure/azure-container-networking/aitelemetry"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/npm/iptm"
+	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/util"
 	"github.com/Azure/azure-container-networking/telemetry"
 	corev1 "k8s.io/api/core/v1"
@@ -82,21 +83,19 @@ func (npMgr *NetworkPolicyManager) GetClusterState() telemetry.ClusterState {
 	return npMgr.clusterState
 }
 
-// SendAiMetrics :- send NPM metrics using AppInsights
-func (npMgr *NetworkPolicyManager) SendAiMetrics() {
-	var (
-		aiConfig = aitelemetry.AIConfig{
-			AppName:                   util.AzureNpmFlag,
-			AppVersion:                npMgr.version,
-			BatchSize:                 32768,
-			BatchInterval:             30,
-			RefreshTimeout:            15,
-			DebugMode:                 true,
-			GetEnvRetryCount:          5,
-			GetEnvRetryWaitTimeInSecs: 3,
-		}
+// GetAppVersion returns network policy manager app version
+func (npMgr *NetworkPolicyManager) GetAppVersion() string {
+	return npMgr.version
+}
 
-		th, err          = aitelemetry.NewAITelemetry("", aiMetadata, aiConfig)
+// GetAIMetadata returns ai metadata number
+func GetAIMetadata() string {
+	return aiMetadata
+}
+
+// SendClusterMetrics :- send NPM cluster metrics using AppInsights
+func (npMgr *NetworkPolicyManager) SendClusterMetrics() {
+	var (
 		heartbeat        = time.NewTicker(time.Minute * heartbeatIntervalInMinutes).C
 		customDimensions = map[string]string{"ClusterID": util.GetClusterID(npMgr.nodeName),
 			"APIServer": npMgr.serverVersion.String()}
@@ -114,30 +113,16 @@ func (npMgr *NetworkPolicyManager) SendAiMetrics() {
 		}
 	)
 
-	for i := 0; err != nil && i < 5; i++ {
-		log.Logf("Failed to init AppInsights with err: %+v", err)
-		time.Sleep(time.Minute * 5)
-		th, err = aitelemetry.NewAITelemetry("", aiMetadata, aiConfig)
-	}
+	for {
+		<-heartbeat
+		clusterState := npMgr.GetClusterState()
+		podCount.Value = float64(clusterState.PodCount)
+		nsCount.Value = float64(clusterState.NsCount)
+		nwPolicyCount.Value = float64(clusterState.NwPolicyCount)
 
-	if th != nil {
-		log.Logf("Initialized AppInsights handle")
-
-		defer th.Close(10)
-
-		for {
-			<-heartbeat
-			clusterState := npMgr.GetClusterState()
-			podCount.Value = float64(clusterState.PodCount)
-			nsCount.Value = float64(clusterState.NsCount)
-			nwPolicyCount.Value = float64(clusterState.NwPolicyCount)
-
-			th.TrackMetric(podCount)
-			th.TrackMetric(nsCount)
-			th.TrackMetric(nwPolicyCount)
-		}
-	} else {
-		log.Logf("Failed to initialize AppInsights handle with err: %+v", err)
+		metrics.SendMetric(podCount)
+		metrics.SendMetric(nsCount)
+		metrics.SendMetric(nwPolicyCount)
 	}
 }
 
@@ -153,7 +138,7 @@ func (npMgr *NetworkPolicyManager) restore() {
 		time.Sleep(restoreRetryWaitTimeInSeconds * time.Second)
 	}
 
-	log.Logf("Error: timeout restoring Azure-NPM states")
+	metrics.SendErrorMetric(util.NpmID, "Error: timeout restoring Azure-NPM states")
 	panic(err.Error)
 }
 
@@ -165,7 +150,7 @@ func (npMgr *NetworkPolicyManager) backup() {
 		time.Sleep(backupWaitTimeInSeconds * time.Second)
 
 		if err = iptMgr.Save(util.IptablesConfigFile); err != nil {
-			log.Logf("Error: failed to back up Azure-NPM states")
+			metrics.SendErrorMetric(util.NpmID, "Error: failed to back up Azure-NPM states")
 		}
 	}
 }
@@ -177,15 +162,18 @@ func (npMgr *NetworkPolicyManager) Start(stopCh <-chan struct{}) error {
 
 	// Wait for the initial sync of local cache.
 	if !cache.WaitForCacheSync(stopCh, npMgr.podInformer.Informer().HasSynced) {
+		metrics.SendErrorMetric(util.NpmID, "Pod informer failed to sync")
 		return fmt.Errorf("Pod informer failed to sync")
 	}
 
 	if !cache.WaitForCacheSync(stopCh, npMgr.nsInformer.Informer().HasSynced) {
+		metrics.SendErrorMetric(util.NpmID, "Namespace informer failed to sync")
 		return fmt.Errorf("Namespace informer failed to sync")
 	}
 
 	if !cache.WaitForCacheSync(stopCh, npMgr.npInformer.Informer().HasSynced) {
-		return fmt.Errorf("Namespace informer failed to sync")
+		metrics.SendErrorMetric(util.NpmID, "Network policy informer failed to sync")
+		return fmt.Errorf("Network policy informer failed to sync")
 	}
 
 	go npMgr.backup()
@@ -216,13 +204,13 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 		}
 	}
 	if err != nil {
-		log.Logf("Error: failed to retrieving kubernetes version")
+		metrics.SendErrorMetric(util.NpmID, "Error: failed to retrieving kubernetes version")
 		panic(err.Error)
 	}
 	log.Logf("API server version: %+v", serverVersion)
 
 	if err = util.SetIsNewNwPolicyVerFlag(serverVersion); err != nil {
-		log.Logf("Error: failed to set IsNewNwPolicyVerFlag")
+		metrics.SendErrorMetric(util.NpmID, "Error: failed to set IsNewNwPolicyVerFlag")
 		panic(err.Error)
 	}
 
@@ -253,7 +241,7 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 	// Create ipset for the namespace.
 	kubeSystemNs := "ns-" + util.KubeSystemFlag
 	if err := allNs.ipsMgr.CreateSet(kubeSystemNs, append([]string{util.IpsetNetHashFlag})); err != nil {
-		log.Logf("Error: failed to create ipset for namespace %s.", kubeSystemNs)
+		metrics.SendErrorMetric(util.NpmID, "Error: failed to create ipset for namespace %s.", kubeSystemNs)
 	}
 
 	podInformer.Informer().AddEventHandler(
