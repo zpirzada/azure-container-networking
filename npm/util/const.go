@@ -22,7 +22,7 @@ const (
 //iptables related constants.
 const (
 	Iptables                  string = "iptables"
-	IP6tables                 string = "ip6tables"
+	Ip6tables                 string = "ip6tables"
 	IptablesSave              string = "iptables-save"
 	IptablesRestore           string = "iptables-restore"
 	IptablesConfigFile        string = "/var/log/iptables.conf"
