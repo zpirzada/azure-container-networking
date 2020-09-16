@@ -99,12 +99,12 @@ type MockCNSClient struct {
 }
 
 // we're just testing that reconciler interacts with CNS on Reconcile().
-func (mi *MockCNSClient) CreateOrUpdateNC(ncRequest cns.CreateNetworkContainerRequest, scalarUnits cns.ScalarUnits) error {
+func (mi *MockCNSClient) CreateOrUpdateNC(ncRequest cns.CreateNetworkContainerRequest, scalar nnc.Scaler, spec nnc.NodeNetworkConfigSpec) error {
 	mi.MockCNSUpdated = true
 	return nil
 }
 
-func (mi *MockCNSClient) ReconcileNCState(ncRequest *cns.CreateNetworkContainerRequest, podInfoByIP map[string]cns.KubernetesPodInfo, scalarUnits cns.ScalarUnits) error {
+func (mi *MockCNSClient) ReconcileNCState(ncRequest *cns.CreateNetworkContainerRequest, podInfoByIP map[string]cns.KubernetesPodInfo, scalar nnc.Scaler, spec nnc.NodeNetworkConfigSpec) error {
 	mi.MockCNSInitialized = true
 	mi.Pods = podInfoByIP
 	mi.NCRequest = ncRequest

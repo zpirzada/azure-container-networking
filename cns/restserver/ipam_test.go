@@ -43,6 +43,7 @@ func getTestService() *HTTPRestService {
 	var config common.ServiceConfig
 	httpsvc, _ := NewHTTPRestService(&config, fakes.NewFakeImdsClient())
 	svc = httpsvc.(*HTTPRestService)
+	svc.IPAMPoolMonitor = fakes.NewIPAMPoolMonitorFake()
 	setOrchestratorTypeInternal(cns.KubernetesCRD)
 
 	return svc
@@ -530,5 +531,46 @@ func validateIpState(t *testing.T, actualIps []cns.IPConfigurationStatus, expect
 		if !found {
 			t.Fatalf("Actual and expected list doesnt match actual: %+v, expected: %+v", actualIp, expectedIp)
 		}
+	}
+}
+
+func TestIPAMMarkIPConfigAsPending(t *testing.T) {
+	svc := getTestService()
+	// set state as already allocated
+	state1, _ := NewPodStateWithOrchestratorContext(testIP1, 24, testPod1GUID, testNCID, cns.Available, testPod1Info)
+	ipconfigs := map[string]cns.IPConfigurationStatus{
+		state1.ID: state1,
+	}
+
+	err := UpdatePodIpConfigState(t, svc, ipconfigs)
+	if err != nil {
+		t.Fatalf("Expected to not fail adding IP's to state: %+v", err)
+	}
+
+	// Release Test Pod 1
+	ips, err := svc.MarkIPsAsPending(1)
+	if err != nil {
+		t.Fatalf("Unexpected failure releasing IP: %+v", err)
+	}
+
+	if _, exists := ips[testPod1GUID]; !exists {
+		t.Fatalf("Expected ID not marked as pending: %+v", err)
+	}
+
+	// Release Test Pod 1
+	pendingrelease := svc.GetPendingReleaseIPConfigs()
+	if len(pendingrelease) != 1 {
+		t.Fatal("Expected pending release slice to be nonzero after pending release")
+	}
+
+	available := svc.GetAvailableIPConfigs()
+	if len(available) != 0 {
+		t.Fatal("Expected available ips to be zero after marked as pending")
+	}
+
+	// Call release again, should be fine
+	err = svc.releaseIPConfig(testPod1Info)
+	if err != nil {
+		t.Fatalf("Unexpected failure releasing IP: %+v", err)
 	}
 }

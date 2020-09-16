@@ -12,12 +12,11 @@ import (
 	"reflect"
 
 	"github.com/Azure/azure-container-networking/cns"
-	"github.com/Azure/azure-container-networking/cns/ipampoolmonitor"
 	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/cns/nmagentclient"
-	"github.com/Azure/azure-container-networking/cns/requestcontroller"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
+	nnc "github.com/Azure/azure-container-networking/nodenetworkconfig/api/v1alpha"
 )
 
 // This file contains the internal functions called by either HTTP APIs (api.go) or
@@ -152,21 +151,15 @@ func (service *HTTPRestService) SyncNodeStatus(dncEP, infraVnet, nodeID string, 
 	return
 }
 
-func (service *HTTPRestService) StartCNSIPAMPoolMonitor(cnsService cns.HTTPService, requestController requestcontroller.RequestController) {
-
-	// TODO, start pool monitor as well
-	service.PoolMonitor = ipampoolmonitor.NewCNSIPAMPoolMonitor(cnsService, requestController)
-}
-
 // This API will be called by CNS RequestController on CRD update.
-func (service *HTTPRestService) ReconcileNCState(ncRequest *cns.CreateNetworkContainerRequest, podInfoByIp map[string]cns.KubernetesPodInfo, scalarUnits cns.ScalarUnits) int {
+func (service *HTTPRestService) ReconcileNCState(ncRequest *cns.CreateNetworkContainerRequest, podInfoByIp map[string]cns.KubernetesPodInfo, scalar nnc.Scaler, spec nnc.NodeNetworkConfigSpec) int {
 	// check if ncRequest is null, then return as there is no CRD state yet
 	if ncRequest == nil {
 		log.Logf("CNS starting with no NC state, podInfoMap count %d", len(podInfoByIp))
 		return Success
 	}
 
-	returnCode := service.CreateOrUpdateNetworkContainerInternal(*ncRequest, scalarUnits)
+	returnCode := service.CreateOrUpdateNetworkContainerInternal(*ncRequest, scalar, spec)
 
 	// If the NC was created successfully, then reconcile the allocated pod state
 	if returnCode != Success {
@@ -202,7 +195,7 @@ func (service *HTTPRestService) ReconcileNCState(ncRequest *cns.CreateNetworkCon
 }
 
 // This API will be called by CNS RequestController on CRD update.
-func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.CreateNetworkContainerRequest, scalarUnits cns.ScalarUnits) int {
+func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.CreateNetworkContainerRequest, scalar nnc.Scaler, spec nnc.NodeNetworkConfigSpec) int {
 	if req.NetworkContainerid == "" {
 		logger.Errorf("[Azure CNS] Error. NetworkContainerid is empty")
 		return NetworkContainerNotSpecified
@@ -252,7 +245,12 @@ func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.C
 		logger.Errorf(returnMessage)
 	}
 
-	service.PoolMonitor.UpdatePoolLimitsTransacted(scalarUnits)
+	if err = service.IPAMPoolMonitor.Update(scalar, spec); err != nil {
+		logger.Errorf("[cns-rc] Error creating or updating IPAM Pool Monitor: %v", err)
+		// requeue
+		return UnexpectedError
+	}
 
 	return returnCode
+
 }

@@ -90,18 +90,18 @@ func (service *HTTPRestService) releaseIPConfigHandler(w http.ResponseWriter, r 
 	return
 }
 
-func (service *HTTPRestService) MarkIPsAsPending(numberToMark int) (map[string]cns.SecondaryIPConfig, error) {
-	pendingReleaseIPs := make(map[string]cns.SecondaryIPConfig)
+func (service *HTTPRestService) MarkIPsAsPending(numberToMark int) (map[string]cns.IPConfigurationStatus, error) {
+	pendingReleaseIPs := make(map[string]cns.IPConfigurationStatus)
 	markedIPCount := 0
 
 	service.Lock()
 	defer service.Unlock()
-	for uuid, ipconfig := range service.PodIPConfigState {
-		if ipconfig.State == cns.Available {
-			ipconfig.State = cns.PendingRelease
-			pendingReleaseIPs[uuid] = cns.SecondaryIPConfig{
-				IPAddress: ipconfig.IPAddress,
-			}
+	for uuid, _ := range service.PodIPConfigState {
+		mutableIPConfig := service.PodIPConfigState[uuid]
+		if mutableIPConfig.State == cns.Available {
+			mutableIPConfig.State = cns.PendingRelease
+			service.PodIPConfigState[uuid] = mutableIPConfig
+			pendingReleaseIPs[uuid] = mutableIPConfig
 			markedIPCount++
 			if markedIPCount == numberToMark {
 				return pendingReleaseIPs, nil
@@ -113,6 +113,8 @@ func (service *HTTPRestService) MarkIPsAsPending(numberToMark int) (map[string]c
 }
 
 func (service *HTTPRestService) GetPodIPConfigState() map[string]cns.IPConfigurationStatus {
+	service.RLock()
+	defer service.RUnlock()
 	return service.PodIPConfigState
 }
 
@@ -129,6 +131,14 @@ func (service *HTTPRestService) GetAvailableIPConfigs() []cns.IPConfigurationSta
 	defer service.RUnlock()
 	return filterIPConfigMap(service.PodIPConfigState, func(ipconfig cns.IPConfigurationStatus) bool {
 		return ipconfig.State == cns.Available
+	})
+}
+
+func (service *HTTPRestService) GetPendingReleaseIPConfigs() []cns.IPConfigurationStatus {
+	service.RLock()
+	defer service.RUnlock()
+	return filterIPConfigMap(service.PodIPConfigState, func(ipconfig cns.IPConfigurationStatus) bool {
+		return ipconfig.State == cns.PendingRelease
 	})
 }
 
