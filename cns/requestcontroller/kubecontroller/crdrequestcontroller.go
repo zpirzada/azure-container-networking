@@ -189,6 +189,11 @@ func (crdRC *crdRequestController) initCNS() error {
 			os.Exit(1)
 		}
 
+		if nodeNetConfig == nil {
+			logger.Errorf("NodeNetworkConfig is not present on cluster")
+			return nil
+		}
+
 		// If instance of crd is not found, pass nil to CNSClient
 		if client.IgnoreNotFound(err) == nil {
 			return crdRC.CNSClient.ReconcileNCState(nil, nil, nodeNetConfig.Status.Scaler, nodeNetConfig.Spec)
