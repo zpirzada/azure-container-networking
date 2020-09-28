@@ -4,6 +4,7 @@
 package restserver
 
 import (
+	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -1414,4 +1415,60 @@ func (service *HTTPRestService) deleteHostNCApipaEndpoint(w http.ResponseWriter,
 
 	err = service.Listener.Encode(w, &response)
 	logger.Response(service.Name, response, response.Response.ReturnCode, ReturnCodeToString(response.Response.ReturnCode), err)
+}
+
+// This function is used to query NMagents's supproted APIs list
+func (service *HTTPRestService) nmAgentSupportedApisHandler(w http.ResponseWriter, r *http.Request) {
+	logger.Printf("[Azure CNS] nmAgentSupportedApisHandler")
+	logger.Request(service.Name, "nmAgentSupportedApisHandler", nil)
+	var (
+		err           error
+		req           cns.NmAgentSupportedApisRequest
+		returnCode    int
+		returnMessage string
+		supportedApis []string
+	)
+
+	err = service.Listener.Decode(w, r, &req)
+	logger.Request(service.Name, &req, err)
+	if err != nil {
+		return
+	}
+
+	switch r.Method {
+	case "POST":
+		getApisResponse, getApisError := nmagentclient.GetNmAgentSupportedApis(
+			req.GetNmAgentSupportedApisURL)
+		if getApisError != nil || getApisResponse.StatusCode != http.StatusOK || getApisResponse == nil {
+			returnMessage = fmt.Sprintf("Failed to retrieve Supported Apis from NMAgent")
+			returnCode = NmAgentSupportedApisError
+			logger.Errorf("[Azure-CNS] %s", returnMessage)
+		}
+
+		if getApisResponse != nil {
+			var xmlDoc nmagentclient.NMAgentSupportedApisResponseXML
+			decoder := xml.NewDecoder(getApisResponse.Body)
+			err = decoder.Decode(&xmlDoc)
+			if err != nil {
+				returnMessage = fmt.Sprintf("Failed to decode XML response of Supported Apis from NMAgent")
+				returnCode = NmAgentSupportedApisError
+				logger.Errorf("[Azure-CNS] %s", returnMessage)
+			}
+			returnCode = 0
+			supportedApis = xmlDoc.SupportedApis
+		}
+
+	default:
+		returnMessage = "[Azure-CNS] GetHostLocalIP API expects a GET."
+	}
+
+	resp := cns.Response{ReturnCode: returnCode, Message: returnMessage}
+	nmAgentSupportedApisResponse := &cns.NmAgentSupportedApisResponse{
+		Response:      resp,
+		SupportedApis: supportedApis,
+	}
+
+	serviceErr := service.Listener.Encode(w, &nmAgentSupportedApisResponse)
+
+	logger.Response(service.Name, nmAgentSupportedApisResponse, resp.ReturnCode, ReturnCodeToString(resp.ReturnCode), serviceErr)
 }

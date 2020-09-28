@@ -27,6 +27,7 @@ const (
 	NumberOfCPUCoresPath          = "/hostcpucores"
 	CreateHostNCApipaEndpointPath = "/network/createhostncapipaendpoint"
 	DeleteHostNCApipaEndpointPath = "/network/deletehostncapipaendpoint"
+	NmAgentSupportedApisPath      = "/network/nmagentsupportedapis"
 	V1Prefix                      = "/v0.1"
 	V2Prefix                      = "/v0.2"
 )
@@ -211,4 +212,13 @@ type DeleteHostNCApipaEndpointRequest struct {
 // DeleteHostNCApipaEndpointResponse describes response for delete host NC apipa endpoint request.
 type DeleteHostNCApipaEndpointResponse struct {
 	Response Response
+}
+
+type NmAgentSupportedApisRequest struct {
+	GetNmAgentSupportedApisURL string
+}
+
+type NmAgentSupportedApisResponse struct {
+	Response      Response
+	SupportedApis []string
 }

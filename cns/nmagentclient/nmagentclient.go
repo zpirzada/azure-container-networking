@@ -20,6 +20,10 @@ type NMANetworkContainerResponse struct {
 	Version            string `json:"version"`
 }
 
+type NMAgentSupportedApisResponseXML struct {
+	SupportedApis []string `xml:"type"`
+}
+
 // JoinNetwork joins the given network
 func JoinNetwork(
 	networkID string,
@@ -84,5 +88,17 @@ func GetNetworkContainerVersion(
 
 	logger.Printf("[NMAgentClient][Response] GetNetworkContainerVersion NC: %s. Response: %+v. Error: %v",
 		networkContainerID, response, err)
+	return response, err
+}
+
+// GetNmAgentSupportedApis :- Retrieves Supported Apis from NMAgent
+func GetNmAgentSupportedApis(
+	getNmAgentSupportedApisURL string) (*http.Response, error) {
+	logger.Printf("[NMAgentClient] In GetNmAgentSupportedApis func")
+
+	response, err := common.GetHttpClient().Get(getNmAgentSupportedApisURL)
+
+	logger.Printf("[NMAgentClient][Response] GetNmAgentSupportedApis. Response: %+v. Error: %v",
+		response, err)
 	return response, err
 }

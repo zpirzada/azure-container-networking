@@ -35,6 +35,7 @@ const (
 	FailedToAllocateIpConfig                = 32
 	EmptyOrchestratorContext                = 33
 	UnsupportedOrchestratorContext          = 34
+	NmAgentSupportedApisError               = 35
 	UnexpectedError                         = 99
 )
 
