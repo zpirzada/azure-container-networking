@@ -194,6 +194,26 @@ func (service *HTTPRestService) releaseIPConfig(podInfo cns.KubernetesPodInfo) e
 	return nil
 }
 
+// called when CNS is starting up and there are existing ipconfigs in the CRD that are marked as pending
+func (service *HTTPRestService) MarkExistingIPsAsPending(pendingIPIDs []string) error {
+	service.Lock()
+	defer service.Unlock()
+
+	for _, id := range pendingIPIDs {
+		if ipconfig, exists := service.PodIPConfigState[id]; exists {
+			if ipconfig.State == cns.Allocated {
+				return fmt.Errorf("Failed to mark IP [%v] as pending, currently allocated", id)
+			}
+
+			ipconfig.State = cns.PendingRelease
+			service.PodIPConfigState[id] = ipconfig
+		} else {
+			logger.Errorf("Inconsistent state, ipconfig with ID [%v] marked as pending release, but does not exist in state", id)
+		}
+	}
+	return nil
+}
+
 func (service *HTTPRestService) GetExistingIPConfig(podInfo cns.KubernetesPodInfo) (cns.PodIpInfo, bool, error) {
 	var (
 		podIpInfo cns.PodIpInfo

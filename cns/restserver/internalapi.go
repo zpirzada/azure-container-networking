@@ -191,6 +191,12 @@ func (service *HTTPRestService) ReconcileNCState(ncRequest *cns.CreateNetworkCon
 		}
 	}
 
+	err := service.MarkExistingIPsAsPending(spec.IPsNotInUse)
+	if err != nil {
+		logger.Errorf("[Azure CNS] Error. Failed to mark IP's as pending %v", spec.IPsNotInUse)
+		return UnexpectedError
+	}
+
 	return 0
 }
 
@@ -252,5 +258,4 @@ func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.C
 	}
 
 	return returnCode
-
 }

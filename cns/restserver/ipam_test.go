@@ -534,7 +534,7 @@ func validateIpState(t *testing.T, actualIps []cns.IPConfigurationStatus, expect
 	}
 }
 
-func TestIPAMMarkIPConfigAsPending(t *testing.T) {
+func TestIPAMMarkIPCountAsPending(t *testing.T) {
 	svc := getTestService()
 	// set state as already allocated
 	state1, _ := NewPodStateWithOrchestratorContext(testIP1, 24, testPod1GUID, testNCID, cns.Available, testPod1Info)
@@ -572,5 +572,47 @@ func TestIPAMMarkIPConfigAsPending(t *testing.T) {
 	err = svc.releaseIPConfig(testPod1Info)
 	if err != nil {
 		t.Fatalf("Unexpected failure releasing IP: %+v", err)
+	}
+}
+
+func TestIPAMMarkExistingIPConfigAsPending(t *testing.T) {
+	svc := getTestService()
+
+	// Add already allocated pod ip to state
+	svc.PodIPIDByOrchestratorContext[testPod1Info.GetOrchestratorContextKey()] = testPod1GUID
+	state1, _ := NewPodStateWithOrchestratorContext(testIP1, 24, testPod1GUID, testNCID, cns.Allocated, testPod1Info)
+	state2 := NewPodState(testIP2, 24, testPod2GUID, testNCID, cns.Available)
+
+	ipconfigs := map[string]cns.IPConfigurationStatus{
+		state1.ID: state1,
+		state2.ID: state2,
+	}
+	err := UpdatePodIpConfigState(t, svc, ipconfigs)
+	if err != nil {
+		t.Fatalf("Expected to not fail adding IP's to state: %+v", err)
+	}
+
+	// mark available ip as as pending
+	pendingIPIDs := []string{testPod2GUID}
+	err = svc.MarkExistingIPsAsPending(pendingIPIDs)
+	if err != nil {
+		t.Fatalf("Expected to successfully mark available ip as pending")
+	}
+
+	pendingIPConfigs := svc.GetPendingReleaseIPConfigs()
+	if pendingIPConfigs[0].ID != testPod2GUID {
+		t.Fatalf("Expected to see ID %v in pending release ipconfigs, actual %+v", testPod2GUID, pendingIPConfigs)
+	}
+
+	// attempt to mark allocated ipconfig as pending, expect fail
+	pendingIPIDs = []string{testPod1GUID}
+	err = svc.MarkExistingIPsAsPending(pendingIPIDs)
+	if err == nil {
+		t.Fatalf("Expected to fail when marking allocated ip as pending")
+	}
+
+	allocatedIPConfigs := svc.GetAllocatedIPConfigs()
+	if allocatedIPConfigs[0].ID != testPod1GUID {
+		t.Fatalf("Expected to see ID %v in pending release ipconfigs, actual %+v", testPod1GUID, allocatedIPConfigs)
 	}
 }
