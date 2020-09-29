@@ -3,6 +3,8 @@ package nmagentclient
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
+	"fmt"
 	"net/http"
 
 	"github.com/Azure/azure-container-networking/cns/logger"
@@ -10,7 +12,11 @@ import (
 )
 
 const (
+	//WireServerIP - wire server ip
 	WireserverIP = "168.63.129.16"
+
+	//GetNmAgentSupportedApiURLFmt Api endpoint to get supported Apis of NMAgent
+	GetNmAgentSupportedApiURLFmt = "http://%s/machine/plugins/?comp=nmagent&type=GetSupportedApis"
 )
 
 // NMANetworkContainerResponse - NMAgent response.
@@ -93,12 +99,38 @@ func GetNetworkContainerVersion(
 
 // GetNmAgentSupportedApis :- Retrieves Supported Apis from NMAgent
 func GetNmAgentSupportedApis(
-	getNmAgentSupportedApisURL string) (*http.Response, error) {
+	getNmAgentSupportedApisURL string) ([]string, string) {
 	logger.Printf("[NMAgentClient] In GetNmAgentSupportedApis func")
+	var (
+		returnMessage string
+		supportedApis []string
+	)
+
+	if getNmAgentSupportedApisURL == "" {
+		getNmAgentSupportedApisURL = fmt.Sprintf(
+			GetNmAgentSupportedApiURLFmt, WireserverIP)
+	}
 
 	response, err := common.GetHttpClient().Get(getNmAgentSupportedApisURL)
+	if err != nil || response.StatusCode != http.StatusOK || response == nil {
+		returnMessage = fmt.Sprintf("Failed to retrieve Supported Apis from NMAgent")
+		logger.Errorf("[Azure-CNS] %s", returnMessage)
+		return supportedApis, returnMessage
+	}
+
+	if response != nil {
+		var xmlDoc NMAgentSupportedApisResponseXML
+		decoder := xml.NewDecoder(response.Body)
+		err = decoder.Decode(&xmlDoc)
+		if err != nil {
+			returnMessage = fmt.Sprintf("Failed to decode XML response of Supported Apis from NMAgent")
+			logger.Errorf("[Azure-CNS] %s", returnMessage)
+			return supportedApis, returnMessage
+		}
+		supportedApis = xmlDoc.SupportedApis
+	}
 
 	logger.Printf("[NMAgentClient][Response] GetNmAgentSupportedApis. Response: %+v. Error: %v",
 		response, err)
-	return response, err
+	return supportedApis, ""
 }

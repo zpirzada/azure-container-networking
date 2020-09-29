@@ -10,6 +10,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"runtime"
+	"strconv"
+	"time"
 
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/logger"
@@ -132,6 +135,11 @@ func (service *HTTPRestService) SyncNodeStatus(dncEP, infraVnet, nodeID string, 
 	service.saveState()
 	service.Unlock()
 
+	if nodeInfoResponse.NmAgentApisMissing {
+		// RegisterNode again with NmAgent Apis list
+		RegisterNode(service, dncEP, infraVnet, nodeID)
+	}
+
 	// delete dangling NCs
 	for nc := range ncsToBeDeleted {
 		var body bytes.Buffer
@@ -253,4 +261,58 @@ func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.C
 
 	return returnCode
 
+}
+
+// Try to register node with DNC when CNS is started in managed DNC mode
+func RegisterNode(httpRestService cns.HTTPService, dncEP, infraVnet, nodeID string) {
+	logger.Printf("[Azure CNS] Registering node %s with Infrastructure Network: %s PrivateEndpoint: %s", nodeID, infraVnet, dncEP)
+
+	var (
+		numCPU              = runtime.NumCPU()
+		url                 = fmt.Sprintf(common.RegisterNodeURLFmt, dncEP, infraVnet, nodeID, dncApiVersion)
+		response            *http.Response
+		err                 = fmt.Errorf("")
+		body                bytes.Buffer
+		httpc               = common.GetHttpClient()
+		nodeRegisterRequest cns.NodeRegisterRequest
+	)
+
+	nodeRegisterRequest.NumCPU = numCPU
+	supportedApis, msg := nmagentclient.GetNmAgentSupportedApis("")
+
+	if msg != "" {
+		logger.Printf("[Azure CNS] Failed to retrieve SupportedApis from NMagent of node %s with Infrastructure Network: %s PrivateEndpoint: %s",
+			nodeID, infraVnet, dncEP)
+	}
+
+	nodeRegisterRequest.NmAgentSupportedApis = supportedApis
+	if err := json.NewEncoder(&body).Encode(nodeRegisterRequest); err != nil {
+		log.Errorf("encoding json failed with %v", err)
+		return
+	}
+
+	for sleep := true; err != nil; sleep = true {
+		response, err = httpc.Post(url, "application/json", &body)
+		if err == nil {
+			if response.StatusCode == http.StatusCreated {
+				var req cns.SetOrchestratorTypeRequest
+				json.NewDecoder(response.Body).Decode(&req)
+				httpRestService.SetNodeOrchestrator(&req)
+				sleep = false
+			} else {
+				err = fmt.Errorf("[Azure CNS] Failed to register node with http status code %s", strconv.Itoa(response.StatusCode))
+				logger.Errorf(err.Error())
+			}
+
+			response.Body.Close()
+		} else {
+			logger.Errorf("[Azure CNS] Failed to register node with err: %+v", err)
+		}
+
+		if sleep {
+			time.Sleep(common.FiveSeconds)
+		}
+	}
+
+	logger.Printf("[Azure CNS] Node Registered")
 }

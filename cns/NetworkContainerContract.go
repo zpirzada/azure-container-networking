@@ -343,4 +343,11 @@ func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate()
 type NodeInfoResponse struct {
 	NetworkContainers  []CreateNetworkContainerRequest
 	GetNCVersionURLFmt string
+	NmAgentApisMissing bool
+}
+
+// NodeRegisterRequest - Struct to hold the node register request.
+type NodeRegisterRequest struct {
+	NumCPU               int
+	NmAgentSupportedApis []string
 }

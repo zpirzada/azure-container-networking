@@ -4,7 +4,6 @@
 package restserver
 
 import (
-	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -1437,25 +1436,11 @@ func (service *HTTPRestService) nmAgentSupportedApisHandler(w http.ResponseWrite
 
 	switch r.Method {
 	case "POST":
-		getApisResponse, getApisError := nmagentclient.GetNmAgentSupportedApis(
+		supportedApis, returnMessage = nmagentclient.GetNmAgentSupportedApis(
 			req.GetNmAgentSupportedApisURL)
-		if getApisError != nil || getApisResponse.StatusCode != http.StatusOK || getApisResponse == nil {
-			returnMessage = fmt.Sprintf("Failed to retrieve Supported Apis from NMAgent")
+		if returnMessage != "" {
 			returnCode = NmAgentSupportedApisError
 			logger.Errorf("[Azure-CNS] %s", returnMessage)
-		}
-
-		if getApisResponse != nil {
-			var xmlDoc nmagentclient.NMAgentSupportedApisResponseXML
-			decoder := xml.NewDecoder(getApisResponse.Body)
-			err = decoder.Decode(&xmlDoc)
-			if err != nil {
-				returnMessage = fmt.Sprintf("Failed to decode XML response of Supported Apis from NMAgent")
-				returnCode = NmAgentSupportedApisError
-				logger.Errorf("[Azure-CNS] %s", returnMessage)
-			}
-			returnCode = 0
-			supportedApis = xmlDoc.SupportedApis
 		}
 
 	default:
