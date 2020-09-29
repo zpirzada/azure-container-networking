@@ -3,6 +3,8 @@ package cns
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 )
 
@@ -134,6 +136,12 @@ type SecondaryIPConfig struct {
 type IPSubnet struct {
 	IPAddress    string
 	PrefixLength uint8
+}
+
+//GetIPNet converts the IPSubnet to the standard net type
+func (ips *IPSubnet) GetIPNet() (net.IP, *net.IPNet, error) {
+	prefix := strconv.Itoa(int(ips.PrefixLength))
+	return net.ParseCIDR(ips.IPAddress + "/" + prefix)
 }
 
 // Route describes an entry in routing table.

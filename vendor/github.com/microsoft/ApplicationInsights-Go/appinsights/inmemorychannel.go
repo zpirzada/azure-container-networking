@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/clock"
-	"github.com/Microsoft/ApplicationInsights-Go/appinsights/contracts"
+	"github.com/microsoft/ApplicationInsights-Go/appinsights/contracts"
 )
 
 var (
@@ -53,7 +53,7 @@ func NewInMemoryChannel(config *TelemetryConfiguration) *InMemoryChannel {
 		batchSize:       config.MaxBatchSize,
 		batchInterval:   config.MaxBatchInterval,
 		throttle:        newThrottleManager(),
-		transmitter:     newTransmitter(config.EndpointUrl),
+		transmitter:     newTransmitter(config.EndpointUrl, config.Client),
 	}
 
 	go channel.acceptLoop()

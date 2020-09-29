@@ -5,7 +5,6 @@ go 1.13
 require (
 	code.cloudfoundry.org/clock v1.0.0 // indirect
 	github.com/Masterminds/semver v1.5.0
-	github.com/Microsoft/ApplicationInsights-Go v0.4.2
 	github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
 	github.com/Microsoft/hcsshim v0.8.10-0.20200506181021-222e9efadbe0
 	github.com/containernetworking/cni v0.7.0-rc2
@@ -16,6 +15,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
+	github.com/microsoft/ApplicationInsights-Go v0.4.3
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.9.0
 	github.com/petar/GoLLRB v0.0.0-20190514000832-33fb24c13b99 // indirect
@@ -23,7 +23,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/satori/go.uuid v1.2.0 // indirect
 	go.opencensus.io v0.22.2 // indirect
-	golang.org/x/net v0.0.0-20191112182307-2180aed22343
+	golang.org/x/net v0.0.0-20191112182307-2180aed22343 // indirect
 	golang.org/x/sys v0.0.0-20191120155948-bd437916bb0e
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	google.golang.org/appengine v1.6.5 // indirect

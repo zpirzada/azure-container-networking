@@ -2,9 +2,6 @@
 code.cloudfoundry.org/clock
 # github.com/Masterminds/semver v1.5.0
 github.com/Masterminds/semver
-# github.com/Microsoft/ApplicationInsights-Go v0.4.2
-github.com/Microsoft/ApplicationInsights-Go/appinsights
-github.com/Microsoft/ApplicationInsights-Go/appinsights/contracts
 # github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
@@ -98,6 +95,9 @@ github.com/json-iterator/go
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
+# github.com/microsoft/ApplicationInsights-Go v0.4.3
+github.com/microsoft/ApplicationInsights-Go/appinsights
+github.com/microsoft/ApplicationInsights-Go/appinsights/contracts
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.1
