@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/hnsclient"
 	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/cns/nmagentclient"
+	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/platform"
 )
 
@@ -1435,7 +1436,7 @@ func (service *HTTPRestService) nmAgentSupportedApisHandler(w http.ResponseWrite
 
 	switch r.Method {
 	case http.MethodPost:
-		supportedApis, returnMessage = nmagentclient.GetNmAgentSupportedApis(
+		supportedApis, returnMessage = nmagentclient.GetNmAgentSupportedApis(common.GetHttpClient(),
 			req.GetNmAgentSupportedApisURL)
 		if returnMessage != "" {
 			returnCode = NmAgentSupportedApisError

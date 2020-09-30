@@ -99,6 +99,7 @@ func GetNetworkContainerVersion(
 
 // GetNmAgentSupportedApis :- Retrieves Supported Apis from NMAgent
 func GetNmAgentSupportedApis(
+	httpc *http.Client,
 	getNmAgentSupportedApisURL string) ([]string, string) {
 	var (
 		returnMessage string
@@ -110,7 +111,7 @@ func GetNmAgentSupportedApis(
 			GetNmAgentSupportedApiURLFmt, WireserverIP)
 	}
 
-	response, err := common.GetHttpClient().Get(getNmAgentSupportedApisURL)
+	response, err := httpc.Get(getNmAgentSupportedApisURL)
 	if err != nil || response.StatusCode != http.StatusOK || response == nil {
 		returnMessage = fmt.Sprintf(
 			"Failed to retrieve Supported Apis from NMAgent with error %v",

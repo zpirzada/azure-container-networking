@@ -4,10 +4,15 @@
 package restserver
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/Azure/azure-container-networking/cns"
@@ -27,7 +32,16 @@ const (
 )
 
 var (
-	dnsservers = []string{"8.8.8.8", "8.8.4.4"}
+	dnsservers        = []string{"8.8.8.8", "8.8.4.4"}
+	hostSupportedApis = `<SupportedRequestTypes>
+							<type>GetSupportedApis</type>
+							<type>GetIpRangesV1</type>
+							<type>GetIpRangesV2</type>
+							<type>GetInterfaceInfoV1</type>
+							<type>PortContainerIOVInformationV1</type>
+							<type>NetworkManagement</type>
+							<type>NetworkManagementDNSSupport</type>
+						</SupportedRequestTypes>`
 )
 
 func TestCreateOrUpdateNetworkContainerInternal(t *testing.T) {
@@ -128,6 +142,17 @@ func TestReconcileNCWithSystemPods(t *testing.T) {
 
 	delete(expectedAllocatedPods, "192.168.0.1")
 	validateNCStateAfterReconcile(t, &req, expectedNcCount, expectedAllocatedPods)
+}
+
+func TestRegisterNode(t *testing.T) {
+	restartService()
+	setEnv(t)
+	setOrchestratorTypeInternal(cns.KubernetesCRD)
+
+	err := RegisterNode(NewTestClient(), svc, "localhost", "dummyvnet", "dummyNodeId")
+	if err != "" {
+		t.Errorf("Unexpected failure on register Node %s", err)
+	}
 }
 
 func setOrchestratorTypeInternal(orchestratorType string) {
@@ -346,4 +371,46 @@ func restartService() {
 
 	service.Stop()
 	startService()
+}
+
+// RoundTripFunc .
+type RoundTripFunc func(req *http.Request) *http.Response
+
+// RoundTrip .
+func (f RoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req), nil
+}
+
+func mockRountTrip(req *http.Request) *http.Response {
+	var (
+		body       io.ReadCloser
+		returnCode = 200
+	)
+	// Test request parameters
+	//equals(t, req.URL.String(), "http://example.com/some/path")
+	if strings.Contains(req.URL.String(), "GetSupportedApis") {
+		// Handle Call to NMAgent
+		body = ioutil.NopCloser(bytes.NewBufferString(hostSupportedApis))
+
+	} else if strings.Contains(req.URL.String(), "dummyNodeId") {
+		//Handle Call to register Node
+		body = ioutil.NopCloser(bytes.NewBufferString("OK"))
+		returnCode = 201
+
+	}
+
+	return &http.Response{
+		StatusCode: returnCode,
+		// Send response to be tested
+		Body: body,
+		// Must be set to non-nil value or it panics
+		Header: make(http.Header),
+	}
+}
+
+//NewTestClient returns *http.Client with Transport replaced to avoid making real calls
+func NewTestClient() *http.Client {
+	return &http.Client{
+		Transport: RoundTripFunc(mockRountTrip),
+	}
 }

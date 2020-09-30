@@ -382,7 +382,7 @@ func main() {
 		httpRestService.SetOption(acn.OptInfrastructureNetworkID, infravnet)
 		httpRestService.SetOption(acn.OptNodeID, nodeID)
 
-		restserver.RegisterNode(httpRestService, privateEndpoint, infravnet, nodeID)
+		restserver.RegisterNode(acn.GetHttpClient(), httpRestService, privateEndpoint, infravnet, nodeID)
 		go func(ep, vnet, node string) {
 			// Periodically poll DNC for node updates
 			for {
