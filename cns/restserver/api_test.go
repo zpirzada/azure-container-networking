@@ -470,7 +470,7 @@ func TestCreateHostNCApipaEndpoint(t *testing.T) {
 	var createHostNCApipaEndpointResponse cns.CreateHostNCApipaEndpointResponse
 
 	err = decodeResponse(w, &createHostNCApipaEndpointResponse)
-	if err != nil || createHostNCApipaEndpointResponse.Response.ReturnCode != 0 {
+	if err != nil || createHostNCApipaEndpointResponse.Response.ReturnCode != UnknownContainerID {
 		t.Errorf("createHostNCApipaEndpoint failed with response %+v", createHostNCApipaEndpointResponse)
 	}
 
