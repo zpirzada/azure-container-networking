@@ -448,6 +448,36 @@ func TestNmAgentSupportedApisHandler(t *testing.T) {
 
 }
 
+func TestCreateHostNCApipaEndpoint(t *testing.T) {
+	fmt.Println("Test: createHostNCApipaEndpoint")
+
+	var (
+		err           error
+		req           *http.Request
+		createHostReq cns.CreateHostNCApipaEndpointRequest
+		body          bytes.Buffer
+	)
+
+	json.NewEncoder(&body).Encode(createHostReq)
+	req, err = http.NewRequest(http.MethodPost, cns.CreateHostNCApipaEndpointPath, &body)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var w *httptest.ResponseRecorder
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, req)
+	var createHostNCApipaEndpointResponse cns.CreateHostNCApipaEndpointResponse
+
+	err = decodeResponse(w, &createHostNCApipaEndpointResponse)
+	if err != nil || createHostNCApipaEndpointResponse.Response.ReturnCode != 0 {
+		t.Errorf("createHostNCApipaEndpoint failed with response %+v", createHostNCApipaEndpointResponse)
+	}
+
+	fmt.Printf("createHostNCApipaEndpoint Responded with %+v\n", createHostNCApipaEndpointResponse)
+
+}
+
 func setOrchestratorType(t *testing.T, orchestratorType string) error {
 	var body bytes.Buffer
 

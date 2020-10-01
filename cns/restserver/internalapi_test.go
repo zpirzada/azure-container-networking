@@ -387,16 +387,18 @@ func mockRountTrip(req *http.Request) *http.Response {
 		returnCode = 200
 	)
 	// Test request parameters
-	//equals(t, req.URL.String(), "http://example.com/some/path")
-	if strings.Contains(req.URL.String(), "GetSupportedApis") {
+	switch {
+	case strings.Contains(req.URL.String(), "GetSupportedApis"):
 		// Handle Call to NMAgent
 		body = ioutil.NopCloser(bytes.NewBufferString(hostSupportedApis))
 
-	} else if strings.Contains(req.URL.String(), "dummyNodeId") {
+	case strings.Contains(req.URL.String(), "dummyNodeId"):
 		//Handle Call to register Node
 		body = ioutil.NopCloser(bytes.NewBufferString("OK"))
 		returnCode = 201
 
+	default:
+		returnCode = 200
 	}
 
 	return &http.Response{

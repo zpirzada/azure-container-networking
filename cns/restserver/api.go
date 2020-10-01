@@ -1421,7 +1421,7 @@ func (service *HTTPRestService) deleteHostNCApipaEndpoint(w http.ResponseWriter,
 func (service *HTTPRestService) nmAgentSupportedApisHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Request(service.Name, "nmAgentSupportedApisHandler", nil)
 	var (
-		err           error
+		err, retErr   error
 		req           cns.NmAgentSupportedApisRequest
 		returnCode    int
 		returnMessage string
@@ -1436,15 +1436,15 @@ func (service *HTTPRestService) nmAgentSupportedApisHandler(w http.ResponseWrite
 
 	switch r.Method {
 	case http.MethodPost:
-		supportedApis, returnMessage = nmagentclient.GetNmAgentSupportedApis(common.GetHttpClient(),
+		supportedApis, retErr = nmagentclient.GetNmAgentSupportedApis(common.GetHttpClient(),
 			req.GetNmAgentSupportedApisURL)
-		if returnMessage != "" {
+		if retErr != nil {
 			returnCode = NmAgentSupportedApisError
-			logger.Errorf("[Azure-CNS] %s", returnMessage)
+			returnMessage = fmt.Sprintf("[Azure-CNS] %s", retErr.Error())
 		}
 
 	default:
-		returnMessage = "[Azure-CNS] GetHostLocalIP API expects a POST method."
+		returnMessage = "[Azure-CNS] NmAgentSupported API list expects a POST method."
 	}
 
 	resp := cns.Response{ReturnCode: returnCode, Message: returnMessage}

@@ -278,9 +278,9 @@ func RegisterNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, in
 	)
 
 	nodeRegisterRequest.NumCPU = numCPU
-	supportedApis, msg := nmagentclient.GetNmAgentSupportedApis(httpc, "")
+	supportedApis, retErr := nmagentclient.GetNmAgentSupportedApis(httpc, "")
 
-	if msg != "" {
+	if retErr != nil {
 		logger.Printf("[Azure CNS] Failed to retrieve SupportedApis from NMagent of node %s with Infrastructure Network: %s PrivateEndpoint: %s",
 			nodeID, infraVnet, dncEP)
 	}

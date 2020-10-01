@@ -100,10 +100,9 @@ func GetNetworkContainerVersion(
 // GetNmAgentSupportedApis :- Retrieves Supported Apis from NMAgent
 func GetNmAgentSupportedApis(
 	httpc *http.Client,
-	getNmAgentSupportedApisURL string) ([]string, string) {
+	getNmAgentSupportedApisURL string) ([]string, error) {
 	var (
-		returnMessage string
-		supportedApis []string
+		returnErr error
 	)
 
 	if getNmAgentSupportedApisURL == "" {
@@ -112,27 +111,31 @@ func GetNmAgentSupportedApis(
 	}
 
 	response, err := httpc.Get(getNmAgentSupportedApisURL)
-	if err != nil || response.StatusCode != http.StatusOK || response == nil {
-		returnMessage = fmt.Sprintf(
-			"Failed to retrieve Supported Apis from NMAgent with error %v",
-			err.Error())
-		logger.Errorf("[Azure-CNS] %s", returnMessage)
-		return supportedApis, returnMessage
+	if response.StatusCode != http.StatusOK || response == nil {
+		returnErr = fmt.Errorf(
+			"Failed to retrieve Supported Apis from NMAgent with StatusCode: %d",
+			response.StatusCode)
+		if err != nil {
+			returnErr = fmt.Errorf(
+				"Failed to retrieve Supported Apis from NMAgent with error %v",
+				err.Error())
+		}
+		logger.Errorf("[Azure-CNS] %s", returnErr)
+		return []string{}, returnErr
 	}
 
 	var xmlDoc NMAgentSupportedApisResponseXML
 	decoder := xml.NewDecoder(response.Body)
 	err = decoder.Decode(&xmlDoc)
 	if err != nil {
-		returnMessage = fmt.Sprintf(
+		returnErr = fmt.Errorf(
 			"Failed to decode XML response of Supported Apis from NMAgent with error %v",
 			err.Error())
-		logger.Errorf("[Azure-CNS] %s", returnMessage)
-		return supportedApis, returnMessage
+		logger.Errorf("[Azure-CNS] %s", returnErr)
+		return []string{}, returnErr
 	}
-	supportedApis = xmlDoc.SupportedApis
 
 	logger.Printf("[NMAgentClient][Response] GetNmAgentSupportedApis. Response: %+v. Error: %v",
 		response, err)
-	return supportedApis, ""
+	return xmlDoc.SupportedApis, nil
 }
