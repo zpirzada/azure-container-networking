@@ -137,7 +137,10 @@ func (service *HTTPRestService) SyncNodeStatus(dncEP, infraVnet, nodeID string, 
 
 	if nodeInfoResponse.NmAgentApisMissing {
 		// RegisterNode again with NmAgent Apis list
-		RegisterNode(httpc, service, dncEP, infraVnet, nodeID)
+		retErr := RegisterNode(httpc, service, dncEP, infraVnet, nodeID)
+		if retErr != nil {
+			logger.Errorf("[Azure-CNS] Failed to register Node ID: %s with error: %s", nodeID, err.Error())
+		}
 	}
 
 	// delete dangling NCs
@@ -264,7 +267,7 @@ func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.C
 }
 
 // Try to register node with DNC when CNS is started in managed DNC mode
-func RegisterNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, infraVnet, nodeID string) string {
+func RegisterNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, infraVnet, nodeID string) error {
 	logger.Printf("[Azure CNS] Registering node %s with Infrastructure Network: %s PrivateEndpoint: %s", nodeID, infraVnet, dncEP)
 
 	var (
@@ -274,7 +277,6 @@ func RegisterNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, in
 		err                 = fmt.Errorf("")
 		body                bytes.Buffer
 		nodeRegisterRequest cns.NodeRegisterRequest
-		retMsg              string
 	)
 
 	nodeRegisterRequest.NumCPU = numCPU
@@ -287,9 +289,8 @@ func RegisterNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, in
 
 	nodeRegisterRequest.NmAgentSupportedApis = supportedApis
 	if err := json.NewEncoder(&body).Encode(nodeRegisterRequest); err != nil {
-		retMsg = fmt.Sprintf("encoding json failed with %v", err)
-		log.Errorf(retMsg)
-		return retMsg
+		log.Errorf("encoding json failed with %v", err)
+		return err
 	}
 
 	for sleep := true; err != nil; sleep = true {
@@ -303,7 +304,7 @@ func RegisterNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, in
 			} else {
 				err = fmt.Errorf("[Azure CNS] Failed to register node with http status code %s", strconv.Itoa(response.StatusCode))
 				logger.Errorf(err.Error())
-				return err.Error()
+				return err
 			}
 
 			response.Body.Close()
@@ -317,5 +318,5 @@ func RegisterNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, in
 	}
 
 	logger.Printf("[Azure CNS] Node Registered")
-	return retMsg
+	return nil
 }

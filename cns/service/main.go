@@ -382,7 +382,15 @@ func main() {
 		httpRestService.SetOption(acn.OptInfrastructureNetworkID, infravnet)
 		httpRestService.SetOption(acn.OptNodeID, nodeID)
 
-		restserver.RegisterNode(acn.GetHttpClient(), httpRestService, privateEndpoint, infravnet, nodeID)
+		registerErr := restserver.RegisterNode(acn.GetHttpClient(), httpRestService, privateEndpoint, infravnet, nodeID)
+		if registerErr != nil {
+			logger.Errorf("[Azure CNS] Resgistering Node failed with error: %v PrivateEndpoint: %s InfrastructureNetworkID: %s NodeID: %s",
+				registerErr,
+				privateEndpoint,
+				infravnet,
+				nodeID)
+			return
+		}
 		go func(ep, vnet, node string) {
 			// Periodically poll DNC for node updates
 			for {
