@@ -150,7 +150,7 @@ func TestRegisterNode(t *testing.T) {
 	setOrchestratorTypeInternal(cns.KubernetesCRD)
 
 	err := RegisterNode(NewTestClient(), svc, "localhost", "dummyvnet", "dummyNodeId")
-	if err != "" {
+	if err != nil {
 		t.Errorf("Unexpected failure on register Node %s", err)
 	}
 }
