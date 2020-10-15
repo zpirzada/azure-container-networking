@@ -15,6 +15,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/aitelemetry"
 	"github.com/Azure/azure-container-networking/cni"
+	"github.com/Azure/azure-container-networking/cni/utils"
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/cnsclient"
 	"github.com/Azure/azure-container-networking/common"
@@ -710,6 +711,7 @@ func (plugin *netPlugin) Get(args *cniSkel.CmdArgs) error {
 
 	// Initialize values from network config.
 	if networkId, err = getNetworkName(k8sPodName, k8sNamespace, args.IfName, nwCfg); err != nil {
+		// TODO: Ideally we should return from here only.
 		log.Printf("[cni-net] Failed to extract network name from network config. error: %v", err)
 	}
 
@@ -796,8 +798,16 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	}
 
 	// Initialize values from network config.
-	if networkId, err = getNetworkName(k8sPodName, k8sNamespace, args.IfName, nwCfg); err != nil {
+	networkId, err = getNetworkName(k8sPodName, k8sNamespace, args.IfName, nwCfg)
+
+	// If error is not found error, then we ignore it, to comply with CNI SPEC.
+	if err != nil {
 		log.Printf("[cni-net] Failed to extract network name from network config. error: %v", err)
+
+		if !utils.IsNotFoundError(err) {
+			err = plugin.Errorf("Failed to extract network name from network config. error: %v", err)
+			return err
+		}
 	}
 
 	endpointId := GetEndpointID(args)

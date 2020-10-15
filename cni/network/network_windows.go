@@ -153,19 +153,30 @@ func updateSubnetPrefix(cnsNwConfig *cns.GetNetworkContainerResponse, subnetPref
 	return nil
 }
 
-func getNetworkName(podName, podNs, ifName string, nwCfg *cni.NetworkConfig) (networkName string, err error) {
+func getNetworkName(podName, podNs, ifName string, nwCfg *cni.NetworkConfig) (string, error) {
+	var (
+		networkName      string
+		err              error
+		cnsNetworkConfig *cns.GetNetworkContainerResponse
+	)
+
 	networkName = nwCfg.Name
 	err = nil
+
 	if nwCfg.MultiTenancy {
 		determineWinVer()
 		if len(strings.TrimSpace(podName)) == 0 || len(strings.TrimSpace(podNs)) == 0 {
 			err = fmt.Errorf("POD info cannot be empty. PodName: %s, PodNamespace: %s", podName, podNs)
-			return
+			return networkName, err
 		}
 
-		_, cnsNetworkConfig, _, err := getContainerNetworkConfiguration(nwCfg, podName, podNs, ifName)
+		_, cnsNetworkConfig, _, err = getContainerNetworkConfiguration(nwCfg, podName, podNs, ifName)
 		if err != nil {
-			log.Printf("GetContainerNetworkConfiguration failed for podname %v namespace %v with error %v", podName, podNs, err)
+			log.Printf(
+				"GetContainerNetworkConfiguration failed for podname %v namespace %v with error %v",
+				podName,
+				podNs,
+				err)
 		} else {
 			var subnet net.IPNet
 			if err = updateSubnetPrefix(cnsNetworkConfig, &subnet); err == nil {
@@ -177,7 +188,7 @@ func getNetworkName(podName, podNs, ifName string, nwCfg *cni.NetworkConfig) (ne
 		}
 	}
 
-	return
+	return networkName, err
 }
 
 func setupInfraVnetRoutingForMultitenancy(
