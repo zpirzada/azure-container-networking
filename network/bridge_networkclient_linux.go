@@ -50,17 +50,30 @@ func (client *LinuxBridgeClient) CreateBridge() error {
 
 func (client *LinuxBridgeClient) AddRoutes(nwInfo *NetworkInfo, interfaceName string) error {
 	if client.nwInfo.IPAMType == AzureCNS {
+
+		// Add snat Rules
+		gwIP := client.nwInfo.Options[SNATIPKey]
+		if gwIP == nil {
+			return fmt.Errorf("Host gateway IP in Options not set")
+		}
+
+		gatewayIP := net.ParseIP(gwIP.(string))
+		if gatewayIP == nil {
+			return fmt.Errorf("Invalid host gateway IP: %+v", gwIP)
+		}
 		// add pod subnet to host
 		devIf, _ := net.InterfaceByName(interfaceName)
 		ifIndex := devIf.Index
-		family := netlink.GetIpAddressFamily(Ipv4DefaultRouteDstPrefix.IP)
+		family := netlink.GetIpAddressFamily(gatewayIP)
 
 		nlRoute := &netlink.Route{
 			Family:    family,
 			Dst:       &client.nwInfo.PodSubnet.Prefix,
-			Gw:        Ipv4DefaultRouteDstPrefix.IP,
+			Gw:        gatewayIP,
 			LinkIndex: ifIndex,
 		}
+
+		log.Printf("Adding Swift route %+v", nlRoute)
 
 		if err := netlink.AddIpRoute(nlRoute); err != nil {
 			if !strings.Contains(strings.ToLower(err.Error()), "file exists") {

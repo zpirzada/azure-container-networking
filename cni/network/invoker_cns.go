@@ -27,12 +27,13 @@ type CNSIPAMInvoker struct {
 }
 
 type IPv4ResultInfo struct {
-	podIPAddress   string
-	ncSubnetPrefix uint8
-	ncPrimaryIP    string
-	gwIPAddress    string
-	hostSubnet     string
-	hostPrimaryIP  string
+	podIPAddress       string
+	ncSubnetPrefix     uint8
+	ncPrimaryIP        string
+	ncGatewayIPAddress string
+	hostSubnet         string
+	hostPrimaryIP      string
+	hostGateway        string
 }
 
 func NewCNSInvoker(podName, namespace string) (*CNSIPAMInvoker, error) {
@@ -61,18 +62,27 @@ func (invoker *CNSIPAMInvoker) Add(nwCfg *cni.NetworkConfig, subnetPrefix *net.I
 	}
 
 	resultIPv4 := IPv4ResultInfo{
-		podIPAddress:   response.PodIpInfo.PodIPConfig.IPAddress,
-		ncSubnetPrefix: response.PodIpInfo.NetworkContainerPrimaryIPConfig.IPSubnet.PrefixLength,
-		ncPrimaryIP:    response.PodIpInfo.NetworkContainerPrimaryIPConfig.IPSubnet.IPAddress,
-		gwIPAddress:    response.PodIpInfo.NetworkContainerPrimaryIPConfig.GatewayIPAddress,
-		hostSubnet:     response.PodIpInfo.HostPrimaryIPInfo.Subnet,
-		hostPrimaryIP:  response.PodIpInfo.HostPrimaryIPInfo.PrimaryIP,
+		podIPAddress:       response.PodIpInfo.PodIPConfig.IPAddress,
+		ncSubnetPrefix:     response.PodIpInfo.NetworkContainerPrimaryIPConfig.IPSubnet.PrefixLength,
+		ncPrimaryIP:        response.PodIpInfo.NetworkContainerPrimaryIPConfig.IPSubnet.IPAddress,
+		ncGatewayIPAddress: response.PodIpInfo.NetworkContainerPrimaryIPConfig.GatewayIPAddress,
+		hostSubnet:         response.PodIpInfo.HostPrimaryIPInfo.Subnet,
+		hostPrimaryIP:      response.PodIpInfo.HostPrimaryIPInfo.PrimaryIP,
+		hostGateway:        response.PodIpInfo.HostPrimaryIPInfo.Gateway,
+	}
+
+	ncgw := net.ParseIP(resultIPv4.ncGatewayIPAddress)
+	if ncgw == nil {
+		return nil, nil, fmt.Errorf("Gateway address %v from response is invalid", resultIPv4.ncGatewayIPAddress)
 	}
 
 	// set the NC Primary IP in options
 	options[network.SNATIPKey] = resultIPv4.ncPrimaryIP
 
-	log.Printf("Received result %+v for pod %v", resultIPv4, podInfo)
+	// set host gateway in options
+	options[network.HostGWKey] = resultIPv4.hostGateway
+
+	log.Printf("Received IP %v for pod %v", resultIPv4.podIPAddress, podInfo)
 
 	result, err := getCNIIPv4Result(resultIPv4, subnetPrefix)
 	if err != nil {
@@ -85,7 +95,7 @@ func (invoker *CNSIPAMInvoker) Add(nwCfg *cni.NetworkConfig, subnetPrefix *net.I
 
 func getCNIIPv4Result(info IPv4ResultInfo, subnetPrefix *net.IPNet) (*cniTypesCurr.Result, error) {
 
-	gw := net.ParseIP(info.gwIPAddress)
+	gw := net.ParseIP(info.ncGatewayIPAddress)
 	if gw == nil {
 		return nil, fmt.Errorf("Gateway address %v from response is invalid", gw)
 	}
