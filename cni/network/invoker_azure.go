@@ -80,6 +80,7 @@ func (invoker *AzureIPAMInvoker) Add(nwCfg *cni.NetworkConfig, subnetPrefix *net
 }
 
 func (invoker *AzureIPAMInvoker) Delete(address *net.IPNet, nwCfg *cni.NetworkConfig, options map[string]interface{}) error {
+	var err error
 
 	if nwCfg == nil {
 		return invoker.plugin.Errorf("nil nwCfg passed to CNI ADD, stack: %+v", string(debug.Stack()))
@@ -115,8 +116,12 @@ func (invoker *AzureIPAMInvoker) Delete(address *net.IPNet, nwCfg *cni.NetworkCo
 			log.Printf("Failed to release ipv6 address: %v", err)
 			return invoker.plugin.Errorf("Failed to release ipv6 address: %v", err)
 		}
+	} else if address == nil {
+		if err = invoker.plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg); err != nil {
+			log.Printf("Network not found, attempted to release address with error:  %v", err)
+		}
 	} else {
-		return invoker.plugin.Errorf("Address is incorrect, not valid IPv4 or IPv6, stack: %+v", string(debug.Stack()))
+		err = fmt.Errorf("Address is incorrect, not valid IPv4 or IPv6")
 	}
 
 	return nil
