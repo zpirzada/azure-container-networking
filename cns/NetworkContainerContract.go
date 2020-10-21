@@ -215,6 +215,7 @@ type PodIpInfo struct {
 
 // DeleteNetworkContainerRequest specifies the details about the request to delete a specifc network container.
 type HostIPInfo struct {
+	Gateway   string
 	PrimaryIP string
 	Subnet    string
 }

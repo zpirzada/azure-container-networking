@@ -21,6 +21,7 @@ const (
 	VlanIDKey   = "VlanID"
 	AzureCNS    = "azure-cns"
 	SNATIPKey   = "NCPrimaryIPKey"
+	HostGWKey   = "HostGatewayIP"
 	genericData = "com.docker.network.generic"
 )
 
