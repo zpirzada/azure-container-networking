@@ -58,9 +58,10 @@ const (
 
 // IPConfig States for CNS IPAM
 const (
-	Available      = "Available"
-	Allocated      = "Allocated"
-	PendingRelease = "PendingRelease"
+	Available          = "Available"
+	Allocated          = "Allocated"
+	PendingRelease     = "PendingRelease"
+	PendingProgramming = "PendingProgramming"
 )
 
 // ChannelMode :- CNS channel modes
