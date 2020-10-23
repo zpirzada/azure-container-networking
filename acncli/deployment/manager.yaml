@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: azure-cni-manager-master
+  name: azure-cni-manager
 spec:
   selector:
     matchLabels:
@@ -11,13 +11,6 @@ spec:
       labels:
         acn: azure-cni-manager
     spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: node-role.kubernetes.io/master
-                    operator: Exists
       tolerations:
         - effect: NoSchedule
           key: node-role.kubernetes.io/master
@@ -25,7 +18,7 @@ spec:
       hostNetwork: true
       containers:
         - name: azure-cni-installer
-          image: mcr.microsoft.com/containernetworking/azure-cni-manager:v1.1.8-10-g9d03b4c-dirty-21
+          image: mcr.microsoft.com/containernetworking/azure-cni-manager:v1.1.9-alphav1
           imagePullPolicy: Always
           env:
             - name: AZURE_CNI_OS
