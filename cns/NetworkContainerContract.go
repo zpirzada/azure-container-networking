@@ -22,6 +22,7 @@ const (
 	DetachContainerFromNetwork               = "/network/detachcontainerfromnetwork"
 	RequestIPConfig                          = "/network/requestipconfig"
 	ReleaseIPConfig                          = "/network/releaseipconfig"
+	GetIPAddresses                           = "/debug/getipaddresses"
 )
 
 // NetworkContainer Prefixes
@@ -199,16 +200,6 @@ type GetNetworkContainerResponse struct {
 	AllowNCToHostCommunication bool
 }
 
-type GetIPConfigRequest struct {
-	DesiredIPAddress    string
-	OrchestratorContext json.RawMessage
-}
-
-type GetIPConfigResponse struct {
-	PodIpInfo PodIpInfo
-	Response  Response
-}
-
 // DeleteNetworkContainerRequest specifies the details about the request to delete a specifc network container.
 type PodIpInfo struct {
 	PodIPConfig                     IPSubnet
@@ -221,6 +212,35 @@ type HostIPInfo struct {
 	Gateway   string
 	PrimaryIP string
 	Subnet    string
+}
+
+type IPConfigRequest struct {
+	DesiredIPAddress    string
+	OrchestratorContext json.RawMessage
+}
+
+// IPConfigResponse is used in CNS IPAM mode as a response to CNI ADD
+type IPConfigResponse struct {
+	PodIpInfo PodIpInfo
+	Response  Response
+}
+
+// GetIPAddressesRequest is used in CNS IPAM mode to get the states of IPConfigs
+// The IPConfigStateFilter is a slice of IP's to fetch from CNS that match those states
+type GetIPAddressesRequest struct {
+	IPConfigStateFilter []string
+}
+
+// GetIPAddressStateResponse is used in CNS IPAM mode as a response to get IP address state
+type GetIPAddressStateResponse struct {
+	IPAddresses []IPAddressState
+	Response    Response
+}
+
+// IPAddressState Only used in the GetIPConfig API to return IP's that match a filter
+type IPAddressState struct {
+	IPAddress string
+	State     string
 }
 
 // DeleteNetworkContainerRequest specifies the details about the request to delete a specifc network container.
