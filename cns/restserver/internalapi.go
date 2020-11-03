@@ -102,15 +102,7 @@ func (service *HTTPRestService) SyncNodeStatus(dncEP, infraVnet, nodeID string, 
 		)
 
 		ncVersionURLs.Store(nc.NetworkContainerid, versionURL)
-		waitingForUpdate, tmpReturnCode, tmpErrStr := isNCWaitingForUpdate(nc.Version, nc.NetworkContainerid)
-		if tmpReturnCode != Success && bytes.Compare(nc.OrchestratorContext, contextFromCNI) == 0 {
-			returnCode = tmpReturnCode
-			errStr = tmpErrStr
-		}
-
-		if tmpReturnCode == UnexpectedError {
-			continue
-		}
+		waitingForUpdate, _, _ := service.isNCWaitingForUpdate(nc.Version, nc.NetworkContainerid)
 
 		body, _ = json.Marshal(nc)
 		req, _ = http.NewRequest(http.MethodPost, "", bytes.NewBuffer(body))
@@ -121,7 +113,7 @@ func (service *HTTPRestService) SyncNodeStatus(dncEP, infraVnet, nodeID string, 
 			if err = json.Unmarshal(w.Body.Bytes(), &resp); err == nil && resp.Response.ReturnCode == Success {
 				service.Lock()
 				ncstatus, _ := service.state.ContainerStatus[ncid]
-				ncstatus.WaitingForUpdate = waitingForUpdate
+				ncstatus.VfpUpdateComplete = !waitingForUpdate
 				service.state.ContainerStatus[ncid] = ncstatus
 				service.Unlock()
 			}

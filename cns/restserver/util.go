@@ -105,16 +105,21 @@ func (service *HTTPRestService) saveNetworkContainerGoalState(req cns.CreateNetw
 	service.Lock()
 	defer service.Unlock()
 
+	var (
+		hostVersion                string
+		existingSecondaryIPConfigs map[string]cns.SecondaryIPConfig //uuid is key
+		vfpUpdateComplete          bool
+	)
+
 	if service.state.ContainerStatus == nil {
 		service.state.ContainerStatus = make(map[string]containerstatus)
 	}
 
 	existingNCStatus, ok := service.state.ContainerStatus[req.NetworkContainerid]
-	var hostVersion string
-	var existingSecondaryIPConfigs map[string]cns.SecondaryIPConfig //uuid is key
 	if ok {
 		hostVersion = existingNCStatus.HostVersion
 		existingSecondaryIPConfigs = existingNCStatus.CreateNetworkContainerRequest.SecondaryIPConfigs
+		vfpUpdateComplete = existingNCStatus.VfpUpdateComplete
 	} else {
 		// Host version is the NC version from NMAgent, set it -1 to indicate no result from NMAgent yet.
 		hostVersion = "-1"
@@ -125,7 +130,8 @@ func (service *HTTPRestService) saveNetworkContainerGoalState(req cns.CreateNetw
 			ID:                            req.NetworkContainerid,
 			VMVersion:                     req.Version,
 			CreateNetworkContainerRequest: req,
-			HostVersion:                   hostVersion}
+			HostVersion:                   hostVersion,
+			VfpUpdateComplete:             vfpUpdateComplete}
 
 	switch req.NetworkContainerType {
 	case cns.AzureContainerInstance:
@@ -315,10 +321,11 @@ func (service *HTTPRestService) getNetworkContainerResponse(req cns.GetNetworkCo
 		containerID                 string
 		getNetworkContainerResponse cns.GetNetworkContainerResponse
 		exists                      bool
+		waitingForUpdate            bool
 	)
 
-	service.RLock()
-	defer service.RUnlock()
+	service.Lock()
+	defer service.Unlock()
 
 	switch service.state.OrchestratorType {
 	case cns.Kubernetes:
@@ -342,28 +349,48 @@ func (service *HTTPRestService) getNetworkContainerResponse(req cns.GetNetworkCo
 
 		context := podInfo.PodName + podInfo.PodNamespace
 		containerID, exists = service.state.ContainerIDByOrchestratorContext[context]
-		if service.ChannelMode == cns.Managed {
-			if exists {
-				_, getNetworkContainerResponse.Response.ReturnCode, getNetworkContainerResponse.Response.Message = isNCWaitingForUpdate(service.state.ContainerStatus[containerID].CreateNetworkContainerRequest.Version, containerID)
-				if getNetworkContainerResponse.Response.ReturnCode == Success {
-					return getNetworkContainerResponse
-				}
-			} else {
-				var (
-					dncEP     = service.GetOption(acn.OptPrivateEndpoint).(string)
-					infraVnet = service.GetOption(acn.OptInfrastructureNetworkID).(string)
-					nodeID    = service.GetOption(acn.OptNodeID).(string)
-				)
 
-				service.RUnlock()
-				getNetworkContainerResponse.Response.ReturnCode, getNetworkContainerResponse.Response.Message = service.SyncNodeStatus(dncEP, infraVnet, nodeID, req.OrchestratorContext)
-				service.RLock()
-				if getNetworkContainerResponse.Response.ReturnCode == NotFound {
-					return getNetworkContainerResponse
-				}
-
-				containerID = service.state.ContainerIDByOrchestratorContext[context]
+		if exists {
+			// If the goal state is available with CNS, check if the NC is pending VFP programming
+			waitingForUpdate, getNetworkContainerResponse.Response.ReturnCode, getNetworkContainerResponse.Response.Message =
+				service.isNCWaitingForUpdate(service.state.ContainerStatus[containerID].CreateNetworkContainerRequest.Version, containerID)
+			// If the return code is not success, return the error to the caller
+			if getNetworkContainerResponse.Response.ReturnCode == NetworkContainerVfpProgramPending {
+				logger.Errorf("[Azure-CNS] isNCWaitingForUpdate failed for NC: %s with error: %s",
+					containerID, getNetworkContainerResponse.Response.Message)
+				return getNetworkContainerResponse
 			}
+
+			vfpUpdateComplete := !waitingForUpdate
+			ncstatus, _ := service.state.ContainerStatus[containerID]
+			// Update the container status if-
+			// 1. VfpUpdateCompleted successfully
+			// 2. VfpUpdateComplete changed to false
+			if (getNetworkContainerResponse.Response.ReturnCode == NetworkContainerVfpProgramComplete &&
+				vfpUpdateComplete == true && ncstatus.VfpUpdateComplete != vfpUpdateComplete) ||
+				(vfpUpdateComplete == false && ncstatus.VfpUpdateComplete != vfpUpdateComplete) {
+				logger.Printf("[Azure-CNS] Setting VfpUpdateComplete to %t for NC: %s", vfpUpdateComplete, containerID)
+				ncstatus.VfpUpdateComplete = vfpUpdateComplete
+				service.state.ContainerStatus[containerID] = ncstatus
+				service.saveState()
+			}
+
+		} else if service.ChannelMode == cns.Managed {
+			// If the NC goal state doesn't exist in CNS running in managed mode, call DNC to retrieve the goal state
+			var (
+				dncEP     = service.GetOption(acn.OptPrivateEndpoint).(string)
+				infraVnet = service.GetOption(acn.OptInfrastructureNetworkID).(string)
+				nodeID    = service.GetOption(acn.OptNodeID).(string)
+			)
+
+			service.Unlock()
+			getNetworkContainerResponse.Response.ReturnCode, getNetworkContainerResponse.Response.Message = service.SyncNodeStatus(dncEP, infraVnet, nodeID, req.OrchestratorContext)
+			service.Lock()
+			if getNetworkContainerResponse.Response.ReturnCode == NotFound {
+				return getNetworkContainerResponse
+			}
+
+			containerID = service.state.ContainerIDByOrchestratorContext[context]
 		}
 
 		logger.Printf("containerid %v", containerID)
@@ -466,9 +493,9 @@ func (service *HTTPRestService) attachOrDetachHelper(req cns.ConfigureContainerN
 	existing, ok := service.getNetworkContainerDetails(cns.SwiftPrefix + req.NetworkContainerid)
 	if service.ChannelMode == cns.Managed && operation == attach {
 		if ok {
-			if existing.WaitingForUpdate {
-				_, returnCode, message := isNCWaitingForUpdate(existing.CreateNetworkContainerRequest.Version, req.NetworkContainerid)
-				if returnCode != Success {
+			if !existing.VfpUpdateComplete {
+				_, returnCode, message := service.isNCWaitingForUpdate(existing.CreateNetworkContainerRequest.Version, req.NetworkContainerid)
+				if returnCode == NetworkContainerVfpProgramPending {
 					return cns.Response{
 						ReturnCode: returnCode,
 						Message:    message}
@@ -684,39 +711,64 @@ func (service *HTTPRestService) populateIpConfigInfoUntransacted(ipConfigStatus 
 }
 
 // isNCWaitingForUpdate :- Determine whether NC version on NMA matches programmed version
-func isNCWaitingForUpdate(ncVersion, ncid string) (waitingForUpdate bool, returnCode int, message string) {
+// Return error and waitingForUpdate as true only CNS gets response from NMAgent indicating the VFP programming is pending
+// This returns success / waitingForUpdate as false in all other cases.
+func (service *HTTPRestService) isNCWaitingForUpdate(ncVersion, ncid string) (waitingForUpdate bool, returnCode int, message string) {
+	waitingForUpdate = true
+	ncStatus, ok := service.state.ContainerStatus[ncid]
+	if ok {
+		if ncStatus.VfpUpdateComplete &&
+			(ncStatus.CreateNetworkContainerRequest.Version == ncVersion) {
+			logger.Printf("[Azure CNS] Network container: %s, version: %s has VFP programming already completed", ncid, ncVersion)
+			returnCode = NetworkContainerVfpProgramCheckSkipped
+			waitingForUpdate = false
+			return
+		}
+	}
+
 	getNCVersionURL, ok := ncVersionURLs.Load(ncid)
 	if !ok {
-		returnCode = NotFound
-		message = fmt.Sprintf("[Azure-CNS] Network container %s not found", ncid)
+		logger.Printf("[Azure CNS] getNCVersionURL for Network container %s not found. Skipping GetNCVersionStatus check from NMAgent",
+			ncid)
+		returnCode = NetworkContainerVfpProgramCheckSkipped
 		return
 	}
 
 	response, err := nmagentclient.GetNetworkContainerVersion(ncid, getNCVersionURL.(string))
-	if err == nil {
-		if response.StatusCode == http.StatusOK {
-			var versionResponse nmagentclient.NMANetworkContainerResponse
-			rBytes, _ := ioutil.ReadAll(response.Body)
-			json.Unmarshal(rBytes, &versionResponse)
-			if versionResponse.ResponseCode == "200" {
-				programmedVersion, _ := strconv.Atoi(ncVersion)
-				nmaVersion, _ := strconv.Atoi(versionResponse.Version)
-				if programmedVersion > nmaVersion {
-					waitingForUpdate = true
-					returnCode = NetworkContainerPendingStatePropagation
-					message = fmt.Sprintf("[Azure-CNS] Network container %s v%d had not propagated to respective NMA w/ v%d", ncid, programmedVersion, nmaVersion)
-				}
-			} else {
-				returnCode = UnexpectedError
-				message = fmt.Sprintf("[Azure-CNS] Failed to get NC version from response %s for NC %s", rBytes, ncid)
-			}
-		} else {
-			returnCode = UnexpectedError
-			message = fmt.Sprintf("[Azure-CNS] Failed to get NC version with http status %d", response.StatusCode)
-		}
+	if err != nil {
+		logger.Printf("[Azure CNS] Failed to get NC version status from NMAgent with error: %+v. "+
+			"Skipping GetNCVersionStatus check from NMAgent", err)
+		returnCode = NetworkContainerVfpProgramCheckSkipped
+		return
+	}
+
+	if response.StatusCode != http.StatusOK {
+		logger.Printf("[Azure CNS] Failed to get NC version status from NMAgent with http status %d. "+
+			"Skipping GetNCVersionStatus check from NMAgent", response.StatusCode)
+		returnCode = NetworkContainerVfpProgramCheckSkipped
+		return
+	}
+
+	var versionResponse nmagentclient.NMANetworkContainerResponse
+	rBytes, _ := ioutil.ReadAll(response.Body)
+	json.Unmarshal(rBytes, &versionResponse)
+	if versionResponse.ResponseCode != "200" {
+		returnCode = NetworkContainerVfpProgramPending
+		message = fmt.Sprintf("Failed to get NC version status from NMAgent. NC: %s, Response %s", ncid, rBytes)
+		return
+	}
+
+	ncTargetVersion, _ := strconv.Atoi(ncVersion)
+	nmaProgrammedNCVersion, _ := strconv.Atoi(versionResponse.Version)
+	if ncTargetVersion > nmaProgrammedNCVersion {
+		returnCode = NetworkContainerVfpProgramPending
+		message = fmt.Sprintf("Network container: %s version: %d is not yet programmed by NMAgent. Programmed version: %d",
+			ncid, ncTargetVersion, nmaProgrammedNCVersion)
 	} else {
-		returnCode = UnexpectedError
-		message = fmt.Sprintf("[Azure-CNS] Failed to get NC version from NMA with error: %+v", err)
+		returnCode = NetworkContainerVfpProgramComplete
+		waitingForUpdate = false
+		message = fmt.Sprintf("Vfp programming complete")
+		logger.Printf("[Azure CNS] Vfp programming complete for NC: %s with version: %d", ncid, ncTargetVersion)
 	}
 
 	return
@@ -757,8 +809,8 @@ func ReturnCodeToString(returnCode int) (s string) {
 		s = "UnexpectedError"
 	case DockerContainerNotSpecified:
 		s = "DockerContainerNotSpecified"
-	case NetworkContainerPendingStatePropagation:
-		s = "NetworkContainerPendingStatePropagation"
+	case NetworkContainerVfpProgramPending:
+		s = "NetworkContainerVfpProgramPending"
 	default:
 		s = "UnknownError"
 	}

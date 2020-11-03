@@ -19,6 +19,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/common"
 	"github.com/Azure/azure-container-networking/cns/fakes"
 	"github.com/Azure/azure-container-networking/cns/logger"
+	"github.com/Azure/azure-container-networking/cns/nmagentclient"
 	acncommon "github.com/Azure/azure-container-networking/common"
 )
 
@@ -51,11 +52,10 @@ type xmlDocument struct {
 }
 
 var (
-	service                               cns.HTTPService
-	svc                                   *HTTPRestService
-	mux                                   *http.ServeMux
-	hostQueryForProgrammedVersionResponse = `{"httpStatusCode":"200","networkContainerId":"eab2470f-test-test-test-b3cd316979d5","version":"1"}`
-	hostQueryResponse                     = xmlDocument{
+	service           cns.HTTPService
+	svc               *HTTPRestService
+	mux               *http.ServeMux
+	hostQueryResponse = xmlDocument{
 		XMLName: xml.Name{Local: "Interfaces"},
 		Interface: []Interface{Interface{
 			XMLName:    xml.Name{Local: "Interface"},
@@ -79,6 +79,16 @@ const (
 	nmagentEndpoint = "localhost:9000"
 )
 
+type createOrUpdateNetworkContainerParams struct {
+	ncID         string
+	ncIP         string
+	ncType       string
+	ncVersion    string
+	vnetID       string
+	podName      string
+	podNamespace string
+}
+
 func getInterfaceInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(acncommon.ContentType, "application/xml")
 	output, _ := xml.Marshal(hostQueryResponse)
@@ -87,10 +97,25 @@ func getInterfaceInfo(w http.ResponseWriter, r *http.Request) {
 
 func nmagentHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(acncommon.ContentType, acncommon.JsonContent)
-	w.WriteHeader(http.StatusOK)
 
-	if strings.Contains(r.RequestURI, "networkContainers") {
-		w.Write([]byte(hostQueryForProgrammedVersionResponse))
+	if strings.Contains(r.RequestURI, "nc-nma-success") {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"httpStatusCode":"200","networkContainerId":"nc-nma-success","version":"0"}`))
+	}
+
+	if strings.Contains(r.RequestURI, "nc-nma-fail-version-mismatch") {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"httpStatusCode":"200","networkContainerId":"nc-nma-fail-version-mismatch","version":"0"}`))
+	}
+
+	if strings.Contains(r.RequestURI, "nc-nma-fail-500") {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"httpStatusCode":"200","networkContainerId":"nc-nma-fail-500","version":"0"}`))
+	}
+
+	if strings.Contains(r.RequestURI, "nc-nma-fail-unavailable") {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"httpStatusCode":"401","networkContainerId":"nc-nma-fail-unavailable","version":"0"}`))
 	}
 }
 
@@ -115,6 +140,7 @@ func TestMain(m *testing.M) {
 
 	nmAgentServer.AddHandler("/getInterface", getInterfaceInfo)
 	nmAgentServer.AddHandler("/", nmagentHandler)
+	nmagentclient.WireserverIP = nmagentEndpoint
 
 	err = nmAgentServer.Start(make(chan error, 1))
 	if err != nil {
@@ -167,7 +193,17 @@ func TestCreateNetworkContainer(t *testing.T) {
 
 	// Test create network container of type JobObject
 	fmt.Println("TestCreateNetworkContainer: JobObject")
-	err := creatOrUpdateNetworkContainerWithName(t, "testJobObject", "10.1.0.5", "JobObject")
+
+	params := createOrUpdateNetworkContainerParams{
+		ncID:         "testJobObject",
+		ncIP:         "10.1.0.5",
+		ncType:       "JobObject",
+		ncVersion:    "0",
+		podName:      "testpod",
+		podNamespace: "testpodnamespace",
+	}
+
+	err := createOrUpdateNetworkContainerWithParams(t, params)
 	if err != nil {
 		t.Errorf("Failed to save the goal state for network container of type JobObject "+
 			" due to error: %+v", err)
@@ -175,7 +211,7 @@ func TestCreateNetworkContainer(t *testing.T) {
 	}
 
 	fmt.Println("Deleting the saved goal state for network container of type JobObject")
-	err = deleteNetworkAdapterWithName(t, "testJobObject")
+	err = deleteNetworkContainerWithParams(t, params)
 	if err != nil {
 		t.Errorf("Failed to delete the saved goal state due to error: %+v", err)
 		t.Fatal(err)
@@ -183,13 +219,31 @@ func TestCreateNetworkContainer(t *testing.T) {
 
 	// Test create network container of type WebApps
 	fmt.Println("TestCreateNetworkContainer: WebApps")
-	err = creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "192.0.0.5", "WebApps")
+	params = createOrUpdateNetworkContainerParams{
+		ncID:         "ethWebApp",
+		ncIP:         "192.0.0.5",
+		ncType:       "WebApps",
+		ncVersion:    "0",
+		podName:      "testpod",
+		podNamespace: "testpodnamespace",
+	}
+
+	err = createOrUpdateNetworkContainerWithParams(t, params)
 	if err != nil {
 		t.Errorf("creatOrUpdateWebAppContainerWithName failed Err:%+v", err)
 		t.Fatal(err)
 	}
 
-	err = creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "192.0.0.6", "WebApps")
+	params = createOrUpdateNetworkContainerParams{
+		ncID:         "ethWebApp",
+		ncIP:         "192.0.0.6",
+		ncType:       "WebApps",
+		ncVersion:    "0",
+		podName:      "testpod",
+		podNamespace: "testpodnamespace",
+	}
+
+	err = createOrUpdateNetworkContainerWithParams(t, params)
 	if err != nil {
 		t.Errorf("Updating interface failed Err:%+v", err)
 		t.Fatal(err)
@@ -197,14 +251,23 @@ func TestCreateNetworkContainer(t *testing.T) {
 
 	fmt.Println("Now calling DeleteNetworkContainer")
 
-	err = deleteNetworkAdapterWithName(t, "ethWebApp")
+	err = deleteNetworkContainerWithParams(t, params)
 	if err != nil {
 		t.Errorf("Deleting interface failed Err:%+v", err)
 		t.Fatal(err)
 	}
 
 	// Test create network container of type COW
-	err = creatOrUpdateNetworkContainerWithName(t, "testCOWContainer", "10.0.0.5", "COW")
+	params = createOrUpdateNetworkContainerParams{
+		ncID:         "testCOWContainer",
+		ncIP:         "10.0.0.5",
+		ncType:       "COW",
+		ncVersion:    "0",
+		podName:      "testpod",
+		podNamespace: "testpodnamespace",
+	}
+
+	err = createOrUpdateNetworkContainerWithParams(t, params)
 	if err != nil {
 		t.Errorf("Failed to save the goal state for network container of type COW"+
 			" due to error: %+v", err)
@@ -212,7 +275,7 @@ func TestCreateNetworkContainer(t *testing.T) {
 	}
 
 	fmt.Println("Deleting the saved goal state for network container of type COW")
-	err = deleteNetworkAdapterWithName(t, "testCOWContainer")
+	err = deleteNetworkContainerWithParams(t, params)
 	if err != nil {
 		t.Errorf("Failed to delete the saved goal state due to error: %+v", err)
 		t.Fatal(err)
@@ -227,14 +290,23 @@ func TestGetNetworkContainerByOrchestratorContext(t *testing.T) {
 	setEnv(t)
 	setOrchestratorType(t, cns.Kubernetes)
 
-	err := creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "11.0.0.5", cns.AzureContainerInstance)
+	params := createOrUpdateNetworkContainerParams{
+		ncID:         "ethWebApp",
+		ncIP:         "11.0.0.5",
+		ncType:       cns.AzureContainerInstance,
+		ncVersion:    "0",
+		podName:      "testpod",
+		podNamespace: "testpodnamespace",
+	}
+
+	err := createOrUpdateNetworkContainerWithParams(t, params)
 	if err != nil {
-		t.Errorf("creatOrUpdateNetworkContainerWithName failed Err:%+v", err)
+		t.Errorf("createOrUpdateNetworkContainerWithParams failed Err:%+v", err)
 		t.Fatal(err)
 	}
 
-	fmt.Println("Now calling getNetworkContainerStatus")
-	err = getNetworkContainerByContext(t, "ethWebApp")
+	fmt.Println("Now calling getNetworkContainerByContext")
+	err = getNetworkContainerByContext(t, params)
 	if err != nil {
 		t.Errorf("TestGetNetworkContainerByOrchestratorContext failed Err:%+v", err)
 		t.Fatal(err)
@@ -242,47 +314,18 @@ func TestGetNetworkContainerByOrchestratorContext(t *testing.T) {
 
 	fmt.Println("Now calling DeleteNetworkContainer")
 
-	err = deleteNetworkAdapterWithName(t, "ethWebApp")
+	err = deleteNetworkContainerWithParams(t, params)
 	if err != nil {
 		t.Errorf("Deleting interface failed Err:%+v", err)
 		t.Fatal(err)
 	}
 
-	err = getNonExistNetworkContainerByContext(t, "ethWebApp")
+	err = getNonExistNetworkContainerByContext(t, params)
 	if err != nil {
 		t.Errorf("TestGetNetworkContainerByOrchestratorContext failed Err:%+v", err)
 		t.Fatal(err)
 	}
 }
-
-// func TestGetNetworkContainerStatus(t *testing.T) {
-// 	// requires more than 30 seconds to run
-// 	fmt.Println("Test: TestCreateNetworkContainer")
-
-// 	setEnv(t)
-// 	setOrchestratorType(t, cns.Kubernetes)
-
-// 	err := creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "11.0.0.5", cns.AzureContainerInstance)
-// 	if err != nil {
-// 		t.Errorf("creatOrUpdateWebAppContainerWithName failed Err:%+v", err)
-// 		t.Fatal(err)
-// 	}
-
-// 	fmt.Println("Now calling getNetworkContainerStatus")
-// 	err = getNetworkContainerStatus(t, "ethWebApp")
-// 	if err != nil {
-// 		t.Errorf("getNetworkContainerStatus failed Err:%+v", err)
-// 		t.Fatal(err)
-// 	}
-
-// 	fmt.Println("Now calling DeleteNetworkContainer")
-
-// 	err = deleteNetworkAdapterWithName(t, "ethWebApp")
-// 	if err != nil {
-// 		t.Errorf("Deleting interface failed Err:%+v", err)
-// 		t.Fatal(err)
-// 	}
-// }
 
 func TestGetInterfaceForNetworkContainer(t *testing.T) {
 	// requires more than 30 seconds to run
@@ -291,14 +334,23 @@ func TestGetInterfaceForNetworkContainer(t *testing.T) {
 	setEnv(t)
 	setOrchestratorType(t, cns.Kubernetes)
 
-	err := creatOrUpdateNetworkContainerWithName(t, "ethWebApp", "11.0.0.5", "WebApps")
+	params := createOrUpdateNetworkContainerParams{
+		ncID:         "ethWebApp",
+		ncIP:         "11.0.0.5",
+		ncType:       "WebApps",
+		ncVersion:    "0",
+		podName:      "testpod",
+		podNamespace: "testpodnamespace",
+	}
+
+	err := createOrUpdateNetworkContainerWithParams(t, params)
 	if err != nil {
 		t.Errorf("creatOrUpdateWebAppContainerWithName failed Err:%+v", err)
 		t.Fatal(err)
 	}
 
 	fmt.Println("Now calling getInterfaceForContainer")
-	err = getInterfaceForContainer(t, "ethWebApp")
+	err = getInterfaceForContainer(t, params)
 	if err != nil {
 		t.Errorf("getInterfaceForContainer failed Err:%+v", err)
 		t.Fatal(err)
@@ -306,7 +358,7 @@ func TestGetInterfaceForNetworkContainer(t *testing.T) {
 
 	fmt.Println("Now calling DeleteNetworkContainer")
 
-	err = deleteNetworkAdapterWithName(t, "ethWebApp")
+	err = deleteNetworkContainerWithParams(t, params)
 	if err != nil {
 		t.Errorf("Deleting interface failed Err:%+v", err)
 		t.Fatal(err)
@@ -339,18 +391,141 @@ func TestGetNumOfCPUCores(t *testing.T) {
 	}
 }
 
+func TestGetNetworkContainerVersionStatus(t *testing.T) {
+	fmt.Println("Test: TestGetNetworkContainerVersionStatus")
+
+	setEnv(t)
+	setOrchestratorType(t, cns.Kubernetes)
+
+	params := createOrUpdateNetworkContainerParams{
+		ncID:         "nc-nma-success",
+		ncIP:         "11.0.0.5",
+		ncType:       cns.AzureContainerInstance,
+		ncVersion:    "0",
+		vnetID:       "vnet1",
+		podName:      "testpod",
+		podNamespace: "testpodnamespace",
+	}
+
+	createNC(t, params)
+
+	if err := getNetworkContainerByContext(t, params); err != nil {
+		t.Errorf("TestGetNetworkContainerByOrchestratorContext failed Err:%+v", err)
+		t.Fatal(err)
+	}
+
+	// Get NC goal state again to test the path where the NMA API doesn't need to be executed but
+	// instead use the cached state ( in json ) of version status
+	if err := getNetworkContainerByContext(t, params); err != nil {
+		t.Errorf("TestGetNetworkContainerByOrchestratorContext failed Err:%+v", err)
+		t.Fatal(err)
+	}
+
+	if err := deleteNetworkContainerWithParams(t, params); err != nil {
+		t.Errorf("Deleting interface failed Err:%+v", err)
+		t.Fatal(err)
+	}
+
+	// Testing the path where the NC version with CNS is higher than the one with NMAgent.
+	// This indicates that the NMAgent is yet to program the NC version.
+	params = createOrUpdateNetworkContainerParams{
+		ncID:         "nc-nma-fail-version-mismatch",
+		ncIP:         "11.0.0.5",
+		ncType:       cns.AzureContainerInstance,
+		ncVersion:    "1",
+		vnetID:       "vnet1",
+		podName:      "testpod",
+		podNamespace: "testpodnamespace",
+	}
+
+	createNC(t, params)
+
+	if err := getNetworkContainerByContextExpectedError(t, params); err != nil {
+		t.Errorf("TestGetNetworkContainerVersionStatus failed")
+		t.Fatal(err)
+	}
+
+	if err := deleteNetworkContainerWithParams(t, params); err != nil {
+		t.Errorf("Deleting interface failed Err:%+v", err)
+		t.Fatal(err)
+	}
+
+	// Testing the path where NMAgent response status code is not 200.
+	// 2. NMAgent response status code is 200 but embedded response is 401
+	params = createOrUpdateNetworkContainerParams{
+		ncID:         "nc-nma-fail-500",
+		ncIP:         "11.0.0.5",
+		ncType:       cns.AzureContainerInstance,
+		ncVersion:    "0",
+		vnetID:       "vnet1",
+		podName:      "testpod",
+		podNamespace: "testpodnamespace",
+	}
+
+	createNC(t, params)
+
+	if err := getNetworkContainerByContext(t, params); err != nil {
+		t.Errorf("TestGetNetworkContainerVersionStatus failed")
+		t.Fatal(err)
+	}
+
+	if err := deleteNetworkContainerWithParams(t, params); err != nil {
+		t.Errorf("Deleting interface failed Err:%+v", err)
+		t.Fatal(err)
+	}
+
+	// Testing the path where NMAgent response status code is 200 but embedded response is 401
+	params = createOrUpdateNetworkContainerParams{
+		ncID:         "nc-nma-fail-unavailable",
+		ncIP:         "11.0.0.5",
+		ncType:       cns.AzureContainerInstance,
+		ncVersion:    "0",
+		vnetID:       "vnet1",
+		podName:      "testpod",
+		podNamespace: "testpodnamespace",
+	}
+
+	createNC(t, params)
+
+	if err := getNetworkContainerByContextExpectedError(t, params); err != nil {
+		t.Errorf("TestGetNetworkContainerVersionStatus failed")
+		t.Fatal(err)
+	}
+
+	if err := deleteNetworkContainerWithParams(t, params); err != nil {
+		t.Errorf("Deleting interface failed Err:%+v", err)
+		t.Fatal(err)
+	}
+}
+
+func createNC(
+	t *testing.T,
+	params createOrUpdateNetworkContainerParams) {
+	if err := createOrUpdateNetworkContainerWithParams(t, params); err != nil {
+		t.Errorf("createOrUpdateNetworkContainerWithParams failed Err:%+v", err)
+		t.Fatal(err)
+	}
+
+	publishNCViaCNS(t, params.vnetID, params.ncID)
+}
+
 func TestPublishNCViaCNS(t *testing.T) {
 	fmt.Println("Test: publishNetworkContainer")
+	publishNCViaCNS(t, "vnet1", "ethWebApp")
 
+}
+
+func publishNCViaCNS(t *testing.T,
+	networkID string,
+	networkContainerID string) {
 	var (
 		body bytes.Buffer
 		resp cns.PublishNetworkContainerResponse
 	)
 
-	networkID := "vnet1"
-	networkContainerID := "ethWebApp"
 	joinNetworkURL := "http://" + nmagentEndpoint + "/dummyVnetURL"
-	createNetworkContainerURL := "http://" + nmagentEndpoint + "/networkContainers/dummyNCURL"
+	createNetworkContainerURL := "http://" + nmagentEndpoint +
+		"/interfaces/dummyIntf/networkContainers/dummyNCURL/authenticationToken/dummyT/api-version"
 
 	publishNCRequest := &cns.PublishNetworkContainerRequest{
 		NetworkID:                         networkID,
@@ -445,22 +620,22 @@ func setOrchestratorType(t *testing.T, orchestratorType string) error {
 	return nil
 }
 
-func creatOrUpdateNetworkContainerWithName(t *testing.T, name string, ip string, containerType string) error {
+func createOrUpdateNetworkContainerWithParams(t *testing.T, params createOrUpdateNetworkContainerParams) error {
 	var body bytes.Buffer
 	var ipConfig cns.IPConfiguration
 	ipConfig.DNSServers = []string{"8.8.8.8", "8.8.4.4"}
 	ipConfig.GatewayIPAddress = "11.0.0.1"
 	var ipSubnet cns.IPSubnet
-	ipSubnet.IPAddress = ip
+	ipSubnet.IPAddress = params.ncIP
 	ipSubnet.PrefixLength = 24
 	ipConfig.IPSubnet = ipSubnet
 	podInfo := cns.KubernetesPodInfo{PodName: "testpod", PodNamespace: "testpodnamespace"}
 	context, _ := json.Marshal(podInfo)
 
 	info := &cns.CreateNetworkContainerRequest{
-		Version:                    "0.1",
-		NetworkContainerType:       containerType,
-		NetworkContainerid:         name,
+		Version:                    params.ncVersion,
+		NetworkContainerType:       params.ncType,
+		NetworkContainerid:         cns.SwiftPrefix + params.ncID,
 		OrchestratorContext:        context,
 		IPConfiguration:            ipConfig,
 		PrimaryInterfaceIdentifier: "11.0.0.7",
@@ -490,12 +665,14 @@ func creatOrUpdateNetworkContainerWithName(t *testing.T, name string, ip string,
 	return nil
 }
 
-func deleteNetworkAdapterWithName(t *testing.T, name string) error {
-	var body bytes.Buffer
-	var resp cns.DeleteNetworkContainerResponse
+func deleteNetworkContainerWithParams(t *testing.T, params createOrUpdateNetworkContainerParams) error {
+	var (
+		body bytes.Buffer
+		resp cns.DeleteNetworkContainerResponse
+	)
 
 	deleteInfo := &cns.DeleteNetworkContainerRequest{
-		NetworkContainerid: name,
+		NetworkContainerid: cns.SwiftPrefix + params.ncID,
 	}
 
 	json.NewEncoder(&body).Encode(deleteInfo)
@@ -517,11 +694,13 @@ func deleteNetworkAdapterWithName(t *testing.T, name string) error {
 	return nil
 }
 
-func getNetworkContainerByContext(t *testing.T, name string) error {
+func getNetworkContainerByContext(t *testing.T, params createOrUpdateNetworkContainerParams) error {
 	var body bytes.Buffer
 	var resp cns.GetNetworkContainerResponse
+	podInfo := cns.KubernetesPodInfo{
+		PodName:      params.podName,
+		PodNamespace: params.podNamespace}
 
-	podInfo := cns.KubernetesPodInfo{PodName: "testpod", PodNamespace: "testpodnamespace"}
 	podInfoBytes, err := json.Marshal(podInfo)
 	getReq := &cns.GetNetworkContainerRequest{OrchestratorContext: podInfoBytes}
 
@@ -544,11 +723,13 @@ func getNetworkContainerByContext(t *testing.T, name string) error {
 	return nil
 }
 
-func getNonExistNetworkContainerByContext(t *testing.T, name string) error {
+func getNonExistNetworkContainerByContext(t *testing.T, params createOrUpdateNetworkContainerParams) error {
 	var body bytes.Buffer
 	var resp cns.GetNetworkContainerResponse
+	podInfo := cns.KubernetesPodInfo{
+		PodName:      params.podName,
+		PodNamespace: params.podNamespace}
 
-	podInfo := cns.KubernetesPodInfo{PodName: "testpod", PodNamespace: "testpodnamespace"}
 	podInfoBytes, err := json.Marshal(podInfo)
 	getReq := &cns.GetNetworkContainerRequest{OrchestratorContext: podInfoBytes}
 
@@ -571,16 +752,18 @@ func getNonExistNetworkContainerByContext(t *testing.T, name string) error {
 	return nil
 }
 
-func getNetworkContainerStatus(t *testing.T, name string) error {
+func getNetworkContainerByContextExpectedError(t *testing.T, params createOrUpdateNetworkContainerParams) error {
 	var body bytes.Buffer
-	var resp cns.GetNetworkContainerStatusResponse
+	var resp cns.GetNetworkContainerResponse
+	podInfo := cns.KubernetesPodInfo{
+		PodName:      params.podName,
+		PodNamespace: params.podNamespace}
 
-	getReq := &cns.GetNetworkContainerStatusRequest{
-		NetworkContainerid: name,
-	}
+	podInfoBytes, err := json.Marshal(podInfo)
+	getReq := &cns.GetNetworkContainerRequest{OrchestratorContext: podInfoBytes}
 
 	json.NewEncoder(&body).Encode(getReq)
-	req, err := http.NewRequest(http.MethodPost, cns.GetNetworkContainerStatus, &body)
+	req, err := http.NewRequest(http.MethodPost, cns.GetNetworkContainerByOrchestratorContext, &body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -589,21 +772,21 @@ func getNetworkContainerStatus(t *testing.T, name string) error {
 	mux.ServeHTTP(w, req)
 
 	err = decodeResponse(w, &resp)
-	if err != nil || resp.Response.ReturnCode != 0 {
-		t.Errorf("GetNetworkContainerStatus failed with response %+v Err:%+v", resp, err)
+	if err != nil || resp.Response.ReturnCode == 0 {
+		t.Errorf("GetNetworkContainerByContext failed with response %+v Err:%+v", resp, err)
 		t.Fatal(err)
 	}
 
-	fmt.Printf("**GetNetworkContainerStatus succeded with response %+v, raw:%+v\n", resp, w.Body)
+	fmt.Printf("**getNetworkContainerByContextExpectedError succeded with response %+v, raw:%+v\n", resp, w.Body)
 	return nil
 }
 
-func getInterfaceForContainer(t *testing.T, name string) error {
+func getInterfaceForContainer(t *testing.T, params createOrUpdateNetworkContainerParams) error {
 	var body bytes.Buffer
 	var resp cns.GetInterfaceForContainerResponse
 
 	getReq := &cns.GetInterfaceForContainerRequest{
-		NetworkContainerID: name,
+		NetworkContainerID: cns.SwiftPrefix + params.ncID,
 	}
 
 	json.NewEncoder(&body).Encode(getReq)
