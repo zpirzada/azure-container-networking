@@ -14,5 +14,9 @@
         "NodeID": "",
         "NodeSyncIntervalInSeconds": 30
     },
-    "ChannelMode": "Direct"
+    "ChannelMode": "Direct",
+    "UseHTTPS" : false,
+    "TLSSubjectName" : "",
+    "TLSCertificatePath" : "",
+    "TLSEndpoint" : "localhost:10091"
 }

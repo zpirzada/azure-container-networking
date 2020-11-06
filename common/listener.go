@@ -4,8 +4,10 @@
 package common
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	localtls "github.com/Azure/azure-container-networking/server/tls"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,13 +18,14 @@ import (
 
 // Listener represents an HTTP listener.
 type Listener struct {
-	URL          *url.URL
-	protocol     string
-	localAddress string
-	endpoints    []string
-	active       bool
-	l            net.Listener
-	mux          *http.ServeMux
+	URL            *url.URL
+	protocol       string
+	localAddress   string
+	endpoints      []string
+	active         bool
+	l              net.Listener
+	securelistener net.Listener
+	mux            *http.ServeMux
 }
 
 // NewListener creates a new Listener.
@@ -36,6 +39,66 @@ func NewListener(u *url.URL) (*Listener, error) {
 	listener.mux = http.NewServeMux()
 
 	return &listener, nil
+}
+
+func GetTlsConfig(tlsSettings localtls.TlsSettings) (*tls.Config, error) {
+	tlsCertRetriever, err := localtls.GetTlsCertificateRetriever(tlsSettings)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get certificate retriever %+v", err)
+	}
+	leafCertificate, err := tlsCertRetriever.GetCertificate()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get certificate %+v", err)
+	}
+	if leafCertificate == nil {
+		return nil, fmt.Errorf("Certificate retrival returned empty %+v", err)
+	}
+	privateKey, err := tlsCertRetriever.GetPrivateKey()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to get certificate private key %+v", err)
+	}
+	tlsCert := tls.Certificate{
+		Certificate: [][]byte{leafCertificate.Raw},
+		PrivateKey:  privateKey,
+		Leaf:        leafCertificate,
+	}
+	tlsConfig := &tls.Config{
+		MaxVersion: tls.VersionTLS12,
+		MinVersion: tls.VersionTLS12,
+		Certificates: []tls.Certificate{
+			tlsCert,
+		},
+	}
+	return tlsConfig, nil
+}
+
+// Start creates the listener socket and starts the HTTPS server.
+func (listener *Listener) StartTLS(errChan chan error, tlsSettings localtls.TlsSettings) error {
+	tlsConfig, err := GetTlsConfig(tlsSettings)
+	if err != nil {
+		log.Printf("[Listener] Failed to compose Tls Configuration with errror: %+v", err)
+		return err
+	}
+	server := http.Server{
+		TLSConfig: tlsConfig,
+		Handler:   listener.mux,
+	}
+
+	// listen on a seperate endpoint for secure tls connections
+	listener.securelistener, err = net.Listen(listener.protocol, tlsSettings.TLSEndpoint)
+	if err != nil {
+		log.Printf("[Listener] Failed to listen on TlsEndpoint: %+v", err)
+		return err
+	}
+	log.Printf("[Listener] Started listening on tls endpoint %s.", tlsSettings.TLSEndpoint)
+
+	// Launch goroutine for servicing https requests
+	go func() {
+		errChan <- server.ServeTLS(listener.securelistener, "", "")
+	}()
+
+	listener.active = true
+	return nil
 }
 
 // Start creates the listener socket and starts the HTTP server.
@@ -74,6 +137,11 @@ func (listener *Listener) Stop() {
 
 	// Stop servicing requests.
 	listener.l.Close()
+
+	if listener.securelistener != nil {
+		// Stop servicing requests on secure listener
+		listener.securelistener.Close()
+	}
 
 	// Delete the unix socket.
 	if listener.protocol == "unix" {

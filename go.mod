@@ -27,6 +27,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.3.2
 	go.opencensus.io v0.22.2 // indirect
+	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/net v0.0.0-20191112182307-2180aed22343 // indirect
 	golang.org/x/sys v0.0.0-20191120155948-bd437916bb0e
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
@@ -36,4 +37,5 @@ require (
 	k8s.io/apimachinery v0.18.2
 	k8s.io/client-go v0.18.2
 	sigs.k8s.io/controller-runtime v0.6.0
+	software.sslmate.com/src/go-pkcs12 v0.0.0-20201102150903-66718f75db0e
 )
