@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/azure-container-networking/network"
 	"github.com/Azure/azure-container-networking/network/policy"
 	"github.com/Microsoft/hcsshim"
+	hnsv2 "github.com/Microsoft/hcsshim/hcn"
 	"golang.org/x/sys/windows/registry"
 
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
@@ -254,17 +255,32 @@ func getEndpointDNSSettings(nwCfg *cni.NetworkConfig, result *cniTypesCurr.Resul
 func getPoliciesFromRuntimeCfg(nwCfg *cni.NetworkConfig) []policy.Policy {
 	log.Printf("[net] RuntimeConfigs: %+v", nwCfg.RuntimeConfig)
 	var policies []policy.Policy
+	var protocol uint32
 	for _, mapping := range nwCfg.RuntimeConfig.PortMappings {
-		rawPolicy, _ := json.Marshal(&hcsshim.NatPolicy{
-			Type:         "NAT",
+
+		cfgProto := strings.ToUpper(strings.TrimSpace(mapping.Protocol))
+		switch cfgProto {
+		case "TCP":
+			protocol = policy.ProtocolTcp
+		case "UDP":
+			protocol = policy.ProtocolUdp
+		}
+
+		rawPolicy, _ := json.Marshal(&hnsv2.PortMappingPolicySetting{
 			ExternalPort: uint16(mapping.HostPort),
 			InternalPort: uint16(mapping.ContainerPort),
-			Protocol:     mapping.Protocol,
+			VIP:          mapping.HostIp,
+			Protocol:     protocol,
+		})
+
+		hnsv2Policy, _ := json.Marshal(&hnsv2.EndpointPolicy{
+			Type:     hnsv2.PortMapping,
+			Settings: rawPolicy,
 		})
 
 		policy := policy.Policy{
 			Type: policy.EndpointPolicy,
-			Data: rawPolicy,
+			Data: hnsv2Policy,
 		}
 		log.Printf("[net] Creating port mapping policy: %+v", policy)
 
