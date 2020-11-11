@@ -266,16 +266,13 @@ func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.C
 
 }
 
-// Try to register node with DNC when CNS is started in managed DNC mode
+// RegisterNode - Tries to register node with DNC when CNS is started in managed DNC mode
 func RegisterNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, infraVnet, nodeID string) error {
 	logger.Printf("[Azure CNS] Registering node %s with Infrastructure Network: %s PrivateEndpoint: %s", nodeID, infraVnet, dncEP)
 
 	var (
 		numCPU              = runtime.NumCPU()
 		url                 = fmt.Sprintf(common.RegisterNodeURLFmt, dncEP, infraVnet, nodeID, dncApiVersion)
-		response            *http.Response
-		err                 = fmt.Errorf("")
-		body                bytes.Buffer
 		nodeRegisterRequest cns.NodeRegisterRequest
 	)
 
@@ -283,40 +280,74 @@ func RegisterNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, in
 	supportedApis, retErr := nmagentclient.GetNmAgentSupportedApis(httpc, "")
 
 	if retErr != nil {
-		logger.Printf("[Azure CNS] Failed to retrieve SupportedApis from NMagent of node %s with Infrastructure Network: %s PrivateEndpoint: %s",
+		logger.Errorf("[Azure CNS] Failed to retrieve SupportedApis from NMagent of node %s with Infrastructure Network: %s PrivateEndpoint: %s",
 			nodeID, infraVnet, dncEP)
+		return retErr
+	}
+
+	//To avoid any null-pointer deferencing errors.
+	if supportedApis == nil {
+		supportedApis = []string{}
 	}
 
 	nodeRegisterRequest.NmAgentSupportedApis = supportedApis
-	if err := json.NewEncoder(&body).Encode(nodeRegisterRequest); err != nil {
+
+	nodeRegisterTicker := time.NewTicker(time.Duration(time.Second) * common.FiveSeconds)
+	responseChan := make(chan error)
+
+	for {
+		select {
+		case responseErr := <-responseChan:
+			return responseErr
+		case <-nodeRegisterTicker.C:
+			go sendRegisterNodeRequest(httpc, httpRestService, nodeRegisterRequest, url, responseChan)
+		}
+	}
+}
+
+// sendRegisterNodeRequest func helps in registering the node until there is an error.
+func sendRegisterNodeRequest(
+	httpc *http.Client,
+	httpRestService cns.HTTPService,
+	nodeRegisterRequest cns.NodeRegisterRequest,
+	registerURL string,
+	responseChan chan<- error) {
+
+	var (
+		body     bytes.Buffer
+		response *http.Response
+		err      = fmt.Errorf("")
+	)
+
+	err = json.NewEncoder(&body).Encode(nodeRegisterRequest)
+	if err != nil {
 		log.Errorf("encoding json failed with %v", err)
-		return err
+		responseChan <- err
+		return
 	}
 
-	for sleep := true; err != nil; sleep = true {
-		response, err = httpc.Post(url, "application/json", &body)
-		if err == nil {
-			if response.StatusCode == http.StatusCreated {
-				var req cns.SetOrchestratorTypeRequest
-				json.NewDecoder(response.Body).Decode(&req)
-				httpRestService.SetNodeOrchestrator(&req)
-				sleep = false
-			} else {
-				err = fmt.Errorf("[Azure CNS] Failed to register node with http status code %s", strconv.Itoa(response.StatusCode))
-				logger.Errorf(err.Error())
-				return err
+	response, err = httpc.Post(registerURL, "application/json", &body)
+	if err == nil {
+		if response.StatusCode == http.StatusCreated {
+			var req cns.SetOrchestratorTypeRequest
+			decodeErr := json.NewDecoder(response.Body).Decode(&req)
+			if decodeErr != nil {
+				log.Errorf("decoding Node Resgister response json failed with %v", err)
+				responseChan <- err
+				return
 			}
+			httpRestService.SetNodeOrchestrator(&req)
 
-			response.Body.Close()
+			logger.Printf("[Azure CNS] Node Registered")
+			responseChan <- nil
 		} else {
-			logger.Errorf("[Azure CNS] Failed to register node with err: %+v", err)
+			err = fmt.Errorf("[Azure CNS] Failed to register node with http status code %s", strconv.Itoa(response.StatusCode))
+			logger.Errorf(err.Error())
+			responseChan <- err
 		}
 
-		if sleep {
-			time.Sleep(common.FiveSeconds)
-		}
+		response.Body.Close()
+	} else {
+		logger.Errorf("[Azure CNS] Failed to register node with err: %+v", err)
 	}
-
-	logger.Printf("[Azure CNS] Node Registered")
-	return nil
 }

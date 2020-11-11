@@ -1417,7 +1417,7 @@ func (service *HTTPRestService) deleteHostNCApipaEndpoint(w http.ResponseWriter,
 	logger.Response(service.Name, response, response.Response.ReturnCode, ReturnCodeToString(response.Response.ReturnCode), err)
 }
 
-// This function is used to query NMagents's supproted APIs list
+// This function is used to query NMagents's supported APIs list
 func (service *HTTPRestService) nmAgentSupportedApisHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Request(service.Name, "nmAgentSupportedApisHandler", nil)
 	var (
@@ -1441,6 +1441,9 @@ func (service *HTTPRestService) nmAgentSupportedApisHandler(w http.ResponseWrite
 		if retErr != nil {
 			returnCode = NmAgentSupportedApisError
 			returnMessage = fmt.Sprintf("[Azure-CNS] %s", retErr.Error())
+		}
+		if supportedApis == nil {
+			supportedApis = []string{}
 		}
 
 	default:
