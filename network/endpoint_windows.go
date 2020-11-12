@@ -416,6 +416,16 @@ func (nw *network) deleteEndpointImplHnsV1(ep *endpoint) error {
 	hnsResponse, err := hcsshim.HNSEndpointRequest("DELETE", ep.HnsId, "")
 	log.Printf("[net] HNSEndpointRequest DELETE response:%+v err:%v.", hnsResponse, err)
 
+	// todo: may need to improve error handling if hns or hcsshim change their error bubbling.
+	// hcsshim bubbles up a generic error when delete fails with message "The endpoint was not found".
+	// the best we can do at the moment is string comparison, which is never great for error checking
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			log.Printf("[net] HNS endpoint id %s not found", ep.HnsId)
+			return nil
+		}
+	}
+
 	return err
 }
 
