@@ -144,7 +144,6 @@ func GetNmAgentSupportedApis(
 		return nil, returnErr
 	}
 
-	logger.Printf("[NMAgentClient][Response] GetNmAgentSupportedApis. Response: %+v.",
-		response, err)
+	logger.Printf("[NMAgentClient][Response] GetNmAgentSupportedApis. Response: %+v.", response)
 	return xmlDoc.SupportedApis, nil
 }
