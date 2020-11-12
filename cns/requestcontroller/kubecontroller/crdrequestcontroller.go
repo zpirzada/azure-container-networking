@@ -249,7 +249,7 @@ func (crdRC *crdRequestController) UpdateCRDSpec(cntxt context.Context, crdSpec 
 		return err
 	}
 
-	logger.Printf("[cns-rc] Received update for IP count %+v", crdSpec)
+	logger.Printf("[cns-rc] Existing Spec, Updated spec for  %+v", nodeNetworkConfig.Spec, crdSpec)
 
 	//Update the CRD spec
 	crdSpec.DeepCopyInto(&nodeNetworkConfig.Spec)
