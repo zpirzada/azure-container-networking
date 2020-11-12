@@ -7,13 +7,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	localtls "github.com/Azure/azure-container-networking/server/tls"
-	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	localtls "github.com/Azure/azure-container-networking/server/tls"
 
 	"github.com/Azure/azure-container-networking/cns/ipampoolmonitor"
 
