@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	localtls "github.com/Azure/azure-container-networking/server/tls"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -19,6 +21,7 @@ import (
 	"github.com/Azure/azure-container-networking/cnm/ipam"
 	"github.com/Azure/azure-container-networking/cnm/network"
 	"github.com/Azure/azure-container-networking/cns"
+	"github.com/Azure/azure-container-networking/cns/cnsclient"
 	"github.com/Azure/azure-container-networking/cns/common"
 	"github.com/Azure/azure-container-networking/cns/configuration"
 	"github.com/Azure/azure-container-networking/cns/hnsclient"
@@ -218,6 +221,20 @@ var args = acn.ArgumentList{
 		Type:         "bool",
 		DefaultValue: false,
 	},
+	{
+		Name:         acn.OptDebugCmd,
+		Shorthand:    acn.OptDebugCmdAlias,
+		Description:  "Debug flag to retrieve IPconfigs, available values: allocated, available, all",
+		Type:         "string",
+		DefaultValue: "",
+	},
+	{
+		Name:         acn.OptDebugArg,
+		Shorthand:    acn.OptDebugArgAlias,
+		Description:  "Argument flag to be paired with the 'debugcmd' flag.",
+		Type:         "string",
+		DefaultValue: "",
+	},
 }
 
 // Prints description and version information.
@@ -251,6 +268,8 @@ func main() {
 	privateEndpoint := acn.GetArg(acn.OptPrivateEndpoint).(string)
 	infravnet := acn.GetArg(acn.OptInfrastructureNetworkID).(string)
 	nodeID := acn.GetArg(acn.OptNodeID).(string)
+	clientDebugCmd := acn.GetArg(acn.OptDebugCmd).(string)
+	clientDebugArg := acn.GetArg(acn.OptDebugArg).(string)
 
 	if vers {
 		printVersion()
@@ -270,6 +289,15 @@ func main() {
 
 	// Create logging provider.
 	logger.InitLogger(name, logLevel, logTarget, logDirectory)
+
+	if clientDebugCmd != "" {
+		err := cnsclient.HandleCNSClientCommands(clientDebugCmd, clientDebugArg)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 
 	if !telemetryEnabled {
 		logger.Errorf("[Azure CNS] Cannot disable telemetry via cmdline. Update cns_config.json to disable telemetry.")
@@ -355,6 +383,14 @@ func main() {
 
 	// Start CNS.
 	if httpRestService != nil {
+		if cnsconfig.UseHTTPS {
+			config.TlsSettings = localtls.TlsSettings{
+				TLSSubjectName:     cnsconfig.TLSSubjectName,
+				TLSCertificatePath: cnsconfig.TLSCertificatePath,
+				TLSEndpoint:        cnsconfig.TLSEndpoint,
+			}
+		}
+
 		err = httpRestService.Start(&config)
 		if err != nil {
 			logger.Errorf("Failed to start CNS, err:%v.\n", err)
@@ -442,8 +478,7 @@ func main() {
 			}
 		}()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		ctx := context.Background()
 		go func() {
 			if err := httpRestServiceImplementation.IPAMPoolMonitor.Start(ctx, poolIPAMRefreshRateInMilliseconds); err != nil {
 				logger.Errorf("[Azure CNS] Failed to start pool monitor with err: %v", err)

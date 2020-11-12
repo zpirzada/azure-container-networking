@@ -5,6 +5,7 @@ package common
 
 import (
 	"errors"
+	"github.com/Azure/azure-container-networking/server/tls"
 
 	"github.com/Azure/azure-container-networking/cns/logger"
 	acn "github.com/Azure/azure-container-networking/common"
@@ -37,6 +38,7 @@ type ServiceConfig struct {
 	ErrChan     chan error
 	Store       store.KeyValueStore
 	ChannelMode string
+	TlsSettings tls.TlsSettings
 }
 
 // NewService creates a new Service object.

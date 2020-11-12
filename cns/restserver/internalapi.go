@@ -96,7 +96,7 @@ func (service *HTTPRestService) SyncNodeStatus(dncEP, infraVnet, nodeID string, 
 	// check if the version is valid and save it to service state
 	for ncid, nc := range ncsToBeAdded {
 		var (
-			versionURL = fmt.Sprintf(nodeInfoResponse.GetNCVersionURLFmt,
+			versionURL = fmt.Sprintf(nmagentclient.GetNetworkContainerVersionURLFmt,
 				nmagentclient.WireserverIP,
 				nc.PrimaryInterfaceIdentifier,
 				nc.NetworkContainerid,
@@ -105,15 +105,7 @@ func (service *HTTPRestService) SyncNodeStatus(dncEP, infraVnet, nodeID string, 
 		)
 
 		ncVersionURLs.Store(nc.NetworkContainerid, versionURL)
-		waitingForUpdate, tmpReturnCode, tmpErrStr := isNCWaitingForUpdate(nc.Version, nc.NetworkContainerid)
-		if tmpReturnCode != Success && bytes.Compare(nc.OrchestratorContext, contextFromCNI) == 0 {
-			returnCode = tmpReturnCode
-			errStr = tmpErrStr
-		}
-
-		if tmpReturnCode == UnexpectedError {
-			continue
-		}
+		waitingForUpdate, _, _ := service.isNCWaitingForUpdate(nc.Version, nc.NetworkContainerid)
 
 		body, _ = json.Marshal(nc)
 		req, _ = http.NewRequest(http.MethodPost, "", bytes.NewBuffer(body))
@@ -124,7 +116,7 @@ func (service *HTTPRestService) SyncNodeStatus(dncEP, infraVnet, nodeID string, 
 			if err = json.Unmarshal(w.Body.Bytes(), &resp); err == nil && resp.Response.ReturnCode == Success {
 				service.Lock()
 				ncstatus, _ := service.state.ContainerStatus[ncid]
-				ncstatus.WaitingForUpdate = waitingForUpdate
+				ncstatus.VfpUpdateComplete = !waitingForUpdate
 				service.state.ContainerStatus[ncid] = ncstatus
 				service.Unlock()
 			}
@@ -188,7 +180,7 @@ func (service *HTTPRestService) ReconcileNCState(ncRequest *cns.CreateNetworkCon
 			}
 			jsonContext, _ := json.Marshal(kubernetesPodInfo)
 
-			ipconfigRequest := cns.GetIPConfigRequest{
+			ipconfigRequest := cns.IPConfigRequest{
 				DesiredIPAddress:    secIpConfig.IPAddress,
 				OrchestratorContext: jsonContext,
 			}
@@ -200,6 +192,12 @@ func (service *HTTPRestService) ReconcileNCState(ncRequest *cns.CreateNetworkCon
 		} else {
 			log.Logf("SecondaryIP %+v is not allocated. ncId: %s", secIpConfig, ncRequest.NetworkContainerid)
 		}
+	}
+
+	err := service.MarkExistingIPsAsPending(spec.IPsNotInUse)
+	if err != nil {
+		logger.Errorf("[Azure CNS] Error. Failed to mark IP's as pending %v", spec.IPsNotInUse)
+		return UnexpectedError
 	}
 
 	return 0
@@ -263,7 +261,6 @@ func (service *HTTPRestService) CreateOrUpdateNetworkContainerInternal(req cns.C
 	}
 
 	return returnCode
-
 }
 
 // RegisterNode - Tries to register node with DNC when CNS is started in managed DNC mode

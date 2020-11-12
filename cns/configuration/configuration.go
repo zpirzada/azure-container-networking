@@ -17,9 +17,13 @@ const (
 )
 
 type CNSConfig struct {
-	TelemetrySettings TelemetrySettings
-	ManagedSettings   ManagedSettings
-	ChannelMode       string
+	TelemetrySettings  TelemetrySettings
+	ManagedSettings    ManagedSettings
+	ChannelMode        string
+	UseHTTPS           bool
+	TLSSubjectName     string
+	TLSCertificatePath string
+	TLSEndpoint        string
 }
 
 type TelemetrySettings struct {

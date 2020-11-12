@@ -38,7 +38,7 @@ spec:
         spec:
           description: NodeNetworkConfigSpec defines the desired state of NetworkConfig
           properties:
-            iPsNotInUse:
+            ipsNotInUse:
               items:
                 type: string
               type: array
@@ -56,25 +56,28 @@ spec:
                 properties:
                   defaultGateway:
                     type: string
-                  iPAssignments:
+                  id:
+                    type: string
+                  ipAssignments:
                     items:
                       description: IPAssignment groups an IP address and Name. Name
                         is a UUID set by the the IP address assigner.
                       properties:
-                        iP:
+                        ip:
                           type: string
                         name:
                           type: string
                       type: object
                     type: array
-                  id:
-                    type: string
                   primaryIP:
                     type: string
                   subnetAddressSpace:
                     type: string
                   subnetName:
                     type: string
+                  version:
+                    format: int64
+                    type: integer
                 type: object
               type: array
             scaler:

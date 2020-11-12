@@ -60,7 +60,7 @@ type containerstatus struct {
 	VMVersion                     string
 	HostVersion                   string
 	CreateNetworkContainerRequest cns.CreateNetworkContainerRequest
-	WaitingForUpdate              bool // True when NC is waiting for NMA to sync versions/rules
+	VfpUpdateComplete             bool // True when VFP programming is completed for the NC
 }
 
 // httpRestServiceState contains the state we would like to persist.
@@ -177,6 +177,7 @@ func (service *HTTPRestService) Start(config *common.ServiceConfig) error {
 	listener.AddHandler(cns.RequestIPConfig, service.requestIPConfigHandler)
 	listener.AddHandler(cns.ReleaseIPConfig, service.releaseIPConfigHandler)
 	listener.AddHandler(cns.NmAgentSupportedApisPath, service.nmAgentSupportedApisHandler)
+	listener.AddHandler(cns.GetIPAddresses, service.getIPAddressesHandler)
 
 	// handlers for v0.2
 	listener.AddHandler(cns.V2Prefix+cns.SetEnvironmentPath, service.setEnvironment)

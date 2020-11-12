@@ -244,7 +244,7 @@ func TestDeleteSet(t *testing.T) {
 		}
 	}()
 
-	testSetName := "test-set"
+	testSetName := "test-delete-set"
 	if err := ipsMgr.CreateSet(testSetName, append([]string{util.IpsetNetHashFlag})); err != nil {
 		t.Errorf("TestDeleteSet failed @ ipsMgr.CreateSet")
 	}
@@ -350,7 +350,7 @@ func TestDeleteFromSet(t *testing.T) {
 		}
 	}()
 
-	testSetName := "test-set"
+	testSetName := "test-delete-from-set"
 	if err := ipsMgr.AddToSet(testSetName, "1.2.3.4", util.IpsetNetHashFlag, ""); err != nil {
 		t.Errorf("TestDeleteFromSet failed @ ipsMgr.AddToSet")
 	}
@@ -468,12 +468,34 @@ func TestDestroy(t *testing.T) {
 		}
 	}()
 
-	if err := ipsMgr.AddToSet("test-destroy-set", "1.2.3.4", util.IpsetNetHashFlag, ""); err != nil {
+	setName := "test-destroy"
+	testIP := "1.2.3.4"
+	if err := ipsMgr.AddToSet(setName, testIP, util.IpsetNetHashFlag, ""); err != nil {
 		t.Errorf("TestDestroy failed @ ipsMgr.AddToSet")
 	}
 
-	if err := ipsMgr.Destroy(); err != nil {
-		t.Errorf("TestDestroy failed @ ipsMgr.Destroy")
+	// Call Destroy and validate. Destroy can only work when no ipset is referenced from iptables.
+	if err := ipsMgr.Destroy(); err == nil {
+		// Validate ipset is not exist when destroy can happen.
+		entry := &ipsEntry{
+			operationFlag: util.IPsetCheckListFlag,
+			set:           util.GetHashedName(setName),
+		}
+
+		if _, err := ipsMgr.Run(entry); err == nil {
+			t.Errorf("TestDestroy failed @ ipsMgr.Destroy since %s still exist in kernel", setName)
+		}
+	} else {
+		// Validate ipset entries are gone from flush command when destroy can not happen.
+		entry := &ipsEntry{
+			operationFlag: util.IpsetTestFlag,
+			set:           util.GetHashedName(setName),
+			spec:          append([]string{testIP}),
+		}
+
+		if _, err := ipsMgr.Run(entry); err == nil {
+			t.Errorf("TestDestroy failed @ ipsMgr.Destroy since %s still exist in ipset", testIP)
+		}
 	}
 }
 

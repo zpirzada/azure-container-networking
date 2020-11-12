@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/azure-container-networking/network"
 	"github.com/Azure/azure-container-networking/network/policy"
 	"github.com/Microsoft/hcsshim"
+	hnsv2 "github.com/Microsoft/hcsshim/hcn"
 	"golang.org/x/sys/windows/registry"
 
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
@@ -26,6 +27,10 @@ var (
 	snatConfigFileName = filepath.FromSlash(os.Getenv("TEMP")) + "\\snatConfig"
 	// windows build for version 1903
 	win1903Version = 18362
+)
+
+const (
+	rehydrateNetworkInfoOnReboot = true
 )
 
 /* handleConsecutiveAdd handles consecutive add calls for infrastructure containers on Windows platform.
@@ -149,19 +154,30 @@ func updateSubnetPrefix(cnsNwConfig *cns.GetNetworkContainerResponse, subnetPref
 	return nil
 }
 
-func getNetworkName(podName, podNs, ifName string, nwCfg *cni.NetworkConfig) (networkName string, err error) {
+func getNetworkName(podName, podNs, ifName string, nwCfg *cni.NetworkConfig) (string, error) {
+	var (
+		networkName      string
+		err              error
+		cnsNetworkConfig *cns.GetNetworkContainerResponse
+	)
+
 	networkName = nwCfg.Name
 	err = nil
+
 	if nwCfg.MultiTenancy {
 		determineWinVer()
 		if len(strings.TrimSpace(podName)) == 0 || len(strings.TrimSpace(podNs)) == 0 {
 			err = fmt.Errorf("POD info cannot be empty. PodName: %s, PodNamespace: %s", podName, podNs)
-			return
+			return networkName, err
 		}
 
-		_, cnsNetworkConfig, _, err := getContainerNetworkConfiguration(nwCfg, podName, podNs, ifName)
+		_, cnsNetworkConfig, _, err = getContainerNetworkConfiguration(nwCfg, podName, podNs, ifName)
 		if err != nil {
-			log.Printf("GetContainerNetworkConfiguration failed for podname %v namespace %v with error %v", podName, podNs, err)
+			log.Printf(
+				"GetContainerNetworkConfiguration failed for podname %v namespace %v with error %v",
+				podName,
+				podNs,
+				err)
 		} else {
 			var subnet net.IPNet
 			if err = updateSubnetPrefix(cnsNetworkConfig, &subnet); err == nil {
@@ -173,7 +189,7 @@ func getNetworkName(podName, podNs, ifName string, nwCfg *cni.NetworkConfig) (ne
 		}
 	}
 
-	return
+	return networkName, err
 }
 
 func setupInfraVnetRoutingForMultitenancy(
@@ -239,17 +255,32 @@ func getEndpointDNSSettings(nwCfg *cni.NetworkConfig, result *cniTypesCurr.Resul
 func getPoliciesFromRuntimeCfg(nwCfg *cni.NetworkConfig) []policy.Policy {
 	log.Printf("[net] RuntimeConfigs: %+v", nwCfg.RuntimeConfig)
 	var policies []policy.Policy
+	var protocol uint32
 	for _, mapping := range nwCfg.RuntimeConfig.PortMappings {
-		rawPolicy, _ := json.Marshal(&hcsshim.NatPolicy{
-			Type:         "NAT",
+
+		cfgProto := strings.ToUpper(strings.TrimSpace(mapping.Protocol))
+		switch cfgProto {
+		case "TCP":
+			protocol = policy.ProtocolTcp
+		case "UDP":
+			protocol = policy.ProtocolUdp
+		}
+
+		rawPolicy, _ := json.Marshal(&hnsv2.PortMappingPolicySetting{
 			ExternalPort: uint16(mapping.HostPort),
 			InternalPort: uint16(mapping.ContainerPort),
-			Protocol:     mapping.Protocol,
+			VIP:          mapping.HostIp,
+			Protocol:     protocol,
+		})
+
+		hnsv2Policy, _ := json.Marshal(&hnsv2.EndpointPolicy{
+			Type:     hnsv2.PortMapping,
+			Settings: rawPolicy,
 		})
 
 		policy := policy.Policy{
 			Type: policy.EndpointPolicy,
-			Data: rawPolicy,
+			Data: hnsv2Policy,
 		}
 		log.Printf("[net] Creating port mapping policy: %+v", policy)
 
@@ -268,7 +299,7 @@ func addIPV6EndpointPolicy(nwInfo network.NetworkInfo) (policy.Policy, error) {
 		return eppolicy, fmt.Errorf("network state doesn't have ipv6 subnet")
 	}
 
-    // Everything should be snat'd except podcidr
+	// Everything should be snat'd except podcidr
 	exceptionList := []string{nwInfo.Subnets[1].Prefix.String()}
 	rawPolicy, _ := json.Marshal(&hcsshim.OutboundNatPolicy{
 		Policy:     hcsshim.Policy{Type: hcsshim.OutboundNat},

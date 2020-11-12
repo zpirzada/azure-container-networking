@@ -17,6 +17,7 @@ const (
 	subnetAddressSpace = "10.0.0.0/24"
 	subnetPrefixLen    = 24
 	testSecIp1         = "10.0.0.2"
+	version            = 1
 )
 
 func TestStatusToNCRequestMalformedPrimaryIP(t *testing.T) {
@@ -193,6 +194,7 @@ func TestStatusToNCRequestSuccess(t *testing.T) {
 				SubnetName:         subnetName,
 				DefaultGateway:     defaultGateway,
 				SubnetAddressSpace: subnetAddressSpace,
+				Version:            version,
 			},
 		},
 	}
@@ -232,5 +234,9 @@ func TestStatusToNCRequestSuccess(t *testing.T) {
 
 	if secondaryIP.IPAddress != testSecIp1 {
 		t.Fatalf("Expected %v as the secondary IP config but got %v", testSecIp1, secondaryIP.IPAddress)
+	}
+
+	if secondaryIP.NCVersion != version {
+		t.Fatalf("Expected %d as the secondary IP config NC version but got %v", version, secondaryIP.NCVersion)
 	}
 }

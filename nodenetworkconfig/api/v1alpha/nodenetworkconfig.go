@@ -48,7 +48,7 @@ type NodeNetworkConfigList struct {
 // NodeNetworkConfigSpec defines the desired state of NetworkConfig
 type NodeNetworkConfigSpec struct {
 	RequestedIPCount int64    `json:"requestedIPCount,omitempty"`
-	IPsNotInUse      []string `json:"iPsNotInUse,omitempty"`
+	IPsNotInUse      []string `json:"ipsNotInUse,omitempty"`
 }
 
 // NodeNetworkConfigStatus defines the observed state of NetworkConfig
@@ -69,15 +69,16 @@ type NetworkContainer struct {
 	ID                 string         `json:"id,omitempty"`
 	PrimaryIP          string         `json:"primaryIP,omitempty"`
 	SubnetName         string         `json:"subnetName,omitempty"`
-	IPAssignments      []IPAssignment `json:"iPAssignments,omitempty"`
+	IPAssignments      []IPAssignment `json:"ipAssignments,omitempty"`
 	DefaultGateway     string         `json:"defaultGateway,omitempty"`
 	SubnetAddressSpace string         `json:"subnetAddressSpace,omitempty"`
+	Version            int64          `json:"version,omitempty"`
 }
 
 // IPAssignment groups an IP address and Name. Name is a UUID set by the the IP address assigner.
 type IPAssignment struct {
 	Name string `json:"name,omitempty"`
-	IP   string `json:"iP,omitempty"`
+	IP   string `json:"ip,omitempty"`
 }
 
 func init() {
