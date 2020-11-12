@@ -150,7 +150,7 @@ func SetHostOptions(nwCfg *cni.NetworkConfig, hostSubnetPrefix *net.IPNet, ncSub
 	}
 
 	azureDNSMatch := fmt.Sprintf(" -m addrtype ! --dst-type local -s %s -d %s -p %s --dport %d", ncSubnetPrefix.String(), iptables.AzureDNS, iptables.UDP, iptables.DNSPort)
-	snatPrimaryIPJump := fmt.Sprintf("%s --to %s", iptables.Snat, info.podIPAddress)
+	snatPrimaryIPJump := fmt.Sprintf("%s --to %s", iptables.Snat, info.ncPrimaryIP)
 	options[network.IPTablesKey] = []iptables.IpTableEntry{
 		iptables.GetCreateChainCmd(iptables.V4, iptables.Nat, iptables.Swift),
 		iptables.GetAppendIptableRuleCmd(iptables.V4, iptables.Nat, iptables.Postrouting, "", iptables.Swift),

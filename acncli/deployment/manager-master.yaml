@@ -25,7 +25,7 @@ spec:
       hostNetwork: true
       containers:
         - name: azure-cni-installer
-          image: mcr.microsoft.com/containernetworking/azure-cni-manager:v1.1.8-10-g9d03b4c-dirty-21
+          image: mcr.microsoft.com/containernetworking/azure-cni-manager:v1.1.8-alphav6-swift-transparent
           imagePullPolicy: Always
           env:
             - name: AZURE_CNI_OS
@@ -33,7 +33,7 @@ spec:
             - name: AZURE_CNI_TENANCY
               value: singletenancy
             - name: AZURE_CNI_MODE
-              value: bridge
+              value: transparent
             - name: AZURE_CNI_IPAM
               value: azure-cns
             - name: AZURE_CNI_EXEMPT
