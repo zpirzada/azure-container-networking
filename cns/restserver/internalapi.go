@@ -289,7 +289,7 @@ func RegisterNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, in
 
 	nodeRegisterRequest.NmAgentSupportedApis = supportedApis
 
-	nodeRegisterTicker := time.NewTicker(time.Duration(time.Second) * common.FiveSeconds)
+	nodeRegisterTicker := time.NewTicker(common.FiveSeconds)
 	responseChan := make(chan error)
 
 	for {
