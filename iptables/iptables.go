@@ -85,8 +85,13 @@ var (
 	DisableIPTableLock bool
 )
 
+type IPTableEntry struct {
+	Version string
+	Params  string
+}
+
 // Run iptables command
-func runCmd(version, params string) error {
+func RunCmd(version, params string) error {
 	var cmd string
 
 	iptCmd := iptables
@@ -110,11 +115,17 @@ func runCmd(version, params string) error {
 // check if iptable chain alreay exists
 func ChainExists(version, tableName, chainName string) bool {
 	params := fmt.Sprintf("-t %s -L %s", tableName, chainName)
-	if err := runCmd(version, params); err != nil {
+	if err := RunCmd(version, params); err != nil {
 		return false
 	}
 
 	return true
+}
+func GetCreateChainCmd(version, tableName, chainName string) IPTableEntry {
+	return IPTableEntry{
+		Version: version,
+		Params:  fmt.Sprintf("-t %s -N %s", tableName, chainName),
+	}
 }
 
 // create new iptable chain under specified table name
@@ -122,8 +133,8 @@ func CreateChain(version, tableName, chainName string) error {
 	var err error
 
 	if !ChainExists(version, tableName, chainName) {
-		params := fmt.Sprintf("-t %s -N %s", tableName, chainName)
-		err = runCmd(version, params)
+		cmd := GetCreateChainCmd(version, tableName, chainName)
+		err = RunCmd(version, cmd.Params)
 	} else {
 		log.Printf("%s Chain exists in table %s", chainName, tableName)
 	}
@@ -134,10 +145,17 @@ func CreateChain(version, tableName, chainName string) error {
 // check if iptable rule alreay exists
 func RuleExists(version, tableName, chainName, match, target string) bool {
 	params := fmt.Sprintf("-t %s -C %s %s -j %s", tableName, chainName, match, target)
-	if err := runCmd(version, params); err != nil {
+	if err := RunCmd(version, params); err != nil {
 		return false
 	}
 	return true
+}
+
+func GetInsertIptableRuleCmd(version, tableName, chainName, match, target string) IPTableEntry {
+	return IPTableEntry{
+		Version: version,
+		Params:  fmt.Sprintf("-t %s -I %s 1 %s -j %s", tableName, chainName, match, target),
+	}
 }
 
 // Insert iptable rule at beginning of iptable chain
@@ -147,8 +165,15 @@ func InsertIptableRule(version, tableName, chainName, match, target string) erro
 		return nil
 	}
 
-	params := fmt.Sprintf("-t %s -I %s 1 %s -j %s", tableName, chainName, match, target)
-	return runCmd(version, params)
+	cmd := GetInsertIptableRuleCmd(version, tableName, chainName, match, target)
+	return RunCmd(version, cmd.Params)
+}
+
+func GetAppendIptableRuleCmd(version, tableName, chainName, match, target string) IPTableEntry {
+	return IPTableEntry{
+		Version: version,
+		Params:  fmt.Sprintf("-t %s -A %s %s -j %s", tableName, chainName, match, target),
+	}
 }
 
 // Append iptable rule at end of iptable chain
@@ -158,12 +183,12 @@ func AppendIptableRule(version, tableName, chainName, match, target string) erro
 		return nil
 	}
 
-	params := fmt.Sprintf("-t %s -A %s %s -j %s", tableName, chainName, match, target)
-	return runCmd(version, params)
+	cmd := GetAppendIptableRuleCmd(version, tableName, chainName, match, target)
+	return RunCmd(version, cmd.Params)
 }
 
 // Delete matched iptable rule
 func DeleteIptableRule(version, tableName, chainName, match, target string) error {
 	params := fmt.Sprintf("-t %s -D %s %s -j %s", tableName, chainName, match, target)
-	return runCmd(version, params)
+	return RunCmd(version, params)
 }

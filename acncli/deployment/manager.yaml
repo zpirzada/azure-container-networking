@@ -18,7 +18,7 @@ spec:
       hostNetwork: true
       containers:
         - name: azure-cni-installer
-          image: mcr.microsoft.com/containernetworking/azure-cni-manager:v1.1.9-alphav1
+          image: mcr.microsoft.com/containernetworking/azure-cni-manager:v1.2.0-2-g0671b63 
           imagePullPolicy: Always
           env:
             - name: AZURE_CNI_OS
@@ -26,9 +26,9 @@ spec:
             - name: AZURE_CNI_TENANCY
               value: singletenancy
             - name: AZURE_CNI_MODE
-              value: bridge
+              value: transparent
             - name: AZURE_CNI_IPAM
-              value: azure-cns
+              value: azure-vnet-ipam
             - name: AZURE_CNI_EXEMPT
               value: azure-vnet-telemetry,azure-vnet-telemetry.config
           volumeMounts:

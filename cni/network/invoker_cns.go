@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/cnsclient"
+	"github.com/Azure/azure-container-networking/iptables"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
@@ -48,7 +49,7 @@ func NewCNSInvoker(podName, namespace string) (*CNSIPAMInvoker, error) {
 }
 
 //Add uses the requestipconfig API in cns, and returns ipv4 and a nil ipv6 as CNS doesn't support IPv6 yet
-func (invoker *CNSIPAMInvoker) Add(nwCfg *cni.NetworkConfig, subnetPrefix *net.IPNet, options map[string]interface{}) (*cniTypesCurr.Result, *cniTypesCurr.Result, error) {
+func (invoker *CNSIPAMInvoker) Add(nwCfg *cni.NetworkConfig, hostSubnetPrefix *net.IPNet, options map[string]interface{}) (*cniTypesCurr.Result, *cniTypesCurr.Result, error) {
 
 	// Parse Pod arguments.
 	podInfo := cns.KubernetesPodInfo{PodName: invoker.podName, PodNamespace: invoker.podNamespace}
@@ -61,7 +62,7 @@ func (invoker *CNSIPAMInvoker) Add(nwCfg *cni.NetworkConfig, subnetPrefix *net.I
 		return nil, nil, err
 	}
 
-	resultIPv4 := IPv4ResultInfo{
+	info := IPv4ResultInfo{
 		podIPAddress:       response.PodIpInfo.PodIPConfig.IPAddress,
 		ncSubnetPrefix:     response.PodIpInfo.NetworkContainerPrimaryIPConfig.IPSubnet.PrefixLength,
 		ncPrimaryIP:        response.PodIpInfo.NetworkContainerPrimaryIPConfig.IPSubnet.IPAddress,
@@ -71,20 +72,46 @@ func (invoker *CNSIPAMInvoker) Add(nwCfg *cni.NetworkConfig, subnetPrefix *net.I
 		hostGateway:        response.PodIpInfo.HostPrimaryIPInfo.Gateway,
 	}
 
-	ncgw := net.ParseIP(resultIPv4.ncGatewayIPAddress)
+	// set the NC Primary IP in options
+	options[network.SNATIPKey] = info.ncPrimaryIP
+
+	log.Printf("[cni-invoker-cns] Received info %v for pod %v", info, podInfo)
+
+	ncgw := net.ParseIP(info.ncGatewayIPAddress)
 	if ncgw == nil {
-		return nil, nil, fmt.Errorf("Gateway address %v from response is invalid", resultIPv4.ncGatewayIPAddress)
+		return nil, nil, fmt.Errorf("Gateway address %v from response is invalid", info.ncGatewayIPAddress)
 	}
 
-	// set the NC Primary IP in options
-	options[network.SNATIPKey] = resultIPv4.ncPrimaryIP
+	// set result ipconfig from CNS Response Body
+	ip, ncipnet, err := net.ParseCIDR(info.podIPAddress + "/" + fmt.Sprint(info.ncSubnetPrefix))
+	if ip == nil {
+		return nil, nil, fmt.Errorf("Unable to parse IP from response: %v with err %v", info.podIPAddress, err)
+	}
 
-	// set host gateway in options
-	options[network.HostGWKey] = resultIPv4.hostGateway
+	// construct ipnet for result
+	resultIPnet := net.IPNet{
+		IP:   ip,
+		Mask: ncipnet.Mask,
+	}
 
-	log.Printf("Received result %+v for pod %v", resultIPv4, podInfo)
+	result := &cniTypesCurr.Result{
+		IPs: []*cniTypesCurr.IPConfig{
+			{
+				Version: "4",
+				Address: resultIPnet,
+				Gateway: ncgw,
+			},
+		},
+		Routes: []*cniTypes.Route{
+			{
+				Dst: network.Ipv4DefaultRouteDstPrefix,
+				GW:  ncgw,
+			},
+		},
+	}
 
-	result, err := getCNIIPv4Result(resultIPv4, subnetPrefix)
+	// set subnet prefix for host vm
+	err = setHostOptions(nwCfg, hostSubnetPrefix, ncipnet, options, info)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -93,54 +120,44 @@ func (invoker *CNSIPAMInvoker) Add(nwCfg *cni.NetworkConfig, subnetPrefix *net.I
 	return result, nil, nil
 }
 
-func getCNIIPv4Result(info IPv4ResultInfo, subnetPrefix *net.IPNet) (*cniTypesCurr.Result, error) {
-
-	gw := net.ParseIP(info.ncGatewayIPAddress)
-	if gw == nil {
-		return nil, fmt.Errorf("Gateway address %v from response is invalid", gw)
-	}
-
-	hostIP := net.ParseIP(info.hostPrimaryIP)
-	if hostIP == nil {
-		return nil, fmt.Errorf("Host IP address %v from response is invalid", hostIP)
-	}
-
-	// set result ipconfig from CNS Response Body
-	ip, ipnet, err := net.ParseCIDR(info.podIPAddress + "/" + fmt.Sprint(info.ncSubnetPrefix))
-	if ip == nil {
-		return nil, fmt.Errorf("Unable to parse IP from response: %v", info.podIPAddress)
-	}
-
+func setHostOptions(nwCfg *cni.NetworkConfig, hostSubnetPrefix *net.IPNet, ncSubnetPrefix *net.IPNet, options map[string]interface{}, info IPv4ResultInfo) error {
 	// get the name of the primary IP address
 	_, hostIPNet, err := net.ParseCIDR(info.hostSubnet)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// set subnet prefix for host vm
-	*subnetPrefix = *hostIPNet
+	*hostSubnetPrefix = *hostIPNet
 
-	// construct ipnet for result
-	resultIPnet := net.IPNet{
-		IP:   ip,
-		Mask: ipnet.Mask,
+	// get the host ip
+	hostIP := net.ParseIP(info.hostPrimaryIP)
+	if hostIP == nil {
+		return fmt.Errorf("Host IP address %v from response is invalid", info.hostPrimaryIP)
 	}
 
-	return &cniTypesCurr.Result{
-		IPs: []*cniTypesCurr.IPConfig{
-			{
-				Version: "4",
-				Address: resultIPnet,
-				Gateway: gw,
-			},
+	// get host gateway
+	hostGateway := net.ParseIP(info.hostGateway)
+	if hostGateway == nil {
+		return fmt.Errorf("Host Gateway %v from response is invalid", info.hostGateway)
+	}
+
+	// this route is needed when the vm on subnet A needs to send traffic to a pod in subnet B on a different vm
+	options[network.RoutesKey] = []network.RouteInfo{
+		{
+			Dst: *ncSubnetPrefix,
+			Gw:  hostGateway,
 		},
-		Routes: []*cniTypes.Route{
-			{
-				Dst: network.Ipv4DefaultRouteDstPrefix,
-				GW:  gw,
-			},
-		},
-	}, nil
+	}
+
+	azureDNSMatch := fmt.Sprintf(" -m addrtype ! --dst-type local -s %s -d %s -p %s --dport %d", ncSubnetPrefix.String(), iptables.AzureDNS, iptables.UDP, iptables.DNSPort)
+	snatPrimaryIPJump := fmt.Sprintf("%s --to %s", iptables.Snat, info.ncPrimaryIP)
+	options[network.IPTablesKey] = []iptables.IPTableEntry{
+		iptables.GetCreateChainCmd(iptables.V4, iptables.Nat, iptables.Swift),
+		iptables.GetAppendIptableRuleCmd(iptables.V4, iptables.Nat, iptables.Postrouting, "", iptables.Swift),
+		iptables.GetInsertIptableRuleCmd(iptables.V4, iptables.Nat, iptables.Swift, azureDNSMatch, snatPrimaryIPJump),
+	}
+
+	return nil
 }
 
 // Delete calls into the releaseipconfiguration API in CNS

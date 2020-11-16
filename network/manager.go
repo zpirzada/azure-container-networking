@@ -21,7 +21,8 @@ const (
 	VlanIDKey   = "VlanID"
 	AzureCNS    = "azure-cns"
 	SNATIPKey   = "NCPrimaryIPKey"
-	HostGWKey   = "HostGatewayIP"
+	RoutesKey   = "RoutesKey"
+	IPTablesKey = "IPTablesKey"
 	genericData = "com.docker.network.generic"
 )
 
@@ -36,7 +37,6 @@ type NetworkClient interface {
 	DeleteL2Rules(extIf *externalInterface)
 	SetBridgeMasterToHostInterface() error
 	SetHairpinOnHostInterface(bool) error
-	AddRoutes(nwInfo *NetworkInfo, interfaceName string) error
 }
 
 type EndpointClient interface {
