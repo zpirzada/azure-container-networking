@@ -4,15 +4,10 @@
 package restserver
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
 	"reflect"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/Azure/azure-container-networking/cns"
@@ -219,17 +214,6 @@ func TestReconcileNCWithSystemPods(t *testing.T) {
 
 	delete(expectedAllocatedPods, "192.168.0.1")
 	validateNCStateAfterReconcile(t, &req, expectedNcCount, expectedAllocatedPods)
-}
-
-func TestRegisterNode(t *testing.T) {
-	restartService()
-	setEnv(t)
-	setOrchestratorTypeInternal(cns.KubernetesCRD)
-
-	err := RegisterNode(NewTestClient(), svc, "localhost", "dummyvnet", "dummyNodeId")
-	if err != nil {
-		t.Errorf("Unexpected failure on register Node %s", err)
-	}
 }
 
 func setOrchestratorTypeInternal(orchestratorType string) {
@@ -469,48 +453,4 @@ func restartService() {
 
 	service.Stop()
 	startService()
-}
-
-// RoundTripFunc .
-type RoundTripFunc func(req *http.Request) *http.Response
-
-// RoundTrip .
-func (f RoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req), nil
-}
-
-func mockRountTrip(req *http.Request) *http.Response {
-	var (
-		body       io.ReadCloser
-		returnCode = 200
-	)
-	// Test request parameters
-	switch {
-	case strings.Contains(req.URL.String(), "GetSupportedApis"):
-		// Handle Call to NMAgent
-		body = ioutil.NopCloser(bytes.NewBufferString(hostSupportedApis))
-
-	case strings.Contains(req.URL.String(), "dummyNodeId"):
-		//Handle Call to register Node
-		body = ioutil.NopCloser(bytes.NewBufferString("OK"))
-		returnCode = 201
-
-	default:
-		returnCode = 200
-	}
-
-	return &http.Response{
-		StatusCode: returnCode,
-		// Send response to be tested
-		Body: body,
-		// Must be set to non-nil value or it panics
-		Header: make(http.Header),
-	}
-}
-
-//NewTestClient returns *http.Client with Transport replaced to avoid making real calls
-func NewTestClient() *http.Client {
-	return &http.Client{
-		Transport: RoundTripFunc(mockRountTrip),
-	}
 }
