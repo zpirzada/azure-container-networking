@@ -125,6 +125,8 @@ func GetNmAgentSupportedApis(
 		logger.Errorf("[Azure-CNS] %s", returnErr)
 		return nil, returnErr
 	}
+	defer response.Body.Close()
+
 	if response.StatusCode != http.StatusOK {
 		returnErr = fmt.Errorf(
 			"Failed to retrieve Supported Apis from NMAgent with StatusCode: %d",

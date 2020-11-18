@@ -278,11 +278,12 @@ func registerNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, in
 	responseChan := make(chan error)
 
 	for {
+		sendRegisterNodeRequest(httpc, httpRestService, nodeRegisterRequest, url, responseChan)
 		select {
 		case responseErr := <-responseChan:
 			return responseErr
 		case <-nodeRegisterTicker.C:
-			go sendRegisterNodeRequest(httpc, httpRestService, nodeRegisterRequest, url, responseChan)
+			continue
 		}
 	}
 }
@@ -309,29 +310,30 @@ func sendRegisterNodeRequest(
 	}
 
 	response, err = httpc.Post(registerURL, "application/json", &body)
-	if err == nil {
-		if response.StatusCode == http.StatusCreated {
-			var req cns.SetOrchestratorTypeRequest
-			decodeErr := json.NewDecoder(response.Body).Decode(&req)
-			if decodeErr != nil {
-				log.Errorf("decoding Node Resgister response json failed with %v", err)
-				responseChan <- err
-				return
-			}
-			httpRestService.SetNodeOrchestrator(&req)
-
-			logger.Printf("[Azure CNS] Node Registered")
-			responseChan <- nil
-		} else {
-			err = fmt.Errorf("[Azure CNS] Failed to register node with http status code %s", strconv.Itoa(response.StatusCode))
-			logger.Errorf(err.Error())
-			responseChan <- err
-		}
-
-		response.Body.Close()
-	} else {
+	if err != nil {
 		logger.Errorf("[Azure CNS] Failed to register node with err: %+v", err)
+		return
 	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusCreated {
+		err = fmt.Errorf("[Azure CNS] Failed to register node with http status code %s", strconv.Itoa(response.StatusCode))
+		logger.Errorf(err.Error())
+		responseChan <- err
+		return
+	}
+
+	var req cns.SetOrchestratorTypeRequest
+	decodeErr := json.NewDecoder(response.Body).Decode(&req)
+	if decodeErr != nil {
+		log.Errorf("decoding Node Resgister response json failed with %v", err)
+		responseChan <- err
+		return
+	}
+	httpRestService.SetNodeOrchestrator(&req)
+
+	logger.Printf("[Azure CNS] Node Registered")
+	responseChan <- nil
 }
 
 // Main is the entry point for CNS.
