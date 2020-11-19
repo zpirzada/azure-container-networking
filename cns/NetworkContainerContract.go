@@ -375,3 +375,9 @@ func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate()
 type NodeInfoResponse struct {
 	NetworkContainers []CreateNetworkContainerRequest
 }
+
+// NodeRegisterRequest - Struct to hold the node register request.
+type NodeRegisterRequest struct {
+	NumCPU               int
+	NmAgentSupportedApis []string
+}

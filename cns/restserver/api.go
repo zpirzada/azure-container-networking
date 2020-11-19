@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/hnsclient"
 	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/cns/nmagentclient"
+	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/platform"
 )
 
@@ -1438,4 +1439,48 @@ func (service *HTTPRestService) deleteHostNCApipaEndpoint(w http.ResponseWriter,
 
 	err = service.Listener.Encode(w, &response)
 	logger.Response(service.Name, response, response.Response.ReturnCode, ReturnCodeToString(response.Response.ReturnCode), err)
+}
+
+// This function is used to query NMagents's supported APIs list
+func (service *HTTPRestService) nmAgentSupportedApisHandler(w http.ResponseWriter, r *http.Request) {
+	logger.Request(service.Name, "nmAgentSupportedApisHandler", nil)
+	var (
+		err, retErr   error
+		req           cns.NmAgentSupportedApisRequest
+		returnCode    int
+		returnMessage string
+		supportedApis []string
+	)
+
+	err = service.Listener.Decode(w, r, &req)
+	logger.Request(service.Name, &req, err)
+	if err != nil {
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPost:
+		supportedApis, retErr = nmagentclient.GetNmAgentSupportedApis(common.GetHttpClient(),
+			req.GetNmAgentSupportedApisURL)
+		if retErr != nil {
+			returnCode = NmAgentSupportedApisError
+			returnMessage = fmt.Sprintf("[Azure-CNS] %s", retErr.Error())
+		}
+		if supportedApis == nil {
+			supportedApis = []string{}
+		}
+
+	default:
+		returnMessage = "[Azure-CNS] NmAgentSupported API list expects a POST method."
+	}
+
+	resp := cns.Response{ReturnCode: returnCode, Message: returnMessage}
+	nmAgentSupportedApisResponse := &cns.NmAgentSupportedApisResponse{
+		Response:      resp,
+		SupportedApis: supportedApis,
+	}
+
+	serviceErr := service.Listener.Encode(w, &nmAgentSupportedApisResponse)
+
+	logger.Response(service.Name, nmAgentSupportedApisResponse, resp.ReturnCode, ReturnCodeToString(resp.ReturnCode), serviceErr)
 }

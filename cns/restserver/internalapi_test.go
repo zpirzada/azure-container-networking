@@ -27,7 +27,16 @@ const (
 )
 
 var (
-	dnsservers = []string{"8.8.8.8", "8.8.4.4"}
+	dnsservers        = []string{"8.8.8.8", "8.8.4.4"}
+	hostSupportedApis = `<SupportedRequestTypes>
+							<type>GetSupportedApis</type>
+							<type>GetIpRangesV1</type>
+							<type>GetIpRangesV2</type>
+							<type>GetInterfaceInfoV1</type>
+							<type>PortContainerIOVInformationV1</type>
+							<type>NetworkManagement</type>
+							<type>NetworkManagementDNSSupport</type>
+						</SupportedRequestTypes>`
 )
 
 func TestCreateOrUpdateNetworkContainerInternal(t *testing.T) {
