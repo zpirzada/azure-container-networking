@@ -288,9 +288,8 @@ func registerNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, in
 		}
 		time.Sleep(acn.FiveSeconds)
 	}
-	logger.Errorf("[Azure CNS] Failed to register node %s after maximum reties for an hour with Infrastructure Network: %s PrivateEndpoint: %s",
+	return fmt.Errorf("[Azure CNS] Failed to register node %s after maximum reties for an hour with Infrastructure Network: %s PrivateEndpoint: %s",
 		nodeID, infraVnet, dncEP)
-	return nil
 }
 
 // sendRegisterNodeRequest func helps in registering the node until there is an error.
@@ -322,14 +321,14 @@ func sendRegisterNodeRequest(
 	if response.StatusCode != http.StatusCreated {
 		err = fmt.Errorf("[Azure CNS] Failed to register node, DNC replied with http status code %s", strconv.Itoa(response.StatusCode))
 		logger.Errorf(err.Error())
-		return false, err
+		return false, nil
 	}
 
 	var req cns.SetOrchestratorTypeRequest
 	err = json.NewDecoder(response.Body).Decode(&req)
 	if err != nil {
-		log.Errorf("[Azure CNS] decoding Node Resgister response json failed with non-retriable err %v", err)
-		return false, err
+		log.Errorf("[Azure CNS] decoding Node Resgister response json failed with err %v", err)
+		return false, nil
 	}
 	httpRestService.SetNodeOrchestrator(&req)
 
