@@ -92,7 +92,14 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 				case v1.ProtocolSCTP:
 					protocol = util.IpsetSCTPFlag
 				}
-				ipsMgr.AddToSet(port.Name, fmt.Sprintf("%s,%s%d", podIP, protocol, port.ContainerPort), util.IpsetIPPortHashFlag, podUid)
+				namedPortname := util.NamedPortIPSetPrefix + port.Name
+				ipsMgr.AddToSet(
+					namedPortname,
+					fmt.Sprintf("%s,%s%d", podIP, protocol, port.ContainerPort),
+					util.IpsetIPPortHashFlag,
+					podUid,
+				)
+
 			}
 		}
 	}
@@ -209,7 +216,12 @@ func (npMgr *NetworkPolicyManager) DeletePod(podObj *corev1.Pod) error {
 				case v1.ProtocolSCTP:
 					protocol = util.IpsetSCTPFlag
 				}
-				ipsMgr.DeleteFromSet(port.Name, fmt.Sprintf("%s,%s%d", cachedPodIp, protocol, port.ContainerPort), podUid)
+				namedPortname := util.NamedPortIPSetPrefix + port.Name
+				ipsMgr.DeleteFromSet(
+					namedPortname,
+					fmt.Sprintf("%s,%s%d", cachedPodIp, protocol, port.ContainerPort),
+					podUid,
+				)
 			}
 		}
 	}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/aitelemetry"
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/npm/ipsm"
 	"github.com/Azure/azure-container-networking/npm/iptm"
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/util"
@@ -187,6 +188,9 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 	log.Logf("Azure-NPM creating, cleaning iptables")
 	iptMgr := iptm.NewIptablesManager()
 	iptMgr.UninitNpmChains()
+
+	log.Logf("Azure-NPM creating, cleaning existing Azure NPM IPSets")
+	ipsm.NewIpsetManager().DestroyNpmIpsets()
 
 	var (
 		podInformer   = informerFactory.Core().V1().Pods()
