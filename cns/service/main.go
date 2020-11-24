@@ -404,6 +404,10 @@ func main() {
 	configuration.SetCNSConfigDefaults(&cnsconfig)
 	logger.Printf("[Azure CNS] Read config :%+v", cnsconfig)
 
+	if cnsconfig.WireserverIP != "" {
+		nmagentclient.WireserverIP = cnsconfig.WireserverIP
+	}
+
 	if cnsconfig.ChannelMode == cns.Managed {
 		config.ChannelMode = cns.Managed
 		privateEndpoint = cnsconfig.ManagedSettings.PrivateEndpoint
