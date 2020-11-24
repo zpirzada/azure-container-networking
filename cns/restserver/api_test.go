@@ -553,6 +553,16 @@ func publishNCViaCNS(t *testing.T,
 	fmt.Printf("PublishNetworkContainer succeded with response %+v, raw:%+v\n", resp, w.Body)
 }
 
+func TestExtractHost(t *testing.T) {
+	joinURL := "http://127.0.0.1:9001/joinedVirtualNetworks/c9b8e695-2de1-11eb-bf54-000d3af666c8/api-version/1"
+
+	host := extractHostFromJoinNetworkURL(joinURL)
+	expected := "127.0.0.1:9001"
+	if host != expected {
+		t.Fatalf("expected host %q, got %q", expected, host)
+	}
+}
+
 func TestUnpublishNCViaCNS(t *testing.T) {
 	fmt.Println("Test: unpublishNetworkContainer")
 

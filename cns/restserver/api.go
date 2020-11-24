@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"regexp"
 	"runtime"
 	"strings"
 
@@ -1139,6 +1140,16 @@ func getAuthTokenFromCreateNetworkContainerURL(
 	return strings.Split(strings.Split(createNetworkContainerURL, "authenticationToken/")[1], "/")[0]
 }
 
+var rgx = regexp.MustCompile("^http[s]?://(.*?)/joinedVirtualNetworks.*?$")
+
+func extractHostFromJoinNetworkURL(url string) string {
+	submatches := rgx.FindStringSubmatch(url)
+	if len(submatches) != 2 {
+		return ""
+	}
+	return submatches[1]
+}
+
 // Publish Network Container by calling nmagent
 func (service *HTTPRestService) publishNetworkContainer(w http.ResponseWriter, r *http.Request) {
 	logger.Printf("[Azure-CNS] PublishNetworkContainer")
@@ -1199,8 +1210,15 @@ func (service *HTTPRestService) publishNetworkContainer(w http.ResponseWriter, r
 		// Store ncGetVersionURL needed for calling NMAgent to check if vfp programming is completed for the NC
 		primaryInterfaceIdentifier := getInterfaceIdFromCreateNetworkContainerURL(req.CreateNetworkContainerURL)
 		authToken := getAuthTokenFromCreateNetworkContainerURL(req.CreateNetworkContainerURL)
+
+		// we attempt to extract the wireserver IP to use from the request, otherwise default to the well-known IP.
+		hostIP := extractHostFromJoinNetworkURL(req.JoinNetworkURL)
+		if hostIP == "" {
+			hostIP = nmagentclient.WireserverIP
+		}
+
 		ncGetVersionURL := fmt.Sprintf(nmagentclient.GetNetworkContainerVersionURLFmt,
-			nmagentclient.WireserverIP,
+			hostIP,
 			primaryInterfaceIdentifier,
 			req.NetworkContainerID,
 			authToken)

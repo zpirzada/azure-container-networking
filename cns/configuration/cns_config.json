@@ -18,5 +18,6 @@
     "UseHTTPS" : false,
     "TLSSubjectName" : "",
     "TLSCertificatePath" : "",
-    "TLSEndpoint" : "localhost:10091"
+    "TLSEndpoint" : "localhost:10091",
+    "WireserverIP": "168.63.129.16"
 }

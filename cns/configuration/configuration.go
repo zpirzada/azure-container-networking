@@ -24,6 +24,7 @@ type CNSConfig struct {
 	TLSSubjectName     string
 	TLSCertificatePath string
 	TLSEndpoint        string
+	WireserverIP       string
 }
 
 type TelemetrySettings struct {
