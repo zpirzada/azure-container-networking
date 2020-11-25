@@ -953,66 +953,6 @@ func (service *HTTPRestService) deleteNetworkContainer(w http.ResponseWriter, r 
 	logger.Response(service.Name, reserveResp, resp.ReturnCode, ReturnCodeToString(resp.ReturnCode), err)
 }
 
-func (service *HTTPRestService) getNetworkContainerStatus(w http.ResponseWriter, r *http.Request) {
-	logger.Printf("[Azure CNS] getNetworkContainerStatus")
-
-	var req cns.GetNetworkContainerStatusRequest
-	returnMessage := ""
-	returnCode := 0
-
-	err := service.Listener.Decode(w, r, &req)
-	logger.Request(service.Name, &req, err)
-	if err != nil {
-		return
-	}
-
-	service.RLock()
-	defer service.RUnlock()
-	var ok bool
-	var containerDetails containerstatus
-
-	containerInfo := service.state.ContainerStatus
-	if containerInfo != nil {
-		containerDetails, ok = containerInfo[req.NetworkContainerid]
-	}
-
-	var hostVersion string
-	var vmVersion string
-
-	if ok {
-		savedReq := containerDetails.CreateNetworkContainerRequest
-		containerVersion, err := service.imdsClient.GetNetworkContainerInfoFromHost(
-			req.NetworkContainerid,
-			savedReq.PrimaryInterfaceIdentifier,
-			savedReq.AuthorizationToken, swiftAPIVersion)
-
-		if err != nil {
-			returnCode = CallToHostFailed
-			returnMessage = err.Error()
-		} else {
-			hostVersion = containerVersion.ProgrammedVersion
-		}
-	} else {
-		returnMessage = "[Azure CNS] Never received call to create this container."
-		returnCode = UnknownContainerID
-	}
-
-	resp := cns.Response{
-		ReturnCode: returnCode,
-		Message:    returnMessage,
-	}
-
-	networkContainerStatusReponse := cns.GetNetworkContainerStatusResponse{
-		Response:           resp,
-		NetworkContainerid: req.NetworkContainerid,
-		AzureHostVersion:   hostVersion,
-		Version:            vmVersion,
-	}
-
-	err = service.Listener.Encode(w, &networkContainerStatusReponse)
-	logger.Response(service.Name, networkContainerStatusReponse, resp.ReturnCode, ReturnCodeToString(resp.ReturnCode), err)
-}
-
 func (service *HTTPRestService) getInterfaceForContainer(w http.ResponseWriter, r *http.Request) {
 	logger.Printf("[Azure CNS] getInterfaceForContainer")
 
