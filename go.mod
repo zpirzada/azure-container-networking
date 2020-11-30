@@ -7,6 +7,7 @@ require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/Microsoft/go-winio v0.4.15-0.20190919025122-fc70bd9a86b5
 	github.com/Microsoft/hcsshim v0.8.10-0.20200506181021-222e9efadbe0
+	github.com/billgraziano/dpapi v0.3.0
 	github.com/containernetworking/cni v0.7.0-rc2
 	github.com/docker/libnetwork v0.5.6
 	github.com/golang/groupcache v0.0.0-20191027212112-611e8accdfc9 // indirect
@@ -26,9 +27,9 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.3.2
 	go.opencensus.io v0.22.2 // indirect
-	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
+	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975 // indirect
 	golang.org/x/net v0.0.0-20191112182307-2180aed22343 // indirect
-	golang.org/x/sys v0.0.0-20191120155948-bd437916bb0e
+	golang.org/x/sys v0.0.0-20200828161417-c663848e9a16
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	k8s.io/api v0.18.2

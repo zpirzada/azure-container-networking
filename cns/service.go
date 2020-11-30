@@ -6,6 +6,7 @@ package cns
 import (
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/Azure/azure-container-networking/cns/common"
 	acn "github.com/Azure/azure-container-networking/common"
@@ -68,7 +69,12 @@ func (service *Service) Initialize(config *common.ServiceConfig) error {
 		if err != nil {
 			return err
 		}
-		if config.TlsSettings.TLSEndpoint != "" {
+		if config.TlsSettings.TLSPort != "" {
+			// listener.URL.Host will always be hostname:port, passed in to CNS via CNS command
+			// else it will default to localhost
+			// extract hostname and override tls port.
+			hostParts := strings.Split(listener.URL.Host, ":")
+			config.TlsSettings.TLSEndpoint = hostParts[0] + ":" + config.TlsSettings.TLSPort
 			// Start the listener and HTTP and HTTPS server.
 			if err = listener.StartTLS(config.ErrChan, config.TlsSettings); err != nil {
 				return err

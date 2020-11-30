@@ -484,7 +484,7 @@ func main() {
 			config.TlsSettings = localtls.TlsSettings{
 				TLSSubjectName:     cnsconfig.TLSSubjectName,
 				TLSCertificatePath: cnsconfig.TLSCertificatePath,
-				TLSEndpoint:        cnsconfig.TLSEndpoint,
+				TLSPort:            cnsconfig.TLSPort,
 			}
 		}
 

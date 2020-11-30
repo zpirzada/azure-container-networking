@@ -7,34 +7,35 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
+	"github.com/billgraziano/dpapi"
 	"io/ioutil"
 	"math/big"
 	"os"
-	"software.sslmate.com/src/go-pkcs12"
 	"testing"
-	"time"
 )
 
 const (
-	validFor   = time.Duration(365 * 24 * time.Hour)
 	rsaBits    = 2048
-	commonName = "dnc.azure.com"
+	commonName = "test.azure.com"
 )
 
-func TestPfxConsumption(t *testing.T) {
-	pfxContent := createPfxCertificate(t)
+func TestPemConsumptionWindows(t *testing.T) {
+	pemContent := createPemCertificate(t)
 	currentDirectory, _ := os.Getwd()
-	pfxLocation := fmt.Sprintf("%s/%s.pfx", currentDirectory, commonName)
+	pemLocation := fmt.Sprintf("%s/%s.Pem", currentDirectory, commonName)
 
-	ioutil.WriteFile(pfxLocation, pfxContent, 0)
-	defer os.Remove(pfxLocation)
+	encryptedPem, _:= dpapi.Encrypt(string(pemContent))
+	ioutil.WriteFile(pemLocation, []byte(encryptedPem), 0644)
+	defer os.Remove(pemLocation)
 
 	config := TlsSettings{
-		TLSCertificatePath:    pfxLocation,
+		TLSCertificatePath:    pemLocation,
 		TLSSubjectName: commonName,
 	}
-	fileCertRetriever, err := NewFileTlsCertificateRetriever(config)
+
+	fileCertRetriever, err := NewTlsCertificateRetriever(config)
 	if err != nil {
 		t.Fatalf("Failed to open file certificate retriever %+v", err)
 	}
@@ -51,7 +52,7 @@ func TestPfxConsumption(t *testing.T) {
 	}
 }
 
-func createPfxCertificate(t *testing.T) []byte {
+func createPemCertificate(t *testing.T) []byte {
 	priv, err := rsa.GenerateKey(rand.Reader, rsaBits)
 	if err != nil {
 		t.Fatalf("Failed to generate private key: %v", err)
@@ -63,17 +64,26 @@ func createPfxCertificate(t *testing.T) []byte {
 			CommonName:   commonName,
 		},
 	}
+
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
 	if err != nil {
 		t.Fatalf("Failed to create certificate: %v", err)
 	}
-	certificate, err := x509.ParseCertificate(derBytes)
+
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
-		t.Fatalf("Could not parse certificate")
+		t.Fatalf("Could not marshal private key %+v", err)
 	}
-	pfxcontent, err := pkcs12.Encode(rand.Reader, priv, certificate, []*x509.Certificate{}, "")
+
 	if err != nil {
-		t.Fatalf("Could not encode certificate to pkcs12")
+		t.Fatalf("Could not encode certificate to Pem %+v", err)
 	}
-	return pfxcontent
+
+
+	pemCert := pem.EncodeToMemory(&pem.Block{Type: CertLabel, Bytes: derBytes})
+	pemKey:= pem.EncodeToMemory(&pem.Block{Type: PrivateKeyLabel, Bytes: privateKeyBytes})
+
+	pemBundle := fmt.Sprintf("%s%s",pemCert,pemKey)
+
+	return []byte(pemBundle)
 }
