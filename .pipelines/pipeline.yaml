@@ -126,9 +126,9 @@ stages:
             condition: always()
 
           - script: |
-              echo '$(DOCKER_PASSWORD)' | docker login containernetworking.azurecr.io -u '$(DOCKER_USERNAME)' --password-stdin
-              docker tag $PUSH_CONTAINER_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag) $PUSH_CONTAINER_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
-              docker push $PUSH_CONTAINER_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
+              echo '$(DOCKER_PASSWORD)' | docker login $IMAGE_REGISTRY -u '$(DOCKER_USERNAME)' --password-stdin
+              docker tag $IMAGE_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag) $IMAGE_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
+              docker push $IMAGE_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
 
               function auto-retry()
               {
@@ -139,10 +139,10 @@ stages:
                     printf "Attempt $i/$attempts - " && "$@" && break ||  sleep 3 &&  i=$[$i+1] && false
                   done
               }
-              auto-retry docker pull mcr.microsoft.com/containernetworking/azure-npm:$(EnvironmentalVariables.Tag)-test
+              auto-retry docker pull $IMAGE_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
             workingDirectory: "$(modulePath)"
             name: "mcrreplication"
-            displayName: "Push NPM Image and Wait for MCR"
+            displayName: "Push NPM Image and Wait for Repository"
 
           - script: |
               cd ./output 

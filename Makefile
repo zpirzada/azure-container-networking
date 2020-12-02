@@ -135,17 +135,19 @@ CNS_IMAGE_ARCHIVE_NAME = azure-cns-$(GOOS)-$(GOARCH)-$(VERSION).$(ARCHIVE_EXT)
 CNM_PLUGIN_IMAGE ?= microsoft/azure-vnet-plugin
 CNM_PLUGIN_ROOTFS = azure-vnet-plugin-rootfs
 
+IMAGE_REGISTRY ?= acnpublic.azurecr.io
+
 # Azure network policy manager parameters.
-AZURE_NPM_IMAGE = containernetworking.azurecr.io/public/containernetworking/azure-npm
+AZURE_NPM_IMAGE ?= $(IMAGE_REGISTRY)/azure-npm
 
 # Azure CNI installer parameters
-AZURE_CNI_IMAGE = containernetworking.azurecr.io/public/containernetworking/azure-cni-manager
+AZURE_CNI_IMAGE = $(IMAGE_REGISTRY)/azure-cni-manager
 
 # Azure vnet telemetry image parameters.
-AZURE_VNET_TELEMETRY_IMAGE = containernetworking.azurecr.io/public/containernetworking/azure-vnet-telemetry
+AZURE_VNET_TELEMETRY_IMAGE = $(IMAGE_REGISTRY)/azure-vnet-telemetry
 
 # Azure container networking service image paramters.
-AZURE_CNS_IMAGE = containernetworking.azurecr.io/public/containernetworking/azure-cns
+AZURE_CNS_IMAGE = $(IMAGE_REGISTRY)/azure-cns
 
 VERSION ?= $(shell git describe --tags --always --dirty)
 CNS_AI_ID = ce672799-8f08-4235-8c12-08563dc2acef
