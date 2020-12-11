@@ -1,9 +1,11 @@
 package fakes
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/common"
@@ -228,6 +230,11 @@ func (fake *HTTPServiceFake) SetNodeOrchestrator(*cns.SetOrchestratorTypeRequest
 
 func (fake *HTTPServiceFake) SyncNodeStatus(string, string, string, json.RawMessage) (int, string) {
 	return 0, ""
+}
+
+// SyncHostNCVersion will update HostVersion in containerstatus.
+func (fake *HTTPServiceFake) SyncHostNCVersion(context.Context, string, time.Duration) {
+	return
 }
 
 func (fake *HTTPServiceFake) GetPendingProgramIPConfigs() []cns.IPConfigurationStatus {

@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/ipamclient"
 	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/cns/networkcontainers"
+	"github.com/Azure/azure-container-networking/cns/nmagentclient"
 	"github.com/Azure/azure-container-networking/cns/routes"
 	acn "github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/store"
@@ -38,6 +39,7 @@ type HTTPRestService struct {
 	dockerClient                 *dockerclient.DockerClient
 	imdsClient                   imdsclient.ImdsClientInterface
 	ipamClient                   *ipamclient.IpamClient
+	nmagentClient                nmagentclient.NMAgentClientInterface
 	networkContainer             *networkcontainers.NetworkContainers
 	PodIPIDByOrchestratorContext map[string]string                    // OrchestratorContext is key and value is Pod IP uuid.
 	PodIPConfigState             map[string]cns.IPConfigurationStatus // seondaryipid(uuid) is key
@@ -84,7 +86,7 @@ type networkInfo struct {
 }
 
 // NewHTTPRestService creates a new HTTP Service object.
-func NewHTTPRestService(config *common.ServiceConfig, imdsClientInterface imdsclient.ImdsClientInterface) (cns.HTTPService, error) {
+func NewHTTPRestService(config *common.ServiceConfig, imdsClientInterface imdsclient.ImdsClientInterface, nmagentClient nmagentclient.NMAgentClientInterface) (cns.HTTPService, error) {
 	service, err := cns.NewService(config.Name, config.Version, config.ChannelMode, config.Store)
 	if err != nil {
 		return nil, err
@@ -118,6 +120,7 @@ func NewHTTPRestService(config *common.ServiceConfig, imdsClientInterface imdscl
 		dockerClient:                 dc,
 		imdsClient:                   imdsClient,
 		ipamClient:                   ic,
+		nmagentClient:                nmagentClient,
 		networkContainer:             nc,
 		PodIPIDByOrchestratorContext: podIPIDByOrchestratorContext,
 		PodIPConfigState:             podIPConfigState,

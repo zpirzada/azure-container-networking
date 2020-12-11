@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/logger"
@@ -99,7 +100,7 @@ func (service *HTTPRestService) MarkIPsAsPending(numberToMark int) (map[string]c
 	defer service.Unlock()
 	for uuid, _ := range service.PodIPConfigState {
 		mutableIPConfig := service.PodIPConfigState[uuid]
-		if mutableIPConfig.State == cns.Available {
+		if mutableIPConfig.State == cns.Available || mutableIPConfig.State == cns.PendingProgramming {
 			mutableIPConfig.State = cns.PendingRelease
 			service.PodIPConfigState[uuid] = mutableIPConfig
 			pendingReleaseIPs[uuid] = mutableIPConfig
@@ -111,6 +112,33 @@ func (service *HTTPRestService) MarkIPsAsPending(numberToMark int) (map[string]c
 	}
 
 	return nil, fmt.Errorf("Failed to mark %d IP's as pending, only marked %d IP's", numberToMark, len(pendingReleaseIPs))
+}
+
+// MarkIpsAsAvailableUntransacted will update pending programming IPs to available if NMAgent side's programmed nc version keep up with nc version.
+// Note: this func is an untransacted API as the caller will take a Service lock
+func (service *HTTPRestService) MarkIpsAsAvailableUntransacted(ncID string, newHostNCVersion int) {
+	// Check whether it exist in service state and get the related nc info
+	if ncInfo, exist := service.state.ContainerStatus[ncID]; !exist {
+		logger.Errorf("Can't find NC with ID %s in service state, stop updating its pending programming IP status", ncID)
+	} else {
+		previousHostNCVersion := ncInfo.HostVersion
+		// We only need to handle the situation when dnc nc version is larger than programmed nc version
+		if previousHostNCVersion < ncInfo.CreateNetworkContainerRequest.Version && previousHostNCVersion < strconv.Itoa(newHostNCVersion) {
+			for uuid, secondaryIPConfigs := range ncInfo.CreateNetworkContainerRequest.SecondaryIPConfigs {
+				if ipConfigStatus, exist := service.PodIPConfigState[uuid]; !exist {
+					logger.Errorf("IP %s with uuid as %s exist in service state Secondary IP list but can't find in PodIPConfigState", ipConfigStatus.IPAddress, uuid)
+				} else if ipConfigStatus.State == cns.PendingProgramming && secondaryIPConfigs.NCVersion <= newHostNCVersion {
+					ipConfigStatus.State = cns.Available
+					service.PodIPConfigState[uuid] = ipConfigStatus
+					// Following 2 sentence assign new host version to secondary ip config.
+					secondaryIPConfigs.NCVersion = newHostNCVersion
+					ncInfo.CreateNetworkContainerRequest.SecondaryIPConfigs[uuid] = secondaryIPConfigs
+					logger.Printf("Change ip %s with uuid %s from pending programming to %s, current secondary ip configs is %v", ipConfigStatus.IPAddress, uuid, cns.Available,
+						ncInfo.CreateNetworkContainerRequest.SecondaryIPConfigs[uuid])
+				}
+			}
+		}
+	}
 }
 
 func (service *HTTPRestService) GetPodIPConfigState() map[string]cns.IPConfigurationStatus {

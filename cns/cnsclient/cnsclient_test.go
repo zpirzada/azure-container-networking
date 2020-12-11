@@ -53,6 +53,7 @@ func addTestStateToRestServer(t *testing.T, secondaryIps []string) {
 	for _, secIpAddress := range secondaryIps {
 		secIpConfig := cns.SecondaryIPConfig{
 			IPAddress: secIpAddress,
+			NCVersion: -1,
 		}
 		ipId := uuid.New()
 		secondaryIPConfigs[ipId.String()] = secIpConfig
@@ -63,6 +64,9 @@ func addTestStateToRestServer(t *testing.T, secondaryIps []string) {
 		NetworkContainerid:   "testNcId1",
 		IPConfiguration:      ipConfig,
 		SecondaryIPConfigs:   secondaryIPConfigs,
+		// Set it as -1 to be same as default host version.
+		// It will allow secondary IPs status to be set as available.
+		Version: "-1",
 	}
 
 	returnCode := svc.CreateOrUpdateNetworkContainerInternal(req, fakes.NewFakeScalar(releasePercent, requestPercent, batchSize), fakes.NewFakeNodeNetworkConfigSpec(initPoolSize))
@@ -122,7 +126,7 @@ func TestMain(m *testing.M) {
 	logger.InitLogger(logName, 0, 0, tmpLogDir+"/")
 	config := common.ServiceConfig{}
 
-	httpRestService, err := restserver.NewHTTPRestService(&config, fakes.NewFakeImdsClient())
+	httpRestService, err := restserver.NewHTTPRestService(&config, fakes.NewFakeImdsClient(), fakes.NewFakeNMAgentClient())
 	svc = httpRestService.(*restserver.HTTPRestService)
 	svc.Name = "cns-test-server"
 	svc.IPAMPoolMonitor = fakes.NewIPAMPoolMonitorFake()

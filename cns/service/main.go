@@ -453,8 +453,13 @@ func main() {
 		return
 	}
 
+	nmaclient, err := nmagentclient.NewNMAgentClient("")
+	if err != nil {
+		logger.Errorf("Failed to start nmagent client due to error %v", err)
+		return
+	}
 	// Create CNS object.
-	httpRestService, err := restserver.NewHTTPRestService(&config, new(imdsclient.ImdsClient))
+	httpRestService, err := restserver.NewHTTPRestService(&config, new(imdsclient.ImdsClient), nmaclient)
 	if err != nil {
 		logger.Errorf("Failed to create CNS object, err:%v.\n", err)
 		return
@@ -561,6 +566,16 @@ func main() {
 			logger.Errorf("[Azure CNS] Failed to make crd request controller :%v", err)
 			return
 		}
+
+		logger.Printf("Starting SyncHostNCVersion")
+		rootCxt := context.Background()
+		go func() {
+			// Periodically poll vfp programmed NC version from NMAgent
+			for {
+				<-time.NewTicker(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond).C
+				httpRestServiceImplementation.SyncHostNCVersion(rootCxt, config.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
+			}
+		}()
 
 		// initialize the ipam pool monitor
 		httpRestServiceImplementation.IPAMPoolMonitor = ipampoolmonitor.NewCNSIPAMPoolMonitor(httpRestServiceImplementation, requestController)
