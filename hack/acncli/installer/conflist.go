@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	c "github.com/Azure/azure-container-networking/acncli/api"
 	ccn "github.com/Azure/azure-container-networking/cni"
+	c "github.com/Azure/azure-container-networking/hack/acncli/api"
 )
 
 type rawPlugin struct {

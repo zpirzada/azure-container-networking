@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	c "github.com/Azure/azure-container-networking/acncli/api"
-	i "github.com/Azure/azure-container-networking/acncli/installer"
+	c "github.com/Azure/azure-container-networking/hack/acncli/api"
+	i "github.com/Azure/azure-container-networking/hack/acncli/installer"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

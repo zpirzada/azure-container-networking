@@ -80,7 +80,7 @@ CNI_NET_DIR = cni/network/plugin
 CNI_IPAM_DIR = cni/ipam/plugin
 CNI_IPAMV6_DIR = cni/ipam/pluginv6
 CNI_TELEMETRY_DIR = cni/telemetry/service
-ACNCLI_DIR = acncli
+ACNCLI_DIR = hack/acncli
 TELEMETRY_CONF_DIR = telemetry
 CNS_DIR = cns/service
 CNMS_DIR = cnms/service
@@ -171,9 +171,9 @@ azure-npm: $(NPM_BUILD_DIR)/azure-npm$(EXE_EXT) npm-archive
 endif
 
 ifeq ($(GOOS),linux)
-all-binaries: acncli azure-cnm-plugin azure-cni-plugin azure-cns azure-cnms azure-npm 
+all-binaries: azure-cnm-plugin azure-cni-plugin azure-cns azure-cnms azure-npm 
 else
-all-binaries: acncli azure-cnm-plugin azure-cni-plugin azure-cns acncli
+all-binaries: azure-cnm-plugin azure-cni-plugin azure-cns
 endif
 
 ifeq ($(GOOS),linux)
@@ -252,11 +252,13 @@ all-binaries-platforms:
 	export GOOS=linux; make all-binaries
 	export GOOS=windows; make all-binaries
 
-# CNI Manager
-.PHONY: azure-cni-manager
-azure-cni-manager: all-binaries
-	docker build -f ./acncli/Dockerfile --build-arg VERSION=$(VERSION) -t $(AZURE_CNI_IMAGE):$(VERSION) .
 
+.PHONY: hack
+hack: acncli
+
+.PHONY: hack-images
+hack-images: 
+	docker build -f ./hack/acncli/Dockerfile --build-arg VERSION=$(VERSION) -t $(AZURE_CNI_IMAGE):$(VERSION) .
 
 # Build the Azure CNM plugin image, installable with "docker plugin install".
 .PHONY: azure-vnet-plugin-image
@@ -397,10 +399,12 @@ cnm-archive:
 # Create a CNM archive for the target platform.
 .PHONY: acncli-archive
 acncli-archive:
+ifeq ($(GOOS),linux)
 	mkdir -p $(ACNCLI_BUILD_DIR)
 	chmod 0755 $(ACNCLI_BUILD_DIR)/acn$(EXE_EXT)
 	cd $(ACNCLI_BUILD_DIR) && $(ARCHIVE_CMD) $(ACNCLI_ARCHIVE_NAME) acn$(EXE_EXT)
 	chown $(BUILD_USER):$(BUILD_USER) $(ACNCLI_BUILD_DIR)/$(ACNCLI_ARCHIVE_NAME)
+endif
 
 
 # Create a CNS archive for the target platform.

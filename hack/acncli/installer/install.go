@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	c "github.com/Azure/azure-container-networking/acncli/api"
+	c "github.com/Azure/azure-container-networking/hack/acncli/api"
 )
 
 type InstallerConfig struct {
@@ -44,7 +44,7 @@ func (i *InstallerConfig) SetCNIType(cniType string) error {
 	case strings.EqualFold(cniType, c.Singletenancy):
 		i.CNITenancy = c.CNI
 	default:
-		return fmt.Errorf("No CNI type supplied, please use %q or %q and try again", c.Transparent, c.Bridge)
+		return fmt.Errorf("No CNI type supplied, please use %q or %q and try again", c.Multitenancy, c.Singletenancy)
 	}
 	return nil
 }
@@ -57,7 +57,7 @@ func (i *InstallerConfig) SetCNIDatapathMode(cniMode string) error {
 			return nil
 		}
 
-		return fmt.Errorf("No CNI mode supplied, please use %q or %q and try again", c.Transparent, c.Bridge)
+		return fmt.Errorf("No CNI datapath mode supplied, please use %q or %q and try again", c.Transparent, c.Bridge)
 	}
 	return nil
 }

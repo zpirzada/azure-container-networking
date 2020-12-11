@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	c "github.com/Azure/azure-container-networking/acncli/api"
+	c "github.com/Azure/azure-container-networking/hack/acncli/api"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
