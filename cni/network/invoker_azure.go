@@ -58,7 +58,7 @@ func (invoker *AzureIPAMInvoker) Add(nwCfg *cni.NetworkConfig, subnetPrefix *net
 	}()
 
 	if nwCfg.IPV6Mode != "" {
-		nwCfg6 := nwCfg
+		nwCfg6 := *nwCfg
 		nwCfg6.Ipam.Environment = common.OptEnvironmentIPv6NodeIpam
 		nwCfg6.Ipam.Type = ipamV6
 
@@ -67,7 +67,7 @@ func (invoker *AzureIPAMInvoker) Add(nwCfg *cni.NetworkConfig, subnetPrefix *net
 			nwCfg6.Ipam.Subnet = invoker.nwInfo.Subnets[1].Prefix.String()
 		}
 
-		resultV6, err = invoker.plugin.DelegateAdd(ipamV6, nwCfg6)
+		resultV6, err = invoker.plugin.DelegateAdd(nwCfg6.Ipam.Type, &nwCfg6)
 		if err != nil {
 			err = invoker.plugin.Errorf("Failed to allocate v6 pool: %v", err)
 		}
@@ -83,18 +83,18 @@ func (invoker *AzureIPAMInvoker) Delete(address *net.IPNet, nwCfg *cni.NetworkCo
 
 	if nwCfg == nil {
 		return invoker.plugin.Errorf("nil nwCfg passed to CNI ADD, stack: %+v", string(debug.Stack()))
-	} else if address == nil {
+	}
+
+	if len(invoker.nwInfo.Subnets) > 0 {
+		nwCfg.Ipam.Subnet = invoker.nwInfo.Subnets[0].Prefix.String()
+	}
+
+	if address == nil {
 		if err := invoker.plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg); err != nil {
-			return invoker.plugin.Errorf("Network not found, attempted to release address with error:  %v", err)
+			return invoker.plugin.Errorf("Attempted to release address with error:  %v", err)
 		}
 	} else if len(address.IP.To4()) == 4 {
-
-		// cleanup pool
-		if options[optReleasePool] == optValPool {
-			nwCfg.Ipam.Address = ""
-		}
-
-		nwCfg.Ipam.Subnet = invoker.nwInfo.Subnets[0].Prefix.String()
+		nwCfg.Ipam.Address = address.IP.String()
 		log.Printf("Releasing ipv4 address :%s pool: %s",
 			nwCfg.Ipam.Address, nwCfg.Ipam.Subnet)
 		if err := invoker.plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg); err != nil {
@@ -105,6 +105,7 @@ func (invoker *AzureIPAMInvoker) Delete(address *net.IPNet, nwCfg *cni.NetworkCo
 		nwCfgIpv6 := *nwCfg
 		nwCfgIpv6.Ipam.Environment = common.OptEnvironmentIPv6NodeIpam
 		nwCfgIpv6.Ipam.Type = ipamV6
+		nwCfgIpv6.Ipam.Address = address.IP.String()
 		if len(invoker.nwInfo.Subnets) > 1 {
 			nwCfgIpv6.Ipam.Subnet = invoker.nwInfo.Subnets[1].Prefix.String()
 		}

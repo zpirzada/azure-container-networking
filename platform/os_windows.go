@@ -9,7 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
+	"golang.org/x/sys/windows"
 
 	"github.com/Azure/azure-container-networking/log"
 )
@@ -228,4 +230,19 @@ func GetProcessNameByID(pidstr string) (string, error) {
 }
 
 func PrintDependencyPackageDetails() {
+}
+
+// https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw
+func ReplaceFile(source, destination string) error {
+	src, err := syscall.UTF16PtrFromString(source)
+	if err != nil {
+		return err
+	}
+
+	dest, err := syscall.UTF16PtrFromString(destination)
+	if err != nil {
+		return err
+	}
+
+	return windows.MoveFileEx(src, dest, windows.MOVEFILE_REPLACE_EXISTING|windows.MOVEFILE_WRITE_THROUGH)
 }

@@ -5,12 +5,16 @@ package store
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/Azure/azure-container-networking/log"
+	"github.com/Azure/azure-container-networking/platform"
 )
 
 const (
@@ -109,20 +113,47 @@ func (kvs *jsonFileStore) Flush() error {
 
 // Lock-free flush for internal callers.
 func (kvs *jsonFileStore) flush() error {
-	file, err := os.Create(kvs.fileName)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
 	buf, err := json.MarshalIndent(&kvs.data, "", "\t")
 	if err != nil {
 		return err
 	}
 
-	if _, err := file.Write(buf); err != nil {
-		return err
+	dir, file := filepath.Split(kvs.fileName)
+	if dir == "" {
+		dir = "."
 	}
+
+	f, err := ioutil.TempFile(dir, file)
+	if err != nil {
+		return fmt.Errorf("cannot create temp file: %v", err)
+	}
+
+	tmpFileName := f.Name()
+
+	defer func(){
+		if err != nil {
+			// remove temp file after job is done
+			_ = os.Remove(tmpFileName)
+			// close is idempotent. just to catch if write returns error
+			f.Close()
+		}
+	}()
+
+
+	if _, err = f.Write(buf); err != nil {
+		return fmt.Errorf("Temp file write failed with: %v", err)
+	}
+
+	if err = f.Close(); err != nil {
+		return fmt.Errorf("temp file close failed with: %v", err)
+	}
+
+	log.Printf("renaming temp file %v to state file", tmpFileName)
+	// atomic replace
+	if err = platform.ReplaceFile(tmpFileName, kvs.fileName); err != nil {
+		return fmt.Errorf("rename temp file to state file failed:%v", err)
+	}
+
 	return nil
 }
 

@@ -439,7 +439,7 @@ func main() {
 	// Log platform information.
 	logger.Printf("Running on %v", platform.GetOSInfo())
 
-	err = acn.CreateDirectory(storeFileLocation)
+	err = platform.CreateDirectory(storeFileLocation)
 	if err != nil {
 		logger.Errorf("Failed to create File Store directory %s, due to Error:%v", storeFileLocation, err.Error())
 		return

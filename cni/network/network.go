@@ -36,8 +36,6 @@ const (
 	// Supported IP version. Currently support only IPv4
 	ipVersion      = "4"
 	ipamV6         = "azure-vnet-ipamv6"
-	optReleasePool = "DeleteOnErr"
-	optValPool     = "pool"
 )
 
 // CNI Operation Types
@@ -438,8 +436,6 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		log.Printf("[cni-net] Creating network %v.", networkId)
 
 		if !nwCfg.MultiTenancy {
-
-			options[optReleasePool] = optValPool
 			result, resultV6, err = plugin.ipamInvoker.Add(nwCfg, &subnetPrefix, options)
 			if err != nil {
 				return err
@@ -447,11 +443,10 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 			defer func() {
 				if err != nil {
-					options[optReleasePool] = optValPool
 					if result != nil && len(result.IPs) > 0 {
 						plugin.ipamInvoker.Delete(&result.IPs[0].Address, nwCfg, options)
 					}
-					if resultV6 != nil && len(result.IPs) > 0 {
+					if resultV6 != nil && len(resultV6.IPs) > 0 {
 						plugin.ipamInvoker.Delete(&resultV6.IPs[0].Address, nwCfg, options)
 					}
 				}
@@ -460,6 +455,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 		gateway := result.IPs[0].Gateway
 		subnetPrefix.IP = subnetPrefix.IP.Mask(subnetPrefix.Mask)
+		nwCfg.Ipam.Subnet = subnetPrefix.String()
 		// Find the master interface.
 		masterIfName := plugin.findMasterInterface(nwCfg, &subnetPrefix)
 		if masterIfName == "" {
@@ -541,7 +537,6 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		if !nwCfg.MultiTenancy {
 			// Network already exists.
 			log.Printf("[cni-net] Found network %v with subnet %v.", networkId, nwInfo.Subnets[0].Prefix.String())
-			nwInfo.Options[optReleasePool] = ""
 			result, resultV6, err = plugin.ipamInvoker.Add(nwCfg, &subnetPrefix, nwInfo.Options)
 			if err != nil {
 				return err
@@ -551,8 +546,12 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 			defer func() {
 				if err != nil {
-					nwInfo.Options[optReleasePool] = ""
-					plugin.ipamInvoker.Delete(&result.IPs[0].Address, nwCfg, nwInfo.Options)
+					if result != nil && len(result.IPs) > 0 {
+						plugin.ipamInvoker.Delete(&result.IPs[0].Address, nwCfg, nwInfo.Options)
+					}
+					if resultV6 != nil && len(resultV6.IPs) > 0 {
+						plugin.ipamInvoker.Delete(&resultV6.IPs[0].Address, nwCfg, nwInfo.Options)
+					}
 				}
 			}()
 		}
@@ -847,6 +846,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		if !nwCfg.MultiTenancy {
 			// attempt to release address associated with this Endpoint id
 			// This is to ensure clean up is done even in failure cases
+			log.Printf("release ip ep not found")
 			if err = plugin.ipamInvoker.Delete(nil, nwCfg, nwInfo.Options); err != nil {
 				log.Printf("Endpoint not found, attempted to release address with error: %v", err)
 			}
@@ -878,8 +878,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	if !nwCfg.MultiTenancy {
 		// Call into IPAM plugin to release the endpoint's addresses.
 		for _, address := range epInfo.IPAddresses {
-			nwCfg.Ipam.Address = address.IP.String()
-			nwInfo.Options[optReleasePool] = ""
+			log.Printf("release ip:%s", address.IP.String())
 			err = plugin.ipamInvoker.Delete(&address, nwCfg, nwInfo.Options)
 			if err != nil {
 				err = plugin.Errorf("Failed to release address %v with error: %v", address, err)
