@@ -92,26 +92,40 @@ func (service *HTTPRestService) releaseIPConfigHandler(w http.ResponseWriter, r 
 	return
 }
 
-func (service *HTTPRestService) MarkIPsAsPending(numberToMark int) (map[string]cns.IPConfigurationStatus, error) {
-	pendingReleaseIPs := make(map[string]cns.IPConfigurationStatus)
-	markedIPCount := 0
+// MarkIPAsPendingRelease will mark IPs to pending release state.
+func (service *HTTPRestService) MarkIPAsPendingRelease(numberToMark int) (map[string]cns.IPConfigurationStatus, error) {
+	allReleasedIPs := make(map[string]cns.IPConfigurationStatus)
+	// Ensure PendingProgramming IPs will be release before Available ones.
+	ipStateTypes := [2]string{cns.PendingProgramming, cns.Available}
 
 	service.Lock()
 	defer service.Unlock()
-	for uuid, _ := range service.PodIPConfigState {
-		mutableIPConfig := service.PodIPConfigState[uuid]
-		if mutableIPConfig.State == cns.Available || mutableIPConfig.State == cns.PendingProgramming {
+	for _, ipStateType := range ipStateTypes {
+		pendingReleaseIPs := service.markSpecificIPTypeAsPending(numberToMark, ipStateType)
+		for uuid, pependingReleaseIP := range pendingReleaseIPs {
+			allReleasedIPs[uuid] = pependingReleaseIP
+		}
+		numberToMark -= len(pendingReleaseIPs)
+		if numberToMark == 0 {
+			return allReleasedIPs, nil
+		}
+	}
+	return nil, fmt.Errorf("Failed to mark %d IP's as pending, only marked %d IP's", numberToMark, len(allReleasedIPs))
+}
+
+func (service *HTTPRestService) markSpecificIPTypeAsPending(numberToMark int, ipStateType string) map[string]cns.IPConfigurationStatus {
+	pendingReleaseIPs := make(map[string]cns.IPConfigurationStatus)
+	for uuid, mutableIPConfig := range service.PodIPConfigState {
+		if mutableIPConfig.State == ipStateType {
 			mutableIPConfig.State = cns.PendingRelease
 			service.PodIPConfigState[uuid] = mutableIPConfig
 			pendingReleaseIPs[uuid] = mutableIPConfig
-			markedIPCount++
-			if markedIPCount == numberToMark {
-				return pendingReleaseIPs, nil
+			if len(pendingReleaseIPs) == numberToMark {
+				return pendingReleaseIPs
 			}
 		}
 	}
-
-	return nil, fmt.Errorf("Failed to mark %d IP's as pending, only marked %d IP's", numberToMark, len(pendingReleaseIPs))
+	return pendingReleaseIPs
 }
 
 // MarkIpsAsAvailableUntransacted will update pending programming IPs to available if NMAgent side's programmed nc version keep up with nc version.
