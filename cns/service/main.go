@@ -669,25 +669,43 @@ func main() {
 	}
 
 	if !disableTelemetry {
-		telemetryStopProcessing <- true
-		stopheartbeat <- true
-		stopSnapshots <- true
+		logger.Printf("stopping telemetry service thread")
+		select {
+		case telemetryStopProcessing <- true:
+		default:
+		}
+
+		logger.Printf("stop heartbeat thread")
+		select {
+		case stopheartbeat <- true:
+		default:
+		}
+
+		logger.Printf("stop snapshot thread")
+		select {
+		case stopSnapshots <- true:
+		default:
+		}
 	}
 
+	logger.Printf("stop cns service")
 	// Cleanup.
 	if httpRestService != nil {
 		httpRestService.Stop()
 	}
 
 	if startCNM {
+		logger.Printf("stop cnm plugin")
 		if netPlugin != nil {
 			netPlugin.Stop()
 		}
 
 		if ipamPlugin != nil {
+			logger.Printf("stop ipam plugin")
 			ipamPlugin.Stop()
 		}
 	}
 
+	logger.Printf("CNS exited")
 	logger.Close()
 }
