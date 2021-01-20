@@ -181,11 +181,12 @@ all-binaries: azure-cnm-plugin azure-cni-plugin azure-cns
 endif
 
 ifeq ($(GOOS),linux)
-all-images: azure-npm-image azure-vnet-telemetry-image
+all-images: azure-npm-image azure-cns-aks-swift-image 
 else
 all-images:
 	@echo "Nothing to build. Skip."
 endif
+
 
 # Clean all build artifacts.
 .PHONY: clean
@@ -233,7 +234,7 @@ $(NPM_BUILD_DIR)/azure-npm$(EXE_EXT): $(NPMFILES)
 .PHONY: all-containerized
 all-containerized:
 	pwd && ls -l
-	docker build -f Dockerfile.build -t $(BUILD_CONTAINER_IMAGE):$(VERSION) .
+	docker build -f Dockerfile.build -t $(BUILD_CONTAINER_IMAGE):$(VERSION) --no-cache .
 	docker run --name $(BUILD_CONTAINER_NAME) \
 		-v /usr/bin/docker:/usr/bin/docker \
 		-v /var/run/docker.sock:/var/run/docker.sock \
@@ -269,7 +270,7 @@ hack-images:
 azure-vnet-plugin-image: azure-cnm-plugin
 	# Build the plugin image, keeping any old image during build for cache, but remove it afterwards.
 	docker images -q $(CNM_PLUGIN_ROOTFS):$(VERSION) > cid
-	docker build \
+	docker build --no-cache \
 		-f Dockerfile.cnm \
 		-t $(CNM_PLUGIN_ROOTFS):$(VERSION) \
 		--build-arg CNM_BUILD_DIR=$(CNM_BUILD_DIR) \
@@ -450,7 +451,15 @@ ifeq ($(GOOS),linux)
 	chown $(BUILD_USER):$(BUILD_USER) $(NPM_BUILD_DIR)/$(NPM_ARCHIVE_NAME)
 endif
 
+
+PRETTYGOTEST := $(shell command -v gotest 2> /dev/null)
+
 # run all tests
 .PHONY: test-all
 test-all:
 	go test -coverpkg=./... -v -race -covermode atomic -coverprofile=coverage.out ./...
+
+# run all tests
+.PHONY: test-integration
+test-integration:
+	go test -coverpkg=./... -v -race -covermode atomic -coverprofile=coverage.out -tags=integration ./test/integration...

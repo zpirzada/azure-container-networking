@@ -16,7 +16,9 @@ stages:
         displayName: CNI, NPM, CNS, CNM
         pool:
           name: Networking-ContainerNetworking
-          demands: agent.os -equals Linux
+          demands: 
+          - agent.os -equals Linux
+          - Role -equals Build
 
         container:
           image: "$(BUILD_IMAGE)" # build image set as variable in pipeline runtime for flexibility
@@ -58,11 +60,7 @@ stages:
               echo "##vso[task.setvariable variable=StorageID;isOutput=true]$(echo ${BUILD_NUMBER//./-})"
               echo "##vso[task.setvariable variable=CommitHash;isOutput=true]$(git rev-parse HEAD)"
               echo "##vso[task.setvariable variable=Tag;isOutput=true]$(git describe --tags --always --dirty)"
-              export BRANCH=$(Build.SourceBranchName)
-              echo Building branch $BRANCH from $(Build.SourceBranch) 
-              if [[ "$BRANCH" == "master" ]]; then
-                echo "##vso[task.setvariable variable=Tag;isOutput=true]$(git describe --tags --abbrev=0)"
-              fi
+              echo "##vso[task.setvariable variable=ImageTag;isOutput=true]$(git describe --tags --always --dirty)-test"
             workingDirectory: "$(modulePath)"
             name: "EnvironmentalVariables"
             displayName: "Set environmental variables"
@@ -75,13 +73,12 @@ stages:
               go get github.com/axw/gocov/gocov
               go get github.com/AlekSi/gocov-xml
               go get github.com/matm/gocov-html
+              go get github.com/rakyll/gotest
             workingDirectory: "$(modulePath)"
             name: "GoDependencies"
             displayName: "Install Go dependencies"
 
           - script: |
-              echo Building in $(pwd)
-              echo Build tag is $(EnvironmentalVariables.Tag)
               export GOOS=windows
               make all-binaries VERSION=$(EnvironmentalVariables.Tag)
             workingDirectory: "$(modulePath)"
@@ -109,11 +106,11 @@ stages:
             displayName: "Run Tests"
 
           - script: |
-              make all-binaries VERSION=$(EnvironmentalVariables.Tag)
-              sudo make azure-npm-image VERSION=$(EnvironmentalVariables.Tag)
+              sudo make hack-images VERSION=$(EnvironmentalVariables.Tag)
+              sudo make all-images VERSION=$(EnvironmentalVariables.Tag)
             workingDirectory: "$(modulePath)"
-            name: "BuildNPMImage"
-            displayName: "Build NPM Image"
+            name: "BuildImages"
+            displayName: "Build Images"
 
           - bash: |
               export CODECOV_TOKEN=$(CODECOV_TOKEN)
@@ -130,6 +127,12 @@ stages:
               docker tag $IMAGE_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag) $IMAGE_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
               docker push $IMAGE_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
 
+              docker tag $IMAGE_REGISTRY/azure-cns:$(EnvironmentalVariables.Tag) $IMAGE_REGISTRY/azure-cns:$(EnvironmentalVariables.Tag)-test
+              docker push $IMAGE_REGISTRY/azure-cns:$(EnvironmentalVariables.Tag)-test
+
+              docker tag $IMAGE_REGISTRY/azure-cni-manager:$(EnvironmentalVariables.Tag) $IMAGE_REGISTRY/azure-cni-manager:$(EnvironmentalVariables.Tag)-test
+              docker push $IMAGE_REGISTRY/azure-cni-manager:$(EnvironmentalVariables.Tag)-test
+
               function auto-retry()
               {
                   export i="1"
@@ -139,7 +142,10 @@ stages:
                     printf "Attempt $i/$attempts - " && "$@" && break ||  sleep 3 &&  i=$[$i+1] && false
                   done
               }
+
               auto-retry docker pull $IMAGE_REGISTRY/azure-npm:$(EnvironmentalVariables.Tag)-test
+              auto-retry docker pull $IMAGE_REGISTRY/azure-cns:$(EnvironmentalVariables.Tag)-test
+              auto-retry docker pull $IMAGE_REGISTRY/azure-cni-manager:$(EnvironmentalVariables.Tag)-test
             workingDirectory: "$(modulePath)"
             name: "mcrreplication"
             displayName: "Push NPM Image and Wait for Repository"
@@ -194,7 +200,13 @@ stages:
             displayName: Create artifact storage container
             condition: succeeded()
 
-  - template: e2e-job-template.yaml
+  - template: singletenancy/aks-swift/e2e-job-template.yaml
+    parameters:
+      name: "aks_on_swift_e2e"
+      displayName: AKS on Swift
+      pipelineBuildImage: "$(BUILD_IMAGE)"
+
+  - template: singletenancy/aks-engine/e2e-job-template.yaml
     parameters:
       name: "ubuntu_16_04_linux_e2e"
       displayName: Ubuntu 16.04
@@ -204,7 +216,7 @@ stages:
       clusterDefinitionCniBuildOS: "linux"
       clusterDefinitionCniBuildExt: ".tgz"
 
-  - template: e2e-job-template.yaml
+  - template: singletenancy/aks-engine/e2e-job-template.yaml
     parameters:
       name: "ubuntu_18_04_linux_e2e"
       displayName: Ubuntu 18.04
@@ -214,7 +226,7 @@ stages:
       clusterDefinitionCniBuildOS: "linux"
       clusterDefinitionCniBuildExt: ".tgz"
 
-  - template: e2e-job-template.yaml
+  - template: singletenancy/aks-engine/e2e-job-template.yaml
     parameters:
       name: "windows_18_09_e2e"
       displayName: "Windows 1809"
@@ -224,7 +236,7 @@ stages:
       clusterDefinitionCniBuildOS: "windows"
       clusterDefinitionCniBuildExt: ".zip"
 
-  - template: e2e-job-template.yaml
+  - template: singletenancy/aks-engine/e2e-job-template.yaml
     parameters:
       name: "windows_19_03_e2e"
       displayName: "Windows 1903"
@@ -237,6 +249,7 @@ stages:
   - stage: cleanup
     displayName: Cleanup
     dependsOn:
+      - "aks_on_swift_e2e"
       - "ubuntu_16_04_linux_e2e"
       - "ubuntu_18_04_linux_e2e"
       - "windows_18_09_e2e"
@@ -260,5 +273,7 @@ stages:
                 BUILD_NUMBER=${BUILD_NUMBER//./-}
                 echo Deleting storage container with name acn-$BUILD_NUMBER and account name $(STORAGE_ACCOUNT_NAME)
                 az storage container delete -n acn-$BUILD_NUMBER --account-name $(STORAGE_ACCOUNT_NAME)
+                echo Pruning old docker images...
+                sudo docker system prune -f
               workingDirectory: "$(modulePath)"
             displayName: Cleanup remote Azure storage container

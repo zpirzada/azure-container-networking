@@ -1,0 +1,46 @@
+parameters:
+  name: ""
+
+steps:
+  - bash: |
+      echo $UID
+      sudo rm -rf $(System.DefaultWorkingDirectory)/*
+    displayName: "Set up OS environment"
+
+  - checkout: self
+
+  - bash: |
+      go version
+      go env
+      mkdir -p '$(GOBIN)'
+      mkdir -p '$(GOPATH)/pkg'
+      mkdir -p '$(modulePath)'
+      echo '##vso[task.prependpath]$(GOBIN)'
+      echo '##vso[task.prependpath]$(GOROOT)/bin'
+    name: "GoEnv"
+    displayName: "Set up the Go environment"
+
+  - bash: |
+      echo $(ImageTag)
+    displayName: Echo Tag
+
+  - task: AzureCLI@1
+    inputs:
+      azureSubscription: $(ARTIFACT_SUBSCRIPTION)
+      scriptLocation: "inlineScript"
+      addSpnToEnvironment: true
+      inlineScript: |
+        mkdir -p ~/.kube/
+        az keyvault secret show --name $(KV_AKS_SWIFT_SECRET_NAME) --vault-name $(KV_NAME) --query value | sed 's/\\n/\n/g' | sed -e 's/^"//' -e 's/"$//'
+        az keyvault secret show --name $(KV_AKS_SWIFT_SECRET_NAME) --vault-name $(KV_NAME) --query value | sed 's/\\n/\n/g' | sed -e 's/^"//' -e 's/"$//' > ~/.kube/config
+    displayName: Pull Kubeconfig from Keyvault
+    condition: succeeded()
+
+  - script: |
+      ls -lah
+      pwd
+      sudo -E env "PATH=$PATH" VERSION=$(ImageTag) INSTALL_CNI=true INSTALL_CNS=true make test-integration
+    name: "aksswifte2e"
+    displayName: "Run AKS Swift E2E"
+
+
