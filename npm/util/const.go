@@ -40,6 +40,8 @@ const (
 	IptablesAccept            string = "ACCEPT"
 	IptablesReject            string = "REJECT"
 	IptablesDrop              string = "DROP"
+	IptablesReturn            string = "RETURN"
+	IptablesMark              string = "MARK"
 	IptablesSrcFlag           string = "src"
 	IptablesDstFlag           string = "dst"
 	IptablesNotFlag           string = "!"
@@ -50,6 +52,9 @@ const (
 	IptablesModuleFlag        string = "-m"
 	IptablesSetModuleFlag     string = "set"
 	IptablesMatchSetFlag      string = "--match-set"
+	IptablesSetMarkFlag       string = "--set-mark"
+	IptablesMarkFlag          string = "--mark"
+	IptablesMarkVerb          string = "mark"
 	IptablesStateModuleFlag   string = "state"
 	IptablesStateFlag         string = "--state"
 	IptablesMultiportFlag     string = "multiport"
@@ -75,6 +80,15 @@ const (
 	IptablesAzureIngressFromPodChain string = "AZURE-NPM-INGRESS-FROM-POD"
 	IptablesAzureEgressToNsChain     string = "AZURE-NPM-EGRESS-TO-NS"
 	IptablesAzureEgressToPodChain    string = "AZURE-NPM-EGRESS-TO-POD"
+	// Below are the skb->mark NPM will use for different criteria
+	IptablesAzureIngressMarkHex string = "0x2000"
+	// IptablesAzureEgressXMarkHex is used for us to not override but append to the existing MARK
+	// https://unix.stackexchange.com/a/283455 comment contains the explanation on
+	// MARK manipulations with offset.
+	IptablesAzureEgressXMarkHex string = "0x1000/0x1000"
+	// IptablesAzureEgressMarkHex is for checking the absolute value of the mark
+	IptablesAzureEgressMarkHex string = "0x1000"
+	IptablesAzureAcceptMarkHex string = "0x3000"
 )
 
 //ipset related constants.
