@@ -1,5 +1,5 @@
 # Use a minimal image as a parent image
-FROM ubuntu:19.10
+FROM ubuntu:20.04
 ARG CNS_BUILD_ARCHIVE
 
 # Install plugin
