@@ -17,6 +17,7 @@ import (
 
 type namespace struct {
 	name           string
+	labelsMap      map[string]string
 	setMap         map[string]string
 	podMap         map[types.UID]*corev1.Pod
 	rawNpMap       map[string]*networkingv1.NetworkPolicy
@@ -29,6 +30,7 @@ type namespace struct {
 func newNs(name string) (*namespace, error) {
 	ns := &namespace{
 		name:           name,
+		labelsMap:      make(map[string]string),
 		setMap:         make(map[string]string),
 		podMap:         make(map[types.UID]*corev1.Pod),
 		rawNpMap:       make(map[string]*networkingv1.NetworkPolicy),
@@ -138,6 +140,9 @@ func (npMgr *NetworkPolicyManager) AddNamespace(nsObj *corev1.Namespace) error {
 	if err != nil {
 		log.Errorf("Error: failed to create namespace %s", nsName)
 	}
+
+	// Append all labels to the cache NS obj
+	ns.labelsMap = util.AppendMap(ns.labelsMap, nsLabel)
 	npMgr.nsMap[nsName] = ns
 
 	return nil
@@ -157,15 +162,83 @@ func (npMgr *NetworkPolicyManager) UpdateNamespace(oldNsObj *corev1.Namespace, n
 		oldNsNs, oldNsLabel, newNsNs, newNsLabel,
 	)
 
-	if err = npMgr.DeleteNamespace(oldNsObj); err != nil {
-		return err
+	if oldNsNs != newNsNs {
+		if err = npMgr.DeleteNamespace(oldNsObj); err != nil {
+			return err
+		}
+
+		if newNsObj.ObjectMeta.DeletionTimestamp == nil && newNsObj.ObjectMeta.DeletionGracePeriodSeconds == nil {
+			if err = npMgr.AddNamespace(newNsObj); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
-	if newNsObj.ObjectMeta.DeletionTimestamp == nil && newNsObj.ObjectMeta.DeletionGracePeriodSeconds == nil {
-		if err = npMgr.AddNamespace(newNsObj); err != nil {
+	// If orignal AddNamespace failed for some reason, then NS will not be found
+	// in nsMap, resulting in retry of ADD.
+	curNsObj, exists := npMgr.nsMap[newNsNs]
+	if !exists {
+		if newNsObj.ObjectMeta.DeletionTimestamp == nil && newNsObj.ObjectMeta.DeletionGracePeriodSeconds == nil {
+			if err = npMgr.AddNamespace(newNsObj); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	//if no change in labels then return
+	if reflect.DeepEqual(curNsObj.labelsMap, newNsLabel) {
+		log.Logf(
+			"NAMESPACE UPDATING:\n nothing to delete or add. old namespace: [%s/%v]\n cache namespace: [%s/%v] new namespace: [%s/%v]",
+			oldNsNs, oldNsLabel, curNsObj.name, curNsObj.labelsMap, newNsNs, newNsLabel,
+		)
+		return nil
+	}
+
+	//If the Namespace is not deleted, delete removed labels and create new labels
+	toAddNsLabels, toDeleteNsLabels := util.CompareMapDiff(curNsObj.labelsMap, newNsLabel)
+
+	// Delete the namespace from its label's ipset list.
+	ipsMgr := npMgr.nsMap[util.KubeAllNamespacesFlag].ipsMgr
+	for nsLabelKey, nsLabelVal := range toDeleteNsLabels {
+		labelKey := "ns-" + nsLabelKey
+		log.Logf("Deleting namespace %s from ipset list %s", oldNsNs, labelKey)
+		if err = ipsMgr.DeleteFromList(labelKey, oldNsNs); err != nil {
+			log.Errorf("Error: failed to delete namespace %s from ipset list %s", oldNsNs, labelKey)
+			return err
+		}
+
+		label := "ns-" + nsLabelKey + ":" + nsLabelVal
+		log.Logf("Deleting namespace %s from ipset list %s", oldNsNs, label)
+		if err = ipsMgr.DeleteFromList(label, oldNsNs); err != nil {
+			log.Errorf("Error: failed to delete namespace %s from ipset list %s", oldNsNs, label)
 			return err
 		}
 	}
+
+	// Add the namespace to its label's ipset list.
+	for nsLabelKey, nsLabelVal := range toAddNsLabels {
+		labelKey := "ns-" + nsLabelKey
+		log.Logf("Adding namespace %s to ipset list %s", oldNsNs, labelKey)
+		if err = ipsMgr.AddToList(labelKey, oldNsNs); err != nil {
+			log.Errorf("Error: failed to add namespace %s to ipset list %s", oldNsNs, labelKey)
+			return err
+		}
+
+		label := "ns-" + nsLabelKey + ":" + nsLabelVal
+		log.Logf("Adding namespace %s to ipset list %s", oldNsNs, label)
+		if err = ipsMgr.AddToList(label, oldNsNs); err != nil {
+			log.Errorf("Error: failed to add namespace %s to ipset list %s", oldNsNs, label)
+			return err
+		}
+	}
+
+	// Append all labels to the cache NS obj
+	curNsObj.labelsMap = util.ClearAndAppendMap(curNsObj.labelsMap, newNsLabel)
+	npMgr.nsMap[newNsNs] = curNsObj
 
 	return nil
 }

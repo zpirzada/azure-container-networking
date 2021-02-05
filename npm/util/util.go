@@ -7,8 +7,8 @@ import (
 	"hash/fnv"
 	"os"
 	"regexp"
-	"strings"
 	"sort"
+	"strings"
 
 	"github.com/Masterminds/semver"
 	"k8s.io/apimachinery/pkg/version"
@@ -69,6 +69,32 @@ func SortMap(m *map[string]string) ([]string, []string) {
 	return sortedKeys, sortedVals
 }
 
+// CompareMapDiff will compare two maps string[string] and returns
+// missing values in both
+func CompareMapDiff(orig map[string]string, new map[string]string) (map[string]string, map[string]string) {
+	notInOrig := make(map[string]string)
+	notInNew := make(map[string]string)
+
+	for keyOrig, valOrig := range orig {
+		if valNew, ok := new[keyOrig]; ok {
+			if valNew != valOrig {
+				notInNew[keyOrig] = valOrig
+				notInOrig[keyOrig] = valNew
+			}
+		} else {
+			notInNew[keyOrig] = valOrig
+		}
+	}
+
+	for keyNew, valNew := range new {
+		if _, ok := orig[keyNew]; !ok {
+			notInOrig[keyNew] = valNew
+		}
+	}
+
+	return notInOrig, notInNew
+}
+
 // UniqueStrSlice removes duplicate elements from the input string.
 func UniqueStrSlice(s []string) []string {
 	m, unique := map[string]bool{}, []string{}
@@ -82,6 +108,16 @@ func UniqueStrSlice(s []string) []string {
 	}
 
 	return unique
+}
+
+// ClearAndAppendMap clears base and appends new to base.
+func ClearAndAppendMap(base, new map[string]string) map[string]string {
+	base = make(map[string]string)
+	for k, v := range new {
+		base[k] = v
+	}
+
+	return base
 }
 
 // AppendMap appends new to base.
@@ -106,7 +142,7 @@ func CompareK8sVer(firstVer *version.Info, secondVer *version.Info) int {
 	if len(v1Minor) < 1 {
 		return -2
 	}
-	v1, err := semver.NewVersion(firstVer.Major+"."+v1Minor[0])
+	v1, err := semver.NewVersion(firstVer.Major + "." + v1Minor[0])
 	if err != nil {
 		return -2
 	}
@@ -114,7 +150,7 @@ func CompareK8sVer(firstVer *version.Info, secondVer *version.Info) int {
 	if len(v2Minor) < 1 {
 		return -2
 	}
-	v2, err := semver.NewVersion(secondVer.Major+"."+v2Minor[0])
+	v2, err := semver.NewVersion(secondVer.Major + "." + v2Minor[0])
 	if err != nil {
 		return -2
 	}
