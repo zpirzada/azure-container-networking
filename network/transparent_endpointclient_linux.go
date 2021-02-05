@@ -12,8 +12,8 @@ import (
 
 const (
 	virtualGwIPString = "169.254.1.1/32"
-	defaultGwCidr = "0.0.0.0/0"
-	defaultGw = "0.0.0.0"
+	defaultGwCidr     = "0.0.0.0/0"
+	defaultGw         = "0.0.0.0"
 )
 
 type TransparentEndpointClient struct {
@@ -152,8 +152,8 @@ func (client *TransparentEndpointClient) ConfigureContainerInterfacesAndRoutes(e
 	for _, ipAddr := range epInfo.IPAddresses {
 		_, ipnet, _ := net.ParseCIDR(ipAddr.String())
 		routeInfo := RouteInfo{
-			Dst: *ipnet,
-			Scope: netlink.RT_SCOPE_LINK,
+			Dst:      *ipnet,
+			Scope:    netlink.RT_SCOPE_LINK,
 			Protocol: netlink.RTPROT_KERNEL,
 		}
 		if err := deleteRoutes(client.containerVethName, []RouteInfo{routeInfo}); err != nil {
@@ -165,7 +165,7 @@ func (client *TransparentEndpointClient) ConfigureContainerInterfacesAndRoutes(e
 	//ip route add 169.254.1.1/32 dev eth0
 	virtualGwIP, virtualGwNet, _ := net.ParseCIDR(virtualGwIPString)
 	routeInfo := RouteInfo{
-		Dst: *virtualGwNet,
+		Dst:   *virtualGwNet,
 		Scope: netlink.RT_SCOPE_LINK,
 	}
 	if err := addRoutes(client.containerVethName, []RouteInfo{routeInfo}); err != nil {
@@ -177,7 +177,7 @@ func (client *TransparentEndpointClient) ConfigureContainerInterfacesAndRoutes(e
 	dstIP := net.IPNet{IP: net.ParseIP(defaultGw), Mask: defaultIPNet.Mask}
 	routeInfo = RouteInfo{
 		Dst: dstIP,
-		Gw: virtualGwIP,
+		Gw:  virtualGwIP,
 	}
 	if err := addRoutes(client.containerVethName, []RouteInfo{routeInfo}); err != nil {
 		return err
@@ -189,12 +189,5 @@ func (client *TransparentEndpointClient) ConfigureContainerInterfacesAndRoutes(e
 }
 
 func (client *TransparentEndpointClient) DeleteEndpoints(ep *endpoint) error {
-	log.Printf("[net] Deleting veth pair %v %v.", ep.HostIfName, ep.IfName)
-	err := netlink.DeleteLink(ep.HostIfName)
-	if err != nil {
-		log.Printf("[net] Failed to delete veth pair %v: %v.", ep.HostIfName, err)
-		return err
-	}
-
 	return nil
 }
