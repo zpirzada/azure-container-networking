@@ -80,7 +80,7 @@ CNI_NET_DIR = cni/network/plugin
 CNI_IPAM_DIR = cni/ipam/plugin
 CNI_IPAMV6_DIR = cni/ipam/pluginv6
 CNI_TELEMETRY_DIR = cni/telemetry/service
-ACNCLI_DIR = hack/acncli
+ACNCLI_DIR = tools/acncli
 TELEMETRY_CONF_DIR = telemetry
 CNS_DIR = cns/service
 CNMS_DIR = cnms/service
@@ -258,12 +258,12 @@ all-binaries-platforms:
 	export GOOS=windows; make all-binaries
 
 
-.PHONY: hack
-hack: acncli
+.PHONY: tools
+tools: acncli
 
-.PHONY: hack-images
-hack-images: 
-	docker build -f ./hack/acncli/Dockerfile --build-arg VERSION=$(VERSION) -t $(AZURE_CNI_IMAGE):$(VERSION) .
+.PHONY: tools-images
+tools-images: 
+	docker build -f ./tools/acncli/Dockerfile --build-arg VERSION=$(VERSION) -t $(AZURE_CNI_IMAGE):$(VERSION) .
 
 # Build the Azure CNM plugin image, installable with "docker plugin install".
 .PHONY: azure-vnet-plugin-image
