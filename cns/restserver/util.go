@@ -74,13 +74,13 @@ func (service *HTTPRestService) saveState() error {
 }
 
 // restoreState restores CNS state from persistent store.
-func (service *HTTPRestService) restoreState() error {
+func (service *HTTPRestService) restoreState() {
 	logger.Printf("[Azure CNS] restoreState")
 
 	// Skip if a store is not provided.
 	if service.store == nil {
 		logger.Printf("[Azure CNS]  store not initialized.")
-		return nil
+		return
 	}
 
 	// Read any persisted state.
@@ -89,15 +89,16 @@ func (service *HTTPRestService) restoreState() error {
 		if err == store.ErrKeyNotFound {
 			// Nothing to restore.
 			logger.Printf("[Azure CNS]  No state to restore.\n")
-			return nil
+		} else {
+			logger.Errorf("[Azure CNS]  Failed to restore state, err:%v. Removing azure-cns.json", err)
+			service.store.Remove()
 		}
 
-		logger.Errorf("[Azure CNS]  Failed to restore state, err:%v\n", err)
-		return err
+		return
 	}
 
 	logger.Printf("[Azure CNS]  Restored state, %+v\n", service.state)
-	return nil
+	return
 }
 
 func (service *HTTPRestService) saveNetworkContainerGoalState(req cns.CreateNetworkContainerRequest) (int, string) {
