@@ -1,0 +1,10 @@
+{
+    "cniVersion": "0.3.0",
+    "name": "azure",
+    "plugins": [
+        {
+            "type": "azure-vnet",
+            "executionMode": "baremetal",
+        }
+    ]
+}

@@ -4,6 +4,7 @@
 package network
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -60,6 +61,12 @@ const (
 	jsonFileExtension = ".json"
 )
 
+type  ExecutionModes string
+const (
+    Default ExecutionModes = "default"
+    Baremetal ExecutionModes = "baremetal"
+)
+
 // NetPlugin represents the CNI network plugin.
 type netPlugin struct {
 	*cni.Plugin
@@ -67,6 +74,13 @@ type netPlugin struct {
 	ipamInvoker IPAMInvoker
 	report      *telemetry.CNIReport
 	tb          *telemetry.TelemetryBuffer
+	nnsClient   NnsClient
+}
+
+// client for node network service
+type NnsClient interface {
+	AddContainerNetworking(ctx context.Context, podName, nwNamespace string) error
+	DeleteContainerNetworking(ctx context.Context, podName, nwNamespace string) error
 }
 
 // snatConfiguration contains a bool that determines whether CNI enables snat on host and snat for dns
@@ -76,7 +90,7 @@ type snatConfiguration struct {
 }
 
 // NewPlugin creates a new netPlugin object.
-func NewPlugin(name string, config *common.PluginConfig) (*netPlugin, error) {
+func NewPlugin(name string, config *common.PluginConfig, client NnsClient) (*netPlugin, error) {
 	// Setup base plugin.
 	plugin, err := cni.NewPlugin(name, config.Version)
 	if err != nil {
@@ -94,6 +108,7 @@ func NewPlugin(name string, config *common.PluginConfig) (*netPlugin, error) {
 	return &netPlugin{
 		Plugin: plugin,
 		nm:     nm,
+		nnsClient: client,
 	}, nil
 }
 
@@ -342,11 +357,6 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	plugin.report.ContainerName = k8sPodName + ":" + k8sNamespace
 
-	if nwCfg.MultiTenancy {
-		// Initialize CNSClient
-		cnsclient.InitCnsClient(nwCfg.CNSUrl)
-	}
-
 	k8sContainerID := args.ContainerID
 	if len(k8sContainerID) == 0 {
 		errMsg := "Container ID not specified in CNI Args"
@@ -359,6 +369,18 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 		errMsg := "Interfacename not specified in CNI Args"
 		log.Printf(errMsg)
 		return plugin.Errorf(errMsg)
+	}
+
+	log.Printf("Execution mode :%s", nwCfg.ExecutionMode)
+	if nwCfg.ExecutionMode == string(Baremetal) {
+        log.Printf("Baremetal mode. Calling vnet agent for ADD")
+		err = plugin.nnsClient.AddContainerNetworking(context.Background(), k8sPodName, args.Netns)
+		return err
+	}
+
+	if nwCfg.MultiTenancy {
+		// Initialize CNSClient
+		cnsclient.InitCnsClient(nwCfg.CNSUrl)
 	}
 
 	for _, ns := range nwCfg.PodNamespaceForDualNetwork {
@@ -764,6 +786,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		epInfo       *network.EndpointInfo
 		cniMetric    telemetry.AIMetric
 		msg          string
+		deleteTried  bool
 	)
 
 	startTime := time.Now()
@@ -790,6 +813,31 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 
 	plugin.setCNIReportDetails(nwCfg, CNI_DEL, "")
 	iptables.DisableIPTableLock = nwCfg.DisableIPTableLock
+
+	defer func() {
+		if !deleteTried {
+			return
+		}
+		operationTimeMs := time.Since(startTime).Milliseconds()
+		cniMetric.Metric = aitelemetry.Metric{
+			Name:             telemetry.CNIDelTimeMetricStr,
+			Value:            float64(operationTimeMs),
+			CustomDimensions: make(map[string]string),
+		}
+		SetCustomDimensions(&cniMetric, nwCfg, err)
+		telemetry.SendCNIMetric(&cniMetric, plugin.tb)
+	}()
+
+	log.Printf("Execution mode :%s", nwCfg.ExecutionMode)
+	if nwCfg.ExecutionMode == string(Baremetal) {
+
+		log.Printf("Baremetal mode. Calling vnet agent for delete container")
+
+		// set the flag to true for attempt. This will be used by deferred telemetry method to emit metrics
+		deleteTried = true
+		err = plugin.nnsClient.DeleteContainerNetworking(context.Background(), k8sPodName, args.Netns)
+		return err
+	}
 
 	if nwCfg.MultiTenancy {
 		// Initialize CNSClient
@@ -858,18 +906,10 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		return err
 	}
 
-	defer func() {
-		operationTimeMs := time.Since(startTime).Milliseconds()
-		cniMetric.Metric = aitelemetry.Metric{
-			Name:             telemetry.CNIDelTimeMetricStr,
-			Value:            float64(operationTimeMs),
-			CustomDimensions: make(map[string]string),
-		}
-		SetCustomDimensions(&cniMetric, nwCfg, err)
-		telemetry.SendCNIMetric(&cniMetric, plugin.tb)
-	}()
+	// set the flag to true for attempt. This will be used by deferred telemetry method to emit metrics
+	deleteTried = true
 
-	// Delete the endpoint.
+    // Delete the endpoint.
 	if err = plugin.nm.DeleteEndpoint(networkId, endpointId); err != nil {
 		err = plugin.Errorf("Failed to delete endpoint: %v", err)
 		return err
