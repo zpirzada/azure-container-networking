@@ -258,18 +258,49 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 		// Pod event handlers
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
+				podObj, ok := obj.(*corev1.Pod)
+				if !ok {
+					metrics.SendErrorLogAndMetric(util.NpmID, "ADD Pod: Received unexpected object type: %v", obj)
+					return
+				}
 				npMgr.Lock()
-				npMgr.AddPod(obj.(*corev1.Pod))
+				npMgr.AddPod(podObj)
 				npMgr.Unlock()
 			},
 			UpdateFunc: func(old, new interface{}) {
+				oldPodObj, ok := old.(*corev1.Pod)
+				if !ok {
+					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE Pod: Received unexpected old object type: %v", oldPodObj)
+					return
+				}
+				newPodObj, ok := new.(*corev1.Pod)
+				if !ok {
+					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE Pod: Received unexpected new object type: %v", newPodObj)
+					return
+				}
 				npMgr.Lock()
-				npMgr.UpdatePod(old.(*corev1.Pod), new.(*corev1.Pod))
+				npMgr.UpdatePod(oldPodObj, newPodObj)
 				npMgr.Unlock()
 			},
 			DeleteFunc: func(obj interface{}) {
+				// DeleteFunc gets the final state of the resource (if it is known).
+				// Otherwise, it gets an object of type DeletedFinalStateUnknown.
+				// This can happen if the watch is closed and misses the delete event and
+				// the controller doesn't notice the deletion until the subsequent re-list
+				podObj, ok := obj.(*corev1.Pod)
+				if !ok {
+					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						metrics.SendErrorLogAndMetric(util.NpmID, "DELETE Pod: Received unexpected object type: %v", obj)
+						return
+					}
+					if podObj, ok = tombstone.Obj.(*corev1.Pod); !ok {
+						metrics.SendErrorLogAndMetric(util.NpmID, "DELETE Pod: Received unexpected object type: %v", obj)
+						return
+					}
+				}
 				npMgr.Lock()
-				npMgr.DeletePod(obj.(*corev1.Pod))
+				npMgr.DeletePod(podObj)
 				npMgr.Unlock()
 			},
 		},
@@ -279,18 +310,45 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 		// Namespace event handlers
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
+				nameSpaceObj, ok := obj.(*corev1.Namespace)
+				if !ok {
+					metrics.SendErrorLogAndMetric(util.NpmID, "ADD NameSpace: Received unexpected object type: %v", obj)
+					return
+				}
 				npMgr.Lock()
-				npMgr.AddNamespace(obj.(*corev1.Namespace))
+				npMgr.AddNamespace(nameSpaceObj)
 				npMgr.Unlock()
 			},
 			UpdateFunc: func(old, new interface{}) {
+				oldNameSpaceObj, ok := old.(*corev1.Namespace)
+				if !ok {
+					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE NameSpace: Received unexpected old object type: %v", oldNameSpaceObj)
+					return
+				}
+				newNameSpaceObj, ok := new.(*corev1.Namespace)
+				if !ok {
+					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE NameSpace: Received unexpected new object type: %v", newNameSpaceObj)
+					return
+				}
 				npMgr.Lock()
-				npMgr.UpdateNamespace(old.(*corev1.Namespace), new.(*corev1.Namespace))
+				npMgr.UpdateNamespace(oldNameSpaceObj, newNameSpaceObj)
 				npMgr.Unlock()
 			},
 			DeleteFunc: func(obj interface{}) {
+				nameSpaceObj, ok := obj.(*corev1.Namespace)
+				if !ok {
+					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						metrics.SendErrorLogAndMetric(util.NpmID, "DELETE NameSpace: Received unexpected object type: %v", obj)
+						return
+					}
+					if nameSpaceObj, ok = tombstone.Obj.(*corev1.Namespace); !ok {
+						metrics.SendErrorLogAndMetric(util.NpmID, "DELETE NameSpace: Received unexpected object type: %v", obj)
+						return
+					}
+				}
 				npMgr.Lock()
-				npMgr.DeleteNamespace(obj.(*corev1.Namespace))
+				npMgr.DeleteNamespace(nameSpaceObj)
 				npMgr.Unlock()
 			},
 		},
@@ -300,18 +358,45 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 		// Network policy event handlers
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
+				networkPolicyObj, ok := obj.(*networkingv1.NetworkPolicy)
+				if !ok {
+					metrics.SendErrorLogAndMetric(util.NpmID, "ADD Network Policy: Received unexpected object type: %v", obj)
+					return
+				}
 				npMgr.Lock()
-				npMgr.AddNetworkPolicy(obj.(*networkingv1.NetworkPolicy))
+				npMgr.AddNetworkPolicy(networkPolicyObj)
 				npMgr.Unlock()
 			},
 			UpdateFunc: func(old, new interface{}) {
+				oldNetworkPolicyObj, ok := old.(*networkingv1.NetworkPolicy)
+				if !ok {
+					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE Network Policy: Received unexpected old object type: %v", oldNetworkPolicyObj)
+					return
+				}
+				newNetworkPolicyObj, ok := new.(*networkingv1.NetworkPolicy)
+				if !ok {
+					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE Network Policy: Received unexpected new object type: %v", newNetworkPolicyObj)
+					return
+				}
 				npMgr.Lock()
-				npMgr.UpdateNetworkPolicy(old.(*networkingv1.NetworkPolicy), new.(*networkingv1.NetworkPolicy))
+				npMgr.UpdateNetworkPolicy(oldNetworkPolicyObj, newNetworkPolicyObj)
 				npMgr.Unlock()
 			},
 			DeleteFunc: func(obj interface{}) {
+				networkPolicyObj, ok := obj.(*networkingv1.NetworkPolicy)
+				if !ok {
+					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						metrics.SendErrorLogAndMetric(util.NpmID, "DELETE Network Policy: Received unexpected object type: %v", obj)
+						return
+					}
+					if networkPolicyObj, ok = tombstone.Obj.(*networkingv1.NetworkPolicy); !ok {
+						metrics.SendErrorLogAndMetric(util.NpmID, "DELETE Network Policy: Received unexpected object type: %v", obj)
+						return
+					}
+				}
 				npMgr.Lock()
-				npMgr.DeleteNetworkPolicy(obj.(*networkingv1.NetworkPolicy))
+				npMgr.DeleteNetworkPolicy(networkPolicyObj)
 				npMgr.Unlock()
 			},
 		},
