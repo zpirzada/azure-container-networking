@@ -70,29 +70,29 @@ func (pm *CNSIPAMPoolMonitor) Reconcile() error {
 	availableIPConfigCount := len(pm.cns.GetAvailableIPConfigs()) // TODO: add pending allocation count to real cns
 	freeIPConfigCount := pm.cachedNNC.Spec.RequestedIPCount - int64(allocatedPodIPCount)
 
-	logger.Printf("[ipam-pool-monitor] Checking pool for resize, Pool Size: %v, Goal Size: %v, BatchSize: %v, MinFree: %v, MaxFree:%v, Allocated: %v, Available: %v, Pending Release: %v, Free: %v, Pending Program: %v",
+	msg := fmt.Sprintf("Pool Size: %v, Goal Size: %v, BatchSize: %v, MinFree: %v, MaxFree:%v, Allocated: %v, Available: %v, Pending Release: %v, Free: %v, Pending Program: %v",
 		cnsPodIPConfigCount, pm.cachedNNC.Spec.RequestedIPCount, pm.scalarUnits.BatchSize, pm.MinimumFreeIps, pm.MaximumFreeIps, allocatedPodIPCount, availableIPConfigCount, pendingReleaseIPCount, freeIPConfigCount, pendingProgramCount)
 
 	switch {
 	// pod count is increasing
 	case freeIPConfigCount < pm.MinimumFreeIps:
-		logger.Printf("[ipam-pool-monitor] Increasing pool size...")
+		logger.Printf("[ipam-pool-monitor] Increasing pool size...%s ", msg)
 		return pm.increasePoolSize()
 
 	// pod count is decreasing
 	case freeIPConfigCount > pm.MaximumFreeIps:
-		logger.Printf("[ipam-pool-monitor] Decreasing pool size...")
+		logger.Printf("[ipam-pool-monitor] Decreasing pool size...%s ", msg)
 		return pm.decreasePoolSize()
 
 	// CRD has reconciled CNS state, and target spec is now the same size as the state
 	// free to remove the IP's from the CRD
 	case pm.pendingRelease && int(pm.cachedNNC.Spec.RequestedIPCount) == cnsPodIPConfigCount:
-		logger.Printf("[ipam-pool-monitor] Removing Pending Release IP's from CRD...")
+		logger.Printf("[ipam-pool-monitor] Removing Pending Release IP's from CRD...%s ", msg)
 		return pm.cleanPendingRelease()
 
 	// no pods scheduled
 	case allocatedPodIPCount == 0:
-		logger.Printf("[ipam-pool-monitor] No pods scheduled")
+		logger.Printf("[ipam-pool-monitor] No pods scheduled, %s", msg)
 		return nil
 	}
 
