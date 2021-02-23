@@ -131,6 +131,7 @@ func (logger *Logger) getLogFileName() string {
 	return logFileName
 }
 
+// todo: handle errors and use atomic file rotation
 // Rotate checks the active log file size and rotates log files if necessary.
 func (logger *Logger) rotate() {
 	// Return if target is not a log file.
@@ -164,7 +165,7 @@ func (logger *Logger) rotate() {
 		}
 
 		// Create a new log file.
-		logger.SetTarget(TargetLogfile)
+		logger.SetTarget(logger.target)
 	}
 }
 
