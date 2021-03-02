@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestNewNs(t *testing.T) {
+func TestnewNs(t *testing.T) {
 	if _, err := newNs("test"); err != nil {
 		t.Errorf("TestnewNs failed @ newNs")
 	}
@@ -165,7 +165,6 @@ func TestAddNamespaceLabel(t *testing.T) {
 			Labels: map[string]string{
 				"app": "old-test-namespace",
 			},
-			ResourceVersion: "0",
 		},
 	}
 
@@ -176,8 +175,6 @@ func TestAddNamespaceLabel(t *testing.T) {
 				"app":    "old-test-namespace",
 				"update": "true",
 			},
-
-			ResourceVersion: "1",
 		},
 	}
 
@@ -228,7 +225,6 @@ func TestDeleteandUpdateNamespaceLabel(t *testing.T) {
 				"update": "true",
 				"group":  "test",
 			},
-			ResourceVersion: "0",
 		},
 	}
 
@@ -239,7 +235,6 @@ func TestDeleteandUpdateNamespaceLabel(t *testing.T) {
 				"app":    "old-test-namespace",
 				"update": "false",
 			},
-			ResourceVersion: "1",
 		},
 	}
 

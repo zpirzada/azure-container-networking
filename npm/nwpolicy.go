@@ -33,7 +33,7 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 		err    error
 		ns     *namespace
 		exists bool
-		npNs   = util.GetNSNameWithPrefix(npObj.ObjectMeta.Namespace)
+		npNs   = "ns-" + npObj.ObjectMeta.Namespace
 		npName = npObj.ObjectMeta.Name
 		allNs  = npMgr.nsMap[util.KubeAllNamespacesFlag]
 		timer  = metrics.StartNewTimer()
@@ -153,7 +153,7 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 		allNs = npMgr.nsMap[util.KubeAllNamespacesFlag]
 	)
 
-	npNs, npName := util.GetNSNameWithPrefix(npObj.ObjectMeta.Namespace), npObj.ObjectMeta.Name
+	npNs, npName := "ns-"+npObj.ObjectMeta.Namespace, npObj.ObjectMeta.Name
 	log.Logf("NETWORK POLICY DELETING: Namespace: %s, Name:%s", npNs, npName)
 
 	var exists bool

@@ -50,6 +50,7 @@ type NetworkPolicyManager struct {
 
 	nodeName                     string
 	nsMap                        map[string]*namespace
+	podMap                       map[string]string // Key: Pod uuid, Value: PodIp
 	isAzureNpmChainCreated       bool
 	isSafeToCleanUpAzureNpmChain bool
 
@@ -117,13 +118,14 @@ func (npMgr *NetworkPolicyManager) SendClusterMetrics() {
 	for {
 		<-heartbeat
 		npMgr.Lock()
-		podCount.Value = 0
+		podCount.Value = float64(len(npMgr.podMap))
 		//Reducing one to remove all-namespaces ns obj
 		nsCount.Value = float64(len(npMgr.nsMap) - 1)
+		nwPolCount := 0
 		for _, ns := range npMgr.nsMap {
-			nwPolicyCount.Value += float64(len(ns.rawNpMap))
-			podCount.Value += float64(len(ns.podMap))
+			nwPolCount = nwPolCount + len(ns.rawNpMap)
 		}
+		nwPolicyCount.Value = float64(nwPolCount)
 		npMgr.Unlock()
 
 		metrics.SendMetric(podCount)
@@ -232,6 +234,7 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 		npInformer:                   npInformer,
 		nodeName:                     os.Getenv("HOSTNAME"),
 		nsMap:                        make(map[string]*namespace),
+		podMap:                       make(map[string]string),
 		isAzureNpmChainCreated:       false,
 		isSafeToCleanUpAzureNpmChain: false,
 		clusterState: telemetry.ClusterState{
@@ -248,7 +251,7 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 	npMgr.nsMap[util.KubeAllNamespacesFlag] = allNs
 
 	// Create ipset for the namespace.
-	kubeSystemNs := util.GetNSNameWithPrefix(util.KubeSystemFlag)
+	kubeSystemNs := "ns-" + util.KubeSystemFlag
 	if err := allNs.ipsMgr.CreateSet(kubeSystemNs, append([]string{util.IpsetNetHashFlag})); err != nil {
 		metrics.SendErrorLogAndMetric(util.NpmID, "Error: failed to create ipset for namespace %s.", kubeSystemNs)
 	}
@@ -266,14 +269,19 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 				npMgr.AddPod(podObj)
 				npMgr.Unlock()
 			},
-			UpdateFunc: func(_, new interface{}) {
+			UpdateFunc: func(old, new interface{}) {
+				oldPodObj, ok := old.(*corev1.Pod)
+				if !ok {
+					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE Pod: Received unexpected old object type: %v", oldPodObj)
+					return
+				}
 				newPodObj, ok := new.(*corev1.Pod)
 				if !ok {
 					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE Pod: Received unexpected new object type: %v", newPodObj)
 					return
 				}
 				npMgr.Lock()
-				npMgr.UpdatePod(newPodObj)
+				npMgr.UpdatePod(oldPodObj, newPodObj)
 				npMgr.Unlock()
 			},
 			DeleteFunc: func(obj interface{}) {
