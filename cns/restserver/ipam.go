@@ -227,21 +227,24 @@ func (service *HTTPRestService) getIPAddressesHandler(w http.ResponseWriter, r *
 	}
 
 	// Get all IPConfigs matching a state, and append to a slice of IPAddressState
-	resp.IPAddresses = filterIPConfigsMatchingState(service.PodIPConfigState, req.IPConfigStateFilter, filterFunc)
+	resp.IPConfigurationStatus = filterIPConfigsMatchingState(service.PodIPConfigState, req.IPConfigStateFilter, filterFunc)
 
 	return
 }
 
 // filter the ipconfigs in CNS matching a state (Available, Allocated, etc.) and return in a slice
-func filterIPConfigsMatchingState(toBeAdded map[string]cns.IPConfigurationStatus, states []string, f func(cns.IPConfigurationStatus, []string) bool) []cns.IPAddressState {
-	vsf := make([]cns.IPAddressState, 0)
+func filterIPConfigsMatchingState(toBeAdded map[string]cns.IPConfigurationStatus, states []string, f func(cns.IPConfigurationStatus, []string) bool) []cns.IPConfigurationStatus {
+	vsf := make([]cns.IPConfigurationStatus, 0)
 	for _, v := range toBeAdded {
 		if f(v, states) {
-			ip := cns.IPAddressState{
-				IPAddress: v.IPAddress,
-				State:     v.State,
+			ipconfigstate := cns.IPConfigurationStatus {
+				IPAddress: 	     v.IPAddress,
+				State:               v.State,
+				OrchestratorContext: v.OrchestratorContext,
+				NCID:                v.NCID,
+				ID:                  v.ID,
 			}
-			vsf = append(vsf, ip)
+			vsf = append(vsf, ipconfigstate)
 		}
 	}
 	return vsf
