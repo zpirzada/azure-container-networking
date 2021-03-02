@@ -407,12 +407,13 @@ func (service *HTTPRestService) AllocateDesiredIPConfig(podInfo cns.KubernetesPo
 					}
 					return podIpInfo, fmt.Errorf("[AllocateDesiredIPConfig] Desired IP is already allocated %+v to Pod: %+v, requested for pod %+v", ipConfig, pInfo, podInfo)
 				}
-			} else if ipConfig.State == cns.Available {
+			} else if ipConfig.State == cns.Available || ipConfig.State == cns.PendingProgramming {
+				// This race can happen during restart, where CNS state is lost and thus we have lost the NC programmed version
+				// As part of reconcile, we mark IPs as Allocated which are already allocated to PODs (listed from APIServer)
 				_, err := service.setIPConfigAsAllocated(ipConfig, podInfo, orchestratorContext)
 				if err != nil {
 					return podIpInfo, err
 				}
-
 				found = true
 			} else {
 				return podIpInfo, fmt.Errorf("[AllocateDesiredIPConfig] Desired IP is not available %+v", ipConfig)
