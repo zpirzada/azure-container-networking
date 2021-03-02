@@ -321,7 +321,7 @@ func (cnsClient *CNSClient) ReleaseIPAddress(orchestratorContext []byte) error {
 // usage GetIPAddressesWithStates(cns.Available, cns.Allocated)
 func (cnsClient *CNSClient) GetIPAddressesMatchingStates(StateFilter ...string) ([]cns.IPConfigurationStatus, error) {
 	var (
-		resp cns.GetIPAddressStateResponse
+		resp cns.GetIPAddressStatusResponse
 		err  error
 		res  *http.Response
 		body bytes.Buffer

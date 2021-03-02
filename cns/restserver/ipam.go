@@ -193,7 +193,7 @@ func (service *HTTPRestService) GetPendingProgramIPConfigs() []cns.IPConfigurati
 func (service *HTTPRestService) getIPAddressesHandler(w http.ResponseWriter, r *http.Request) {
 	var (
 		req           cns.GetIPAddressesRequest
-		resp          cns.GetIPAddressStateResponse
+		resp          cns.GetIPAddressStatusResponse
 		statusCode    int
 		returnMessage string
 		err           error
@@ -237,14 +237,7 @@ func filterIPConfigsMatchingState(toBeAdded map[string]cns.IPConfigurationStatus
 	vsf := make([]cns.IPConfigurationStatus, 0)
 	for _, v := range toBeAdded {
 		if f(v, states) {
-			ipconfigstate := cns.IPConfigurationStatus {
-				IPAddress: 	     v.IPAddress,
-				State:               v.State,
-				OrchestratorContext: v.OrchestratorContext,
-				NCID:                v.NCID,
-				ID:                  v.ID,
-			}
-			vsf = append(vsf, ipconfigstate)
+			vsf = append(vsf, v)
 		}
 	}
 	return vsf

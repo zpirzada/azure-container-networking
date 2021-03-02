@@ -93,6 +93,6 @@ func printIPAddresses(addrSlice []cns.IPConfigurationStatus) {
 	})
 
 	for _, addr := range addrSlice {
-		fmt.Printf("%+v\n", addr)
+		cns.IPConfigurationStatus.String(addr)
 	}
 }
