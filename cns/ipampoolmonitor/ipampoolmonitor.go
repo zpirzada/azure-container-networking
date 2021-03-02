@@ -104,24 +104,29 @@ func (pm *CNSIPAMPoolMonitor) increasePoolSize() error {
 	defer pm.mu.Unlock()
 
 	var err error
-	pm.cachedNNC.Spec.RequestedIPCount += pm.scalarUnits.BatchSize
-
-	// pass nil map to CNStoCRDSpec because we don't want to modify the to be deleted ipconfigs
-	pm.cachedNNC.Spec, err = pm.createNNCSpecForCRD(false)
+	var tempNNCSpec nnc.NodeNetworkConfigSpec
+	tempNNCSpec, err = pm.createNNCSpecForCRD(false)
 	if err != nil {
 		return err
 	}
 
-	logger.Printf("[ipam-pool-monitor] Increasing pool size, Current Pool Size: %v, Requested IP Count: %v, Pods with IP's:%v, ToBeDeleted Count: %v", len(pm.cns.GetPodIPConfigState()), pm.cachedNNC.Spec.RequestedIPCount, len(pm.cns.GetAllocatedIPConfigs()), len(pm.cachedNNC.Spec.IPsNotInUse))
-	return pm.rc.UpdateCRDSpec(context.Background(), pm.cachedNNC.Spec)
+	tempNNCSpec.RequestedIPCount += pm.scalarUnits.BatchSize
+	logger.Printf("[ipam-pool-monitor] Increasing pool size, Current Pool Size: %v, Updated Requested IP Count: %v, Pods with IP's:%v, ToBeDeleted Count: %v", len(pm.cns.GetPodIPConfigState()), tempNNCSpec.RequestedIPCount, len(pm.cns.GetAllocatedIPConfigs()), len(tempNNCSpec.IPsNotInUse))
+
+	err = pm.rc.UpdateCRDSpec(context.Background(), tempNNCSpec)
+	if err != nil {
+		// caller will retry to update the CRD again
+		return err
+	}
+
+	// save the updated state to cachedSpec
+	pm.cachedNNC.Spec = tempNNCSpec
+	return nil
 }
 
 func (pm *CNSIPAMPoolMonitor) decreasePoolSize() error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-
-	// TODO: Better handling here for negatives
-	pm.cachedNNC.Spec.RequestedIPCount -= pm.scalarUnits.BatchSize
 
 	// mark n number of IP's as pending
 	pendingIpAddresses, err := pm.cns.MarkIPAsPendingRelease(int(pm.scalarUnits.BatchSize))
@@ -129,16 +134,28 @@ func (pm *CNSIPAMPoolMonitor) decreasePoolSize() error {
 		return err
 	}
 
-	logger.Printf("[ipam-pool-monitor] Updated Requested count %v, Releasing ips: %+v", pm.cachedNNC.Spec.RequestedIPCount, pendingIpAddresses)
+	totalIpsSetForRelease := len(pendingIpAddresses)
+	logger.Printf("[ipam-pool-monitor] Releasing IPCount in this batch %d", totalIpsSetForRelease)
 
-	// convert the pending IP addresses to a spec
-	pm.cachedNNC.Spec, err = pm.createNNCSpecForCRD(false)
+	var tempNNCSpec nnc.NodeNetworkConfigSpec
+	tempNNCSpec, err = pm.createNNCSpecForCRD(false)
 	if err != nil {
 		return err
 	}
+
+	tempNNCSpec.RequestedIPCount -= int64(totalIpsSetForRelease)
+	logger.Printf("[ipam-pool-monitor] Decreasing pool size, Current Pool Size: %v, Requested IP Count: %v, Pods with IP's: %v, ToBeDeleted Count: %v", len(pm.cns.GetPodIPConfigState()), tempNNCSpec.RequestedIPCount, len(pm.cns.GetAllocatedIPConfigs()), len(tempNNCSpec.IPsNotInUse))
+
+	err = pm.rc.UpdateCRDSpec(context.Background(), tempNNCSpec)
+	if err != nil {
+		// caller will retry to update the CRD again
+		return err
+	}
+
+	// save the updated state to cachedSpec
+	pm.cachedNNC.Spec = tempNNCSpec
 	pm.pendingRelease = true
-	logger.Printf("[ipam-pool-monitor] Decreasing pool size, Current Pool Size: %v, Requested IP Count: %v, Pods with IP's: %v, ToBeDeleted Count: %v", len(pm.cns.GetPodIPConfigState()), pm.cachedNNC.Spec.RequestedIPCount, len(pm.cns.GetAllocatedIPConfigs()), len(pm.cachedNNC.Spec.IPsNotInUse))
-	return pm.rc.UpdateCRDSpec(context.Background(), pm.cachedNNC.Spec)
+	return nil
 }
 
 // if cns pending ip release map is empty, request controller has already reconciled the CNS state,
@@ -148,13 +165,22 @@ func (pm *CNSIPAMPoolMonitor) cleanPendingRelease() error {
 	defer pm.mu.Unlock()
 
 	var err error
-	pm.cachedNNC.Spec, err = pm.createNNCSpecForCRD(true)
+	var tempNNCSpec nnc.NodeNetworkConfigSpec
+	tempNNCSpec, err = pm.createNNCSpecForCRD(true)
 	if err != nil {
-		logger.Printf("[ipam-pool-monitor] Failed to translate ")
+		return err
 	}
 
+	err = pm.rc.UpdateCRDSpec(context.Background(), tempNNCSpec)
+	if err != nil {
+		// caller will retry to update the CRD again
+		return err
+	}
+
+	// save the updated state to cachedSpec
+	pm.cachedNNC.Spec = tempNNCSpec
 	pm.pendingRelease = false
-	return pm.rc.UpdateCRDSpec(context.Background(), pm.cachedNNC.Spec)
+	return nil
 }
 
 // CNSToCRDSpec translates CNS's map of Ips to be released and requested ip count into a CRD Spec
