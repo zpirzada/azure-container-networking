@@ -23,7 +23,7 @@ type NnsGrpcClient struct {
 // Add container to the network. Container Id is appended to the podName
 func (c *NnsGrpcClient) AddContainerNetworking(
 	ctx context.Context,
-	podName, nwNamespace string) error   {
+	podName, nwNamespace string) (error, *nns.ConfigureContainerNetworkingResponse)   {
 
 	return  configureContainerNetworking(ctx, nns.RequestType_Setup, podName, nwNamespace)
 }
@@ -31,7 +31,7 @@ func (c *NnsGrpcClient) AddContainerNetworking(
 // Add container to the network. Container Id is appended to the podName
 func (c *NnsGrpcClient) DeleteContainerNetworking(
 	ctx context.Context,
-	podName, nwNamespace string) error   {
+	podName, nwNamespace string) (error, *nns.ConfigureContainerNetworkingResponse)   {
 
 	return  configureContainerNetworking(ctx, nns.RequestType_Teardown, podName, nwNamespace)
 }
@@ -39,16 +39,16 @@ func (c *NnsGrpcClient) DeleteContainerNetworking(
 func configureContainerNetworking (
 	ctx context.Context,
 	reqtype nns.RequestType,
-	podName, nwNamespace string) error {
+	podName, nwNamespace string) (error, *nns.ConfigureContainerNetworkingResponse) {
 
 	client, conn, err := newNnsGrpcClient(ctx)
 	if err != nil {
-		return err
+		return err, nil
 	}
 
 	defer func() {
 		if err := conn.Close(); err != nil {
-            log.Debugf("grpc connection close for container %s failed with : %s", podName, err)
+            log.Printf("grpc connection close for container %s failed with : %s", podName, err)
 		}
 	}()
 
@@ -63,14 +63,14 @@ func configureContainerNetworking (
 
 	res, err := client.ConfigureContainerNetworking(localCtx, req)
 	if err != nil {
-		log.Debugf("ConfigureContainerNetworking for container %s for nw namespace %s failed with error: %s",
+		log.Printf("ConfigureContainerNetworking for container %s for nw namespace %s failed with error: %s \n",
 			podName, nwNamespace, err)
 	} else {
-		log.Debugf("ConfigureContainerNetworking for container %s for nw namespace %s succeeded with result: %v",
+		log.Printf("ConfigureContainerNetworking for container %s for nw namespace %s succeeded with result: %v \n",
 			podName, nwNamespace, res)
 	}
 
-    return err
+    return err, res
 }
 
 func newNnsGrpcClient (ctx context.Context) (nns.NodeNetworkServiceClient, *grpc.ClientConn,  error)  {

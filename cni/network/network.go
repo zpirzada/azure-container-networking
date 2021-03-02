@@ -25,6 +25,7 @@ import (
 	"github.com/Azure/azure-container-networking/network"
 	"github.com/Azure/azure-container-networking/network/policy"
 	"github.com/Azure/azure-container-networking/platform"
+	nns "github.com/Azure/azure-container-networking/proto/nodenetworkservice/3.302.0.744"
 	"github.com/Azure/azure-container-networking/telemetry"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
@@ -79,8 +80,8 @@ type netPlugin struct {
 
 // client for node network service
 type NnsClient interface {
-	AddContainerNetworking(ctx context.Context, podName, nwNamespace string) error
-	DeleteContainerNetworking(ctx context.Context, podName, nwNamespace string) error
+	AddContainerNetworking(ctx context.Context, podName, nwNamespace string) (error, *nns.ConfigureContainerNetworkingResponse)
+	DeleteContainerNetworking(ctx context.Context, podName, nwNamespace string) (error, *nns.ConfigureContainerNetworkingResponse)
 }
 
 // snatConfiguration contains a bool that determines whether CNI enables snat on host and snat for dns
@@ -373,8 +374,14 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	log.Printf("Execution mode :%s", nwCfg.ExecutionMode)
 	if nwCfg.ExecutionMode == string(Baremetal) {
+		var  res *nns.ConfigureContainerNetworkingResponse
         log.Printf("Baremetal mode. Calling vnet agent for ADD")
-		err = plugin.nnsClient.AddContainerNetworking(context.Background(), k8sPodName, args.Netns)
+		err, res = plugin.nnsClient.AddContainerNetworking(context.Background(), k8sPodName, args.Netns)
+
+		if err == nil {
+			result = convertNnsToCniResult(res, args.IfName)
+		}
+
 		return err
 	}
 
@@ -835,7 +842,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 
 		// set the flag to true for attempt. This will be used by deferred telemetry method to emit metrics
 		deleteTried = true
-		err = plugin.nnsClient.DeleteContainerNetworking(context.Background(), k8sPodName, args.Netns)
+		err, _ = plugin.nnsClient.DeleteContainerNetworking(context.Background(), k8sPodName, args.Netns)
 		return err
 	}
 
@@ -1181,4 +1188,43 @@ func determineSnat() (bool, bool, error) {
 	}
 
 	return snatConfig.EnableSnatForDns, snatConfig.EnableSnatOnHost, nil
+}
+
+func convertNnsToCniResult(netRes *nns.ConfigureContainerNetworkingResponse, ifName string) *cniTypesCurr.Result {
+
+	// This function does not add interfaces to CNI result. Reason being CRI (containerD in baremetal case)
+	// only looks for default interface named "eth0" and this default interface is added in the defer
+	// method of ADD method
+	result := &cniTypesCurr.Result{}
+	var resultIpconfigs []*cniTypesCurr.IPConfig
+
+    if netRes.Interfaces != nil {
+		for i, ni :=  range netRes.Interfaces {
+
+			intIndex := i
+			for _, ip := range ni.Ipaddresses {
+
+				ipWithPrefix := strings.Join([]string { ip.Ip, ip.PrefixLength }, "/")
+				_, ipNet, err := net.ParseCIDR(ipWithPrefix)
+				if err != nil {
+					log.Printf("convertNnsToCniResult error: %s \n", err)
+					continue
+				}
+
+				gateway := net.ParseIP(ip.DefaultGateway)
+				ipConfig := &cniTypesCurr.IPConfig{
+					Address: *ipNet,
+					Gateway: gateway,
+					Version: ip.Version,
+					Interface: &intIndex,
+				}
+
+				resultIpconfigs = append(resultIpconfigs, ipConfig)
+			}
+		}
+	}
+
+	result.IPs = resultIpconfigs
+
+	return result
 }
