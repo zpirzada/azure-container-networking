@@ -2852,6 +2852,94 @@ func TestAllowAllFromAppBackend(t *testing.T) {
 	}
 }
 
+func TestAllowMultiplePodSelectors(t *testing.T) {
+	allowAllEgress, err := readPolicyYaml("testpolicies/allow-ns-y-z-pod-b-c.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	util.IsNewNwPolicyVerFlag = true
+
+	sets, _, lists, _, _, iptEntries := translatePolicy(allowAllEgress)
+
+	expectedSets := []string{
+		"app:backend",
+		"ns-testnamespace",
+	}
+	if !reflect.DeepEqual(sets, expectedSets) {
+		t.Errorf("translatedPolicy failed @ ALLOW-all-FROM-app:backend-policy sets comparison")
+		t.Errorf("sets: %v", sets)
+		t.Errorf("expectedSets: %v", expectedSets)
+	}
+
+	expectedLists := []string{}
+	if !reflect.DeepEqual(lists, expectedLists) {
+		t.Errorf("translatedPolicy failed @ ALLOW-all-FROM-app:backend-policy lists comparison")
+		t.Errorf("lists: %v", lists)
+		t.Errorf("expectedLists: %v", expectedLists)
+	}
+
+	expectedIptEntries := []*iptm.IptEntry{}
+	nonKubeSystemEntries := []*iptm.IptEntry{
+		&iptm.IptEntry{
+			Chain: util.IptablesAzureEgressPortChain,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("ns-testnamespace"),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:backend"),
+				util.IptablesSrcFlag,
+				util.IptablesJumpFlag,
+				util.IptablesMark,
+				util.IptablesSetMarkFlag,
+				util.IptablesAzureEgressXMarkHex,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				"ALLOW-ALL-FROM-app:backend-IN-ns-testnamespace",
+			},
+		},
+		&iptm.IptEntry{
+			Chain:       util.IptablesAzureEgressPortChain,
+			IsJumpEntry: true,
+			Specs: []string{
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("ns-testnamespace"),
+				util.IptablesSrcFlag,
+				util.IptablesModuleFlag,
+				util.IptablesSetModuleFlag,
+				util.IptablesMatchSetFlag,
+				util.GetHashedName("app:backend"),
+				util.IptablesSrcFlag,
+				util.IptablesJumpFlag,
+				util.IptablesAzureEgressDropsChain,
+				util.IptablesModuleFlag,
+				util.IptablesCommentModuleFlag,
+				util.IptablesCommentFlag,
+				fmt.Sprintf("ALLOW-ALL-FROM-app:backend-IN-ns-testnamespace-TO-JUMP-TO-%s",
+					util.IptablesAzureEgressDropsChain),
+			},
+		},
+	}
+	expectedIptEntries = append(expectedIptEntries, nonKubeSystemEntries...)
+	// has egress, but empty map means allow all
+	expectedIptEntries = append(expectedIptEntries, getDefaultDropEntries("testnamespace", allowAllEgress.Spec.PodSelector, false, false)...)
+	if !reflect.DeepEqual(iptEntries, expectedIptEntries) {
+		t.Errorf("translatedPolicy failed @ ALLOW-all-FROM-app:backend-policy policy comparison")
+		marshalledIptEntries, _ := json.Marshal(iptEntries)
+		marshalledExpectedIptEntries, _ := json.Marshal(expectedIptEntries)
+		t.Errorf("iptEntries: %s", marshalledIptEntries)
+		t.Errorf("expectedIptEntries: %s", marshalledExpectedIptEntries)
+	}
+}
+
 func TestDenyAllFromNsUnsafe(t *testing.T) {
 	denyAllFromNsUnsafePolicy, err := readPolicyYaml("testpolicies/deny-all-from-ns-unsafe.yaml")
 	if err != nil {
