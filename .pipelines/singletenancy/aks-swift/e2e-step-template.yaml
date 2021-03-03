@@ -54,12 +54,10 @@ steps:
       sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$IMAGE_REGISTRY"'\/azure-cns:'"$(EnvironmentalVariables.Tag)"'-test\\/' configmap.json
       kubectl replace -f configmap.json
 
-      # Kill a kube addon manager pod to reboot the system
       echo "killing addonmanager pod to reboot CNS on cx cluster"
       POD_TO_DELETE=`kubectl get po -n $STABLE_DNC_NAMESPACE -l k8s-app=kube-addon-manager | grep -o -m 1 'kube-addon-manager\S*'`
       kubectl delete pod -n $STABLE_DNC_NAMESPACE $POD_TO_DELETE
 
-      # Wait until pod is back up
       export KUBECONFIG=~/.kube/dirty-acn-cx-cluster
       echo "Waiting for CNS dameonset to be ready..."
 
