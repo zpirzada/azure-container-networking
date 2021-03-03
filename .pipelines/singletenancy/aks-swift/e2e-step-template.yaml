@@ -31,16 +31,81 @@ steps:
       addSpnToEnvironment: true
       inlineScript: |
         mkdir -p ~/.kube/
-        az keyvault secret show --name $(KV_AKS_SWIFT_SECRET_NAME) --vault-name $(KV_NAME) --query value | sed 's/\\n/\n/g' | sed -e 's/^"//' -e 's/"$//'
-        az keyvault secret show --name $(KV_AKS_SWIFT_SECRET_NAME) --vault-name $(KV_NAME) --query value | sed 's/\\n/\n/g' | sed -e 's/^"//' -e 's/"$//' > ~/.kube/config
+        echo "DNC Underlay config"
+        az keyvault secret show --name $(KV_DNC_UNDERLAY_SECRET_NAME) --vault-name $(KV_NAME) --query value | sed 's/\\n/\n/g' | sed -e 's/^"//' -e 's/"$//'
+        az keyvault secret show --name $(KV_DNC_UNDERLAY_SECRET_NAME) --vault-name $(KV_NAME) --query value | sed 's/\\n/\n/g' | sed -e 's/^"//' -e 's/"$//' > ~/.kube/dnc-underlay
+        echo "Dirty ACN cx cluster config"
+        az keyvault secret show --name $(KV_AKS_SWIFT_CX_SECRET_NAME) --vault-name $(KV_NAME) --query value | sed 's/\\n/\n/g' | sed -e 's/^"//' -e 's/"$//'
+        az keyvault secret show --name $(KV_AKS_SWIFT_CX_SECRET_NAME) --vault-name $(KV_NAME) --query value | sed 's/\\n/\n/g' | sed -e 's/^"//' -e 's/"$//' > ~/.kube/dirty-acn-cx-cluster
     displayName: Pull Kubeconfig from Keyvault
+    condition: succeeded()
+
+  - script: |
+      set -e
+      echo "installing kubectl"
+      curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+      echo "Installing dirty CNS version by overriding kube-addon-manager's ConfigMap on the underlay cluster for the Stable DNC namespace $(STABLE_DNC_NAMESPACE)"
+      export KUBECONFIG=~/.kube/dnc-underlay
+      kubectl get cm -n $STABLE_DNC_NAMESPACE kube-addons -ojson > configmap.json
+      
+      echo "Replacing configmap image value for CNS"
+      # This line is gross I know, unfortunatly the addon configmap squishes each deployment onto one big line so I had to do a regex search and replace, no json or yaml editing available
+      sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$IMAGE_REGISTRY"'\/azure-cns:'"$(EnvironmentalVariables.Tag)"'-test\\/' configmap.json
+      kubectl replace -f configmap.json
+
+      # Kill a kube addon manager pod to reboot the system
+      echo "killing addonmanager pod to reboot CNS on cx cluster"
+      POD_TO_DELETE=`kubectl get po -n $STABLE_DNC_NAMESPACE -l k8s-app=kube-addon-manager | grep -o -m 1 'kube-addon-manager\S*'`
+      kubectl delete pod -n $STABLE_DNC_NAMESPACE $POD_TO_DELETE
+
+      # Wait until pod is back up
+      export KUBECONFIG=~/.kube/dirty-acn-cx-cluster
+      echo "Waiting for CNS dameonset to be ready..."
+
+      NUM_NODES=`kubectl get no | wc -l`
+      NUM_NODES=$[$NUM_NODES-1]
+
+      export i="1"
+      export attempts="100"
+      while [[ $(kubectl get ds -n kube-system azure-cns -ojson | jq '.status.numberReady') != $NUM_NODES ]]; do
+        sleep 3;
+        i=$[$i+1]
+        if [[ $i -gt $attempts ]]
+        then
+          echo "CNS daemonset never got ready, exiting"
+          exit 1
+        fi
+      done
+
+      echo "Daemonset is ready"
+      kubectl get ds -n kube-system azure-cns
+      kubectl get po -owide -n kube-system -l k8s-app=azure-cns
+
+    name: "installcns"
+    displayName: "Install CNS"
     condition: succeeded()
 
   - script: |
       ls -lah
       pwd
-      sudo -E env "PATH=$PATH" VERSION=$(ImageTag) INSTALL_CNI=true INSTALL_CNS=true make test-integration
+      cp ~/.kube/dirty-acn-cx-cluster ~/.kube/config
+      export KUBECONFIG=~/.kube/config
+      sudo -E env "PATH=$PATH" VERSION=$(ImageTag) INSTALL_CNI=true INSTALL_CNS=false make test-integration
     name: "aksswifte2e"
     displayName: "Run AKS Swift E2E"
+
+  - script: |
+      export KUBECONFIG=~/.kube/dnc-underlay
+      kubectl get cm -n $STABLE_DNC_NAMESPACE kube-addons -ojson > configmap.json
+      
+      echo "Replacing configmap image value for CNS"
+      # This line is gross I know, unfortunatly the addon configmap squishes each deployment onto one big line so I had to do a regex search and replace, no json or yaml editing available
+      sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$STABLE_CNS_IMAGE_FULL"'\\/' configmap.json
+      kubectl replace -f configmap.json
+
+    name: "cleanup"
+    displayName: "Restore to stable CNS"
+    condition: always()
 
 
