@@ -50,10 +50,15 @@ steps:
       echo "Installing dirty CNS version by overriding kube-addon-manager's ConfigMap on the underlay cluster for the Stable DNC namespace $(STABLE_DNC_NAMESPACE)"
       export KUBECONFIG=~/.kube/dnc-underlay
       kubectl get cm -n $STABLE_DNC_NAMESPACE kube-addons -ojson > configmap.json
+      echo "config map before"
+      cat configmap.json | grep azure-cns.yaml
       
       echo "Replacing configmap image value for CNS"
       # This line is gross I know, unfortunatly the addon configmap squishes each deployment onto one big line so I had to do a regex search and replace, no json or yaml editing available
       sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$IMAGE_REGISTRY"'\/azure-cns:'"${{parameters.cnsImageTag}}"'-test\\/' configmap.json
+
+      echo "config map after"
+      cat configmap.json | grep azure-cns.yaml
       kubectl replace -f configmap.json
 
       echo "killing addonmanager pod to reboot CNS on cx cluster"
