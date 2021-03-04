@@ -55,7 +55,7 @@ steps:
       
       echo "Replacing configmap image value for CNS"
       # This line is gross I know, unfortunatly the addon configmap squishes each deployment onto one big line so I had to do a regex search and replace, no json or yaml editing available
-      sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$IMAGE_REGISTRY"'\/azure-cns:'"${{parameters.cnsImageTag}}"'-test\\/' configmap.json
+      sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$IMAGE_REGISTRY"'\/azure-cns:'"$IMAGETAG"'-test\\/' configmap.json
 
       echo "config map after"
       cat configmap.json | grep azure-cns.yaml
@@ -101,15 +101,15 @@ steps:
     displayName: "Run AKS Swift E2E"
 
   - script: |
+      printenv
       export KUBECONFIG=~/.kube/dnc-underlay
       kubectl get cm -n $STABLE_DNC_NAMESPACE kube-addons -ojson > configmap.json
-      
       echo "Replacing configmap image value for CNS"
       # This line is gross I know, unfortunatly the addon configmap squishes each deployment onto one big line so I had to do a regex search and replace, no json or yaml editing available
-      export STABLE_CNS_IMAGE_FULL=`echo $STABLE_CNS_IMAGE_FULL | sed 's/\//\\\//g'`
+      export STABLE_CNS_IMAGE_FULL_SED=`echo $STABLE_CNS_IMAGE_FULL | sed 's/\//\\\//g'`
       echo "Sed friendly cns image path"
-      echo $STABLE_CNS_IMAGE_FULL
-      sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$STABLE_CNS_IMAGE_FULL"'\\/' configmap.json
+      echo $STABLE_CNS_IMAGE_FULL_SED
+      sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$STABLE_CNS_IMAGE_FULL_SED"'\\/' configmap.json
       kubectl replace -f configmap.json
 
     name: "cleanup"
