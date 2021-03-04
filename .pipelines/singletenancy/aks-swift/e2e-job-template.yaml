@@ -28,4 +28,3 @@ stages:
           - template: e2e-step-template.yaml
             parameters:
               name: ${{ parameters.name }}
-              cnsImageTag: ${{ parameters.cnsImageTag }}
