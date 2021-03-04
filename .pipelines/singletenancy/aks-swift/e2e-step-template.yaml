@@ -1,5 +1,6 @@
 parameters:
   name: ""
+  cnsImageTag: ""
 
 steps:
   - bash: |
@@ -42,6 +43,7 @@ steps:
 
   - script: |
       set -e
+      printenv
       echo "installing kubectl"
       curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
       sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
@@ -51,7 +53,7 @@ steps:
       
       echo "Replacing configmap image value for CNS"
       # This line is gross I know, unfortunatly the addon configmap squishes each deployment onto one big line so I had to do a regex search and replace, no json or yaml editing available
-      sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$IMAGE_REGISTRY"'\/azure-cns:'"$(EnvironmentalVariables.Tag)"'-test\\/' configmap.json
+      sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$IMAGE_REGISTRY"'\/azure-cns:'"${{parameters.cnsImageTag}}"'-test\\/' configmap.json
       kubectl replace -f configmap.json
 
       echo "killing addonmanager pod to reboot CNS on cx cluster"
@@ -99,6 +101,7 @@ steps:
       
       echo "Replacing configmap image value for CNS"
       # This line is gross I know, unfortunatly the addon configmap squishes each deployment onto one big line so I had to do a regex search and replace, no json or yaml editing available
+      echo $STABLE_CNS_IMAGE_FULL
       sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$STABLE_CNS_IMAGE_FULL"'\\/' configmap.json
       kubectl replace -f configmap.json
 
