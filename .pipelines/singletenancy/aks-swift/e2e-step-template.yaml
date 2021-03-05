@@ -149,6 +149,29 @@ steps:
       echo $STABLE_CNS_IMAGE_FULL_SED
       sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$STABLE_CNS_IMAGE_FULL_SED"'\\/' configmap.json
       kubectl replace -f configmap.json
+      sleep 15
+
+      export KUBECONFIG=~/.kube/dirty-acn-cx-cluster
+      echo "Waiting for CNS dameonset to be ready..."
+
+      NUM_NODES=`kubectl get no | wc -l`
+      NUM_NODES=$[$NUM_NODES-1]
+
+      export i="1"
+      export attempts="100"
+      while [[ $(kubectl get ds -n kube-system azure-cns -ojson | jq '.status.numberReady') != $NUM_NODES ]]; do
+        sleep 3;
+        i=$[$i+1]
+        if [[ $i -gt $attempts ]]
+        then
+          echo "CNS daemonset never got ready, exiting"
+          exit 1
+        fi
+      done
+
+      echo "Daemonset is ready"
+      kubectl get ds -n kube-system azure-cns
+      kubectl get po -owide -n kube-system -l k8s-app=azure-cns
 
     name: "cleanup"
     displayName: "Restore to stable CNS"
