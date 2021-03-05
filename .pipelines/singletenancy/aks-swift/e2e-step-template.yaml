@@ -107,7 +107,8 @@ steps:
       kubectl get cm -n $STABLE_DNC_NAMESPACE kube-addons -ojson > configmap.json
       echo "Replacing configmap image value for CNS"
       # This line is gross I know, unfortunatly the addon configmap squishes each deployment onto one big line so I had to do a regex search and replace, no json or yaml editing available
-      export STABLE_CNS_IMAGE_FULL_SED=`echo $STABLE_CNS_IMAGE_FULL | sed 's/\//\\\//g'`
+      STABLE_CNS_IMAGE_FULL_SED=$(echo $STABLE_CNS_IMAGE_FULL | sed 's/\//\\\//g')
+      echo $STABLE_CNS_IMAGE_FULL
       echo "Sed friendly cns image path"
       echo $STABLE_CNS_IMAGE_FULL_SED
       sed -i 's/[[:alnum:]\.\:\/\-]*azure-cns:[[:alnum:]\.\:\/\-]*/'"$STABLE_CNS_IMAGE_FULL_SED"'\\/' configmap.json
