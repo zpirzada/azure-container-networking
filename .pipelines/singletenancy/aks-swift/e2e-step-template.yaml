@@ -93,10 +93,21 @@ steps:
     condition: succeeded()
 
   - script: |
-      ls -lah
-      pwd
+      set -e
+      echo "Versions about to run"
+      export KUBECONFIG=~/.kube/dnc-underlay
+      kubectl get po -n $STABLE_DNC_NAMESPACE -l app=dnc -oyaml | grep -B 4 -A 4 -m 2 image:
+      
       cp ~/.kube/dirty-acn-cx-cluster ~/.kube/config
       export KUBECONFIG=~/.kube/config
+      kubectl get po -n kube-system -l k8s-app=azure-cns -oyaml | grep -m 2 -B 4 -A 4 image:
+
+      # Vendoring doesn't include tests so we have to git clone the ACN github
+      git clone https://github.com/Azure/azure-container-networking.git
+      cd azure-container-networking/
+      
+      kubectl cluster-info
+      kubectl get po -owide -A
       sudo -E env "PATH=$PATH" VERSION=$(ImageTag) INSTALL_CNI=true INSTALL_CNS=false make test-integration
     name: "aksswifte2e"
     displayName: "Run AKS Swift E2E"
@@ -116,4 +127,19 @@ steps:
 
     name: "cleanup"
     displayName: "Restore to stable CNS"
+    condition: always()
+
+  - script: |
+      echo "Logs will be available as a build artifact"
+      cd ./output 
+      export KUBECONFIG=~/.kube/dnc-underlay
+      kubectl logs -n $STABLE_DNC_NAMESPACE -l app=dnc --tail -1 -c dnc --prefix > dnc-logs.txt
+      kubectl logs -n $STABLE_DNC_NAMESPACE -l app=dnc --tail -1 -c requestcontroller --prefix > dnc-rc-logs.txt
+
+      export KUBECONFIG=~/.kube/dirty-acn-cx-cluster
+      kubectl logs -n kube-system -l k8s-app=azure-cns --tail -1 --prefix > cns-logs.txt
+
+    workingDirectory: "$(modulePath)"
+    name: "GetLogs"
+    displayName: "Get logs"
     condition: always()
