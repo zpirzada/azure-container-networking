@@ -93,6 +93,31 @@ steps:
     condition: succeeded()
 
   - script: |
+      echo "Refreshing dnc pod"
+      export KUBECONFIG=~/.kube/dnc-underlay
+      kubectl get po -n $STABLE_DNC_NAMESPACE -owide
+      kubectl delete po -n $STABLE_DNC_NAMESPACE -l app=dnc
+      echo "Waiting for new dnc pod to be ready..."
+      export i="1"
+      export attempts="100"
+      while [[ $(kubectl get pods -n $STABLE_DNC_NAMESPACE -l app=dnc -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do
+        sleep 3;
+        i=$[$i+1]
+        if [[ $i -gt $attempts ]]
+        then
+          echo "Pod never showed up, exiting"
+          exit 1
+        fi
+      done
+
+      echo "Pod is up and running"
+      kubectl get po -n $STABLE_DNC_NAMESPACE -owide
+      kubectl get po -n $STABLE_DNC_NAMESPACE -l app=dnc -oyaml | grep -B 4 -A 4 -m 2 image:
+    name: "refreshdnc"
+    displayName: "Refresh DNC"
+    condition: succeeded()
+
+  - script: |
       set -e
       echo "Versions about to run"
       export KUBECONFIG=~/.kube/dnc-underlay
