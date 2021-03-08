@@ -121,6 +121,7 @@ const (
 
 	IpsetUDPFlag  string = "udp:"
 	IpsetSCTPFlag string = "sctp:"
+	IpsetTCPFlag  string = "tcp:"
 
 	AzureNpmFlag   string = "azure-npm"
 	AzureNpmPrefix string = "azure-npm-"
@@ -132,6 +133,8 @@ const (
 
 	//Prefixes for ipsets
 	NamedPortIPSetPrefix string = "namedport:"
+
+	NamespacePrefix string = "ns-"
 )
 
 //NPM telemetry constants.
