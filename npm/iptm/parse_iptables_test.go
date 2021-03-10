@@ -1,0 +1,63 @@
+package iptm
+
+import (
+	"fmt"
+	"io/ioutil"
+	"testing"
+)
+
+func TestGetChainLines(t *testing.T) {
+	data, err := readIptablesCfg("../testpolicies/iptables-save.cfg")
+	if err != nil {
+		t.Errorf("TestGetChainLines failed@ reading data from iptables-save cfg file with err: %s", err)
+	}
+
+	chainMap := GetChainLines("filter", data)
+
+	for k, v := range chainMap {
+		fmt.Println(k)
+		if len(v.Rules) > 0 {
+			fmt.Println(string(v.Rules[0]))
+		}
+	}
+}
+
+func readIptablesCfg(fileName string) ([]byte, error) {
+	b, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(b), nil
+}
+
+func TestReadLinesFromByteBuffer(t *testing.T) {
+	testFn := func(byteArray []byte, expected []string) {
+		index := 0
+		readIndex := 0
+		for ; readIndex < len(byteArray); index++ {
+			line, n := readLine(readIndex, byteArray)
+			readIndex = n
+			if expected[index] != string(line) {
+				t.Errorf("expected:%q, actual:%q", expected[index], line)
+			}
+		} // for
+		if readIndex < len(byteArray) {
+			t.Errorf("Byte buffer was only partially read. Buffer length is:%d, readIndex is:%d", len(byteArray), readIndex)
+		}
+		if index < len(expected) {
+			t.Errorf("All expected strings were not compared. expected arr length:%d, matched count:%d", len(expected), index-1)
+		}
+	}
+
+	byteArray1 := []byte("\n  Line 1  \n\n\n L ine4  \nLine 5 \n \n")
+	expected1 := []string{"", "Line 1", "", "", "L ine4", "Line 5", ""}
+	testFn(byteArray1, expected1)
+
+	byteArray1 = []byte("")
+	expected1 = []string{}
+	testFn(byteArray1, expected1)
+
+	byteArray1 = []byte("\n\n")
+	expected1 = []string{"", ""}
+	testFn(byteArray1, expected1)
+}

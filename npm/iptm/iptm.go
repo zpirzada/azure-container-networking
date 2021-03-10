@@ -4,6 +4,7 @@
 package iptm
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -353,6 +354,15 @@ func (iptMgr *IptablesManager) DeleteChain(chain string) error {
 	return nil
 }
 
+// AddAll will run through all entries and Adds them
+func (iptMgr *IptablesManager) AddAll(iptEntries []*IptEntry) {
+	for _, iptEntry := range iptEntries {
+		if err := iptMgr.Add(iptEntry); err != nil {
+			log.Errorf("Error: failed to apply iptables rule. Rule: %+v", iptEntry)
+		}
+	}
+}
+
 // Add adds a rule in iptables.
 func (iptMgr *IptablesManager) Add(entry *IptEntry) error {
 	timer := metrics.StartNewTimer()
@@ -373,6 +383,15 @@ func (iptMgr *IptablesManager) Add(entry *IptEntry) error {
 	timer.StopAndRecord(metrics.AddIPTableRuleExecTime)
 
 	return nil
+}
+
+// DeleteAll will run through all entries and dletes them
+func (iptMgr *IptablesManager) DeleteAll(iptEntries []*IptEntry) {
+	for _, iptEntry := range iptEntries {
+		if err := iptMgr.Delete(iptEntry); err != nil {
+			log.Errorf("Error: failed to apply iptables rule. Rule: %+v", iptEntry)
+		}
+	}
 }
 
 // Delete removes a rule in iptables.
@@ -469,6 +488,33 @@ func (iptMgr *IptablesManager) Save(configFile string) error {
 	return nil
 }
 
+// SaveIntoBuffer will save iptables output into a provided buffer
+func (iptMgr *IptablesManager) SaveIntoBuffer(buffer *bytes.Buffer) error {
+	l, err := grabIptablesLocks()
+	if err != nil {
+		return err
+	}
+
+	defer func(l *os.File) {
+		if err = l.Close(); err != nil {
+			log.Logf("Failed to close iptables locks")
+		}
+	}(l)
+
+	cmdArgs := []string{"-t", string("filter")}
+	cmd := exec.Command(util.IptablesSave, cmdArgs...)
+
+	cmd.Stdout = buffer
+	stderrBuffer := bytes.NewBuffer(nil)
+	cmd.Stderr = stderrBuffer
+
+	err = cmd.Run()
+	if err != nil {
+		stderrBuffer.WriteTo(buffer) // ignore error, since we need to return the original error
+	}
+	return err
+}
+
 // Restore restores iptables configuration from /var/log/iptables.conf
 func (iptMgr *IptablesManager) Restore(configFile string) error {
 	if len(configFile) == 0 {
@@ -498,6 +544,31 @@ func (iptMgr *IptablesManager) Restore(configFile string) error {
 	cmd.Stdin = f
 	if err := cmd.Start(); err != nil {
 		metrics.SendErrorLogAndMetric(util.IptmID, "Error: failed to run iptables-restore.")
+		return err
+	}
+	cmd.Wait()
+
+	return nil
+}
+
+// RestoreFromBuffer restores iptables configuration from a given buffer
+func (iptMgr *IptablesManager) RestoreFromBuffer(buffer *bytes.Buffer, cmdArgs []string) error {
+
+	l, err := grabIptablesLocks()
+	if err != nil {
+		return err
+	}
+
+	defer func(l *os.File) {
+		if err = l.Close(); err != nil {
+			log.Logf("Failed to close iptables locks")
+		}
+	}(l)
+
+	cmd := exec.Command(util.IptablesRestore, cmdArgs...)
+	cmd.Stdin = buffer
+	if err := cmd.Start(); err != nil {
+		metrics.SendErrorLogAndMetric(util.IptmID, "Error: failed to run iptables-restore with err: %s", err)
 		return err
 	}
 	cmd.Wait()
@@ -564,3 +635,12 @@ func grabIptablesLocks() (*os.File, error) {
 // 	writeLine(filterChains, "*filter")
 
 // }
+
+// BulkUpdateIPtables will handle updating of iptables
+func (iptMgr *IptablesManager) BulkUpdateIPtables(toAddEntries []*IptEntry, toDeleteEntries []*IptEntry) {
+	iptableBuffer := bytes.NewBuffer(nil)
+	if err := iptMgr.SaveIntoBuffer(iptableBuffer); err != nil {
+		metrics.SendErrorLogAndMetric(util.IptmID, "[IPTM] Error: failed to get iptables-save command output with err: %s", err.Error())
+	}
+
+}
