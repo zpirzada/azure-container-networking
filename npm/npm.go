@@ -48,8 +48,8 @@ type NetworkPolicyManager struct {
 	nsInformer      coreinformers.NamespaceInformer
 	npInformer      networkinginformers.NetworkPolicyInformer
 
-	nodeName                     string
-	nsMap                        map[string]*namespace
+	NodeName                     string
+	NsMap                        map[string]*Namespace
 	isAzureNpmChainCreated       bool
 	isSafeToCleanUpAzureNpmChain bool
 
@@ -98,7 +98,7 @@ func GetAIMetadata() string {
 func (npMgr *NetworkPolicyManager) SendClusterMetrics() {
 	var (
 		heartbeat        = time.NewTicker(time.Minute * heartbeatIntervalInMinutes).C
-		customDimensions = map[string]string{"ClusterID": util.GetClusterID(npMgr.nodeName),
+		customDimensions = map[string]string{"ClusterID": util.GetClusterID(npMgr.NodeName),
 			"APIServer": npMgr.serverVersion.String()}
 		podCount = aitelemetry.Metric{
 			Name:             "PodCount",
@@ -119,10 +119,10 @@ func (npMgr *NetworkPolicyManager) SendClusterMetrics() {
 		npMgr.Lock()
 		podCount.Value = 0
 		//Reducing one to remove all-namespaces ns obj
-		nsCount.Value = float64(len(npMgr.nsMap) - 1)
-		for _, ns := range npMgr.nsMap {
+		nsCount.Value = float64(len(npMgr.NsMap) - 1)
+		for _, ns := range npMgr.NsMap {
 			nwPolicyCount.Value += float64(len(ns.rawNpMap))
-			podCount.Value += float64(len(ns.podMap))
+			podCount.Value += float64(len(ns.PodMap))
 		}
 		npMgr.Unlock()
 
@@ -230,8 +230,8 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 		podInformer:                  podInformer,
 		nsInformer:                   nsInformer,
 		npInformer:                   npInformer,
-		nodeName:                     os.Getenv("HOSTNAME"),
-		nsMap:                        make(map[string]*namespace),
+		NodeName:                     os.Getenv("HOSTNAME"),
+		NsMap:                        make(map[string]*Namespace),
 		isAzureNpmChainCreated:       false,
 		isSafeToCleanUpAzureNpmChain: false,
 		clusterState: telemetry.ClusterState{
@@ -245,11 +245,11 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 	}
 
 	allNs, _ := newNs(util.KubeAllNamespacesFlag)
-	npMgr.nsMap[util.KubeAllNamespacesFlag] = allNs
+	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	// Create ipset for the namespace.
 	kubeSystemNs := util.GetNSNameWithPrefix(util.KubeSystemFlag)
-	if err := allNs.ipsMgr.CreateSet(kubeSystemNs, append([]string{util.IpsetNetHashFlag})); err != nil {
+	if err := allNs.IpsMgr.CreateSet(kubeSystemNs, append([]string{util.IpsetNetHashFlag})); err != nil {
 		metrics.SendErrorLogAndMetric(util.NpmID, "Error: failed to create ipset for namespace %s.", kubeSystemNs)
 	}
 

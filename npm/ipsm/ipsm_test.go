@@ -317,7 +317,7 @@ func TestAddToSetWithCachePodInfo(t *testing.T) {
 	}
 
 	// validate if Pod1 exists
-	cachedPodUid := ipsMgr.setMap[setname].elements[ip]
+	cachedPodUid := ipsMgr.SetMap[setname].elements[ip]
 	if cachedPodUid != pod1 {
 		t.Errorf("setname: %s, hashedname: %s is added with wrong podUid: %s, expected: %s", setname, util.GetHashedName(setname), cachedPodUid, pod1)
 	}
@@ -328,7 +328,7 @@ func TestAddToSetWithCachePodInfo(t *testing.T) {
 		t.Errorf("TestAddToSetWithCachePodInfo with pod2 failed @ ipsMgr.AddToSet")
 	}
 
-	cachedPodUid = ipsMgr.setMap[setname].elements[ip]
+	cachedPodUid = ipsMgr.SetMap[setname].elements[ip]
 	if cachedPodUid != pod2 {
 		t.Errorf("setname: %s, hashedname: %s is added with wrong podUid: %s, expected: %s", setname, util.GetHashedName(setname), cachedPodUid, pod2)
 	}
@@ -355,7 +355,7 @@ func TestDeleteFromSet(t *testing.T) {
 		t.Errorf("TestDeleteFromSet failed @ ipsMgr.AddToSet")
 	}
 
-	if len(ipsMgr.setMap[testSetName].elements) != 1 {
+	if len(ipsMgr.SetMap[testSetName].elements) != 1 {
 		t.Errorf("TestDeleteFromSet failed @ ipsMgr.AddToSet")
 	}
 
@@ -364,7 +364,7 @@ func TestDeleteFromSet(t *testing.T) {
 	}
 
 	// After deleting the only entry, "1.2.3.4" from "test-set", "test-set" ipset won't exist
-	if _, exists := ipsMgr.setMap[testSetName]; exists {
+	if _, exists := ipsMgr.SetMap[testSetName]; exists {
 		t.Errorf("TestDeleteFromSet failed @ ipsMgr.DeleteFromSet")
 	}
 
@@ -395,7 +395,7 @@ func TestDeleteFromSetWithPodCache(t *testing.T) {
 		t.Errorf("TestDeleteFromSetWithPodCache failed for pod1 @ ipsMgr.AddToSet")
 	}
 
-	if len(ipsMgr.setMap[setname].elements) != 1 {
+	if len(ipsMgr.SetMap[setname].elements) != 1 {
 		t.Errorf("TestDeleteFromSetWithPodCache failed @ ipsMgr.AddToSet")
 	}
 
@@ -420,7 +420,7 @@ func TestDeleteFromSetWithPodCache(t *testing.T) {
 	}
 
 	// note the set will stil exist with pod ip
-	cachedPodUid := ipsMgr.setMap[setname].elements[ip]
+	cachedPodUid := ipsMgr.SetMap[setname].elements[ip]
 	if cachedPodUid != pod2 {
 		t.Errorf("setname: %s, hashedname: %s is added with wrong podUid: %s, expected: %s", setname, util.GetHashedName(setname), cachedPodUid, pod2)
 	}
@@ -430,7 +430,7 @@ func TestDeleteFromSetWithPodCache(t *testing.T) {
 		t.Errorf("TestDeleteFromSetWithPodCache for pod2 failed @ ipsMgr.DeleteFromSet")
 	}
 
-	if _, exists := ipsMgr.setMap[setname]; exists {
+	if _, exists := ipsMgr.SetMap[setname]; exists {
 		t.Errorf("TestDeleteFromSetWithPodCache failed @ ipsMgr.DeleteFromSet")
 	}
 }
