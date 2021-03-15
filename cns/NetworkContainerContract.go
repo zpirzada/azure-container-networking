@@ -219,6 +219,11 @@ type IPConfigRequest struct {
 	OrchestratorContext json.RawMessage
 }
 
+func (i IPConfigRequest) String() string {
+	return fmt.Sprintf("[IPConfigRequest: DesiredIPAddress %s, OrchestratorContext %s]",
+		i.DesiredIPAddress, string(i.OrchestratorContext))
+}
+
 // IPConfigResponse is used in CNS IPAM mode as a response to CNI ADD
 type IPConfigResponse struct {
 	PodIpInfo PodIpInfo
@@ -235,6 +240,12 @@ type GetIPAddressesRequest struct {
 type GetIPAddressStateResponse struct {
 	IPAddresses []IPAddressState
 	Response    Response
+}
+
+// GetIPAddressStatusResponse is used in CNS IPAM mode as a response to get IP address, state and Pod info
+type GetIPAddressStatusResponse struct {
+	IPConfigurationStatus[] IPConfigurationStatus
+	Response Response
 }
 
 // IPAddressState Only used in the GetIPConfig API to return IP's that match a filter

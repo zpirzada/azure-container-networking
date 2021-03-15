@@ -38,7 +38,6 @@ var (
 )
 
 func HandleCNSClientCommands(cmd, arg string) error {
-
 	cnsIPAddress := os.Getenv(envCNSIPAddress)
 	cnsPort := os.Getenv(envCNSPort)
 
@@ -68,10 +67,14 @@ func getCmd(client *CNSClient, arg string) error {
 	case cns.PendingRelease:
 		states = append(states, cns.PendingRelease)
 
+	case cns.PendingProgramming:
+		states = append(states, cns.PendingProgramming)
+
 	default:
 		states = append(states, cns.Allocated)
 		states = append(states, cns.Available)
 		states = append(states, cns.PendingRelease)
+		states = append(states, cns.PendingProgramming)
 	}
 
 	addr, err := client.GetIPAddressesMatchingStates(states...)
@@ -84,12 +87,12 @@ func getCmd(client *CNSClient, arg string) error {
 }
 
 // Sort the addresses based on IP, then write to stdout
-func printIPAddresses(addrSlice []cns.IPAddressState) {
+func printIPAddresses(addrSlice []cns.IPConfigurationStatus) {
 	sort.Slice(addrSlice, func(i, j int) bool {
 		return addrSlice[i].IPAddress < addrSlice[j].IPAddress
 	})
 
 	for _, addr := range addrSlice {
-		fmt.Printf("%+v\n", addr)
+		cns.IPConfigurationStatus.String(addr)
 	}
 }

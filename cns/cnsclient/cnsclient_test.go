@@ -137,9 +137,15 @@ func TestMain(m *testing.M) {
 	}
 
 	if httpRestService != nil {
+		err = httpRestService.Init(&config)
+		if err != nil {
+			logger.Errorf("Failed to initialize HttpService, err:%v.\n", err)
+			return
+		}
+
 		err = httpRestService.Start(&config)
 		if err != nil {
-			logger.Errorf("Failed to start CNS, err:%v.\n", err)
+			logger.Errorf("Failed to start HttpService, err:%v.\n", err)
 			return
 		}
 	}
@@ -239,4 +245,5 @@ func TestCNSClientRequestAndRelease(t *testing.T) {
 	if ipaddresses[0].IPAddress != desiredIpAddress && ipaddresses[0].State != cns.Available {
 		t.Fatalf("Available IP address does not match expected, address state: %+v", ipaddresses)
 	}
+	fmt.Println(ipaddresses)
 }

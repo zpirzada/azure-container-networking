@@ -6,6 +6,7 @@ package cns
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/Azure/azure-container-networking/cns/common"
 	nnc "github.com/Azure/azure-container-networking/nodenetworkconfig/api/v1alpha"
@@ -46,7 +47,7 @@ type HTTPService interface {
 	MarkIPAsPendingRelease(numberToMark int) (map[string]IPConfigurationStatus, error)
 }
 
-// This is used for KubernetesCRD orchastrator Type where NC has multiple ips.
+// This is used for KubernetesCRD orchestrator Type where NC has multiple ips.
 // This struct captures the state for SecondaryIPs associated to a given NC
 type IPConfigurationStatus struct {
 	NCID                string
@@ -54,6 +55,11 @@ type IPConfigurationStatus struct {
 	IPAddress           string
 	State               string
 	OrchestratorContext json.RawMessage
+}
+
+func (i IPConfigurationStatus) String() string {
+	return fmt.Sprintf("IPConfigurationStatus: Id: [%s], NcId: [%s], IpAddress: [%s], State: [%s], OrchestratorContext: [%s]",
+		i.ID, i.NCID, i.IPAddress, i.State, string(i.OrchestratorContext))
 }
 
 // SetEnvironmentRequest describes the Request to set the environment in CNS.

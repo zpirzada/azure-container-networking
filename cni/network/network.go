@@ -518,6 +518,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 			Id:           networkId,
 			Mode:         nwCfg.Mode,
 			MasterIfName: masterIfName,
+			AdapterName: nwCfg.AdapterName,
 			Subnets: []network.SubnetInfo{
 				{
 					Family:  platform.AfINET,
