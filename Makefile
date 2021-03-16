@@ -402,10 +402,9 @@ cni-archive:
 ifeq ($(GOOS),windows)
 	mkdir -p $(CNI_BAREMETAL_BUILD_DIR)
 	cp cni/azure-$(GOOS)-baremetal.conflist $(CNI_BAREMETAL_BUILD_DIR)/10-azure.conflist
-	cp telemetry/azure-vnet-telemetry.config $(CNI_BAREMETAL_BUILD_DIR)/azure-vnet-telemetry.config
-	cp $(CNI_BUILD_DIR)/azure-vnet$(EXE_EXT) $(CNI_BUILD_DIR)/azure-vnet-telemetry$(EXE_EXT) $(CNI_BAREMETAL_BUILD_DIR)
+	cp $(CNI_BUILD_DIR)/azure-vnet$(EXE_EXT) $(CNI_BAREMETAL_BUILD_DIR)
 	chmod 0755 $(CNI_BAREMETAL_BUILD_DIR)/azure-vnet$(EXE_EXT)
-	cd $(CNI_BAREMETAL_BUILD_DIR) && $(ARCHIVE_CMD) $(CNI_BAREMETAL_ARCHIVE_NAME) azure-vnet$(EXE_EXT) azure-vnet-telemetry$(EXE_EXT) 10-azure.conflist azure-vnet-telemetry.config
+	cd $(CNI_BAREMETAL_BUILD_DIR) && $(ARCHIVE_CMD) $(CNI_BAREMETAL_ARCHIVE_NAME) azure-vnet$(EXE_EXT) 10-azure.conflist
 	chown $(BUILD_USER):$(BUILD_USER) $(CNI_BAREMETAL_BUILD_DIR)/$(CNI_BAREMETAL_ARCHIVE_NAME)
 endif
 
