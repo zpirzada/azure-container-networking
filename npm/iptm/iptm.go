@@ -183,6 +183,7 @@ func (iptMgr *IptablesManager) UninitNpmChains() error {
 		metrics.SendErrorLogAndMetric(util.IptmID, "Error: failed to add default allow CONNECTED/RELATED rule to AZURE-NPM chain.")
 		return err
 	}
+	iptablesAzureChainList := getAllNpmChains()
 
 	// For backward compatibility, we should be cleaning older chains
 	allAzureChains := append(
@@ -268,7 +269,8 @@ func (iptMgr *IptablesManager) Exists(entry *IptEntry) (bool, error) {
 // AddAllChains adds all NPM chains
 func (iptMgr *IptablesManager) AddAllChains() error {
 	// Add all secondary Chains
-	for _, chainToAdd := range IptablesAzureChainList {
+	iptablesAzureChainList := getAllNpmChains()
+	for _, chainToAdd := range iptablesAzureChainList {
 		if err := iptMgr.AddChain(chainToAdd); err != nil {
 			return err
 		}
@@ -640,7 +642,18 @@ func grabIptablesLocks() (*os.File, error) {
 func (iptMgr *IptablesManager) BulkUpdateIPtables(toAddEntries []*IptEntry, toDeleteEntries []*IptEntry) {
 	iptableBuffer := bytes.NewBuffer(nil)
 	if err := iptMgr.SaveIntoBuffer(iptableBuffer); err != nil {
-		metrics.SendErrorLogAndMetric(util.IptmID, "[IPTM] Error: failed to get iptables-save command output with err: %s", err.Error())
+		metrics.SendErrorLogAndMetric(util.IptmID, "[BulkUpdateIPtables] Error: failed to get iptables-save command output with err: %s", err.Error())
 	}
+
+}
+
+func (iptMgr *IptablesManager) parseiptablesBuffer(buffer *bytes.Buffer) (*Iptable, error) {
+	filterTable := NewIptable("filter", buffer)
+
+	if err := filterTable.Validate(); err != nil {
+		metrics.SendErrorLogAndMetric(util.IptmID, "[parseiptablesBuffer] %s", err.Error())
+	}
+
+	return filterTable, nil
 
 }

@@ -17,15 +17,81 @@ func getAllChainsAndRules() [][]string {
 		getAzureNPMEgressChainRules,
 		getAzureNPMEgressPortChainRules,
 		getAzureNPMEgressToChainRules,
+var (
+	IptablesAzureChainMap = map[string]func() [][]string{
+		util.IptablesAzureChain:             getAzureNPMChainRules,
+		util.IptablesAzureIngressChain:      getAzureNPMIngressChainRules,
+		util.IptablesAzureIngressPortChain:  getAzureNPMIngressPortChainRules,
+		util.IptablesAzureIngressFromChain:  getAzureNPMIngressFromChainRules,
+		util.IptablesAzureEgressChain:       getAzureNPMEgressChainRules,
+		util.IptablesAzureEgressPortChain:   getAzureNPMEgressPortChainRules,
+		util.IptablesAzureEgressToChain:     getAzureNPMEgressToChainRules,
+		util.IptablesAzureIngressDropsChain: func() [][]string { return nil },
+		util.IptablesAzureEgressDropsChain:  func() [][]string { return nil },
 	}
+)
 
+func getAllNpmChains() []string {
+	listOfChains := []string{}
+	for chain, _ := range IptablesAzureChainMap {
+		listOfChains = append(listOfChains, chain)
+	}
+	return listOfChains
+}
+
+// GetAllChainsAndRules returns all NPM chains and rules
+func getAllChainsAndRules() [][]string {
 	chainsAndRules := [][]string{}
-	for _, fn := range funcList {
+	for _, fn := range IptablesAzureChainMap {
 		tempRules := fn()
 		chainsAndRules = append(chainsAndRules, tempRules...)
 	}
 
 	return chainsAndRules
+}
+
+func getChainsFromRule(rule []string) string {
+	return rule[0]
+}
+
+func getChainObjects() *Iptable {
+	npmChains := &Iptable{
+		Chains:    make(map[string]*IptableChain),
+		TableName: "npmchains",
+	}
+
+	allRules := getAllChainsAndRules()
+
+	for _, rule := range allRules {
+		chain := getChainsFromRule(rule)
+		val, ok := npmChains.Chains[chain]
+		if !ok {
+			val = NewIptableChain(chain)
+		}
+
+		val.Rules = append(val.Rules, convertRuleListToByte(rule))
+		npmChains.Chains[chain] = val
+
+	}
+
+	return npmChains
+}
+
+func convertRuleListToByte(rule []string) []byte {
+	return []byte(convertRuleListToString(rule))
+}
+
+func convertRuleListToString(rule []string) string {
+	returnString := "-A"
+	for _, word := range rule {
+		returnString = fmt.Sprintf("%s %s", returnString, word)
+	}
+
+	return returnString
+}
+
+func convertRuleStringToByte(rule string) []byte {
+	return []byte(rule)
 }
 
 // getAzureNPMChainRules returns all rules for AZURE-NPM chain

@@ -21,8 +21,8 @@ func MakeChainLine(chain string) string {
 // It returns a map of iptables.Chain to []byte where the []byte is the chain line
 // from save (with counters etc.).
 // Note that to avoid allocations memory is SHARED with save.
-func GetChainLines(table string, save []byte) map[string]IptableChain {
-	chainsMap := make(map[string]IptableChain)
+func GetChainLines(table string, save []byte) map[string]*IptableChain {
+	chainsMap := make(map[string]*IptableChain)
 	tablePrefix := []byte("*" + string(table))
 	readIndex := 0
 	// find beginning of table
@@ -56,7 +56,7 @@ func GetChainLines(table string, save []byte) map[string]IptableChain {
 				val.Data = line
 				chainsMap[chain] = val
 			} else {
-				chainsMap[chain] = IptableChain{
+				chainsMap[chain] = &IptableChain{
 					Chain: chain,
 					Data:  line,
 					Rules: make([][]byte, 0),
@@ -66,7 +66,7 @@ func GetChainLines(table string, save []byte) map[string]IptableChain {
 			chain := getChainNameFromRule(line)
 			val, ok := chainsMap[chain]
 			if !ok {
-				val = IptableChain{
+				val = &IptableChain{
 					Chain: chain,
 					Data:  []byte{},
 					Rules: make([][]byte, 0),
