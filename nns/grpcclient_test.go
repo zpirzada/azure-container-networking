@@ -1,4 +1,4 @@
-package nnsgrpcclient
+package nns
 
 import (
 	"context"
@@ -20,48 +20,44 @@ func TestMain(m *testing.M) {
 }
 
 func setup() {
-	mockserver  = nnsmockserver.NewNnsMockServer()
-	go  mockserver.StartGrpcServer(nnsPort)
-	fmt.Printf("mock nns server started\n")
+	mockserver = nnsmockserver.NewNnsMockServer()
+	go mockserver.StartGrpcServer(nnsPort)
+	fmt.Println("mock nns server started\n")
 }
 
 func teardown() {
 	mockserver.StopGrpcServer()
-	fmt.Printf("mock nns server stopped\n")
+	fmt.Println("mock nns server stopped\n")
 }
 
 // CNI ADD to add container to network
 func TestAddContainerNetworking(t *testing.T) {
 
-	client := &NnsGrpcClient{}
+	client := &GrpcClient{}
 	if err, _ := client.AddContainerNetworking(
-		 context.Background(),
+		context.Background(),
 		"sf_8e9961f4-5b4f-4b3c-a9ae-c3294b0d9681",
 		"testnwspace"); err != nil {
-       t.Fatalf("TestAddContainerNetworking failed: %v", err)
+		t.Fatalf("TestAddContainerNetworking failed: %v", err)
 	}
-
-	fmt.Printf("TestAddContainerNetworking success\n")
 }
 
 // CNI DEL to delete container from network
 func TestDeleteContainerNetworking(t *testing.T) {
 
-	client := &NnsGrpcClient{}
+	client := &GrpcClient{}
 	if err, _ := client.DeleteContainerNetworking(
 		context.Background(),
 		"sf_8e9961f4-5b4f-4b3c-a9ae-c3294b0d9681",
 		"testnwspace"); err != nil {
 		t.Fatalf("TestSetupContainer: %v", err)
 	}
-
-	fmt.Printf("TestDeleteContainerNetworking: success\n")
 }
 
 // CNI ADD to add container to network - failure case
 func TestAddContainerNetworkingFailure(t *testing.T) {
 
-	client := &NnsGrpcClient{}
+	client := &GrpcClient{}
 
 	var err error
 	if err, _ = client.AddContainerNetworking(context.Background(), "testpod", "testnwspace"); err == nil {
@@ -71,14 +67,12 @@ func TestAddContainerNetworkingFailure(t *testing.T) {
 	if !strings.Contains(err.Error(), "Setup") {
 		t.Fatalf("TestAddContainerNetworkingFailure failed. Error should have contained Setup. %v \n", err)
 	}
-
-	fmt.Printf("TestAddContainerNetworkingFailure success\n")
 }
 
 // CNI DEL to add container to network - failure case
 func TestDeleteContainerNetworkingFailure(t *testing.T) {
 
-	client := &NnsGrpcClient{}
+	client := &GrpcClient{}
 
 	var err error
 	if err, _ = client.DeleteContainerNetworking(context.Background(), "testpod", "testnwspace"); err == nil {
@@ -88,8 +82,6 @@ func TestDeleteContainerNetworkingFailure(t *testing.T) {
 	if !strings.Contains(err.Error(), "Teardown") {
 		t.Fatalf("TestDeleteContainerNetworkingFailure failed. Error should have contained Teardown. %v \n", err)
 	}
-
-	fmt.Printf("TestDeleteContainerNetworkingFailure success\n")
 }
 
 // CNI ADD to add container to network - grpc server was down temporarily and client reconnects well
@@ -104,14 +96,12 @@ func TestAddContainerNetworkingGrpcServerDown(t *testing.T) {
 		setup()
 	}()
 
-	client := &NnsGrpcClient{}
+	client := &GrpcClient{}
 
 	var err error
 	if err, _ = client.AddContainerNetworking(
-		context.Background(),"sf_8e9961f4-5b4f-4b3c-a9ae-c3294b0d9681", "testnwspace"); err != nil {
+		context.Background(), "sf_8e9961f4-5b4f-4b3c-a9ae-c3294b0d9681", "testnwspace"); err != nil {
 
 		t.Fatalf("TestAddContainerNetworkingGrpcServerDown failed. %s\n", err)
 	}
-
-	fmt.Printf("TestAddContainerNetworkingGrpcServerDown success\n")
 }

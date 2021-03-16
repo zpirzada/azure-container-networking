@@ -25,7 +25,7 @@ import (
 	"github.com/Azure/azure-container-networking/network"
 	"github.com/Azure/azure-container-networking/network/policy"
 	"github.com/Azure/azure-container-networking/platform"
-	nns "github.com/Azure/azure-container-networking/proto/nodenetworkservice/3.302.0.744"
+	nnscontracts "github.com/Azure/azure-container-networking/proto/nodenetworkservice/3.302.0.744"
 	"github.com/Azure/azure-container-networking/telemetry"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
@@ -80,8 +80,15 @@ type netPlugin struct {
 
 // client for node network service
 type NnsClient interface {
-	AddContainerNetworking(ctx context.Context, podName, nwNamespace string) (error, *nns.ConfigureContainerNetworkingResponse)
-	DeleteContainerNetworking(ctx context.Context, podName, nwNamespace string) (error, *nns.ConfigureContainerNetworkingResponse)
+	// Do network port programming for the pod via node network service.
+	// podName - name of the pod as received from containerD
+	// nwNamesapce - network namespace name as received from containerD
+	AddContainerNetworking(ctx context.Context, podName, nwNamespace string) (error, *nnscontracts.ConfigureContainerNetworkingResponse)
+
+	// Undo or delete network port programming for the pod via node network service.
+	// podName - name of the pod as received from containerD
+	// nwNamesapce - network namespace name as received from containerD
+	DeleteContainerNetworking(ctx context.Context, podName, nwNamespace string) (error, *nnscontracts.ConfigureContainerNetworkingResponse)
 }
 
 // snatConfiguration contains a bool that determines whether CNI enables snat on host and snat for dns
@@ -374,7 +381,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	log.Printf("Execution mode :%s", nwCfg.ExecutionMode)
 	if nwCfg.ExecutionMode == string(Baremetal) {
-		var  res *nns.ConfigureContainerNetworkingResponse
+		var  res *nnscontracts.ConfigureContainerNetworkingResponse
         log.Printf("Baremetal mode. Calling vnet agent for ADD")
 		err, res = plugin.nnsClient.AddContainerNetworking(context.Background(), k8sPodName, args.Netns)
 
@@ -794,7 +801,6 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		epInfo       *network.EndpointInfo
 		cniMetric    telemetry.AIMetric
 		msg          string
-		deleteTried  bool
 	)
 
 	startTime := time.Now()
@@ -822,10 +828,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	plugin.setCNIReportDetails(nwCfg, CNI_DEL, "")
 	iptables.DisableIPTableLock = nwCfg.DisableIPTableLock
 
-	defer func() {
-		if !deleteTried {
-			return
-		}
+	sendMeticFunc := func() {
 		operationTimeMs := time.Since(startTime).Milliseconds()
 		cniMetric.Metric = aitelemetry.Metric{
 			Name:             telemetry.CNIDelTimeMetricStr,
@@ -834,15 +837,15 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		}
 		SetCustomDimensions(&cniMetric, nwCfg, err)
 		telemetry.SendCNIMetric(&cniMetric, plugin.tb)
-	}()
+	}
 
 	log.Printf("Execution mode :%s", nwCfg.ExecutionMode)
 	if nwCfg.ExecutionMode == string(Baremetal) {
 
 		log.Printf("Baremetal mode. Calling vnet agent for delete container")
 
-		// set the flag to true for attempt. This will be used by deferred telemetry method to emit metrics
-		deleteTried = true
+		// schedule send metric before attempting delete
+		defer sendMeticFunc()
 		err, _ = plugin.nnsClient.DeleteContainerNetworking(context.Background(), k8sPodName, args.Netns)
 		return err
 	}
@@ -914,10 +917,9 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		return err
 	}
 
-	// set the flag to true for attempt. This will be used by deferred telemetry method to emit metrics
-	deleteTried = true
-
-    // Delete the endpoint.
+	// schedule send metric before attempting delete
+	defer sendMeticFunc()
+	// Delete the endpoint.
 	if err = plugin.nm.DeleteEndpoint(networkId, endpointId); err != nil {
 		err = plugin.Errorf("Failed to delete endpoint: %v", err)
 		return err
@@ -1191,7 +1193,7 @@ func determineSnat() (bool, bool, error) {
 	return snatConfig.EnableSnatForDns, snatConfig.EnableSnatOnHost, nil
 }
 
-func convertNnsToCniResult(netRes *nns.ConfigureContainerNetworkingResponse, ifName string) *cniTypesCurr.Result {
+func convertNnsToCniResult(netRes *nnscontracts.ConfigureContainerNetworkingResponse, ifName string) *cniTypesCurr.Result {
 
 	// This function does not add interfaces to CNI result. Reason being CRI (containerD in baremetal case)
 	// only looks for default interface named "eth0" and this default interface is added in the defer
