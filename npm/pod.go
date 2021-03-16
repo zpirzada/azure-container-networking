@@ -211,6 +211,13 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 		return err
 	}
 
+	// K8s categorizes Succeeded abd Failed pods be terminated and will not restart them
+	// So NPM will ignorer adding these pods
+	if podObj.Status.Phase == v1.PodSucceeded || podObj.Status.Phase == v1.PodFailed {
+		log.Logf("Skipping pod update since it went to completed [%s%s/%s/%s%+v%s] ", podUID, podNs, podName, podNodeName, podLabels, podIP)
+		return nil
+	}
+
 	// Add pod namespace if it doesn't exist
 	if _, exists := npMgr.NsMap[podNs]; !exists {
 		npMgr.NsMap[podNs], err = newNs(podNs)
