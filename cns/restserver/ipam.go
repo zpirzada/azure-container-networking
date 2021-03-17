@@ -181,6 +181,44 @@ func (service *HTTPRestService) GetPodIPConfigState() map[string]cns.IPConfigura
 	return service.PodIPConfigState
 }
 
+func (service *HTTPRestService) getPodIPIDByOrchestratorContexthandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		req           string
+		resp          cns.GetPodContextResponse
+		statusCode    int
+		returnMessage string
+		err           error
+	)
+
+	statusCode = UnexpectedError
+
+	defer func() {
+		if err != nil {
+			resp.Response.ReturnCode = statusCode
+			resp.Response.Message = returnMessage
+		}
+
+		err = service.Listener.Encode(w, &resp)
+		logger.Response(service.Name, resp, resp.Response.ReturnCode, ReturnCodeToString(resp.Response.ReturnCode), err)
+	}()
+
+	err = service.Listener.Decode(w, r, &req)
+	if err != nil {
+		returnMessage = err.Error()
+		return
+	}
+
+	resp.PodContext = service.GetPodIPIDByOrchestratorContext()
+
+	return
+}
+
+func (service *HTTPRestService) GetPodIPIDByOrchestratorContext() map[string]string {
+	service.RLock()
+	defer service.RUnlock()
+	return service.PodIPIDByOrchestratorContext
+}
+
 // GetPendingProgramIPConfigs returns list of IPs which are in pending program status
 func (service *HTTPRestService) GetPendingProgramIPConfigs() []cns.IPConfigurationStatus {
 	service.RLock()
