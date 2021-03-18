@@ -52,6 +52,24 @@ type HTTPRestService struct {
 	dncPartitionKey string
 }
 
+type GetHTTPResponse struct {
+	HttpStruct HttpStruct
+	Response   Response
+}
+
+//define struct here
+type HttpStruct struct {
+	PodIPIDByOrchestratorContext map[string]string                    // OrchestratorContext is key and value is Pod IP uuid.
+	PodIPConfigState             map[string]cns.IPConfigurationStatus // seondaryipid(uuid) is key
+	AllocatedIPCount             map[string]allocatedIPCount          // key - ncid
+	//IPAMPoolMonitor              cns.IPAMPoolMonitor
+
+}
+type Response struct {
+	ReturnCode int
+	Message    string
+}
+
 type allocatedIPCount struct {
 	Count int
 }
