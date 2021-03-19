@@ -103,7 +103,7 @@ func (ipsMgr *IpsetManager) CreateList(listName string) error {
 	}
 	log.Logf("Creating List: %+v", entry)
 	if errCode, err := ipsMgr.Run(entry); err != nil && errCode != 1 {
-		metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to create ipset list %s.", listName)
+		metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to create ipset list %s with err: %+v", listName, err)
 		return err
 	}
 
@@ -124,7 +124,7 @@ func (ipsMgr *IpsetManager) DeleteList(listName string) error {
 			return nil
 		}
 
-		metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to delete ipset %s %+v", listName, entry)
+		metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to delete ipset %s %+v with err: %+v", listName, entry, err)
 		return err
 	}
 
@@ -217,7 +217,7 @@ func (ipsMgr *IpsetManager) DeleteFromList(listName string, setName string) erro
 	}
 
 	if _, err := ipsMgr.Run(entry); err != nil {
-		metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to delete ipset entry. %+v", entry)
+		metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to delete ipset entry %+v with err %+v", entry)
 		return err
 	}
 
@@ -398,7 +398,7 @@ func (ipsMgr *IpsetManager) DeleteFromSet(setName, ip, podUid string) error {
 			return nil
 		}
 
-		metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to delete ipset entry. Entry: %+v", entry)
+		metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to delete ipset entry. Entry: %+v, err %+v", entry, err)
 		return err
 	}
 
@@ -423,7 +423,7 @@ func (ipsMgr *IpsetManager) Clean() error {
 		}
 
 		if err := ipsMgr.DeleteSet(setName); err != nil {
-			metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to clean ipset")
+			metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to clean ipset with err %+v", err)
 			return err
 		}
 	}
@@ -434,7 +434,7 @@ func (ipsMgr *IpsetManager) Clean() error {
 		}
 
 		if err := ipsMgr.DeleteList(listName); err != nil {
-			metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to clean ipset list")
+			metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to clean ipset list with err %+v")
 			return err
 		}
 	}

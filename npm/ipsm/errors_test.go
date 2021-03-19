@@ -11,14 +11,14 @@ import (
 ✅ | where Raw !contains "Set cannot be destroyed: it is in use by a kernel component" // Exit status 1
 ✅ | where Raw !contains "Elem separator in" // Error: There was an error running command: [ipset -A -exist azure-npm-527074092 10.104.7.252,3000] Stderr: [exit status 1, ipset v7.5: Syntax error: Elem separator in 10.104.7.252,3000, but settype hash:net supports none.]
 ✅ | where Raw !contains "The set with the given name does not exist" // Exit status 1
- | where Raw !contains "TSet cannot be created: set with the same name already exists" // Exit status 1
-| where Raw !contains "failed to create ipset rules" // Exit status 1
-| where Raw !contains "Second element is missing from" //Error: There was an error running command: [ipset -A -exist azure-npm-4041682038 172.16.48.55] Stderr: [exit status 1, ipset v7.5: Syntax error: Second element is missing from 172.16.48.55.]
-| where Raw !contains "Error: failed to create ipset."
-| where Raw !contains "Missing second mandatory argument to command del" //Error: There was an error running command: [ipset -D -exist azure-npm-2064349730] Stderr: [exit status 2, ipset v7.5: Missing second mandatory argument to command del Try `ipset help' for more information.]
-| where Raw !contains "Kernel error received: maximal number of sets reached" //Error: There was an error running command: [ipset -N -exist azure-npm-804639716 nethash] Stderr: [exit status 1, ipset v7.5: Kernel error received: maximal number of sets reached, cannot create more.]
-| where Raw !contains "failed to create ipset list"
-| where Raw !contains "set with the same name already exists"
+❌ | where Raw !contains "TSet cannot be created: set with the same name already exists" // Exit status 1
+❌| where Raw !contains "failed to create ipset rules" // Exit status 1
+✅ | where Raw !contains "Second element is missing from" //Error: There was an error running command: [ipset -A -exist azure-npm-4041682038 172.16.48.55] Stderr: [exit status 1, ipset v7.5: Syntax error: Second element is missing from 172.16.48.55.]
+❌| where Raw !contains "Error: failed to create ipset."
+✅ | where Raw !contains "Missing second mandatory argument to command del" //Error: There was an error running command: [ipset -D -exist azure-npm-2064349730] Stderr: [exit status 2, ipset v7.5: Missing second mandatory argument to command del Try `ipset help' for more information.]
+✅ | where Raw !contains "Kernel error received: maximal number of sets reached" //Error: There was an error running command: [ipset -N -exist azure-npm-804639716 nethash] Stderr: [exit status 1, ipset v7.5: Kernel error received: maximal number of sets reached, cannot create more.]
+❌ | where Raw !contains "failed to create ipset list"
+❌ | where Raw !contains "set with the same name already exists"
 | where Raw !contains "failed to delete ipset entry"
 | where Raw !contains "Set to be added/deleted/tested as element does not exist"
 | where (Raw !contains "ipset list with" and Raw !contains "not found")
@@ -86,8 +86,8 @@ func TestElemSeparatorSupportsNone(t *testing.T) {
 		spec:          append([]string{fmt.Sprintf("10.104.7.252,3000")}),
 	}
 
-	if _, err := ipsMgr.Run(entry); err == nil {
-		t.Errorf("")
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != ElemSeperatorNotSupported {
+		t.Errorf("Expected elem seperator error: %+v", err)
 	}
 }
 
@@ -110,12 +110,8 @@ func TestIPSetWithGivenNameDoesNotExist(t *testing.T) {
 	}
 
 	var err *NPMError
-	if _, err = ipsMgr.Run(entry); err == nil {
-		t.Fatalf("Expected set to not exist when adding to nonexistent set")
-	}
-
-	if err.ErrID != SetWithGivenNameDoesNotExist {
-		t.Fatalf("Expected error code to match when set does not exist")
+	if _, err = ipsMgr.Run(entry); err == nil || err.ErrID != SetWithGivenNameDoesNotExist {
+		t.Fatalf("Expected set to not exist when adding to nonexistent set %+v", err)
 	}
 }
 
@@ -131,7 +127,6 @@ func TestIPSetWithGivenNameAlreadyExists(t *testing.T) {
 		}
 	}()
 
-	var err *NPMError
 	entry := &ipsEntry{
 		name:          "test-set",
 		operationFlag: util.IpsetCreationFlag,
@@ -144,12 +139,97 @@ func TestIPSetWithGivenNameAlreadyExists(t *testing.T) {
 		t.Fatalf("Expected err")
 	}
 
-	if errCode, err := ipsMgr.Run(entry); err != nil && errCode != 1 {
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != SetWithGivenNameDoesNotExist {
+		t.Fatalf("Expected error code to match when set does not exist: %+v", err)
+	}
+}
 
-		t.Fatalf("Expected err")
+func TestIPSetSecondElementIsMissingWhenAddingIpWithNoPort(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
 	}
 
-	if err.ErrID != SetWithGivenNameDoesNotExist {
-		t.Fatalf("Expected error code to match when set does not exist")
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
+		}
+	}()
+
+	testsetname := "testsetname"
+
+	spec := append([]string{util.IpsetIPPortHashFlag})
+	if err := ipsMgr.CreateSet(testsetname, spec); err != nil {
+		t.Errorf("TestCreateSet failed @ ipsMgr.CreateSet when creating port set")
+	}
+
+	entry := &ipsEntry{
+		operationFlag: util.IpsetAppendFlag,
+		set:           util.GetHashedName(testsetname),
+		spec:          append([]string{fmt.Sprintf("%s", "1.1.1.1")}),
+	}
+
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != SecondElementIsMissing {
+		t.Fatalf("Expected to fail when adding ip with no port to set that requires port: %+v", err)
+	}
+}
+
+func TestIPSetMissingSecondMandatoryArgument(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
+	}
+
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
+		}
+	}()
+
+	testsetname := "testsetname"
+
+	spec := append([]string{util.IpsetIPPortHashFlag})
+	if err := ipsMgr.CreateSet(testsetname, spec); err != nil {
+		t.Errorf("TestCreateSet failed @ ipsMgr.CreateSet when creating port set")
+	}
+
+	entry := &ipsEntry{
+		operationFlag: util.IpsetAppendFlag,
+		set:           util.GetHashedName(testsetname),
+		spec:          append([]string{}),
+	}
+
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != MissingSecondMandatoryArgument {
+		t.Fatalf("Expected to fail when running ipset command with no second argument: %+v", err)
+	}
+}
+
+func TestIPSetAlreadyExists(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
+	}
+
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
+		}
+	}()
+
+	testsetname := "testsetname"
+
+	spec := append([]string{util.IpsetIPPortHashFlag})
+	entry := &ipsEntry{
+		operationFlag: util.IpsetCreationFlag,
+		set:           util.GetHashedName(testsetname),
+		spec:          spec,
+	}
+
+	if _, err := ipsMgr.Run(entry); err != nil {
+		t.Fatalf("Expected to not fail when creating ipset: %+v", err)
+	}
+
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != IPSetWithGivenNameAlreadyExists {
+		t.Fatalf("Expected to fail when creating ipset that already exists: %+v", err)
 	}
 }
