@@ -24,7 +24,7 @@ const (
 	ReleaseIPConfig                          = "/network/releaseipconfig"
 	GetIPAddresses                           = "/debug/getipaddresses"
 	GetPodIPOrchestratorContext              = "/debug/getpodcontext"
-	GetHTTPRestStruct                        = "/debug/gethttpreststruct"
+	GetHTTPRestData                          = "/debug/getrestdata"
 )
 
 // NetworkContainer Prefixes

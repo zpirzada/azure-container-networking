@@ -175,6 +175,13 @@ type NodeConfiguration struct {
 type IPAMPoolMonitor interface {
 	Start(ctx context.Context, poolMonitorRefreshMilliseconds int) error
 	Update(scalar nnc.Scaler, spec nnc.NodeNetworkConfigSpec) error
+	GetStateSnapshot() IpamPoolMonitorStateSnapshot
+}
+
+//struct to expose state values for IPAMPoolMonitor struct
+type IpamPoolMonitorStateSnapshot struct {
+	MinimumFreeIps int64
+	MaximumFreeIps int64
 }
 
 // Response describes generic response from CNS.

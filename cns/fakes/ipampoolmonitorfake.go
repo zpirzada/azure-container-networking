@@ -3,10 +3,15 @@ package fakes
 import (
 	"context"
 
+	"github.com/Azure/azure-container-networking/cns"
+
 	nnc "github.com/Azure/azure-container-networking/nodenetworkconfig/api/v1alpha"
 )
 
-type IPAMPoolMonitorFake struct{}
+type IPAMPoolMonitorFake struct {
+	FakeMinimumIps int
+	FakeMaximumIps int
+}
 
 func NewIPAMPoolMonitorFake() *IPAMPoolMonitorFake {
 	return &IPAMPoolMonitorFake{}
@@ -22,4 +27,11 @@ func (ipm *IPAMPoolMonitorFake) Update(scalar nnc.Scaler, spec nnc.NodeNetworkCo
 
 func (ipm *IPAMPoolMonitorFake) Reconcile() error {
 	return nil
+}
+
+func (ipm *IPAMPoolMonitorFake) GetStateSnapshot() cns.IpamPoolMonitorStateSnapshot {
+	return cns.IpamPoolMonitorStateSnapshot{
+		MinimumFreeIps: int64(ipm.FakeMinimumIps),
+		MaximumFreeIps: int64(ipm.FakeMaximumIps),
+	}
 }

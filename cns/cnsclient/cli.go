@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-container-networking/cns"
+	"github.com/Azure/azure-container-networking/cns/restserver"
 )
 
 const (
@@ -15,7 +16,11 @@ const (
 	getAllocatedArg      = "Allocated"
 	getAllArg            = "All"
 	getPendingReleaseArg = "PendingRelease"
+<<<<<<< HEAD
 	getPodCmdArg         = "getPodContexts"
+=======
+	getInMemoryData      = "getInMemory"
+>>>>>>> da5071c ([CNS] Debug API to expose In-Memory Data HTTPRestService)
 
 	releaseArg = "release"
 
@@ -29,7 +34,11 @@ const (
 var (
 	availableCmds = []string{
 		getCmdArg,
+<<<<<<< HEAD
 		getPodCmdArg,
+=======
+		getInMemoryData,
+>>>>>>> da5071c ([CNS] Debug API to expose In-Memory Data HTTPRestService)
 	}
 
 	getFlags = []string{
@@ -51,8 +60,13 @@ func HandleCNSClientCommands(cmd, arg string) error {
 	switch {
 	case strings.EqualFold(getCmdArg, cmd):
 		return getCmd(cnsClient, arg)
+<<<<<<< HEAD
 	case strings.EqualFold(getPodCmdArg, cmd):
 		return getPodCmd(cnsClient)
+=======
+	case strings.EqualFold(getInMemoryData, cmd):
+		return getInMemory(cnsClient)
+>>>>>>> da5071c ([CNS] Debug API to expose In-Memory Data HTTPRestService)
 	default:
 		return fmt.Errorf("No debug cmd supplied, options are: %v", getCmdArg)
 	}
@@ -101,13 +115,20 @@ func printIPAddresses(addrSlice []cns.IPConfigurationStatus) {
 	}
 }
 
+<<<<<<< HEAD
 func getPodCmd(client *CNSClient) error {
 
 	resp, err := client.GetPodOrchestratorContext()
+=======
+func getInMemory(client *CNSClient) error {
+
+	inmemoryData, err := client.GetHTTPServiceData()
+>>>>>>> da5071c ([CNS] Debug API to expose In-Memory Data HTTPRestService)
 	if err != nil {
 		return err
 	}
 
+<<<<<<< HEAD
 	printPodContext(resp)
 	return nil
 }
@@ -118,4 +139,14 @@ func printPodContext(podContext map[string]string) {
 		fmt.Println(i, " ", orchContext, " : ", podID)
 		i++
 	}
+=======
+	printInMemoryStruct(inmemoryData.HttpRestServiceData)
+	return nil
+}
+
+func printInMemoryStruct(data restserver.HttpRestServiceData) {
+	fmt.Println("PodIPIDByOrchestratorContext: ", data.PodIPIDByOrchestratorContext)
+	fmt.Println("PodIPConfigState: ", data.PodIPConfigState)
+	fmt.Println("IPAMPoolMonitor: ", data.IPAMPoolMonitor)
+>>>>>>> da5071c ([CNS] Debug API to expose In-Memory Data HTTPRestService)
 }

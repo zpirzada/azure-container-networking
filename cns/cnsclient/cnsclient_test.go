@@ -129,7 +129,7 @@ func TestMain(m *testing.M) {
 	httpRestService, err := restserver.NewHTTPRestService(&config, fakes.NewFakeImdsClient(), fakes.NewFakeNMAgentClient())
 	svc = httpRestService.(*restserver.HTTPRestService)
 	svc.Name = "cns-test-server"
-	svc.IPAMPoolMonitor = fakes.NewIPAMPoolMonitorFake()
+	svc.IPAMPoolMonitor = &fakes.IPAMPoolMonitorFake{FakeMinimumIps: 10, FakeMaximumIps: 20}
 
 	if err != nil {
 		logger.Errorf("Failed to create CNS object, err:%v.\n", err)

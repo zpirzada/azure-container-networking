@@ -71,7 +71,6 @@ func (pm *CNSIPAMPoolMonitor) Reconcile() error {
 	pendingReleaseIPCount := len(pm.httpService.GetPendingReleaseIPConfigs())
 	availableIPConfigCount := len(pm.httpService.GetAvailableIPConfigs()) // TODO: add pending allocation count to real cns
 	freeIPConfigCount := pm.cachedNNC.Spec.RequestedIPCount - int64(allocatedPodIPCount)
-
 	msg := fmt.Sprintf("[ipam-pool-monitor] Pool Size: %v, Goal Size: %v, BatchSize: %v, MinFree: %v, MaxFree:%v, Allocated: %v, Available: %v, Pending Release: %v, Free: %v, Pending Program: %v",
 		cnsPodIPConfigCount, pm.cachedNNC.Spec.RequestedIPCount, pm.scalarUnits.BatchSize, pm.MinimumFreeIps, pm.MaximumFreeIps, allocatedPodIPCount, availableIPConfigCount, pendingReleaseIPCount, freeIPConfigCount, pendingProgramCount)
 
@@ -248,4 +247,15 @@ func (pm *CNSIPAMPoolMonitor) Update(scalar nnc.Scaler, spec nnc.NodeNetworkConf
 		pm.cachedNNC.Spec, pm.MinimumFreeIps, pm.MaximumFreeIps)
 
 	return nil
+}
+
+//this function sets the values for state in IPAMPoolMonitor Struct
+func (pm *CNSIPAMPoolMonitor) GetStateSnapshot() cns.IpamPoolMonitorStateSnapshot{
+	defer pm.mu.Unlock()
+	pm.mu.Lock()
+
+	return cns.IpamPoolMonitorStateSnapshot {
+		MinimumFreeIps: pm.MinimumFreeIps,
+		MaximumFreeIps: pm.MaximumFreeIps,
+	}
 }
