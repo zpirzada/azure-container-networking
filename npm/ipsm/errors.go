@@ -25,15 +25,15 @@ const (
 )
 
 var (
-	ipseterrs = map[int]npmErrorDefiniion{
-		SetCannotBeDestroyedInUseByKernelComponent: {"Set cannot be destroyed: it is in use by a kernel component", false},
-		ElemSeperatorNotSupported:                  {"Syntax error: Elem separator", false},
-		SetWithGivenNameDoesNotExist:               {"The set with the given name does not exist", false},
-		SecondElementIsMissing:                     {"Second element is missing from", false},
-		MissingSecondMandatoryArgument:             {"Missing second mandatory argument to command", false},
-		MaximalNumberOfSetsReached:                 {"Kernel error received: maximal number of sets reached", false}, // no ut
-		IPSetWithGivenNameAlreadyExists:            {"Set cannot be created: set with the same name already exists", false},
-		Unknown:                                    {"Unknown error", false},
+	ipseterrs = map[int]npmErrorDefinition{
+		SetCannotBeDestroyedInUseByKernelComponent: {"Set cannot be destroyed: it is in use by a kernel component", npmErrorRetrySettings{Create: false, Append: false, Delete: false}},
+		ElemSeperatorNotSupported:                  {"Syntax error: Elem separator", npmErrorRetrySettings{Create: false, Append: false, Delete: false}},
+		SetWithGivenNameDoesNotExist:               {"The set with the given name does not exist", npmErrorRetrySettings{Create: false, Append: false, Delete: false}},
+		SecondElementIsMissing:                     {"Second element is missing from", npmErrorRetrySettings{Create: false, Append: false, Delete: false}},
+		MissingSecondMandatoryArgument:             {"Missing second mandatory argument to command", npmErrorRetrySettings{Create: false, Append: false, Delete: false}},
+		MaximalNumberOfSetsReached:                 {"Kernel error received: maximal number of sets reached", npmErrorRetrySettings{Create: false, Append: false, Delete: false}}, // no ut
+		IPSetWithGivenNameAlreadyExists:            {"Set cannot be created: set with the same name already exists", npmErrorRetrySettings{Create: false, Append: false, Delete: false}},
+		Unknown:                                    {"Unknown error", npmErrorRetrySettings{Create: false, Append: false, Delete: false}},
 	}
 
 	operationstrings = map[string]string{
@@ -51,7 +51,7 @@ func ConvertToNPMErrorWithEntry(operationFlag string, err error, cmd []string) *
 		if strings.Contains(errstr, errDefinition.description) {
 			return &NPMError{
 				OperationAction: operationstrings[operationFlag],
-				IsRetriable:     errDefinition.isRetriable,
+				IsRetriable:     errDefinition.IsRetriable(operationFlag),
 				FullCmd:         cmd,
 				ErrID:           code,
 				Err:             err,
@@ -61,6 +61,7 @@ func ConvertToNPMErrorWithEntry(operationFlag string, err error, cmd []string) *
 
 	return &NPMError{
 		OperationAction: operationstrings[operationFlag],
+		IsRetriable:     false,
 		FullCmd:         cmd,
 		ErrID:           Unknown,
 		Err:             err,
@@ -75,9 +76,27 @@ type NPMError struct {
 	Err             error
 }
 
-type npmErrorDefiniion struct {
+func (n *npmErrorDefinition) IsRetriable(operationAction string) bool {
+	switch operationAction {
+	case createIPSet:
+		return n.isRetriable.Create
+	case deleteIPSet:
+		return n.isRetriable.Delete
+	case appendIPSet:
+		return n.isRetriable.Append
+	}
+	return false
+}
+
+type npmErrorDefinition struct {
 	description string
-	isRetriable bool
+	isRetriable npmErrorRetrySettings
+}
+
+type npmErrorRetrySettings struct {
+	Create bool
+	Append bool
+	Delete bool
 }
 
 func (n *NPMError) Error() string {
