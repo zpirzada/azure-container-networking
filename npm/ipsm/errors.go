@@ -21,6 +21,7 @@ const (
 	MissingSecondMandatoryArgument             = 5
 	MaximalNumberOfSetsReached                 = 6
 	IPSetWithGivenNameAlreadyExists            = 7
+	SetToBeAddedDeletedTestedDoesNotExist      = 8
 	Unknown                                    = 999
 )
 
@@ -33,6 +34,7 @@ var (
 		MissingSecondMandatoryArgument:             {"Missing second mandatory argument to command", npmErrorRetrySettings{Create: false, Append: false, Delete: false}},
 		MaximalNumberOfSetsReached:                 {"Kernel error received: maximal number of sets reached", npmErrorRetrySettings{Create: false, Append: false, Delete: false}}, // no ut
 		IPSetWithGivenNameAlreadyExists:            {"Set cannot be created: set with the same name already exists", npmErrorRetrySettings{Create: false, Append: false, Delete: false}},
+		SetToBeAddedDeletedTestedDoesNotExist:      {"Set to be added/deleted/tested as element does not exist", npmErrorRetrySettings{Create: false, Append: false, Delete: false}},
 		Unknown:                                    {"Unknown error", npmErrorRetrySettings{Create: false, Append: false, Delete: false}},
 	}
 

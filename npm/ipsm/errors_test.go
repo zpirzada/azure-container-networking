@@ -233,3 +233,39 @@ func TestIPSetAlreadyExists(t *testing.T) {
 		t.Fatalf("Expected to fail when creating ipset that already exists: %+v", err)
 	}
 }
+
+func TestIPSetCannotBeAddedAsElementDoesNotExist(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
+	}
+
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
+		}
+	}()
+
+	testsetname := "testsetname"
+
+	spec := append([]string{util.IpsetSetListFlag})
+	entry := &ipsEntry{
+		operationFlag: util.IpsetCreationFlag,
+		set:           util.GetHashedName(testsetname),
+		spec:          spec,
+	}
+
+	if _, err := ipsMgr.Run(entry); err != nil {
+		t.Fatalf("Expected to not fail when creating ipset: %+v", err)
+	}
+	testsetname2 := "testsetname2"
+	entry = &ipsEntry{
+		operationFlag: util.IpsetAppendFlag,
+		set:           util.GetHashedName(testsetname),
+		spec:          append([]string{util.GetHashedName(testsetname2)}),
+	}
+
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != SetToBeAddedDeletedTestedDoesNotExist {
+		t.Fatalf("Expected to fail when adding set to list and the set doesn't exist: %+v", err)
+	}
+}
