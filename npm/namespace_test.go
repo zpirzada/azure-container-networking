@@ -83,7 +83,7 @@ func TestAddNamespace(t *testing.T) {
 
 	npMgr.Lock()
 	if err := npMgr.AddNamespace(nsObj); err != nil {
-		t.Errorf("TestAddNamespace @ npMgr.AddNamespace")
+		t.Errorf("TestAddNamespace @ npMgr.AddNamespace with err: %+v", err)
 	}
 	npMgr.Unlock()
 }
@@ -134,11 +134,11 @@ func TestUpdateNamespace(t *testing.T) {
 
 	npMgr.Lock()
 	if err := npMgr.AddNamespace(oldNsObj); err != nil {
-		t.Errorf("TestUpdateNamespace failed @ npMgr.AddNamespace")
+		t.Errorf("TestUpdateNamespace failed @ npMgr.AddNamespace with err %+v", err)
 	}
 
 	if err := npMgr.UpdateNamespace(oldNsObj, newNsObj); err != nil {
-		t.Errorf("TestUpdateNamespace failed @ npMgr.UpdateNamespace")
+		t.Errorf("TestUpdateNamespace failed @ npMgr.UpdateNamespace with err %+v", err)
 	}
 	npMgr.Unlock()
 }
@@ -197,11 +197,11 @@ func TestAddNamespaceLabel(t *testing.T) {
 	}
 
 	if err := npMgr.UpdateNamespace(oldNsObj, newNsObj); err != nil {
-		t.Fatalf("TestAddNamespaceLabel failed @ npMgr.UpdateNamespace with err %v", err)
+		t.Errorf("TestAddNamespaceLabel failed @ npMgr.UpdateNamespace with err %+v", err)
 	}
 
 	if !reflect.DeepEqual(npMgr.NsMap["ns-"+newNsObj.Name].LabelsMap, newNsObj.ObjectMeta.Labels) {
-		t.Fatalf("TestAddNamespaceLabel failed @ npMgr.nsMap labelMap check")
+		t.Errorf("TestAddNamespaceLabel failed @ npMgr.nsMap labelMap check with err %+v", err)
 	}
 
 	npMgr.Unlock()
@@ -258,11 +258,11 @@ func TestDeleteandUpdateNamespaceLabel(t *testing.T) {
 
 	npMgr.Lock()
 	if err := npMgr.AddNamespace(oldNsObj); err != nil {
-		t.Errorf("TestDeleteandUpdateNamespaceLabel failed @ npMgr.AddNamespace")
+		t.Errorf("TestDeleteandUpdateNamespaceLabel failed @ npMgr.AddNamespace with err %+v", err)
 	}
 
 	if err := npMgr.UpdateNamespace(oldNsObj, newNsObj); err != nil {
-		t.Errorf("TestDeleteandUpdateNamespaceLabel failed @ npMgr.UpdateNamespace")
+		t.Errorf("TestDeleteandUpdateNamespaceLabel failed @ npMgr.UpdateNamespace with err %+v", err)
 	}
 
 	if !reflect.DeepEqual(npMgr.NsMap["ns-"+newNsObj.Name].LabelsMap, newNsObj.ObjectMeta.Labels) {
@@ -308,11 +308,11 @@ func TestDeleteNamespace(t *testing.T) {
 
 	npMgr.Lock()
 	if err := npMgr.AddNamespace(nsObj); err != nil {
-		t.Errorf("TestDeleteNamespace @ npMgr.AddNamespace")
+		t.Errorf("TestDeleteNamespace @ npMgr.AddNamespace check with err %+v", err)
 	}
 
 	if err := npMgr.DeleteNamespace(nsObj); err != nil {
-		t.Errorf("TestDeleteNamespace @ npMgr.DeleteNamespace")
+		t.Errorf("TestDeleteNamespace @ npMgr.DeleteNamespace check with err %+v", err)
 	}
 
 	if _, exists := npMgr.NsMap["ns-"+nsObj.Name]; exists {

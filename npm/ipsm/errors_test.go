@@ -2,6 +2,7 @@ package ipsm
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/Azure/azure-container-networking/npm/util"
@@ -31,35 +32,50 @@ import (
 | where Raw !contains "Operation not permitted" // Most probably from UTs
 */
 
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func GetIPSetName() string {
+	b := make([]byte, 8)
+
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+
+	return "npm-test-" + string(b)
+}
+
 // "Set cannot be destroyed: it is in use by a kernel component"
 func TestSetCannotBeDestroyed(t *testing.T) {
 	ipsMgr := NewIpsetManager()
 	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
-		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
+		t.Errorf("TestAddToList failed @ ipsMgr.Save")
 	}
 
 	defer func() {
 		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
-			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore")
 		}
 	}()
 
-	if err := ipsMgr.CreateSet("test-set", append([]string{util.IpsetNetHashFlag})); err != nil {
-		t.Fatalf("Failed to create set with err %v", err)
+	testset1 := GetIPSetName()
+	testlist1 := GetIPSetName()
+
+	if err := ipsMgr.CreateSet(testset1, append([]string{util.IpsetNetHashFlag})); err != nil {
+		t.Errorf("Failed to create set with err %v", err)
 	}
 
-	if err := ipsMgr.AddToSet("test-set", fmt.Sprintf("%s", "1.1.1.1"), util.IpsetIPPortHashFlag, "0"); err != nil {
-		t.Fatalf("Failed to add to set with err %v", err)
+	if err := ipsMgr.AddToSet(testset1, fmt.Sprintf("%s", "1.1.1.1"), util.IpsetIPPortHashFlag, "0"); err != nil {
+		t.Errorf("Failed to add to set with err %v", err)
 	}
 
-	if err := ipsMgr.AddToList("test-list", "test-set"); err != nil {
-		t.Fatalf("Failed to add to list with err %v", err)
+	if err := ipsMgr.AddToList(testlist1, testset1); err != nil {
+		t.Errorf("Failed to add to list with err %v", err)
 	}
 
 	// Delete set and validate set is not exist.
-	if err := ipsMgr.DeleteSet("test-set"); err != nil {
+	if err := ipsMgr.DeleteSet(testset1); err != nil {
 		if err.ErrID != SetCannotBeDestroyedInUseByKernelComponent {
-			t.Fatalf("Expected to error with ipset in use by kernel component")
+			t.Errorf("Expected to error with ipset in use by kernel component")
 		}
 	}
 }
@@ -67,22 +83,24 @@ func TestSetCannotBeDestroyed(t *testing.T) {
 func TestElemSeparatorSupportsNone(t *testing.T) {
 	ipsMgr := NewIpsetManager()
 	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
-		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
+		t.Errorf("TestAddToList failed @ ipsMgr.Save")
 	}
 
 	defer func() {
 		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
-			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore")
 		}
 	}()
 
-	if err := ipsMgr.CreateSet("test-set", append([]string{util.IpsetNetHashFlag})); err != nil {
-		t.Fatalf("TestAddToList failed @ ipsMgr.CreateSet")
+	testset1 := GetIPSetName()
+
+	if err := ipsMgr.CreateSet(testset1, append([]string{util.IpsetNetHashFlag})); err != nil {
+		t.Errorf("TestAddToList failed @ ipsMgr.CreateSet")
 	}
 
 	entry := &ipsEntry{
 		operationFlag: util.IpsetTestFlag,
-		set:           util.GetHashedName("test-set"),
+		set:           util.GetHashedName(testset1),
 		spec:          append([]string{fmt.Sprintf("10.104.7.252,3000")}),
 	}
 
@@ -94,178 +112,162 @@ func TestElemSeparatorSupportsNone(t *testing.T) {
 func TestIPSetWithGivenNameDoesNotExist(t *testing.T) {
 	ipsMgr := NewIpsetManager()
 	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
-		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
+		t.Errorf("TestAddToList failed @ ipsMgr.Save with err %+v", err)
 	}
 
 	defer func() {
 		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
-			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore with err %+v", err)
 		}
 	}()
 
+	testset1 := GetIPSetName()
+	testset2 := GetIPSetName()
+
 	entry := &ipsEntry{
 		operationFlag: util.IpsetAppendFlag,
-		set:           util.GetHashedName("test-set"),
-		spec:          append([]string{util.GetHashedName("test-set2")}),
+		set:           util.GetHashedName(testset1),
+		spec:          append([]string{util.GetHashedName(testset2)}),
 	}
 
 	var err *NPMError
 	if _, err = ipsMgr.Run(entry); err == nil || err.ErrID != SetWithGivenNameDoesNotExist {
-		t.Fatalf("Expected set to not exist when adding to nonexistent set %+v", err)
+		t.Errorf("Expected set to not exist when adding to nonexistent set %+v", err)
 	}
 }
 
 func TestIPSetWithGivenNameAlreadyExists(t *testing.T) {
 	ipsMgr := NewIpsetManager()
 	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
-		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
+		t.Errorf("TestAddToList failed @ ipsMgr.Save with err %+v", err)
 	}
 
 	defer func() {
 		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
-			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore with err %+v", err)
 		}
 	}()
 
+	testset1 := GetIPSetName()
+
 	entry := &ipsEntry{
-		name:          "test-set",
+		name:          testset1,
 		operationFlag: util.IpsetCreationFlag,
 		// Use hashed string for set name to avoid string length limit of ipset.
-		set:  util.GetHashedName("test-set"),
+		set:  util.GetHashedName(testset1),
 		spec: append([]string{util.IpsetNetHashFlag}),
 	}
 
 	if errCode, err := ipsMgr.Run(entry); err != nil && errCode != 1 {
-		t.Fatalf("Expected err")
+		t.Errorf("Expected err")
 	}
 
-	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != SetWithGivenNameDoesNotExist {
-		t.Fatalf("Expected error code to match when set does not exist: %+v", err)
+	entry = &ipsEntry{
+		name:          testset1,
+		operationFlag: util.IpsetCreationFlag,
+		// Use hashed string for set name to avoid string length limit of ipset.
+		set:  util.GetHashedName(testset1),
+		spec: append([]string{util.IpsetSetListFlag}),
+	}
+
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != IPSetWithGivenNameAlreadyExists {
+		t.Errorf("Expected error code to match when set does not exist: %+v", err)
 	}
 }
 
 func TestIPSetSecondElementIsMissingWhenAddingIpWithNoPort(t *testing.T) {
 	ipsMgr := NewIpsetManager()
 	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
-		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
+		t.Errorf("TestAddToList failed @ ipsMgr.Save with err: %+v", err)
 	}
 
 	defer func() {
 		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
-			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore")
 		}
 	}()
 
-	testsetname := "testsetname"
+	testset1 := GetIPSetName()
 
 	spec := append([]string{util.IpsetIPPortHashFlag})
-	if err := ipsMgr.CreateSet(testsetname, spec); err != nil {
+	if err := ipsMgr.CreateSet(testset1, spec); err != nil {
 		t.Errorf("TestCreateSet failed @ ipsMgr.CreateSet when creating port set")
 	}
 
 	entry := &ipsEntry{
 		operationFlag: util.IpsetAppendFlag,
-		set:           util.GetHashedName(testsetname),
+		set:           util.GetHashedName(testset1),
 		spec:          append([]string{fmt.Sprintf("%s", "1.1.1.1")}),
 	}
 
 	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != SecondElementIsMissing {
-		t.Fatalf("Expected to fail when adding ip with no port to set that requires port: %+v", err)
+		t.Errorf("Expected to fail when adding ip with no port to set that requires port: %+v", err)
 	}
 }
 
 func TestIPSetMissingSecondMandatoryArgument(t *testing.T) {
 	ipsMgr := NewIpsetManager()
 	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
-		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
+		t.Errorf("TestAddToList failed @ ipsMgr.Save")
 	}
 
 	defer func() {
 		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
-			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore")
 		}
 	}()
 
-	testsetname := "testsetname"
+	testset1 := GetIPSetName()
 
 	spec := append([]string{util.IpsetIPPortHashFlag})
-	if err := ipsMgr.CreateSet(testsetname, spec); err != nil {
+	if err := ipsMgr.CreateSet(testset1, spec); err != nil {
 		t.Errorf("TestCreateSet failed @ ipsMgr.CreateSet when creating port set")
 	}
 
 	entry := &ipsEntry{
 		operationFlag: util.IpsetAppendFlag,
-		set:           util.GetHashedName(testsetname),
+		set:           util.GetHashedName(testset1),
 		spec:          append([]string{}),
 	}
 
 	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != MissingSecondMandatoryArgument {
-		t.Fatalf("Expected to fail when running ipset command with no second argument: %+v", err)
-	}
-}
-
-func TestIPSetAlreadyExists(t *testing.T) {
-	ipsMgr := NewIpsetManager()
-	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
-		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
-	}
-
-	defer func() {
-		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
-			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
-		}
-	}()
-
-	testsetname := "testsetname"
-
-	spec := append([]string{util.IpsetIPPortHashFlag})
-	entry := &ipsEntry{
-		operationFlag: util.IpsetCreationFlag,
-		set:           util.GetHashedName(testsetname),
-		spec:          spec,
-	}
-
-	if _, err := ipsMgr.Run(entry); err != nil {
-		t.Fatalf("Expected to not fail when creating ipset: %+v", err)
-	}
-
-	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != IPSetWithGivenNameAlreadyExists {
-		t.Fatalf("Expected to fail when creating ipset that already exists: %+v", err)
+		t.Errorf("Expected to fail when running ipset command with no second argument: %+v", err)
 	}
 }
 
 func TestIPSetCannotBeAddedAsElementDoesNotExist(t *testing.T) {
 	ipsMgr := NewIpsetManager()
 	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
-		t.Fatalf("TestAddToList failed @ ipsMgr.Save")
+		t.Errorf("TestAddToList failed @ ipsMgr.Save")
 	}
 
 	defer func() {
 		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
-			t.Fatalf("TestAddToList failed @ ipsMgr.Restore")
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore")
 		}
 	}()
 
-	testsetname := "testsetname"
+	testset1 := GetIPSetName()
+	testset2 := GetIPSetName()
 
 	spec := append([]string{util.IpsetSetListFlag})
 	entry := &ipsEntry{
 		operationFlag: util.IpsetCreationFlag,
-		set:           util.GetHashedName(testsetname),
+		set:           util.GetHashedName(testset1),
 		spec:          spec,
 	}
 
 	if _, err := ipsMgr.Run(entry); err != nil {
-		t.Fatalf("Expected to not fail when creating ipset: %+v", err)
+		t.Errorf("Expected to not fail when creating ipset: %+v", err)
 	}
-	testsetname2 := "testsetname2"
+
 	entry = &ipsEntry{
 		operationFlag: util.IpsetAppendFlag,
-		set:           util.GetHashedName(testsetname),
-		spec:          append([]string{util.GetHashedName(testsetname2)}),
+		set:           util.GetHashedName(testset1),
+		spec:          append([]string{util.GetHashedName(testset2)}),
 	}
 
 	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != SetToBeAddedDeletedTestedDoesNotExist {
-		t.Fatalf("Expected to fail when adding set to list and the set doesn't exist: %+v", err)
+		t.Errorf("Expected to fail when adding set to list and the set doesn't exist: %+v", err)
 	}
 }
