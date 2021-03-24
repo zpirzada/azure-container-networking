@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/azure-container-networking/npm/ipsm"
 	"github.com/Azure/azure-container-networking/npm/util"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -48,6 +49,9 @@ func TestAllNsList(t *testing.T) {
 func TestAddNamespace(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		NsMap:            make(map[string]*Namespace),
+		PodMap:           make(map[string]*NpmPod),
+		RawNpMap:         make(map[string]*networkingv1.NetworkPolicy),
+		ProcessedNpMap:   make(map[string]*networkingv1.NetworkPolicy),
 		TelemetryEnabled: false,
 	}
 
@@ -87,6 +91,9 @@ func TestAddNamespace(t *testing.T) {
 func TestUpdateNamespace(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		NsMap:            make(map[string]*Namespace),
+		PodMap:           make(map[string]*NpmPod),
+		RawNpMap:         make(map[string]*networkingv1.NetworkPolicy),
+		ProcessedNpMap:   make(map[string]*networkingv1.NetworkPolicy),
 		TelemetryEnabled: false,
 	}
 
@@ -139,6 +146,9 @@ func TestUpdateNamespace(t *testing.T) {
 func TestAddNamespaceLabel(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		NsMap:            make(map[string]*Namespace),
+		PodMap:           make(map[string]*NpmPod),
+		RawNpMap:         make(map[string]*networkingv1.NetworkPolicy),
+		ProcessedNpMap:   make(map[string]*networkingv1.NetworkPolicy),
 		TelemetryEnabled: false,
 	}
 
@@ -183,15 +193,15 @@ func TestAddNamespaceLabel(t *testing.T) {
 
 	npMgr.Lock()
 	if err := npMgr.AddNamespace(oldNsObj); err != nil {
-		t.Errorf("TestAddNamespaceLabel failed @ npMgr.AddNamespace")
+		t.Fatalf("TestAddNamespaceLabel failed @ npMgr.AddNamespace with err %v", err)
 	}
 
 	if err := npMgr.UpdateNamespace(oldNsObj, newNsObj); err != nil {
-		t.Errorf("TestAddNamespaceLabel failed @ npMgr.UpdateNamespace")
+		t.Fatalf("TestAddNamespaceLabel failed @ npMgr.UpdateNamespace with err %v", err)
 	}
 
 	if !reflect.DeepEqual(npMgr.NsMap["ns-"+newNsObj.Name].LabelsMap, newNsObj.ObjectMeta.Labels) {
-		t.Errorf("TestAddNamespaceLabel failed @ npMgr.nsMap labelMap check")
+		t.Fatalf("TestAddNamespaceLabel failed @ npMgr.nsMap labelMap check")
 	}
 
 	npMgr.Unlock()
@@ -200,6 +210,9 @@ func TestAddNamespaceLabel(t *testing.T) {
 func TestDeleteandUpdateNamespaceLabel(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		NsMap:            make(map[string]*Namespace),
+		PodMap:           make(map[string]*NpmPod),
+		RawNpMap:         make(map[string]*networkingv1.NetworkPolicy),
+		ProcessedNpMap:   make(map[string]*networkingv1.NetworkPolicy),
 		TelemetryEnabled: false,
 	}
 
@@ -261,6 +274,9 @@ func TestDeleteandUpdateNamespaceLabel(t *testing.T) {
 func TestDeleteNamespace(t *testing.T) {
 	npMgr := &NetworkPolicyManager{
 		NsMap:            make(map[string]*Namespace),
+		PodMap:           make(map[string]*NpmPod),
+		RawNpMap:         make(map[string]*networkingv1.NetworkPolicy),
+		ProcessedNpMap:   make(map[string]*networkingv1.NetworkPolicy),
 		TelemetryEnabled: false,
 	}
 
