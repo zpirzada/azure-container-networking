@@ -36,8 +36,8 @@ const (
 	dockerNetworkOption = "com.docker.network.generic"
 	opModeTransparent   = "transparent"
 	// Supported IP version. Currently support only IPv4
-	ipVersion      = "4"
-	ipamV6         = "azure-vnet-ipamv6"
+	ipVersion = "4"
+	ipamV6    = "azure-vnet-ipamv6"
 )
 
 // CNI Operation Types
@@ -62,10 +62,11 @@ const (
 	jsonFileExtension = ".json"
 )
 
-type  ExecutionModes string
+type ExecutionMode string
+
 const (
-    Default ExecutionModes = "default"
-    Baremetal ExecutionModes = "baremetal"
+	Default   ExecutionMode = "default"
+	Baremetal ExecutionMode = "baremetal"
 )
 
 // NetPlugin represents the CNI network plugin.
@@ -114,8 +115,8 @@ func NewPlugin(name string, config *common.PluginConfig, client NnsClient) (*net
 	config.NetApi = nm
 
 	return &netPlugin{
-		Plugin: plugin,
-		nm:     nm,
+		Plugin:    plugin,
+		nm:        nm,
 		nnsClient: client,
 	}, nil
 }
@@ -381,12 +382,12 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	log.Printf("Execution mode :%s", nwCfg.ExecutionMode)
 	if nwCfg.ExecutionMode == string(Baremetal) {
-		var  res *nnscontracts.ConfigureContainerNetworkingResponse
-        log.Printf("Baremetal mode. Calling vnet agent for ADD")
+		var res *nnscontracts.ConfigureContainerNetworkingResponse
+		log.Printf("Baremetal mode. Calling vnet agent for ADD")
 		err, res = plugin.nnsClient.AddContainerNetworking(context.Background(), k8sPodName, args.Netns)
 
 		if err == nil {
-			result = convertNnsToCniResult(res, args.IfName)
+			result = convertNnsToCniResult(res, args.IfName, k8sPodName, "AddContainerNetworking")
 		}
 
 		return err
@@ -525,7 +526,7 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 			Id:           networkId,
 			Mode:         nwCfg.Mode,
 			MasterIfName: masterIfName,
-			AdapterName: nwCfg.AdapterName,
+			AdapterName:  nwCfg.AdapterName,
 			Subnets: []network.SubnetInfo{
 				{
 					Family:  platform.AfINET,
@@ -828,7 +829,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	plugin.setCNIReportDetails(nwCfg, CNI_DEL, "")
 	iptables.DisableIPTableLock = nwCfg.DisableIPTableLock
 
-	sendMeticFunc := func() {
+	sendMetricFunc := func() {
 		operationTimeMs := time.Since(startTime).Milliseconds()
 		cniMetric.Metric = aitelemetry.Metric{
 			Name:             telemetry.CNIDelTimeMetricStr,
@@ -845,7 +846,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 		log.Printf("Baremetal mode. Calling vnet agent for delete container")
 
 		// schedule send metric before attempting delete
-		defer sendMeticFunc()
+		defer sendMetricFunc()
 		err, _ = plugin.nnsClient.DeleteContainerNetworking(context.Background(), k8sPodName, args.Netns)
 		return err
 	}
@@ -918,7 +919,7 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	}
 
 	// schedule send metric before attempting delete
-	defer sendMeticFunc()
+	defer sendMetricFunc()
 	// Delete the endpoint.
 	if err = plugin.nm.DeleteEndpoint(networkId, endpointId); err != nil {
 		err = plugin.Errorf("Failed to delete endpoint: %v", err)
@@ -1193,7 +1194,11 @@ func determineSnat() (bool, bool, error) {
 	return snatConfig.EnableSnatForDns, snatConfig.EnableSnatOnHost, nil
 }
 
-func convertNnsToCniResult(netRes *nnscontracts.ConfigureContainerNetworkingResponse, ifName string) *cniTypesCurr.Result {
+func convertNnsToCniResult(
+	netRes *nnscontracts.ConfigureContainerNetworkingResponse,
+	ifName string,
+	podName string,
+	operationName string) *cniTypesCurr.Result {
 
 	// This function does not add interfaces to CNI result. Reason being CRI (containerD in baremetal case)
 	// only looks for default interface named "eth0" and this default interface is added in the defer
@@ -1201,24 +1206,25 @@ func convertNnsToCniResult(netRes *nnscontracts.ConfigureContainerNetworkingResp
 	result := &cniTypesCurr.Result{}
 	var resultIpconfigs []*cniTypesCurr.IPConfig
 
-    if netRes.Interfaces != nil {
-		for i, ni :=  range netRes.Interfaces {
+	if netRes.Interfaces != nil {
+		for i, ni := range netRes.Interfaces {
 
 			intIndex := i
 			for _, ip := range ni.Ipaddresses {
 
-				ipWithPrefix := strings.Join([]string { ip.Ip, ip.PrefixLength }, "/")
+				ipWithPrefix := fmt.Sprintf("%s/%s", ip.Ip, ip.PrefixLength)
 				_, ipNet, err := net.ParseCIDR(ipWithPrefix)
 				if err != nil {
-					log.Printf("convertNnsToCniResult error: %s \n", err)
+					log.Printf("Error while converting to cni result for %s operation on pod %s. %s",
+						operationName, podName, err)
 					continue
 				}
 
 				gateway := net.ParseIP(ip.DefaultGateway)
 				ipConfig := &cniTypesCurr.IPConfig{
-					Address: *ipNet,
-					Gateway: gateway,
-					Version: ip.Version,
+					Address:   *ipNet,
+					Gateway:   gateway,
+					Version:   ip.Version,
 					Interface: &intIndex,
 				}
 
