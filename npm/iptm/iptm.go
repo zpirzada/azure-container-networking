@@ -52,6 +52,10 @@ type IptEntry struct {
 	Specs                 []string
 }
 
+func (e *IptEntry) getAppendRule() []string {
+	return append([]string{util.IptablesAppendFlag, e.Chain}, e.Specs...)
+}
+
 // IptablesManager stores iptables entries.
 type IptablesManager struct {
 	OperationFlag string
@@ -356,12 +360,13 @@ func (iptMgr *IptablesManager) DeleteChain(chain string) error {
 }
 
 // AddAll will run through all entries and Adds them
-func (iptMgr *IptablesManager) AddAll(iptEntries []*IptEntry) {
+func (iptMgr *IptablesManager) AddAll(iptEntries []*IptEntry) error {
 	for _, iptEntry := range iptEntries {
 		if err := iptMgr.Add(iptEntry); err != nil {
-			log.Errorf("Error: failed to apply iptables rule. Rule: %+v", iptEntry)
+			return fmt.Errorf("failed to add entry %+v with error %s", iptEntry, err.Error())
 		}
 	}
+	return nil
 }
 
 // Add adds a rule in iptables.
@@ -387,12 +392,13 @@ func (iptMgr *IptablesManager) Add(entry *IptEntry) error {
 }
 
 // DeleteAll will run through all entries and dletes them
-func (iptMgr *IptablesManager) DeleteAll(iptEntries []*IptEntry) {
+func (iptMgr *IptablesManager) DeleteAll(iptEntries []*IptEntry) error {
 	for _, iptEntry := range iptEntries {
 		if err := iptMgr.Delete(iptEntry); err != nil {
-			log.Errorf("Error: failed to apply iptables rule. Rule: %+v", iptEntry)
+			return fmt.Errorf("failed to delete entry %+v with error %s", iptEntry, err.Error())
 		}
 	}
+	return nil
 }
 
 // Delete removes a rule in iptables.
@@ -490,7 +496,7 @@ func (iptMgr *IptablesManager) Save(configFile string) error {
 }
 
 // SaveIntoBuffer will save iptables output into a provided buffer
-func (iptMgr *IptablesManager) SaveIntoBuffer(buffer *bytes.Buffer) error {
+func (iptMgr *IptablesManager) SaveIntoBuffer(tableName string, buffer *bytes.Buffer) error {
 	l, err := grabIptablesLocks()
 	if err != nil {
 		return err
@@ -502,7 +508,7 @@ func (iptMgr *IptablesManager) SaveIntoBuffer(buffer *bytes.Buffer) error {
 		}
 	}(l)
 
-	cmdArgs := []string{"-t", string("filter")}
+	cmdArgs := []string{"-t", string(tableName)}
 	cmd := exec.Command(util.IptablesSave, cmdArgs...)
 
 	cmd.Stdout = buffer
@@ -637,19 +643,28 @@ func grabIptablesLocks() (*os.File, error) {
 
 // }
 
-// BulkUpdateIPtables will handle updating of iptables
-func (iptMgr *IptablesManager) BulkUpdateIPtables(toAddEntries []*IptEntry, toDeleteEntries []*IptEntry) {
-	iptableBuffer := bytes.NewBuffer(nil)
-	if err := iptMgr.SaveIntoBuffer(iptableBuffer); err != nil {
+func (iptMgr *IptablesManager) SaveAndInitializeFilterTable() (*Iptable, error) {
+	// TODO add metric timers
+	var (
+		iptableBuffer = bytes.NewBuffer(nil)
+		tableName     = "filter"
+	)
+	if err := iptMgr.SaveIntoBuffer(tableName, iptableBuffer); err != nil {
 		metrics.SendErrorLogAndMetric(util.IptmID, "[BulkUpdateIPtables] Error: failed to get iptables-save command output with err: %s", err.Error())
 	}
 
+	return iptMgr.parseiptablesBuffer(tableName, iptableBuffer)
 }
 
-func (iptMgr *IptablesManager) parseiptablesBuffer(buffer *bytes.Buffer) (*Iptable, error) {
-	filterTable := NewIptable("filter", buffer)
+func (iptMgr *IptablesManager) parseiptablesBuffer(tableName string, buffer *bytes.Buffer) (*Iptable, error) {
+	filterTable := NewIptable(tableName, buffer)
 
 	if err := filterTable.Validate(); err != nil {
+		metrics.SendErrorLogAndMetric(util.IptmID, "[parseiptablesBuffer] %s", err.Error())
+	}
+
+	err := filterTable.InitializeChains()
+	if err != nil {
 		metrics.SendErrorLogAndMetric(util.IptmID, "[parseiptablesBuffer] %s", err.Error())
 	}
 

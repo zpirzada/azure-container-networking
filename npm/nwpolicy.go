@@ -184,11 +184,10 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 	createCidrsRule("in", npObj.ObjectMeta.Name, npObj.ObjectMeta.Namespace, ingressIPCidrs, ipsMgr)
 	createCidrsRule("out", npObj.ObjectMeta.Name, npObj.ObjectMeta.Namespace, egressIPCidrs, ipsMgr)
 	iptMgr := allNs.iptMgr
-	for _, iptEntry := range iptEntries {
-		if err = iptMgr.Add(iptEntry); err != nil {
-			metrics.SendErrorLogAndMetric(util.NetpolID, "[AddNetworkPolicy] Error: failed to apply iptables rule. Rule: %+v with err: %v", iptEntry, err)
-			return err
-		}
+
+	if err = iptMgr.AddAll(iptEntries); err != nil {
+		metrics.SendErrorLogAndMetric(util.NetpolID, "[AddNetworkPolicy] Error: failed to apply iptables rule. with err: %v", err)
+		return err
 	}
 	npMgr.RawNpMap[npKey] = npObj
 
@@ -230,11 +229,10 @@ func (npMgr *NetworkPolicyManager) DeleteNetworkPolicy(npObj *networkingv1.Netwo
 	_, _, _, ingressIPCidrs, egressIPCidrs, iptEntries := translatePolicy(npObj)
 
 	iptMgr := allNs.iptMgr
-	for _, iptEntry := range iptEntries {
-		if err = iptMgr.Delete(iptEntry); err != nil {
-			metrics.SendErrorLogAndMetric(util.NetpolID, "[DeleteNetworkPolicy] Error: failed to apply iptables rule. Rule: %+v with err: %v", iptEntry, err)
-			return err
-		}
+
+	if err = iptMgr.DeleteAll(iptEntries); err != nil {
+		metrics.SendErrorLogAndMetric(util.NetpolID, "[DeleteNetworkPolicy] Error: failed to apply iptables rule. with err: %v", err)
+		return err
 	}
 
 	removeCidrsRule("in", npObj.ObjectMeta.Name, npObj.ObjectMeta.Namespace, ingressIPCidrs, allNs.IpsMgr)

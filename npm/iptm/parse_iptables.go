@@ -13,8 +13,20 @@ var (
 // Below section is taken from https://github.com/kubernetes/kubernetes/blob/master/pkg/util/iptables
 // and modified as required for this pkg
 // MakeChainLine return an iptables-save/restore formatted chain line given a Chain
-func MakeChainLine(chain string) string {
-	return fmt.Sprintf(":%s - [0:0]", chain)
+func MakeChainLine(chain string) []byte {
+	return []byte(fmt.Sprintf(":%s - [0:0]", chain))
+}
+
+func getByteSliceFromRule(rule []string) []byte {
+	var (
+		ruleStr = ""
+	)
+
+	for _, s := range rule {
+		ruleStr = fmt.Sprintf("%s %s", ruleStr, s)
+	}
+
+	return []byte(ruleStr)
 }
 
 // GetChainLines parses a table's iptables-save data to find chains in the table.

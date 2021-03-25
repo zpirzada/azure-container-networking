@@ -21,6 +21,32 @@ var (
 	}
 )
 
+//getChainsRulesWithTable will return chains and rules for a given tablename
+func getChainsRulesWithTable(tablename string) [][]string {
+
+	switch tablename {
+	case "filter":
+		return getAllChainsAndRules()
+	default:
+	}
+
+	return [][]string{}
+
+}
+
+//getChainsRulesWithTable will return chains and rules for a given tablename
+func getChainsWithTable(tablename string) []string {
+
+	switch tablename {
+	case "filter":
+		return getAllNpmChains()
+	default:
+	}
+
+	return []string{}
+
+}
+
 func getAllNpmChains() []string {
 	listOfChains := []string{}
 	for chain, _ := range IptablesAzureChainMap {
@@ -44,27 +70,25 @@ func getChainsFromRule(rule []string) string {
 	return rule[0]
 }
 
-func getChainObjects() *Iptable {
-	npmChains := &Iptable{
-		Chains:    make(map[string]*IptableChain),
-		TableName: "npmchains",
-	}
-
+func getFilterDefaultChainObjects() map[string]*IptableChain {
+	var (
+		chains = make(map[string]*IptableChain)
+	)
 	allRules := getAllChainsAndRules()
 
 	for _, rule := range allRules {
 		chain := getChainsFromRule(rule)
-		val, ok := npmChains.Chains[chain]
+		val, ok := chains[chain]
 		if !ok {
 			val = NewIptableChain(chain)
 		}
 
 		val.Rules = append(val.Rules, convertRuleListToByte(rule))
-		npmChains.Chains[chain] = val
+		chains[chain] = val
 
 	}
 
-	return npmChains
+	return chains
 }
 
 func convertRuleListToByte(rule []string) []byte {
