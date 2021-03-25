@@ -371,36 +371,28 @@ func (cnsClient *CNSClient) GetIPAddressesMatchingStates(StateFilter ...string) 
 
 	return resp.IPConfigurationStatus, err
 }
+
 //GetPodOrchestratorContext calls GetPodIpOrchestratorContext API on CNS
 func (cnsClient *CNSClient) GetPodOrchestratorContext() (map[string]string, error) {
 	var (
 		resp cns.GetPodContextResponse
 		err  error
 		res  *http.Response
-		body bytes.Buffer
 	)
 
 	url := cnsClient.connectionURL + cns.GetPodIPOrchestratorContext
 	log.Printf("GetPodIPOrchestratorContext url %v", url)
 
-	payload := ""
-
-	err = json.NewEncoder(&body).Encode(payload)
+	res, err = http.Get(url)
 	if err != nil {
-		log.Errorf("encoding json failed with %v", err)
-		return resp.PodContext, err
-	}
-
-	res, err = http.Post(url, contentTypeJSON, &body)
-	if err != nil {
-		log.Errorf("[Azure CNSClient] HTTP Post returned error %v", err.Error())
+		log.Errorf("[Azure CNSClient] GetPodIPOrchestratorContext HTTP Get returned error %v", err.Error())
 		return resp.PodContext, err
 	}
 
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		errMsg := fmt.Sprintf("[Azure CNSClient] GetPodContext invalid http status code: %v", res.StatusCode)
+		errMsg := fmt.Sprintf("[Azure CNSClient] GetPodIPOrchestratorContext invalid http status code: %v", res.StatusCode)
 		log.Errorf(errMsg)
 		return resp.PodContext, fmt.Errorf(errMsg)
 	}

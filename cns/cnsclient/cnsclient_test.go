@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/common"
 	"github.com/Azure/azure-container-networking/cns/fakes"
@@ -238,21 +239,47 @@ func TestCNSClientRequestAndRelease(t *testing.T) {
 	if ipaddresses[0].IPAddress != desiredIpAddress && ipaddresses[0].State != cns.Allocated {
 		t.Fatalf("Available IP address does not match expected, address state: %+v", ipaddresses)
 	}
-	fmt.Println(ipaddresses)
 
-	//test for pod ip by orch context map
-	podcontext, err := cnsClient.GetPodOrchestratorContext()
-	if err != nil {
-		t.Fatalf("Get pod ip by orchestrator context failed %+v", err)
-	}
-	if len(podcontext) < 1 {
-		t.Fatalf("Error in getting podcontext %+v", podcontext)
-	}
-	fmt.Println(podcontext)
+	t.Log(ipaddresses)
 
 	// release requested IP address, expect success
 	err = cnsClient.ReleaseIPAddress(orchestratorContext)
 	if err != nil {
 		t.Fatalf("Expected to not fail when releasing IP reservation found with context: %+v", err)
 	}
+}
+
+func TestCNSClientPodContextApi(t *testing.T) {
+	podName := "testpodname"
+	podNamespace := "testpodnamespace"
+	desiredIpAddress := "10.0.0.5"
+
+	secondaryIps := make([]string, 0)
+	secondaryIps = append(secondaryIps, desiredIpAddress)
+	cnsClient, _ := InitCnsClient("")
+
+	addTestStateToRestServer(t, secondaryIps)
+
+	podInfo := cns.KubernetesPodInfo{PodName: podName, PodNamespace: podNamespace}
+	orchestratorContext, err := json.Marshal(podInfo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// request IP address
+	_, err = cnsClient.RequestIPAddress(orchestratorContext)
+	if err != nil {
+		t.Fatalf("get IP from CNS failed with %+v", err)
+	}
+
+	//test for pod ip by orch context map
+	podcontext, err := cnsClient.GetPodOrchestratorContext()
+	if err != nil {
+		t.Errorf("Get pod ip by orchestrator context failed:  %+v", err)
+	}
+	if len(podcontext) < 1 {
+		t.Errorf("Expected atleast 1 entry in map for podcontext:  %+v", podcontext)
+	}
+
+	t.Log(podcontext)
 }

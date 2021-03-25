@@ -112,10 +112,10 @@ func getPodCmd(client *CNSClient) error {
 	return nil
 }
 
-func printPodContext(podContext map[string]string){
+func printPodContext(podContext map[string]string) {
 	var i = 1
-	for orchContext,podID := range podContext {
-			fmt.Println(i, " ", orchContext, " : ", podID)
-			i++
+	for orchContext, podID := range podContext {
+		fmt.Println(i, " ", orchContext, " : ", podID)
+		i++
 	}
 }
