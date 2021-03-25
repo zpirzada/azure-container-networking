@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+var (
+	chainSaveFormat = ":%s - [0:0]"
+)
+
 // Iptable holds a table contents
 type Iptable struct {
 	Chains    map[string]*IptableChain
@@ -101,4 +105,11 @@ func (c *IptableChain) Insert(rule []byte) error {
 	tempSlice := [][]byte{rule}
 	c.Rules = append(tempSlice, c.Rules...)
 	return nil
+}
+
+func (c *IptableChain) GetSaveFormat() []byte {
+	if len(c.Data) == 0 {
+		return []byte(fmt.Sprintf(chainSaveFormat, c.Chain))
+	}
+	return c.Data
 }
