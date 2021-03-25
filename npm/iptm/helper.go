@@ -6,20 +6,10 @@ import (
 	"github.com/Azure/azure-container-networking/npm/util"
 )
 
-// GetAllChainsAndRules returns all NPM chains and rules
-func getAllChainsAndRules() [][]string {
-	funcList := []func() [][]string{
-		getAzureNPMChainRules,
-		getAzureNPMAcceptChainRules,
-		getAzureNPMIngressChainRules,
-		getAzureNPMIngressPortChainRules,
-		getAzureNPMIngressFromChainRules,
-		getAzureNPMEgressChainRules,
-		getAzureNPMEgressPortChainRules,
-		getAzureNPMEgressToChainRules,
 var (
 	IptablesAzureChainMap = map[string]func() [][]string{
 		util.IptablesAzureChain:             getAzureNPMChainRules,
+		util.IptablesAzureAcceptChain:       getAzureNPMAcceptChainRules,
 		util.IptablesAzureIngressChain:      getAzureNPMIngressChainRules,
 		util.IptablesAzureIngressPortChain:  getAzureNPMIngressPortChainRules,
 		util.IptablesAzureIngressFromChain:  getAzureNPMIngressFromChainRules,

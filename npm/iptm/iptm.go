@@ -183,11 +183,10 @@ func (iptMgr *IptablesManager) UninitNpmChains() error {
 		metrics.SendErrorLogAndMetric(util.IptmID, "Error: failed to add default allow CONNECTED/RELATED rule to AZURE-NPM chain.")
 		return err
 	}
-	iptablesAzureChainList := getAllNpmChains()
 
 	// For backward compatibility, we should be cleaning older chains
 	allAzureChains := append(
-		IptablesAzureChainList,
+		getAllNpmChains(),
 		util.IptablesAzureTargetSetsChain,
 		util.IptablesAzureIngressWrongDropsChain,
 	)
