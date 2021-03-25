@@ -80,8 +80,6 @@ func (npMgr *NetworkPolicyManager) policyExists(npObj *networkingv1.NetworkPolic
 func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkPolicy) error {
 	var (
 		err            error
-		ns             *Namespace
-		exists         bool
 		npNs           = util.GetNSNameWithPrefix(npObj.ObjectMeta.Namespace)
 		npName         = npObj.ObjectMeta.Name
 		allNs          = npMgr.NsMap[util.KubeAllNamespacesFlag]
@@ -97,15 +95,6 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 		err = fmt.Errorf("[AddNetworkPolicy] Error: npKey is empty for %s network policy in %s", npName, npNs)
 		metrics.SendErrorLogAndMetric(util.NetpolID, err.Error())
 		return err
-	}
-
-	if ns, exists = npMgr.NsMap[npNs]; !exists {
-		ns, err = newNs(npNs)
-		if err != nil {
-			metrics.SendErrorLogAndMetric(util.NetpolID, "[AddNetworkPolicy] Error: creating namespace %s with err: %v", npNs, err)
-			return err
-		}
-		npMgr.NsMap[npNs] = ns
 	}
 
 	if npMgr.policyExists(npObj) {
@@ -177,10 +166,7 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 			return err
 		}
 	}
-	if err = npMgr.InitAllNsList(); err != nil {
-		metrics.SendErrorLogAndMetric(util.NetpolID, "[AddNetworkPolicy] Error: initializing all-namespace ipset list with err: %v", err)
-		return err
-	}
+
 	createCidrsRule("in", npObj.ObjectMeta.Name, npObj.ObjectMeta.Namespace, ingressIPCidrs, ipsMgr)
 	createCidrsRule("out", npObj.ObjectMeta.Name, npObj.ObjectMeta.Namespace, egressIPCidrs, ipsMgr)
 	iptMgr := allNs.iptMgr
