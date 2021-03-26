@@ -180,8 +180,10 @@ type IPAMPoolMonitor interface {
 
 //struct to expose state values for IPAMPoolMonitor struct
 type IpamPoolMonitorStateSnapshot struct {
-	MinimumFreeIps int64
-	MaximumFreeIps int64
+	MinimumFreeIps           int64
+	MaximumFreeIps           int64
+	UpdatingIpsNotInUseCount int
+	CachedNNC                nnc.NodeNetworkConfig
 }
 
 // Response describes generic response from CNS.

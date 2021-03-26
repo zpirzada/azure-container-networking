@@ -9,8 +9,10 @@ import (
 )
 
 type IPAMPoolMonitorFake struct {
-	FakeMinimumIps int
-	FakeMaximumIps int
+	FakeMinimumIps       int
+	FakeMaximumIps       int
+	FakeIpsNotInUseCount int
+	FakecachedNNC        nnc.NodeNetworkConfig
 }
 
 func NewIPAMPoolMonitorFake() *IPAMPoolMonitorFake {
@@ -31,7 +33,9 @@ func (ipm *IPAMPoolMonitorFake) Reconcile() error {
 
 func (ipm *IPAMPoolMonitorFake) GetStateSnapshot() cns.IpamPoolMonitorStateSnapshot {
 	return cns.IpamPoolMonitorStateSnapshot{
-		MinimumFreeIps: int64(ipm.FakeMinimumIps),
-		MaximumFreeIps: int64(ipm.FakeMaximumIps),
+		MinimumFreeIps:           int64(ipm.FakeMinimumIps),
+		MaximumFreeIps:           int64(ipm.FakeMaximumIps),
+		UpdatingIpsNotInUseCount: ipm.FakeIpsNotInUseCount,
+		CachedNNC:                ipm.FakecachedNNC,
 	}
 }

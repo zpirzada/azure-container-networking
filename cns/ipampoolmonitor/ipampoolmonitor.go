@@ -15,9 +15,9 @@ import (
 type CNSIPAMPoolMonitor struct {
 	pendingRelease bool
 
-	cachedNNC   nnc.NodeNetworkConfig
+	cachedNNC                nnc.NodeNetworkConfig
 	updatingIpsNotInUseCount int
-	scalarUnits nnc.Scaler
+	scalarUnits              nnc.Scaler
 
 	httpService    cns.HTTPService
 	rc             requestcontroller.RequestController
@@ -30,9 +30,9 @@ type CNSIPAMPoolMonitor struct {
 func NewCNSIPAMPoolMonitor(httpService cns.HTTPService, rc requestcontroller.RequestController) *CNSIPAMPoolMonitor {
 	logger.Printf("NewCNSIPAMPoolMonitor: Create IPAM Pool Monitor")
 	return &CNSIPAMPoolMonitor{
-		pendingRelease:				false,
-		httpService:        		httpService,
-		rc:             			rc,
+		pendingRelease: false,
+		httpService:    httpService,
+		rc:             rc,
 	}
 }
 
@@ -201,7 +201,6 @@ func (pm *CNSIPAMPoolMonitor) cleanPendingRelease() error {
 
 	logger.Printf("[ipam-pool-monitor] cleanPendingRelease: UpdateCRDSpec succeeded for spec %+v", tempNNCSpec)
 
-
 	// save the updated state to cachedSpec
 	pm.cachedNNC.Spec = tempNNCSpec
 	pm.pendingRelease = false
@@ -250,12 +249,14 @@ func (pm *CNSIPAMPoolMonitor) Update(scalar nnc.Scaler, spec nnc.NodeNetworkConf
 }
 
 //this function sets the values for state in IPAMPoolMonitor Struct
-func (pm *CNSIPAMPoolMonitor) GetStateSnapshot() cns.IpamPoolMonitorStateSnapshot{
-	defer pm.mu.Unlock()
+func (pm *CNSIPAMPoolMonitor) GetStateSnapshot() cns.IpamPoolMonitorStateSnapshot {
 	pm.mu.Lock()
+	defer pm.mu.Unlock()
 
-	return cns.IpamPoolMonitorStateSnapshot {
-		MinimumFreeIps: pm.MinimumFreeIps,
-		MaximumFreeIps: pm.MaximumFreeIps,
+	return cns.IpamPoolMonitorStateSnapshot{
+		MinimumFreeIps:           pm.MinimumFreeIps,
+		MaximumFreeIps:           pm.MaximumFreeIps,
+		UpdatingIpsNotInUseCount: pm.updatingIpsNotInUseCount,
+		CachedNNC:                pm.cachedNNC,
 	}
 }
