@@ -17,6 +17,11 @@ func MakeChainLine(chain string) []byte {
 	return []byte(fmt.Sprintf(":%s - [0:0]", chain))
 }
 
+// MakeTableLine returns byte for table in save format
+func MakeTableLine(tableName string) []byte {
+	return []byte("*" + string(tableName))
+}
+
 func getByteSliceFromRule(rule []string) []byte {
 	var (
 		ruleStr = ""
@@ -35,7 +40,7 @@ func getByteSliceFromRule(rule []string) []byte {
 // Note that to avoid allocations memory is SHARED with save.
 func GetChainLines(table string, save []byte) map[string]*IptableChain {
 	chainsMap := make(map[string]*IptableChain)
-	tablePrefix := []byte("*" + string(table))
+	tablePrefix := MakeTableLine(table)
 	readIndex := 0
 	// find beginning of table
 	for readIndex < len(save) {

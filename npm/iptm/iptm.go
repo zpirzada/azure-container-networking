@@ -59,12 +59,14 @@ func (e *IptEntry) getAppendRule() []string {
 // IptablesManager stores iptables entries.
 type IptablesManager struct {
 	OperationFlag string
+	iptmBuffer    *util.NpmBuffer
 }
 
 // NewIptablesManager creates a new instance for IptablesManager object.
 func NewIptablesManager() *IptablesManager {
 	iptMgr := &IptablesManager{
 		OperationFlag: "",
+		iptmBuffer:    util.NewNpmBuffer(),
 	}
 
 	return iptMgr
@@ -646,6 +648,8 @@ func grabIptablesLocks() (*os.File, error) {
 func (iptMgr *IptablesManager) SaveAndInitializeFilterTable() (*Iptable, error) {
 	// TODO add metric timers
 	var (
+		// If required, we can move this buffer one stage up
+		// and built as required overtime
 		iptableBuffer = bytes.NewBuffer(nil)
 		tableName     = "filter"
 	)

@@ -160,17 +160,36 @@ func NewIptableChain(chain string) *IptableChain {
 	}
 }
 
+// ruleExists check is a rule byte slice is
+// present in chains' rules
+func (c *IptableChain) ruleExists(rule []byte) bool {
+	for _, existingRule := range c.Rules {
+		if reflect.DeepEqual(rule, existingRule) {
+			return true
+		}
+	}
+	return false
+}
+
 // appendRule will take in a string rule and adds
 // at the bottom of rules. This helps in adding jump targets
 // at the bottom of the chain
 func (c *IptableChain) appendRule(rule []string) {
-	c.Rules = append(c.Rules, getByteSliceFromRule(rule))
+	byteRule := getByteSliceFromRule(rule)
+	if c.ruleExists(byteRule) {
+		return
+	}
+	c.Rules = append(c.Rules, byteRule)
 }
 
 // insertRule will take in a string rule and adds it
 // at the top of the rules.
 func (c *IptableChain) insertRule(rule []string) {
-	tempSlice := [][]byte{getByteSliceFromRule(rule)}
+	byteRule := getByteSliceFromRule(rule)
+	if c.ruleExists(byteRule) {
+		return
+	}
+	tempSlice := [][]byte{byteRule}
 	c.Rules = append(tempSlice, c.Rules...)
 }
 
