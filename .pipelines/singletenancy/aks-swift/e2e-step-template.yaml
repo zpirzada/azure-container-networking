@@ -131,7 +131,6 @@ steps:
       kubectl get po -owide -A
       sudo -E env "PATH=$PATH" VERSION=$(ImageTag) INSTALL_CNI=true INSTALL_CNS=false make test-integration
     name: "aksswifte2e"
-    workingDirectory: "$(modulePath)"
     displayName: "Run AKS Swift E2E"
 
   - script: |
