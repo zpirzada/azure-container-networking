@@ -2,7 +2,6 @@ parameters:
   name: ""
   displayName: ""
   pipelineBuildImage: "$(BUILD_IMAGE)"
-  cnsImageTag: ""
 
 stages:
   - stage: ${{ parameters.name }}

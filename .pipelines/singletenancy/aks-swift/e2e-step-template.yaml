@@ -98,6 +98,7 @@ steps:
       kubectl get po -n $STABLE_DNC_NAMESPACE -owide
       kubectl delete po -n $STABLE_DNC_NAMESPACE -l app=dnc
       echo "Waiting for new dnc pod to be ready..."
+      sleep 15
       export i="1"
       export attempts="100"
       while [[ $(kubectl get pods -n $STABLE_DNC_NAMESPACE -l app=dnc -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do
@@ -149,6 +150,7 @@ steps:
 
       export KUBECONFIG=~/.kube/dirty-acn-cx-cluster
       echo "Waiting for CNS dameonset to be ready..."
+      sleep 30
 
       NUM_NODES=`kubectl get no | wc -l`
       NUM_NODES=$[$NUM_NODES-1]
