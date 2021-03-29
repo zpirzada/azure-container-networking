@@ -248,7 +248,7 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 		TelemetryEnabled: true,
 	}
 
-	allNs, _ := newNs(util.KubeAllNamespacesFlag)
+	allNs := newNs(util.KubeAllNamespacesFlag)
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	// Create ipset for the namespace.

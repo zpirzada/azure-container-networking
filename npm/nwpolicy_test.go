@@ -26,10 +26,8 @@ func TestAddNetworkPolicy(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	iptMgr := iptm.NewIptablesManager()
@@ -173,10 +171,8 @@ func TestUpdateNetworkPolicy(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	iptMgr := iptm.NewIptablesManager()
@@ -288,10 +284,8 @@ func TestDeleteNetworkPolicy(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	iptMgr := iptm.NewIptablesManager()

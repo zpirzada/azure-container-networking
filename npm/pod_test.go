@@ -45,10 +45,8 @@ func TestAddPod(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()
@@ -104,10 +102,8 @@ func TestUpdatePod(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()
@@ -181,10 +177,8 @@ func TestOldRVUpdatePod(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()
@@ -264,10 +258,8 @@ func TestDeletePod(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()
@@ -319,10 +311,8 @@ func TestAddHostNetworkPod(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()
@@ -373,10 +363,8 @@ func TestUpdateHostNetworkPod(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()
@@ -450,10 +438,8 @@ func TestDeleteHostNetworkPod(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()

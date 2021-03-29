@@ -17,12 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestNewNs(t *testing.T) {
-	if _, err := newNs("test"); err != nil {
-		t.Errorf("TestnewNs failed @ newNs")
-	}
-}
-
 func TestAllNsList(t *testing.T) {
 	npMgr := &NetworkPolicyManager{}
 
@@ -55,10 +49,8 @@ func TestAddNamespace(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()
@@ -97,10 +89,8 @@ func TestUpdateNamespace(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()
@@ -152,10 +142,8 @@ func TestAddNamespaceLabel(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()
@@ -201,7 +189,7 @@ func TestAddNamespaceLabel(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(npMgr.NsMap["ns-"+newNsObj.Name].LabelsMap, newNsObj.ObjectMeta.Labels) {
-		t.Errorf("TestAddNamespaceLabel failed @ npMgr.nsMap labelMap check with err %+v", err)
+		t.Errorf("TestAddNamespaceLabel failed @ npMgr.nsMap labelMap")
 	}
 
 	npMgr.Unlock()
@@ -216,10 +204,8 @@ func TestDeleteandUpdateNamespaceLabel(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()
@@ -280,10 +266,8 @@ func TestDeleteNamespace(t *testing.T) {
 		TelemetryEnabled: false,
 	}
 
-	allNs, err := newNs(util.KubeAllNamespacesFlag)
-	if err != nil {
-		panic(err.Error)
-	}
+	allNs := newNs(util.KubeAllNamespacesFlag)
+
 	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	ipsMgr := ipsm.NewIpsetManager()

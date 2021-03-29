@@ -220,11 +220,8 @@ func (npMgr *NetworkPolicyManager) AddPod(podObj *corev1.Pod) error {
 
 	// Add pod namespace if it doesn't exist
 	if _, exists := npMgr.NsMap[podNs]; !exists {
-		npMgr.NsMap[podNs], err = newNs(podNs)
-		if err != nil {
-			metrics.SendErrorLogAndMetric(util.PodID, "[AddPod] Error: failed to create namespace %s with err: %v", podNs, err)
-			return err
-		}
+		npMgr.NsMap[podNs] = newNs(podNs)
+
 		log.Logf("Creating set: %v, hashedSet: %v", podNs, util.GetHashedName(podNs))
 		if err = ipsMgr.CreateSet(podNs, append([]string{util.IpsetNetHashFlag})); err != nil {
 			metrics.SendErrorLogAndMetric(util.PodID, "[AddPod] Error: creating ipset %s with err: %v", podNs, err)
@@ -302,11 +299,8 @@ func (npMgr *NetworkPolicyManager) UpdatePod(newPodObj *corev1.Pod) error {
 
 	// Add pod namespace if it doesn't exist
 	if _, exists := npMgr.NsMap[newPodObjNs]; !exists {
-		npMgr.NsMap[newPodObjNs], err = newNs(newPodObjNs)
-		if err != nil {
-			metrics.SendErrorLogAndMetric(util.PodID, "[UpdatePod] Error: failed to create namespace %s with err: %v", newPodObjNs, err)
-			return err
-		}
+		npMgr.NsMap[newPodObjNs] = newNs(newPodObjNs)
+
 		log.Logf("Creating set: %v, hashedSet: %v", newPodObjNs, util.GetHashedName(newPodObjNs))
 		if err = ipsMgr.CreateSet(newPodObjNs, append([]string{util.IpsetNetHashFlag})); err != nil {
 			metrics.SendErrorLogAndMetric(util.PodID, "[UpdatePod] Error creating ipset %s with err: %v", newPodObjNs, err)
