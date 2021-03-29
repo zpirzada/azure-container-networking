@@ -151,10 +151,16 @@ stages:
             displayName: "Push NPM Image and Wait for Repository"
 
           - script: |
-              cd ./output 
+              mkdir -p ./output/bins
+              cd ./output/linux_amd64
               sudo find . -mindepth 2 -type f -regextype posix-extended ! -iregex '.*\.(zip|tgz)$' -delete
-              sudo find . -mindepth 2 -type f -print -exec mv {} . \;
+              sudo find . -mindepth 2 -type f -print -exec mv {} ../bins \;
               sudo rm -R -- */ && cd ..
+              cd ./windows_amd64
+              sudo find . -mindepth 2 -type f -regextype posix-extended ! -iregex '.*\.(zip|tgz)$' -delete
+              sudo find . -mindepth 2 -type f -print -exec mv {} ../bins \;
+              sudo rm -R -- */ && cd ..
+              rmdir ./linux_amd64 && rmdir ./windows_amd64
             workingDirectory: "$(modulePath)"
             name: "PrepareArtifacts"
             displayName: "Prepare Artifacts"
@@ -195,7 +201,7 @@ stages:
               inlineScript: |
                 echo Creating storage container with name acn-$(EnvironmentalVariables.StorageID) and account name $(STORAGE_ACCOUNT_NAME)
                 az storage container create -n acn-$(EnvironmentalVariables.StorageID) --account-name $(STORAGE_ACCOUNT_NAME) --public-access container
-                az storage blob upload-batch -d acn-$(EnvironmentalVariables.StorageID) -s ./output/  --account-name $(STORAGE_ACCOUNT_NAME)
+                az storage blob upload-batch -d acn-$(EnvironmentalVariables.StorageID) -s ./output/bins/  --account-name $(STORAGE_ACCOUNT_NAME)
               workingDirectory: "$(modulePath)"
             displayName: Create artifact storage container
             condition: succeeded()
@@ -228,16 +234,6 @@ stages:
 
   - template: singletenancy/aks-engine/e2e-job-template.yaml
     parameters:
-      name: "windows_18_09_e2e"
-      displayName: "Windows 1809"
-      pipelineBuildImage: "$(BUILD_IMAGE)"
-      clusterDefinition: "cniWindows1809.json"
-      clusterDefinitionCniTypeKey: "azureCNIURLWindows"
-      clusterDefinitionCniBuildOS: "windows"
-      clusterDefinitionCniBuildExt: ".zip"
-
-  - template: singletenancy/aks-engine/e2e-job-template.yaml
-    parameters:
       name: "windows_19_03_e2e"
       displayName: "Windows 1903"
       pipelineBuildImage: "$(BUILD_IMAGE)"
@@ -252,7 +248,6 @@ stages:
       - "aks_on_swift_e2e"
       - "ubuntu_16_04_linux_e2e"
       - "ubuntu_18_04_linux_e2e"
-      - "windows_18_09_e2e"
       - "windows_19_03_e2e"
     jobs:
       - job: delete_remote_artifacts

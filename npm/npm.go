@@ -48,9 +48,11 @@ type NetworkPolicyManager struct {
 	nsInformer      coreinformers.NamespaceInformer
 	npInformer      networkinginformers.NetworkPolicyInformer
 
-	nodeName                     string
-	nsMap                        map[string]*namespace
-	podMap                       map[string]string // Key: Pod uuid, Value: PodIp
+	NodeName                     string
+	NsMap                        map[string]*Namespace
+	PodMap                       map[string]*NpmPod                     // Key is ns-<nsname>/<podname>/<poduuid>
+	RawNpMap                     map[string]*networkingv1.NetworkPolicy // Key is ns-<nsname>/<policyname>
+	ProcessedNpMap               map[string]*networkingv1.NetworkPolicy // Key is ns-<nsname>/<podSelectorHash>
 	isAzureNpmChainCreated       bool
 	isSafeToCleanUpAzureNpmChain bool
 
@@ -99,7 +101,7 @@ func GetAIMetadata() string {
 func (npMgr *NetworkPolicyManager) SendClusterMetrics() {
 	var (
 		heartbeat        = time.NewTicker(time.Minute * heartbeatIntervalInMinutes).C
-		customDimensions = map[string]string{"ClusterID": util.GetClusterID(npMgr.nodeName),
+		customDimensions = map[string]string{"ClusterID": util.GetClusterID(npMgr.NodeName),
 			"APIServer": npMgr.serverVersion.String()}
 		podCount = aitelemetry.Metric{
 			Name:             "PodCount",
@@ -118,14 +120,11 @@ func (npMgr *NetworkPolicyManager) SendClusterMetrics() {
 	for {
 		<-heartbeat
 		npMgr.Lock()
-		podCount.Value = float64(len(npMgr.podMap))
+		podCount.Value = 0
 		//Reducing one to remove all-namespaces ns obj
-		nsCount.Value = float64(len(npMgr.nsMap) - 1)
-		nwPolCount := 0
-		for _, ns := range npMgr.nsMap {
-			nwPolCount = nwPolCount + len(ns.rawNpMap)
-		}
-		nwPolicyCount.Value = float64(nwPolCount)
+		nsCount.Value = float64(len(npMgr.NsMap) - 1)
+		nwPolicyCount.Value += float64(len(npMgr.RawNpMap))
+		podCount.Value += float64(len(npMgr.PodMap))
 		npMgr.Unlock()
 
 		metrics.SendMetric(podCount)
@@ -232,9 +231,11 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 		podInformer:                  podInformer,
 		nsInformer:                   nsInformer,
 		npInformer:                   npInformer,
-		nodeName:                     os.Getenv("HOSTNAME"),
-		nsMap:                        make(map[string]*namespace),
-		podMap:                       make(map[string]string),
+		NodeName:                     os.Getenv("HOSTNAME"),
+		NsMap:                        make(map[string]*Namespace),
+		PodMap:                       make(map[string]*NpmPod),
+		RawNpMap:                     make(map[string]*networkingv1.NetworkPolicy),
+		ProcessedNpMap:               make(map[string]*networkingv1.NetworkPolicy),
 		isAzureNpmChainCreated:       false,
 		isSafeToCleanUpAzureNpmChain: false,
 		clusterState: telemetry.ClusterState{
@@ -248,11 +249,11 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 	}
 
 	allNs, _ := newNs(util.KubeAllNamespacesFlag)
-	npMgr.nsMap[util.KubeAllNamespacesFlag] = allNs
+	npMgr.NsMap[util.KubeAllNamespacesFlag] = allNs
 
 	// Create ipset for the namespace.
-	kubeSystemNs := "ns-" + util.KubeSystemFlag
-	if err := allNs.ipsMgr.CreateSet(kubeSystemNs, append([]string{util.IpsetNetHashFlag})); err != nil {
+	kubeSystemNs := util.GetNSNameWithPrefix(util.KubeSystemFlag)
+	if err := allNs.IpsMgr.CreateSet(kubeSystemNs, append([]string{util.IpsetNetHashFlag})); err != nil {
 		metrics.SendErrorLogAndMetric(util.NpmID, "Error: failed to create ipset for namespace %s.", kubeSystemNs)
 	}
 
@@ -269,19 +270,14 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 				npMgr.AddPod(podObj)
 				npMgr.Unlock()
 			},
-			UpdateFunc: func(old, new interface{}) {
-				oldPodObj, ok := old.(*corev1.Pod)
-				if !ok {
-					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE Pod: Received unexpected old object type: %v", oldPodObj)
-					return
-				}
+			UpdateFunc: func(_, new interface{}) {
 				newPodObj, ok := new.(*corev1.Pod)
 				if !ok {
 					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE Pod: Received unexpected new object type: %v", newPodObj)
 					return
 				}
 				npMgr.Lock()
-				npMgr.UpdatePod(oldPodObj, newPodObj)
+				npMgr.UpdatePod(newPodObj)
 				npMgr.Unlock()
 			},
 			DeleteFunc: func(obj interface{}) {
