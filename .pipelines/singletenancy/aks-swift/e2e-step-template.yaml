@@ -121,20 +121,17 @@ steps:
       set -e
       echo "Versions about to run"
       export KUBECONFIG=~/.kube/dnc-underlay
-      kubectl get po -n $STABLE_DNC_NAMESPACE -l app=dnc -oyaml | grep -B 4 -A 4 -m 2 image:
+      kubectl get po -n $STABLE_DNC_NAMESPACE -l app=dnc -oyaml | grep -B 4 -A 4 -m 4 image:
       
       cp ~/.kube/dirty-acn-cx-cluster ~/.kube/config
       export KUBECONFIG=~/.kube/config
       kubectl get po -n kube-system -l k8s-app=azure-cns -oyaml | grep -m 2 -B 4 -A 4 image:
-
-      # Vendoring doesn't include tests so we have to git clone the ACN github
-      git clone https://github.com/Azure/azure-container-networking.git
-      cd azure-container-networking/
       
       kubectl cluster-info
       kubectl get po -owide -A
       sudo -E env "PATH=$PATH" VERSION=$(ImageTag) INSTALL_CNI=true INSTALL_CNS=false make test-integration
     name: "aksswifte2e"
+    workingDirectory: "$(modulePath)"
     displayName: "Run AKS Swift E2E"
 
   - script: |
@@ -188,7 +185,7 @@ steps:
 
       export KUBECONFIG=~/.kube/dirty-acn-cx-cluster
       kubectl logs -n kube-system -l k8s-app=azure-cns --tail -1 --prefix > cns-logs.txt
-
+      ls
     workingDirectory: "$(modulePath)"
     name: "GetLogs"
     displayName: "Get logs"
@@ -198,4 +195,10 @@ steps:
     inputs:
       sourceFolder: "$(modulePath)/aks-swift-output"
       targetFolder: $(Build.ArtifactStagingDirectory)/aks-swift-output
+    condition: always()
+  
+  - task: PublishBuildArtifacts@1
+    inputs:
+      artifactName: aks-swift-output
+      pathtoPublish: "$(Build.ArtifactStagingDirectory)/aks-swift-output"
     condition: always()
