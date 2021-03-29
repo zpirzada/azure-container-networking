@@ -179,7 +179,9 @@ steps:
 
   - script: |
       echo "Logs will be available as a build artifact"
-      cd ./output 
+      mkdir aks-swift-output
+      cd aks-swift-output
+      pwd
       export KUBECONFIG=~/.kube/dnc-underlay
       kubectl logs -n $STABLE_DNC_NAMESPACE -l app=dnc --tail -1 -c dnc --prefix > dnc-logs.txt
       kubectl logs -n $STABLE_DNC_NAMESPACE -l app=dnc --tail -1 -c requestcontroller --prefix > dnc-rc-logs.txt
@@ -190,4 +192,10 @@ steps:
     workingDirectory: "$(modulePath)"
     name: "GetLogs"
     displayName: "Get logs"
+    condition: always()
+
+  - task: CopyFiles@2
+    inputs:
+      sourceFolder: "$(modulePath)/aks-swift-output"
+      targetFolder: $(Build.ArtifactStagingDirectory)/aks-swift-output
     condition: always()
