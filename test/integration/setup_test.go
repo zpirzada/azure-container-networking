@@ -83,25 +83,15 @@ func TestMain(m *testing.M) {
 		}
 	} else {
 		log.Printf("Env %v not set to true, skipping", envInstallCNI)
-	}
-	fmt.Printf("Before install cns")
+  }
 	if installopt := os.Getenv(envInstallCNS); installopt != "" {
-		fmt.Printf("In if CNS")
 		// create dirty cns ds
 		if installCNS, err := strconv.ParseBool(installopt); err == nil && installCNS == true {
-			fmt.Printf("Thing was bool and true")
 			if cnscleanup, err = installCNSDaemonset(ctx, clientset, os.Getenv(envImageTag)); err != nil {
-				fmt.Printf("no error")
 				return
 			}
-		} else {
-			fmt.Printf("installopt %v", installopt)
-			fmt.Printf("InstallCNS %v", installCNS)
-			fmt.Printf("error %v", err)
-			fmt.Printf("envImageTag %v", os.Getenv(envImageTag))
 		}
 	} else {
-		fmt.Printf("Env %v not set to true, skipping", envInstallCNS)
 		log.Printf("Env %v not set to true, skipping", envInstallCNS)
 	}
 
@@ -115,13 +105,11 @@ func installCNSDaemonset(ctx context.Context, clientset *kubernetes.Clientset, i
 	)
 
 	if imageTag == "" {
-		fmt.Print("No image")
 		return nil, fmt.Errorf("Azure CNS image tag not set")
 	}
 
 	// setup daemonset
 	if cns, err = mustParseDaemonSet(cnsDaemonSetPath); err != nil {
-		fmt.Print("Must parse failed")
 		return nil, err
 	}
 
@@ -130,7 +118,6 @@ func installCNSDaemonset(ctx context.Context, clientset *kubernetes.Clientset, i
 	cnsDaemonsetClient := clientset.AppsV1().DaemonSets(cns.Namespace)
 
 	log.Printf("Installing CNS with image %s", cns.Spec.Template.Spec.Containers[0].Image)
-	fmt.Printf("Installing CNS")
 	// setup the CNS configmap
 	if err := mustSetupConfigMap(ctx, clientset, cnsConfigMapPath); err != nil {
 		return nil, err
