@@ -220,6 +220,6 @@ func waitForPodsRunning(ctx context.Context, clientset *kubernetes.Clientset, na
 		return nil
 	}
 
-	retrier := retry.Retrier{Attempts: 10, Delay: 2 * time.Second}
+	retrier := retry.Retrier{Attempts: 10, Delay: 6 * time.Second}
 	return retrier.Do(ctx, checkPodIPsFn)
 }
