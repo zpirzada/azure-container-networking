@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 
+	npmerr "github.com/Azure/azure-container-networking/npm/util/errors"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -27,19 +28,19 @@ func isSamePolicy(old, new *networkingv1.NetworkPolicy) bool {
 }
 
 // addPolicy merges policies based on labels.
-func addPolicy(old, new *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+func addPolicy(old, new *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, *npmerr.NPMError) {
 	// if namespace matches && podSelector matches, then merge
 	// else return as is.
 	if !reflect.DeepEqual(old.TypeMeta, new.TypeMeta) {
-		return nil, fmt.Errorf("Old and new networkpolicies don't have the same TypeMeta")
+		return nil, npmerr.Errorf(npmerr.AddPolicy, false, fmt.Sprintf("Old and new networkpolicies don't have the same TypeMeta"))
 	}
 
 	if old.ObjectMeta.Namespace != new.ObjectMeta.Namespace {
-		return nil, fmt.Errorf("Old and new networkpolicies don't have the same namespace")
+		return nil, npmerr.Errorf(npmerr.AddPolicy, false, fmt.Sprintf("Old and new networkpolicies don't have the same namespace"))
 	}
 
 	if !reflect.DeepEqual(old.Spec.PodSelector, new.Spec.PodSelector) {
-		return nil, fmt.Errorf("Old and new networkpolicies don't apply to the same set of target pods")
+		return nil, npmerr.Errorf(npmerr.AddPolicy, false, fmt.Sprintf("Old and new networkpolicies don't apply to the same set of target pods"))
 	}
 
 	addedPolicy := &networkingv1.NetworkPolicy{
@@ -72,19 +73,19 @@ func addPolicy(old, new *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolic
 }
 
 // deductPolicy deduct one policy from the other.
-func deductPolicy(old, new *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, error) {
+func deductPolicy(old, new *networkingv1.NetworkPolicy) (*networkingv1.NetworkPolicy, *npmerr.NPMError) {
 	// if namespace matches && podSelector matches, then merge
 	// else return as is.
 	if !reflect.DeepEqual(old.TypeMeta, new.TypeMeta) {
-		return nil, fmt.Errorf("Old and new networkpolicy don't have the same TypeMeta")
+		return nil, npmerr.Errorf("DeductPolicy", false, fmt.Sprintf("Old and new networkpolicy don't have the same TypeMeta"))
 	}
 
 	if old.ObjectMeta.Namespace != new.ObjectMeta.Namespace {
-		return nil, fmt.Errorf("Old and new networkpolicy don't have the same namespace")
+		return nil, npmerr.Errorf("DeductPolicy", false, fmt.Sprintf("Old and new networkpolicy don't have the same namespace"))
 	}
 
 	if !reflect.DeepEqual(old.Spec.PodSelector, new.Spec.PodSelector) {
-		return nil, fmt.Errorf("Old and new networkpolicy don't have apply to the same set of target pods")
+		return nil, npmerr.Errorf("DeductPolicy", false, fmt.Sprintf("Old and new networkpolicy don't have apply to the same set of target pods"))
 	}
 
 	if reflect.DeepEqual(old.Spec, new.Spec) {

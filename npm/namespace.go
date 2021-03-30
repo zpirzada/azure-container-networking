@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-container-networking/npm/iptm"
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/util"
+	npmerr "github.com/Azure/azure-container-networking/npm/util/errors"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -92,7 +93,7 @@ func (npMgr *NetworkPolicyManager) UninitAllNsList() error {
 }
 
 // AddNamespace handles adding namespace to ipset.
-func (npMgr *NetworkPolicyManager) AddNamespace(nsObj *corev1.Namespace) error {
+func (npMgr *NetworkPolicyManager) AddNamespace(nsObj *corev1.Namespace) *npmerr.NPMError {
 	nsName, nsLabel := util.GetNSNameWithPrefix(nsObj.ObjectMeta.Name), nsObj.ObjectMeta.Labels
 	log.Logf("NAMESPACE CREATING: [%s/%v]", nsName, nsLabel)
 

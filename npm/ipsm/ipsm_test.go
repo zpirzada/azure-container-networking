@@ -107,7 +107,7 @@ func TestDeleteFromList(t *testing.T) {
 		t.Errorf("TestDeleteFromList failed @ ipsMgr.CreateSet")
 	}
 
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		operationFlag: util.IPsetCheckListFlag,
 		set:           util.GetHashedName(setName),
 	}
@@ -122,7 +122,7 @@ func TestDeleteFromList(t *testing.T) {
 		t.Errorf("TestDeleteFromList failed @ ipsMgr.AddToList")
 	}
 
-	entry = &ipsEntry{
+	entry = &IpsEntry{
 		operationFlag: util.IpsetTestFlag,
 		set:           util.GetHashedName(listName),
 		spec:          append([]string{util.GetHashedName(setName)}),
@@ -147,7 +147,7 @@ func TestDeleteFromList(t *testing.T) {
 		t.Errorf("TestDeleteFromList failed @ ipsMgr.DeleteFromList %v", err)
 	}
 
-	entry = &ipsEntry{
+	entry = &IpsEntry{
 		operationFlag: util.IpsetTestFlag,
 		set:           util.GetHashedName(listName),
 		spec:          append([]string{util.GetHashedName(setName)}),
@@ -163,7 +163,7 @@ func TestDeleteFromList(t *testing.T) {
 		t.Errorf("TestDeleteSet failed @ ipsMgr.DeleteSet")
 	}
 
-	entry = &ipsEntry{
+	entry = &IpsEntry{
 		operationFlag: util.IPsetCheckListFlag,
 		set:           util.GetHashedName(listName),
 	}
@@ -177,7 +177,7 @@ func TestDeleteFromList(t *testing.T) {
 		t.Errorf("TestDeleteSet failed @ ipsMgr.DeleteSet")
 	}
 
-	entry = &ipsEntry{
+	entry = &IpsEntry{
 		operationFlag: util.IPsetCheckListFlag,
 		set:           util.GetHashedName(setName),
 	}
@@ -507,7 +507,7 @@ func TestDestroy(t *testing.T) {
 	// Call Destroy and validate. Destroy can only work when no ipset is referenced from iptables.
 	if err := ipsMgr.Destroy(); err == nil {
 		// Validate ipset is not exist when destroy can happen.
-		entry := &ipsEntry{
+		entry := &IpsEntry{
 			operationFlag: util.IPsetCheckListFlag,
 			set:           util.GetHashedName(setName),
 		}
@@ -517,7 +517,7 @@ func TestDestroy(t *testing.T) {
 		}
 	} else {
 		// Validate ipset entries are gone from flush command when destroy can not happen.
-		entry := &ipsEntry{
+		entry := &IpsEntry{
 			operationFlag: util.IpsetTestFlag,
 			set:           util.GetHashedName(setName),
 			spec:          append([]string{testIP}),
@@ -541,7 +541,7 @@ func TestRun(t *testing.T) {
 		}
 	}()
 
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		operationFlag: util.IpsetCreationFlag,
 		set:           "test-set",
 		spec:          append([]string{util.IpsetNetHashFlag}),

@@ -4,7 +4,6 @@ package npm
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"github.com/Azure/azure-container-networking/npm/iptm"
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/util"
+	npmerr "github.com/Azure/azure-container-networking/npm/util/errors"
 	"github.com/Azure/azure-container-networking/telemetry"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -163,24 +163,24 @@ func (npMgr *NetworkPolicyManager) backup() {
 }
 
 // Start starts shared informers and waits for the shared informer cache to sync.
-func (npMgr *NetworkPolicyManager) Start(stopCh <-chan struct{}) error {
+func (npMgr *NetworkPolicyManager) Start(stopCh <-chan struct{}) *npmerr.NPMError {
 	// Starts all informers manufactured by npMgr's informerFactory.
 	npMgr.informerFactory.Start(stopCh)
 
 	// Wait for the initial sync of local cache.
 	if !cache.WaitForCacheSync(stopCh, npMgr.podInformer.Informer().HasSynced) {
 		metrics.SendErrorLogAndMetric(util.NpmID, "Pod informer failed to sync")
-		return fmt.Errorf("Pod informer failed to sync")
+		return npmerr.Errorf("Start", true, "Pod informer failed to sync")
 	}
 
 	if !cache.WaitForCacheSync(stopCh, npMgr.nsInformer.Informer().HasSynced) {
 		metrics.SendErrorLogAndMetric(util.NpmID, "Namespace informer failed to sync")
-		return fmt.Errorf("Namespace informer failed to sync")
+		return npmerr.Errorf("Start", true, "Namespace informer failed to sync")
 	}
 
 	if !cache.WaitForCacheSync(stopCh, npMgr.npInformer.Informer().HasSynced) {
 		metrics.SendErrorLogAndMetric(util.NpmID, "Network policy informer failed to sync")
-		return fmt.Errorf("Network policy informer failed to sync")
+		return npmerr.Errorf("Start", true, "Network policy informer failed to sync")
 	}
 
 	go npMgr.reconcileChains()
@@ -204,23 +204,23 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 		nsInformer    = informerFactory.Core().V1().Namespaces()
 		npInformer    = informerFactory.Networking().V1().NetworkPolicies()
 		serverVersion *version.Info
-		err           error
 	)
 
+	var serverErr error
 	for ticker, start := time.NewTicker(1*time.Second).C, time.Now(); time.Since(start) < time.Minute*1; {
 		<-ticker
-		serverVersion, err = clientset.ServerVersion()
-		if err == nil {
+		serverVersion, serverErr = clientset.ServerVersion()
+		if serverErr == nil {
 			break
 		}
 	}
-	if err != nil {
+	if serverErr != nil {
 		metrics.SendErrorLogAndMetric(util.NpmID, "Error: failed to retrieving kubernetes version")
-		panic(err.Error)
+		panic(serverErr.Error)
 	}
 	log.Logf("API server version: %+v", serverVersion)
 
-	if err = util.SetIsNewNwPolicyVerFlag(serverVersion); err != nil {
+	if err := util.SetIsNewNwPolicyVerFlag(serverVersion); err != nil {
 		metrics.SendErrorLogAndMetric(util.NpmID, "Error: failed to set IsNewNwPolicyVerFlag")
 		panic(err.Error)
 	}

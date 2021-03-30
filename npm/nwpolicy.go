@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/azure-container-networking/npm/iptm"
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/util"
+	npmerr "github.com/Azure/azure-container-networking/npm/util/errors"
 	networkingv1 "k8s.io/api/networking/v1"
 )
 
@@ -79,7 +80,6 @@ func (npMgr *NetworkPolicyManager) policyExists(npObj *networkingv1.NetworkPolic
 // AddNetworkPolicy handles adding network policy to iptables.
 func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkPolicy) error {
 	var (
-		err            error
 		npNs           = util.GetNSNameWithPrefix(npObj.ObjectMeta.Namespace)
 		npName         = npObj.ObjectMeta.Name
 		allNs          = npMgr.NsMap[util.KubeAllNamespacesFlag]
@@ -92,7 +92,7 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 	log.Logf("NETWORK POLICY CREATING: NameSpace%s, Name:%s", npNs, npName)
 
 	if npKey == "" {
-		err = fmt.Errorf("[AddNetworkPolicy] Error: npKey is empty for %s network policy in %s", npName, npNs)
+		err := fmt.Errorf("[AddNetworkPolicy] Error: npKey is empty for %s network policy in %s", npName, npNs)
 		metrics.SendErrorLogAndMetric(util.NetpolID, err.Error())
 		return err
 	}
@@ -102,12 +102,12 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 	}
 
 	if !npMgr.isAzureNpmChainCreated {
-		if err = allNs.IpsMgr.CreateSet(util.KubeSystemFlag, append([]string{util.IpsetNetHashFlag})); err != nil {
+		if err := allNs.IpsMgr.CreateSet(util.KubeSystemFlag, append([]string{util.IpsetNetHashFlag})); err != nil {
 			metrics.SendErrorLogAndMetric(util.NetpolID, "[AddNetworkPolicy] Error: failed to initialize kube-system ipset with err %s", err)
 			return err
 		}
 
-		if err = allNs.iptMgr.InitNpmChains(); err != nil {
+		if err := allNs.iptMgr.InitNpmChains(); err != nil {
 			metrics.SendErrorLogAndMetric(util.NetpolID, "[AddNetworkPolicy] Error: failed to initialize azure-npm chains with err %s", err)
 			return err
 		}
@@ -132,6 +132,7 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 
 	// Add (merge) the new policy with others who apply to the same pods
 	if oldPolicy, oldPolicyExists := npMgr.ProcessedNpMap[npProcessedKey]; oldPolicyExists {
+		var err *npmerr.NPMError
 		addedPolicy, err = addPolicy(oldPolicy, npObj)
 		if err != nil {
 			metrics.SendErrorLogAndMetric(util.NetpolID, "[AddNetworkPolicy] Error: adding policy %s to %s with err: %v", npName, oldPolicy.ObjectMeta.Name, err)
@@ -148,20 +149,20 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 	sets, namedPorts, lists, ingressIPCidrs, egressIPCidrs, iptEntries = translatePolicy(npObj)
 	for _, set := range sets {
 		log.Logf("Creating set: %v, hashedSet: %v", set, util.GetHashedName(set))
-		if err = ipsMgr.CreateSet(set, append([]string{util.IpsetNetHashFlag})); err != nil {
+		if err := ipsMgr.CreateSet(set, append([]string{util.IpsetNetHashFlag})); err != nil {
 			metrics.SendErrorLogAndMetric(util.NetpolID, "[AddNetworkPolicy] Error: creating ipset %s with err: %v", set, err)
 			return err
 		}
 	}
 	for _, set := range namedPorts {
 		log.Logf("Creating set: %v, hashedSet: %v", set, util.GetHashedName(set))
-		if err = ipsMgr.CreateSet(set, append([]string{util.IpsetIPPortHashFlag})); err != nil {
+		if err := ipsMgr.CreateSet(set, append([]string{util.IpsetIPPortHashFlag})); err != nil {
 			metrics.SendErrorLogAndMetric(util.NetpolID, "[AddNetworkPolicy] Error: creating ipset named port %s with err: %v", set, err)
 			return err
 		}
 	}
 	for _, list := range lists {
-		if err = ipsMgr.CreateList(list); err != nil {
+		if err := ipsMgr.CreateList(list); err != nil {
 			metrics.SendErrorLogAndMetric(util.NetpolID, "[AddNetworkPolicy] Error: creating ipset list %s with err: %v", list, err)
 			return err
 		}
@@ -171,7 +172,7 @@ func (npMgr *NetworkPolicyManager) AddNetworkPolicy(npObj *networkingv1.NetworkP
 	createCidrsRule("out", npObj.ObjectMeta.Name, npObj.ObjectMeta.Namespace, egressIPCidrs, ipsMgr)
 	iptMgr := allNs.iptMgr
 	for _, iptEntry := range iptEntries {
-		if err = iptMgr.Add(iptEntry); err != nil {
+		if err := iptMgr.Add(iptEntry); err != nil {
 			metrics.SendErrorLogAndMetric(util.NetpolID, "[AddNetworkPolicy] Error: failed to apply iptables rule. Rule: %+v with err: %v", iptEntry, err)
 			return err
 		}

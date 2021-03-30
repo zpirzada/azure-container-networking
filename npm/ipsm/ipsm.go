@@ -5,18 +5,21 @@ package ipsm
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 	"syscall"
+	"testing"
 
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/util"
+	npmerr "github.com/Azure/azure-container-networking/npm/util/errors"
 )
 
-type ipsEntry struct {
+type IpsEntry struct {
 	operationFlag string
 	name          string
 	set           string
@@ -90,12 +93,12 @@ func isNsSet(setName string) bool {
 }
 
 // CreateList creates an ipset list. npm maintains one setlist per namespace label.
-func (ipsMgr *IpsetManager) CreateList(listName string) error {
+func (ipsMgr *IpsetManager) CreateList(listName string) *npmerr.NPMError {
 	if _, exists := ipsMgr.ListMap[listName]; exists {
 		return nil
 	}
 
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		name:          listName,
 		operationFlag: util.IpsetCreationFlag,
 		set:           util.GetHashedName(listName),
@@ -114,7 +117,7 @@ func (ipsMgr *IpsetManager) CreateList(listName string) error {
 
 // DeleteList removes an ipset list.
 func (ipsMgr *IpsetManager) DeleteList(listName string) error {
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		operationFlag: util.IpsetDestroyFlag,
 		set:           util.GetHashedName(listName),
 	}
@@ -134,7 +137,7 @@ func (ipsMgr *IpsetManager) DeleteList(listName string) error {
 }
 
 // AddToList inserts an ipset to an ipset list.
-func (ipsMgr *IpsetManager) AddToList(listName string, setName string) error {
+func (ipsMgr *IpsetManager) AddToList(listName string, setName string) *npmerr.NPMError {
 	if listName == setName {
 		return nil
 	}
@@ -144,7 +147,7 @@ func (ipsMgr *IpsetManager) AddToList(listName string, setName string) error {
 
 	// if set does not exist, then return because the ipset call will fail due to set not existing
 	if !exists {
-		return fmt.Errorf("Set [%s] does not exist when attempting to add to list [%s]", setName, listName)
+		return npmerr.Errorf("AddToList", false, fmt.Sprintf("Set [%s] does not exist when attempting to add to list [%s]", setName, listName))
 	}
 
 	// Check if the list that is being added to exists
@@ -152,7 +155,7 @@ func (ipsMgr *IpsetManager) AddToList(listName string, setName string) error {
 
 	// Make sure that set returned is of list type, otherwise return because we can't add a set to a non setlist type
 	if exists && listtype != util.IpsetSetListFlag {
-		return fmt.Errorf("Failed to add set [%s] to list [%s], but list is of type [%s]", setName, listName, listtype)
+		return npmerr.Errorf("AddToList", false, fmt.Sprintf("Failed to add set [%s] to list [%s], but list is of type [%s]", setName, listName, listtype))
 	} else if !exists {
 		// if the list doesn't exist, create it
 		if err := ipsMgr.CreateList(listName); err != nil {
@@ -165,7 +168,7 @@ func (ipsMgr *IpsetManager) AddToList(listName string, setName string) error {
 		return nil
 	}
 
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		operationFlag: util.IpsetAppendFlag,
 		set:           util.GetHashedName(listName),
 		spec:          []string{util.GetHashedName(setName)},
@@ -211,7 +214,7 @@ func (ipsMgr *IpsetManager) DeleteFromList(listName string, setName string) erro
 	}
 
 	hashedListName, hashedSetName := util.GetHashedName(listName), util.GetHashedName(setName)
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		operationFlag: util.IpsetDeletionFlag,
 		set:           hashedListName,
 		spec:          []string{hashedSetName},
@@ -238,14 +241,14 @@ func (ipsMgr *IpsetManager) DeleteFromList(listName string, setName string) erro
 }
 
 // CreateSet creates an ipset.
-func (ipsMgr *IpsetManager) CreateSet(setName string, spec []string) *NPMError {
+func (ipsMgr *IpsetManager) CreateSet(setName string, spec []string) *npmerr.NPMError {
 	timer := metrics.StartNewTimer()
 
 	if _, exists := ipsMgr.SetMap[setName]; exists {
 		return nil
 	}
 
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		name:          setName,
 		operationFlag: util.IpsetCreationFlag,
 		// Use hashed string for set name to avoid string length limit of ipset.
@@ -268,13 +271,13 @@ func (ipsMgr *IpsetManager) CreateSet(setName string, spec []string) *NPMError {
 }
 
 // DeleteSet removes a set from ipset.
-func (ipsMgr *IpsetManager) DeleteSet(setName string) *NPMError {
+func (ipsMgr *IpsetManager) DeleteSet(setName string) *npmerr.NPMError {
 	if _, exists := ipsMgr.SetMap[setName]; !exists {
 		metrics.SendErrorLogAndMetric(util.IpsmID, "ipset with name %s not found", setName)
 		return nil
 	}
 
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		operationFlag: util.IpsetDestroyFlag,
 		set:           util.GetHashedName(setName),
 	}
@@ -295,7 +298,7 @@ func (ipsMgr *IpsetManager) DeleteSet(setName string) *NPMError {
 }
 
 // AddToSet inserts an ip to an entry in setMap, and creates/updates the corresponding ipset.
-func (ipsMgr *IpsetManager) AddToSet(setName, ip, spec, podUid string) error {
+func (ipsMgr *IpsetManager) AddToSet(setName, ip, spec, podUid string) *npmerr.NPMError {
 	if ipsMgr.Exists(setName, ip, spec) {
 
 		// make sure we have updated the podUid in case it gets changed
@@ -317,7 +320,7 @@ func (ipsMgr *IpsetManager) AddToSet(setName, ip, spec, podUid string) error {
 	// always guaranteed to have ip, not guaranteed to have port + protocol
 	ipDetails := strings.Split(ip, ",")
 	if len(ipDetails) > 0 && ipDetails[0] == "" {
-		return fmt.Errorf("Failed to add IP to set [%s], the ip to be added was empty, spec: %+v", setName, spec)
+		return npmerr.Errorf("AddToSet", false, fmt.Sprintf("Failed to add IP to set [%s], the ip to be added was empty, spec: %+v", setName, spec))
 	}
 
 	// check if the set exists, ignore the type of the set being added if it exists since the only purpose is to see if it's created or not
@@ -337,7 +340,7 @@ func (ipsMgr *IpsetManager) AddToSet(setName, ip, spec, podUid string) error {
 		resultSpec = append([]string{ip})
 	}
 
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		operationFlag: util.IpsetAppendFlag,
 		set:           util.GetHashedName(setName),
 		spec:          resultSpec,
@@ -359,7 +362,7 @@ func (ipsMgr *IpsetManager) AddToSet(setName, ip, spec, podUid string) error {
 }
 
 // DeleteFromSet removes an ip from an entry in setMap, and delete/update the corresponding ipset.
-func (ipsMgr *IpsetManager) DeleteFromSet(setName, ip, podUid string) error {
+func (ipsMgr *IpsetManager) DeleteFromSet(setName, ip, podUid string) *npmerr.NPMError {
 	ipSet, exists := ipsMgr.SetMap[setName]
 	if !exists {
 		log.Logf("ipset with name %s not found", setName)
@@ -373,7 +376,7 @@ func (ipsMgr *IpsetManager) DeleteFromSet(setName, ip, podUid string) error {
 	// always guaranteed to have ip, not guaranteed to have port + protocol
 	ipDetails := strings.Split(ip, ",")
 	if len(ipDetails) > 0 && ipDetails[0] == "" {
-		return fmt.Errorf("Failed to add IP to set [%s], the ip to be added was empty", setName)
+		return npmerr.Errorf("DeleteFromSet", false, fmt.Sprintf("Failed to add IP to set [%s], the ip to be added was empty", setName))
 	}
 
 	if _, exists := ipsMgr.SetMap[setName].elements[ip]; exists {
@@ -388,7 +391,7 @@ func (ipsMgr *IpsetManager) DeleteFromSet(setName, ip, podUid string) error {
 	}
 
 	// TODO optimize to not run this command in case cache has already been updated.
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		operationFlag: util.IpsetDeletionFlag,
 		set:           util.GetHashedName(setName),
 		spec:          append([]string{ip}),
@@ -445,7 +448,7 @@ func (ipsMgr *IpsetManager) Clean() error {
 
 // Destroy completely cleans ipset.
 func (ipsMgr *IpsetManager) Destroy() error {
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		operationFlag: util.IpsetFlushFlag,
 	}
 	if _, err := ipsMgr.Run(entry); err != nil {
@@ -465,7 +468,7 @@ func (ipsMgr *IpsetManager) Destroy() error {
 }
 
 // Run execute an ipset command to update ipset.
-func (ipsMgr *IpsetManager) Run(entry *ipsEntry) (int, *NPMError) {
+func (ipsMgr *IpsetManager) Run(entry *IpsEntry) (int, *npmerr.NPMError) {
 	cmdName := util.Ipset
 	cmdArgs := append([]string{entry.operationFlag, util.IpsetExistFlag, entry.set}, entry.spec...)
 	cmdArgs = util.DropEmptyFields(cmdArgs)
@@ -478,7 +481,7 @@ func (ipsMgr *IpsetManager) Run(entry *ipsEntry) (int, *NPMError) {
 			metrics.SendErrorLogAndMetric(util.IpsmID, "Error: There was an error running command: [%s %v] Stderr: [%v, %s]", cmdName, strings.Join(cmdArgs, " "), err, strings.TrimSuffix(string(msg.Stderr), "\n"))
 		}
 		er := fmt.Errorf("%s", strings.TrimSuffix(string(msg.Stderr), "\n"))
-		npmerr := ConvertToNPMErrorWithEntry(entry.operationFlag, er, append([]string{cmdName}, cmdArgs...))
+		npmerr := npmerr.ConvertToNPMError(entry.operationFlag, er, append([]string{cmdName}, cmdArgs...))
 		fmt.Println(npmerr)
 
 		return errCode, npmerr
@@ -534,7 +537,7 @@ func (ipsMgr *IpsetManager) Restore(configFile string) error {
 }
 
 // DestroyNpmIpsets destroys only ipsets created by NPM
-func (ipsMgr *IpsetManager) DestroyNpmIpsets() *NPMError {
+func (ipsMgr *IpsetManager) DestroyNpmIpsets() *npmerr.NPMError {
 
 	cmdName := util.Ipset
 	cmdArgs := util.IPsetCheckListFlag
@@ -546,7 +549,7 @@ func (ipsMgr *IpsetManager) DestroyNpmIpsets() *NPMError {
 			metrics.SendErrorLogAndMetric(util.IpsmID, "{DestroyNpmIpsets} Error: There was an error running command: [%s] Stderr: [%v, %s]", cmdName, err, strings.TrimSuffix(string(msg.Stderr), "\n"))
 		}
 
-		npmerr := ConvertToNPMErrorWithEntry(cmdArgs, err, append([]string{cmdName}, cmdArgs))
+		npmerr := npmerr.ConvertToNPMError(cmdArgs, err, append([]string{cmdName}, cmdArgs))
 
 		return npmerr
 	}
@@ -578,12 +581,12 @@ func (ipsMgr *IpsetManager) DestroyNpmIpsets() *NPMError {
 		return nil
 	}
 
-	entry := &ipsEntry{
+	entry := &IpsEntry{
 		operationFlag: util.IpsetFlushFlag,
 	}
 
 	for _, ipsetName := range ipsetLists {
-		entry := &ipsEntry{
+		entry := &IpsEntry{
 			operationFlag: util.IpsetFlushFlag,
 			set:           ipsetName,
 		}
@@ -602,4 +605,244 @@ func (ipsMgr *IpsetManager) DestroyNpmIpsets() *NPMError {
 	}
 
 	return nil
+}
+
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func GetIPSetName() string {
+	b := make([]byte, 8)
+
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+
+	return "npm-test-" + string(b)
+}
+
+// "Set cannot be destroyed: it is in use by a kernel component"
+func TestSetCannotBeDestroyed(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Errorf("TestAddToList failed @ ipsMgr.Save")
+	}
+
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore")
+		}
+	}()
+
+	testset1 := GetIPSetName()
+	testlist1 := GetIPSetName()
+
+	if err := ipsMgr.CreateSet(testset1, append([]string{util.IpsetNetHashFlag})); err != nil {
+		t.Errorf("Failed to create set with err %v", err)
+	}
+
+	if err := ipsMgr.AddToSet(testset1, fmt.Sprintf("%s", "1.1.1.1"), util.IpsetIPPortHashFlag, "0"); err != nil {
+		t.Errorf("Failed to add to set with err %v", err)
+	}
+
+	if err := ipsMgr.AddToList(testlist1, testset1); err != nil {
+		t.Errorf("Failed to add to list with err %v", err)
+	}
+
+	// Delete set and validate set is not exist.
+	if err := ipsMgr.DeleteSet(testset1); err != nil {
+		if err.ErrID != npmerr.SetCannotBeDestroyedInUseByKernelComponent {
+			t.Errorf("Expected to error with ipset in use by kernel component")
+		}
+	}
+}
+
+func TestElemSeparatorSupportsNone(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Errorf("TestAddToList failed @ ipsMgr.Save")
+	}
+
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore")
+		}
+	}()
+
+	testset1 := GetIPSetName()
+
+	if err := ipsMgr.CreateSet(testset1, append([]string{util.IpsetNetHashFlag})); err != nil {
+		t.Errorf("TestAddToList failed @ ipsMgr.CreateSet")
+	}
+
+	entry := &IpsEntry{
+		operationFlag: util.IpsetTestFlag,
+		set:           util.GetHashedName(testset1),
+		spec:          append([]string{fmt.Sprintf("10.104.7.252,3000")}),
+	}
+
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != npmerr.ElemSeperatorNotSupported {
+		t.Errorf("Expected elem seperator error: %+v", err)
+	}
+}
+
+func TestIPSetWithGivenNameDoesNotExist(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Errorf("TestAddToList failed @ ipsMgr.Save with err %+v", err)
+	}
+
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore with err %+v", err)
+		}
+	}()
+
+	testset1 := GetIPSetName()
+	testset2 := GetIPSetName()
+
+	entry := &IpsEntry{
+		operationFlag: util.IpsetAppendFlag,
+		set:           util.GetHashedName(testset1),
+		spec:          append([]string{util.GetHashedName(testset2)}),
+	}
+
+	var err *npmerr.NPMError
+	if _, err = ipsMgr.Run(entry); err == nil || err.ErrID != npmerr.SetWithGivenNameDoesNotExist {
+		t.Errorf("Expected set to not exist when adding to nonexistent set %+v", err)
+	}
+}
+
+func TestIPSetWithGivenNameAlreadyExists(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Errorf("TestAddToList failed @ ipsMgr.Save with err %+v", err)
+	}
+
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore with err %+v", err)
+		}
+	}()
+
+	testset1 := GetIPSetName()
+
+	entry := &IpsEntry{
+		name:          testset1,
+		operationFlag: util.IpsetCreationFlag,
+		// Use hashed string for set name to avoid string length limit of ipset.
+		set:  util.GetHashedName(testset1),
+		spec: append([]string{util.IpsetNetHashFlag}),
+	}
+
+	if errCode, err := ipsMgr.Run(entry); err != nil && errCode != 1 {
+		t.Errorf("Expected err")
+	}
+
+	entry = &IpsEntry{
+		name:          testset1,
+		operationFlag: util.IpsetCreationFlag,
+		// Use hashed string for set name to avoid string length limit of ipset.
+		set:  util.GetHashedName(testset1),
+		spec: append([]string{util.IpsetSetListFlag}),
+	}
+
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != npmerr.IPSetWithGivenNameAlreadyExists {
+		t.Errorf("Expected error code to match when set does not exist: %+v", err)
+	}
+}
+
+func TestIPSetSecondElementIsMissingWhenAddingIpWithNoPort(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Errorf("TestAddToList failed @ ipsMgr.Save with err: %+v", err)
+	}
+
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore")
+		}
+	}()
+
+	testset1 := GetIPSetName()
+
+	spec := append([]string{util.IpsetIPPortHashFlag})
+	if err := ipsMgr.CreateSet(testset1, spec); err != nil {
+		t.Errorf("TestCreateSet failed @ ipsMgr.CreateSet when creating port set")
+	}
+
+	entry := &IpsEntry{
+		operationFlag: util.IpsetAppendFlag,
+		set:           util.GetHashedName(testset1),
+		spec:          append([]string{fmt.Sprintf("%s", "1.1.1.1")}),
+	}
+
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != npmerr.SecondElementIsMissing {
+		t.Errorf("Expected to fail when adding ip with no port to set that requires port: %+v", err)
+	}
+}
+
+func TestIPSetMissingSecondMandatoryArgument(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Errorf("TestAddToList failed @ ipsMgr.Save")
+	}
+
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore")
+		}
+	}()
+
+	testset1 := GetIPSetName()
+
+	spec := append([]string{util.IpsetIPPortHashFlag})
+	if err := ipsMgr.CreateSet(testset1, spec); err != nil {
+		t.Errorf("TestCreateSet failed @ ipsMgr.CreateSet when creating port set")
+	}
+
+	entry := &IpsEntry{
+		operationFlag: util.IpsetAppendFlag,
+		set:           util.GetHashedName(testset1),
+		spec:          append([]string{}),
+	}
+
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != npmerr.MissingSecondMandatoryArgument {
+		t.Errorf("Expected to fail when running ipset command with no second argument: %+v", err)
+	}
+}
+
+func TestIPSetCannotBeAddedAsElementDoesNotExist(t *testing.T) {
+	ipsMgr := NewIpsetManager()
+	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
+		t.Errorf("TestAddToList failed @ ipsMgr.Save")
+	}
+
+	defer func() {
+		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
+			t.Errorf("TestAddToList failed @ ipsMgr.Restore")
+		}
+	}()
+
+	testset1 := GetIPSetName()
+	testset2 := GetIPSetName()
+
+	spec := append([]string{util.IpsetSetListFlag})
+	entry := &IpsEntry{
+		operationFlag: util.IpsetCreationFlag,
+		set:           util.GetHashedName(testset1),
+		spec:          spec,
+	}
+
+	if _, err := ipsMgr.Run(entry); err != nil {
+		t.Errorf("Expected to not fail when creating ipset: %+v", err)
+	}
+
+	entry = &IpsEntry{
+		operationFlag: util.IpsetAppendFlag,
+		set:           util.GetHashedName(testset1),
+		spec:          append([]string{util.GetHashedName(testset2)}),
+	}
+
+	if _, err := ipsMgr.Run(entry); err == nil || err.ErrID != npmerr.SetToBeAddedDeletedTestedDoesNotExist {
+		t.Errorf("Expected to fail when adding set to list and the set doesn't exist: %+v", err)
+	}
 }

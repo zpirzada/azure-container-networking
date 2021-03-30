@@ -10,6 +10,7 @@ import (
 	"github.com/Azure/azure-container-networking/npm"
 	restserver "github.com/Azure/azure-container-networking/npm/http/server"
 	"github.com/Azure/azure-container-networking/npm/metrics"
+	npmerr "github.com/Azure/azure-container-networking/npm/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -24,19 +25,19 @@ const (
 // Version is populated by make during build.
 var version string
 
-func initLogging() error {
+func initLogging() *npmerr.NPMError {
 	log.SetName("azure-npm")
 	log.SetLevel(log.LevelInfo)
 	if err := log.SetTargetLogDirectory(log.TargetStdout, ""); err != nil {
 		log.Logf("Failed to configure logging, err:%v.", err)
-		return err
+		return npmerr.Error("InitLogging", true, err)
 	}
 
 	return nil
 }
 
 func main() {
-	var err error
+	var err *npmerr.NPMError
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -51,16 +52,16 @@ func main() {
 	metrics.InitializeAll()
 
 	// Creates the in-cluster config
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		panic(err.Error())
+	config, clusterErr := rest.InClusterConfig()
+	if clusterErr != nil {
+		panic(clusterErr.Error())
 	}
 
 	// Creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Logf("clientset creation failed with error %v.", err)
-		panic(err.Error())
+	clientset, configErr := kubernetes.NewForConfig(config)
+	if configErr != nil {
+		log.Logf("clientset creation failed with error %v.", configErr)
+		panic(configErr.Error())
 	}
 
 	// Setting reSyncPeriod to 15 mins

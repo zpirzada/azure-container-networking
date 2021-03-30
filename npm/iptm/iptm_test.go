@@ -7,6 +7,7 @@ import (
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/metrics/promutil"
 	"github.com/Azure/azure-container-networking/npm/util"
+	npmerr "github.com/Azure/azure-container-networking/npm/util/errors"
 )
 
 func TestSave(t *testing.T) {
@@ -230,7 +231,7 @@ func TestGetChainLineNumber(t *testing.T) {
 
 	var (
 		lineNum    int
-		err        error
+		err        *npmerr.NPMError
 		kubeExists bool
 		npmExists  bool
 	)

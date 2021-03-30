@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/util"
+	npmerr "github.com/Azure/azure-container-networking/npm/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	// utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
@@ -66,7 +67,7 @@ func NewIptablesManager() *IptablesManager {
 }
 
 // InitNpmChains initializes Azure NPM chains in iptables.
-func (iptMgr *IptablesManager) InitNpmChains() error {
+func (iptMgr *IptablesManager) InitNpmChains() *npmerr.NPMError {
 	log.Logf("Initializing AZURE-NPM chains.")
 
 	if err := iptMgr.AddAllChains(); err != nil {
@@ -78,7 +79,7 @@ func (iptMgr *IptablesManager) InitNpmChains() error {
 		metrics.SendErrorLogAndMetric(util.IptmID, "Error: failed to add AZURE-NPM chain to FORWARD chain. %s", err.Error())
 	}
 
-	if err = iptMgr.AddAllRulesToChains(); err != nil {
+	if err := iptMgr.AddAllRulesToChains(); err != nil {
 		return err
 	}
 
@@ -166,7 +167,7 @@ func (iptMgr *IptablesManager) CheckAndAddForwardChain() error {
 }
 
 // UninitNpmChains uninitializes Azure NPM chains in iptables.
-func (iptMgr *IptablesManager) UninitNpmChains() error {
+func (iptMgr *IptablesManager) UninitNpmChains() *npmerr.NPMError {
 
 	// Remove AZURE-NPM chain from FORWARD chain.
 	entry := &IptEntry{
@@ -211,7 +212,7 @@ func (iptMgr *IptablesManager) UninitNpmChains() error {
 }
 
 // AddAllRulesToChains Checks and adds all the rules in NPM chains
-func (iptMgr *IptablesManager) AddAllRulesToChains() error {
+func (iptMgr *IptablesManager) AddAllRulesToChains() *npmerr.NPMError {
 
 	allChainsAndRules := getAllChainsAndRules()
 	for _, rule := range allChainsAndRules {
@@ -250,7 +251,7 @@ func (iptMgr *IptablesManager) AddAllRulesToChains() error {
 }
 
 // Exists checks if a rule exists in iptables.
-func (iptMgr *IptablesManager) Exists(entry *IptEntry) (bool, error) {
+func (iptMgr *IptablesManager) Exists(entry *IptEntry) (bool, *npmerr.NPMError) {
 	iptMgr.OperationFlag = util.IptablesCheckFlag
 	returnCode, err := iptMgr.Run(entry)
 	if err == nil {
@@ -265,7 +266,7 @@ func (iptMgr *IptablesManager) Exists(entry *IptEntry) (bool, error) {
 }
 
 // AddAllChains adds all NPM chains
-func (iptMgr *IptablesManager) AddAllChains() error {
+func (iptMgr *IptablesManager) AddAllChains() *npmerr.NPMError {
 	// Add all secondary Chains
 	for _, chainToAdd := range IptablesAzureChainList {
 		if err := iptMgr.AddChain(chainToAdd); err != nil {
@@ -276,7 +277,7 @@ func (iptMgr *IptablesManager) AddAllChains() error {
 }
 
 // AddChain adds a chain to iptables.
-func (iptMgr *IptablesManager) AddChain(chain string) error {
+func (iptMgr *IptablesManager) AddChain(chain string) *npmerr.NPMError {
 	entry := &IptEntry{
 		Chain: chain,
 	}
@@ -296,7 +297,7 @@ func (iptMgr *IptablesManager) AddChain(chain string) error {
 }
 
 // GetChainLineNumber given a Chain and its parent chain returns line number
-func (iptMgr *IptablesManager) GetChainLineNumber(chain string, parentChain string) (int, error) {
+func (iptMgr *IptablesManager) GetChainLineNumber(chain string, parentChain string) (int, *npmerr.NPMError) {
 
 	var (
 		output []byte
@@ -310,13 +311,13 @@ func (iptMgr *IptablesManager) GetChainLineNumber(chain string, parentChain stri
 	grep := exec.Command("grep", chain)
 	pipe, err := iptFilterEntries.StdoutPipe()
 	if err != nil {
-		return 0, err
+		return 0, npmerr.Error("GetChainLineNumber", false, err)
 	}
 	defer pipe.Close()
 	grep.Stdin = pipe
 
 	if err = iptFilterEntries.Start(); err != nil {
-		return 0, err
+		return 0, npmerr.Error("GetChainLineNumber", false, err)
 	}
 	// Without this wait, defunct iptable child process are created
 	defer iptFilterEntries.Wait()
@@ -334,7 +335,7 @@ func (iptMgr *IptablesManager) GetChainLineNumber(chain string, parentChain stri
 }
 
 // DeleteChain deletes a chain from iptables.
-func (iptMgr *IptablesManager) DeleteChain(chain string) error {
+func (iptMgr *IptablesManager) DeleteChain(chain string) *npmerr.NPMError {
 	entry := &IptEntry{
 		Chain: chain,
 	}
@@ -400,7 +401,7 @@ func (iptMgr *IptablesManager) Delete(entry *IptEntry) error {
 }
 
 // Run execute an iptables command to update iptables.
-func (iptMgr *IptablesManager) Run(entry *IptEntry) (int, error) {
+func (iptMgr *IptablesManager) Run(entry *IptEntry) (int, *npmerr.NPMError) {
 	cmdName := entry.Command
 	if cmdName == "" {
 		cmdName = util.Iptables
@@ -427,34 +428,37 @@ func (iptMgr *IptablesManager) Run(entry *IptEntry) (int, error) {
 			metrics.SendErrorLogAndMetric(util.IptmID, "Error: There was an error running command: [%s %v] Stderr: [%v, %s]", cmdName, strings.Join(cmdArgs, " "), err, msgStr)
 		}
 
-		return errCode, err
+		er := fmt.Errorf("%s", strings.TrimSuffix(string(msg.Stderr), "\n"))
+		npmerr := npmerr.ConvertToNPMError(iptMgr.OperationFlag, er, append([]string{cmdName}, cmdArgs...))
+
+		return errCode, npmerr
 	}
 
 	return 0, nil
 }
 
 // Save saves current iptables configuration to /var/log/iptables.conf
-func (iptMgr *IptablesManager) Save(configFile string) error {
+func (iptMgr *IptablesManager) Save(configFile string) (err *npmerr.NPMError) {
 	if len(configFile) == 0 {
 		configFile = util.IptablesConfigFile
 	}
 
-	l, err := grabIptablesLocks()
-	if err != nil {
-		return err
+	l, gerr := grabIptablesLocks()
+	if gerr != nil {
+		return npmerr.Error("IPTablesSave", true, err)
 	}
 
 	defer func(l *os.File) {
-		if err = l.Close(); err != nil {
+		if ferr := l.Close(); ferr != nil {
 			log.Logf("Failed to close iptables locks")
 		}
 	}(l)
 
 	// create the config file for writing
-	f, err := os.Create(configFile)
-	if err != nil {
+	f, ferr := os.Create(configFile)
+	if ferr != nil {
 		metrics.SendErrorLogAndMetric(util.IptmID, "Error: failed to open file: %s.", configFile)
-		return err
+		return npmerr.Error("IPTablesSave", true, err)
 	}
 	defer f.Close()
 
@@ -462,7 +466,7 @@ func (iptMgr *IptablesManager) Save(configFile string) error {
 	cmd.Stdout = f
 	if err := cmd.Start(); err != nil {
 		metrics.SendErrorLogAndMetric(util.IptmID, "Error: failed to run iptables-save.")
-		return err
+		return npmerr.Error("IPTablesSave", true, err)
 	}
 	cmd.Wait()
 
@@ -470,27 +474,27 @@ func (iptMgr *IptablesManager) Save(configFile string) error {
 }
 
 // Restore restores iptables configuration from /var/log/iptables.conf
-func (iptMgr *IptablesManager) Restore(configFile string) error {
+func (iptMgr *IptablesManager) Restore(configFile string) (err *npmerr.NPMError) {
 	if len(configFile) == 0 {
 		configFile = util.IptablesConfigFile
 	}
 
-	l, err := grabIptablesLocks()
-	if err != nil {
-		return err
+	l, gerr := grabIptablesLocks()
+	if gerr != nil {
+		return gerr
 	}
 
 	defer func(l *os.File) {
-		if err = l.Close(); err != nil {
+		if err := l.Close(); err != nil {
 			log.Logf("Failed to close iptables locks")
 		}
 	}(l)
 
 	// open the config file for reading
-	f, err := os.Open(configFile)
-	if err != nil {
+	f, ferr := os.Open(configFile)
+	if ferr != nil {
 		metrics.SendErrorLogAndMetric(util.IptmID, "Error: failed to open file: %s.", configFile)
-		return err
+		return npmerr.Error("IPTablesRestore", true, ferr)
 	}
 	defer f.Close()
 
@@ -498,7 +502,7 @@ func (iptMgr *IptablesManager) Restore(configFile string) error {
 	cmd.Stdin = f
 	if err := cmd.Start(); err != nil {
 		metrics.SendErrorLogAndMetric(util.IptmID, "Error: failed to run iptables-restore.")
-		return err
+		return npmerr.Error("IPTablesRestore", true, err)
 	}
 	cmd.Wait()
 
@@ -506,7 +510,7 @@ func (iptMgr *IptablesManager) Restore(configFile string) error {
 }
 
 // grabs iptables v1.6 xtable lock
-func grabIptablesLocks() (*os.File, error) {
+func grabIptablesLocks() (*os.File, *npmerr.NPMError) {
 	var success bool
 
 	l := &os.File{}
@@ -521,7 +525,7 @@ func grabIptablesLocks() (*os.File, error) {
 	l, err := os.OpenFile(util.IptablesLockFile, os.O_CREATE, 0600)
 	if err != nil {
 		metrics.SendErrorLogAndMetric(util.IptmID, "Error: failed to open iptables lock file %s.", util.IptablesLockFile)
-		return nil, err
+		return nil, npmerr.Error("GrabIPTablesLock", false, err)
 	}
 
 	if err := wait.PollImmediate(200*time.Millisecond, 2*time.Second, func() (bool, error) {
@@ -532,7 +536,7 @@ func grabIptablesLocks() (*os.File, error) {
 		return true, nil
 	}); err != nil {
 		metrics.SendErrorLogAndMetric(util.IptmID, "Error: failed to acquire new iptables lock: %v.", err)
-		return nil, err
+		return nil, npmerr.Error("GrabIPTablesLock", false, err)
 	}
 
 	success = true
