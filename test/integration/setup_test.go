@@ -75,7 +75,7 @@ func TestMain(m *testing.M) {
 	ctx := context.Background()
 	if installopt := os.Getenv(envInstallCNI); installopt != "" {
 		// create dirty cni-manager ds
-		if installCNI, err := strconv.ParseBool(installopt); err != nil && installCNI == true {
+		if installCNI, err := strconv.ParseBool(installopt); err == nil && installCNI == true {
 			if cnicleanup, err = installCNIManagerDaemonset(ctx, clientset, os.Getenv(envImageTag)); err != nil {
 				log.Print(err)
 				return
@@ -88,7 +88,7 @@ func TestMain(m *testing.M) {
 	if installopt := os.Getenv(envInstallCNS); installopt != "" {
 		fmt.Printf("In if CNS")
 		// create dirty cns ds
-		if installCNS, err := strconv.ParseBool(installopt); err != nil && installCNS == true {
+		if installCNS, err := strconv.ParseBool(installopt); err == nil && installCNS == true {
 			fmt.Printf("Thing was bool and true")
 			if cnscleanup, err = installCNSDaemonset(ctx, clientset, os.Getenv(envImageTag)); err != nil {
 				fmt.Printf("no error")
