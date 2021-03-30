@@ -96,6 +96,11 @@ func TestMain(m *testing.M) {
 			}
 		}
 	} else {
+		fmt.Printf("Env %v not set to true, skipping", envInstallCNS)
+		fmt.Printf("installopt %v", installopt)
+		fmt.Printf("InstallCNS %v", installCNS)
+		fmt.Printf("error %v", err)
+		fmt.Printf("envImageTag %v", envImageTag)
 		log.Printf("Env %v not set to true, skipping", envInstallCNS)
 	}
 
