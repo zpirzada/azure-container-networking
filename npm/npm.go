@@ -36,6 +36,8 @@ const (
 	telemetryRetryTimeInSeconds   = 60
 	heartbeatIntervalInMinutes    = 30
 	reconcileChainTimeInMinutes   = 5
+	// TODO: consider increasing thread number later when logics are correct
+	threadness = 1
 )
 
 // NetworkPolicyManager contains informers for pod, namespace and networkpolicy.
@@ -43,10 +45,11 @@ type NetworkPolicyManager struct {
 	sync.Mutex
 	clientset *kubernetes.Clientset
 
-	informerFactory informers.SharedInformerFactory
-	podInformer     coreinformers.PodInformer
-	nsInformer      coreinformers.NamespaceInformer
-	npInformer      networkinginformers.NetworkPolicyInformer
+	informerFactory     informers.SharedInformerFactory
+	podInformer         coreinformers.PodInformer
+	nsInformer          coreinformers.NamespaceInformer
+	npInformer          networkinginformers.NetworkPolicyInformer
+	nameSpaceController *nameSpaceController
 
 	NodeName                     string
 	NsMap                        map[string]*Namespace
@@ -183,6 +186,7 @@ func (npMgr *NetworkPolicyManager) Start(stopCh <-chan struct{}) error {
 		return fmt.Errorf("Network policy informer failed to sync")
 	}
 
+	go npMgr.nameSpaceController.Run(threadness, stopCh)
 	go npMgr.reconcileChains()
 	go npMgr.backup()
 
@@ -304,53 +308,8 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 		},
 	)
 
-	nsInformer.Informer().AddEventHandler(
-		// Namespace event handlers
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				nameSpaceObj, ok := obj.(*corev1.Namespace)
-				if !ok {
-					metrics.SendErrorLogAndMetric(util.NpmID, "ADD NameSpace: Received unexpected object type: %v", obj)
-					return
-				}
-				npMgr.Lock()
-				npMgr.AddNamespace(nameSpaceObj)
-				npMgr.Unlock()
-			},
-			UpdateFunc: func(old, new interface{}) {
-				oldNameSpaceObj, ok := old.(*corev1.Namespace)
-				if !ok {
-					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE NameSpace: Received unexpected old object type: %v", oldNameSpaceObj)
-					return
-				}
-				newNameSpaceObj, ok := new.(*corev1.Namespace)
-				if !ok {
-					metrics.SendErrorLogAndMetric(util.NpmID, "UPDATE NameSpace: Received unexpected new object type: %v", newNameSpaceObj)
-					return
-				}
-				npMgr.Lock()
-				npMgr.UpdateNamespace(oldNameSpaceObj, newNameSpaceObj)
-				npMgr.Unlock()
-			},
-			DeleteFunc: func(obj interface{}) {
-				nameSpaceObj, ok := obj.(*corev1.Namespace)
-				if !ok {
-					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-					if !ok {
-						metrics.SendErrorLogAndMetric(util.NpmID, "DELETE NameSpace: Received unexpected object type: %v", obj)
-						return
-					}
-					if nameSpaceObj, ok = tombstone.Obj.(*corev1.Namespace); !ok {
-						metrics.SendErrorLogAndMetric(util.NpmID, "DELETE NameSpace: Received unexpected object type: %v", obj)
-						return
-					}
-				}
-				npMgr.Lock()
-				npMgr.DeleteNamespace(nameSpaceObj)
-				npMgr.Unlock()
-			},
-		},
-	)
+	// create NameSpace controller
+	npMgr.nameSpaceController = NewNameSpaceController(nsInformer, clientset, npMgr)
 
 	npInformer.Informer().AddEventHandler(
 		// Network policy event handlers
