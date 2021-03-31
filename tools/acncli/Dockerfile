@@ -19,4 +19,4 @@ ENV AZURE_CNI_TENANCY=singletenancy
 ENV AZURE_CNI_IPAM=azure-cns
 ENV AZURE_CNI_MODE=transparent
 
-CMD ["./acn", "cni", "manager", "--follow", "--mode", "transparent"]
+ENTRYPOINT ["./acn", "cni", "manager", "--follow", "--mode", "transparent"]
