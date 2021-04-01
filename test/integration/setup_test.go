@@ -1,5 +1,3 @@
-// +build integration
-
 package k8s
 
 import (
@@ -36,6 +34,9 @@ const (
 	cnsRoleBindingPath        = cnsManifestFolder + "/rolebinding.yaml"
 	cnsServiceAccountPath     = cnsManifestFolder + "/serviceaccount.yaml"
 	cnsLabelSelector          = "k8s-app=azure-cns"
+
+  // relative log directory
+  logDir = "logs/"
 )
 
 func TestMain(m *testing.M) {
@@ -76,7 +77,7 @@ func TestMain(m *testing.M) {
 	if installopt := os.Getenv(envInstallCNI); installopt != "" {
 		// create dirty cni-manager ds
 		if installCNI, err := strconv.ParseBool(installopt); err == nil && installCNI == true {
-			if cnicleanup, err = installCNIManagerDaemonset(ctx, clientset, os.Getenv(envImageTag)); err != nil {
+			if cnicleanup, err = installCNIManagerDaemonset(ctx, clientset, os.Getenv(envImageTag), logDir); err != nil {
 				log.Print(err)
 				return
 			}
@@ -87,7 +88,7 @@ func TestMain(m *testing.M) {
 	if installopt := os.Getenv(envInstallCNS); installopt != "" {
 		// create dirty cns ds
 		if installCNS, err := strconv.ParseBool(installopt); err == nil && installCNS == true {
-			if cnscleanup, err = installCNSDaemonset(ctx, clientset, os.Getenv(envImageTag)); err != nil {
+			if cnscleanup, err = installCNSDaemonset(ctx, clientset, os.Getenv(envImageTag), logDir); err != nil {
 				return
 			}
 		}
@@ -98,7 +99,7 @@ func TestMain(m *testing.M) {
 	exitCode = m.Run()
 }
 
-func installCNSDaemonset(ctx context.Context, clientset *kubernetes.Clientset, imageTag string) (func() error, error) {
+func installCNSDaemonset(ctx context.Context, clientset *kubernetes.Clientset, imageTag, logDir string) (func() error, error) {
 	var (
 		err error
 		cns v1.DaemonSet
@@ -142,6 +143,9 @@ func installCNSDaemonset(ctx context.Context, clientset *kubernetes.Clientset, i
 	}
 
 	cleanupds := func() error {
+    if err := exportLogsByLabelSelector(ctx, clientset, cns.Namespace, cnsLabelSelector, logDir); err != nil {
+      return err
+    }
 		if err := mustDeleteDaemonset(ctx, cnsDaemonsetClient, cns); err != nil {
 			return err
 		}
@@ -151,7 +155,7 @@ func installCNSDaemonset(ctx context.Context, clientset *kubernetes.Clientset, i
 	return cleanupds, nil
 }
 
-func installCNIManagerDaemonset(ctx context.Context, clientset *kubernetes.Clientset, imageTag string) (func() error, error) {
+func installCNIManagerDaemonset(ctx context.Context, clientset *kubernetes.Clientset, imageTag, logDir string) (func() error, error) {
 	var (
 		err error
 		cni v1.DaemonSet
@@ -177,6 +181,9 @@ func installCNIManagerDaemonset(ctx context.Context, clientset *kubernetes.Clien
 	}
 
 	cleanupds := func() error {
+    if err := exportLogsByLabelSelector(ctx, clientset, cni.Namespace, cniLabelSelector, logDir); err != nil {
+      return err
+    }
 		if err := mustDeleteDaemonset(ctx, cniDaemonsetClient, cni); err != nil {
 			return err
 		}

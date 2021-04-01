@@ -54,12 +54,11 @@ steps:
 
   - script: |
       echo "Logs will be available as a build artifact"
+      rm -rf aks-swift-output
       mkdir aks-swift-output
+      cp test/integration/logs/* aks-swift-output/
       cd aks-swift-output
       pwd
-      export KUBECONFIG=~/.kube/config
-      kubectl logs -n kube-system -l k8s-app=azure-cns --tail -1 --prefix > cns-logs.txt
-      kubectl logs -n kube-system -l acn=azure-cni-manager --tail -1 --prefix > cni-manager-logs.txt
       export KUBECONFIG=~/.kube/dnc-underlay
       kubectl logs -n $STABLE_DNC_NAMESPACE -l app=dnc --tail -1 -c dnc --prefix > dnc-logs.txt
       kubectl logs -n $STABLE_DNC_NAMESPACE -l app=dnc --tail -1 -c requestcontroller --prefix > dnc-rc-logs.txt
