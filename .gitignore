@@ -16,4 +16,4 @@ ipam-*.xml
 .idea/*
 
 # Logs
-logs/*
+*.log
