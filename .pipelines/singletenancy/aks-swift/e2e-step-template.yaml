@@ -54,28 +54,20 @@ steps:
 
   - script: |
       echo "Logs will be available as a build artifact"
-      rm -rf aks-swift-output
-      ls -la
-      sudo ls test/integration
-      sudo ls test/integration/logs
-      mkdir aks-swift-output
-      sudo cp test/integration/logs/* aks-swift-output/
-      cd aks-swift-output
-      pwd
+      ARTIFACT_DIR=$(Build.ArtifactsStagingDirectory)/aks-swift-output/
+      echo $ARTIFACT_DIR
+      sudo rm -rf $ARTIFACT_DIR
+      sudo mkdir $ARTIFACT_DIR
+      sudo cp test/integration/logs/* $ARTIFACT_DIR
       export KUBECONFIG=~/.kube/dnc-underlay
       kubectl logs -n $STABLE_DNC_NAMESPACE -l app=dnc --tail -1 -c dnc --prefix > dnc-logs.txt
       kubectl logs -n $STABLE_DNC_NAMESPACE -l app=dnc --tail -1 -c requestcontroller --prefix > dnc-rc-logs.txt
-      ls
+
+      sudo cp *.txt $ARTIFACT_DIR
     name: "GetLogs"
     displayName: "Get logs"
     condition: always()
 
-  - task: CopyFiles@2
-    inputs:
-      sourceFolder: "$(modulePath)/aks-swift-output"
-      targetFolder: $(Build.ArtifactStagingDirectory)/aks-swift-output
-    condition: always()
-  
   - task: PublishBuildArtifacts@1
     inputs:
       artifactName: aks-swift-output
