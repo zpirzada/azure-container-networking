@@ -55,6 +55,7 @@ steps:
   - script: |
       echo "Logs will be available as a build artifact"
       rm -rf aks-swift-output
+      tree
       mkdir aks-swift-output
       cp test/integration/logs/* aks-swift-output/
       cd aks-swift-output
