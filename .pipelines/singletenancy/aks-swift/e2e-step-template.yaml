@@ -56,14 +56,14 @@ steps:
       echo "Logs will be available as a build artifact"
       ARTIFACT_DIR=$(Build.ArtifactStagingDirectory)/aks-swift-output/
       echo $ARTIFACT_DIR
-      sudo rm -rf $ARTIFACT_DIR
-      sudo mkdir $ARTIFACT_DIR
-      sudo cp test/integration/logs/* $ARTIFACT_DIR
+      rm -rf $ARTIFACT_DIR
+      mkdir $ARTIFACT_DIR
+      cp test/integration/logs/* $ARTIFACT_DIR
       export KUBECONFIG=~/.kube/dnc-underlay
       kubectl logs -n $STABLE_DNC_NAMESPACE -l app=dnc --tail -1 -c dnc --prefix > dnc-logs.txt
       kubectl logs -n $STABLE_DNC_NAMESPACE -l app=dnc --tail -1 -c requestcontroller --prefix > dnc-rc-logs.txt
 
-      sudo cp *.txt $ARTIFACT_DIR
+      cp *.txt $ARTIFACT_DIR
     name: "GetLogs"
     displayName: "Get logs"
     condition: always()
