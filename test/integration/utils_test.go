@@ -261,7 +261,7 @@ func exportLogsByLabelSelector(ctx context.Context, clientset *kubernetes.Client
 func writeToFile(dir, fileName, str string) error {
 	if _, err := os.Stat(dir); os.IsNotExist(err) { 
 		// your dir does not exist
-		os.MkdirAll(dir, 0700)
+		os.MkdirAll(dir, 0644)
 	}
 	// open output file
 	f, err := os.Create(dir + fileName)
