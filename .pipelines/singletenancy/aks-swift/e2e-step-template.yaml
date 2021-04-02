@@ -64,6 +64,8 @@ steps:
       kubectl logs -n $STABLE_DNC_NAMESPACE -l app=dnc --tail -1 -c requestcontroller --prefix > dnc-rc-logs.txt
 
       cp *.txt $ARTIFACT_DIR
+
+      sudo rm -rf test/integration/logs
     name: "GetLogs"
     displayName: "Get logs"
     condition: always()
