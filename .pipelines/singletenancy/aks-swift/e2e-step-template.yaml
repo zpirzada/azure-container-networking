@@ -54,7 +54,7 @@ steps:
 
   - script: |
       echo "Logs will be available as a build artifact"
-      ARTIFACT_DIR=$(Build.ArtifactsStagingDirectory)/aks-swift-output/
+      ARTIFACT_DIR=$(Build.ArtifactStagingDirectory)/aks-swift-output/
       echo $ARTIFACT_DIR
       sudo rm -rf $ARTIFACT_DIR
       sudo mkdir $ARTIFACT_DIR
