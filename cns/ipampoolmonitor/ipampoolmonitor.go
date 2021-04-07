@@ -15,9 +15,9 @@ import (
 type CNSIPAMPoolMonitor struct {
 	pendingRelease bool
 
-	cachedNNC   nnc.NodeNetworkConfig
+	cachedNNC                nnc.NodeNetworkConfig
 	updatingIpsNotInUseCount int
-	scalarUnits nnc.Scaler
+	scalarUnits              nnc.Scaler
 
 	httpService    cns.HTTPService
 	rc             requestcontroller.RequestController
@@ -30,9 +30,9 @@ type CNSIPAMPoolMonitor struct {
 func NewCNSIPAMPoolMonitor(httpService cns.HTTPService, rc requestcontroller.RequestController) *CNSIPAMPoolMonitor {
 	logger.Printf("NewCNSIPAMPoolMonitor: Create IPAM Pool Monitor")
 	return &CNSIPAMPoolMonitor{
-		pendingRelease:				false,
-		httpService:        		httpService,
-		rc:             			rc,
+		pendingRelease: false,
+		httpService:    httpService,
+		rc:             rc,
 	}
 }
 
@@ -71,7 +71,6 @@ func (pm *CNSIPAMPoolMonitor) Reconcile() error {
 	pendingReleaseIPCount := len(pm.httpService.GetPendingReleaseIPConfigs())
 	availableIPConfigCount := len(pm.httpService.GetAvailableIPConfigs()) // TODO: add pending allocation count to real cns
 	freeIPConfigCount := pm.cachedNNC.Spec.RequestedIPCount - int64(allocatedPodIPCount)
-
 	msg := fmt.Sprintf("[ipam-pool-monitor] Pool Size: %v, Goal Size: %v, BatchSize: %v, MinFree: %v, MaxFree:%v, Allocated: %v, Available: %v, Pending Release: %v, Free: %v, Pending Program: %v",
 		cnsPodIPConfigCount, pm.cachedNNC.Spec.RequestedIPCount, pm.scalarUnits.BatchSize, pm.MinimumFreeIps, pm.MaximumFreeIps, allocatedPodIPCount, availableIPConfigCount, pendingReleaseIPCount, freeIPConfigCount, pendingProgramCount)
 
@@ -202,7 +201,6 @@ func (pm *CNSIPAMPoolMonitor) cleanPendingRelease() error {
 
 	logger.Printf("[ipam-pool-monitor] cleanPendingRelease: UpdateCRDSpec succeeded for spec %+v", tempNNCSpec)
 
-
 	// save the updated state to cachedSpec
 	pm.cachedNNC.Spec = tempNNCSpec
 	pm.pendingRelease = false
@@ -248,4 +246,17 @@ func (pm *CNSIPAMPoolMonitor) Update(scalar nnc.Scaler, spec nnc.NodeNetworkConf
 		pm.cachedNNC.Spec, pm.MinimumFreeIps, pm.MaximumFreeIps)
 
 	return nil
+}
+
+//this function sets the values for state in IPAMPoolMonitor Struct
+func (pm *CNSIPAMPoolMonitor) GetStateSnapshot() cns.IpamPoolMonitorStateSnapshot {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	return cns.IpamPoolMonitorStateSnapshot{
+		MinimumFreeIps:           pm.MinimumFreeIps,
+		MaximumFreeIps:           pm.MaximumFreeIps,
+		UpdatingIpsNotInUseCount: pm.updatingIpsNotInUseCount,
+		CachedNNC:                pm.cachedNNC,
+	}
 }
