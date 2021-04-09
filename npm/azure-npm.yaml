@@ -83,6 +83,12 @@ spec:
       containers:
         - name: azure-npm
           image: mcr.microsoft.com/containernetworking/azure-npm:v1.1.5
+          resources:
+            limits:
+              cpu: 250m
+              memory: 300Mi
+            requests:
+              cpu: 250m
           securityContext:
             privileged: true
           env:
