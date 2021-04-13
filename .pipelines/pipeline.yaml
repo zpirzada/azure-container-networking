@@ -15,14 +15,7 @@ stages:
       - job: unit_tests
         displayName: CNI, NPM, CNS, CNM
         pool:
-          name: Networking-ContainerNetworking
-          demands: 
-          - agent.os -equals Linux
-          - Role -equals Build
-
-        container:
-          image: "$(BUILD_IMAGE)" # build image set as variable in pipeline runtime for flexibility
-          options: "--privileged"
+          name: "$(BUILD_POOL_NAME_DEFAULT)"
 
         # Go setup for the vmImage:
         # https://github.com/Microsoft/azure-pipelines-image-generation/blob/master/images/linux/scripts/installers/go.sh
@@ -32,18 +25,9 @@ stages:
           modulePath: "$(GOPATH)/src/github.com/Azure/azure-container-networking" # $(build.repository.name)' # Path to the module's code
 
         steps:
-          - bash: |
-              echo $UID
-              sudo rm -rf $(System.DefaultWorkingDirectory)/*
-              sudo rm /run/docker/plugins/test.sock || true
-              sudo ip link del dev dummy || true
-            displayName: "Set up OS environment"
-
-          - checkout: self
 
           - bash: |
-              go version
-              go env
+              go version 
               mkdir -p '$(GOBIN)'
               mkdir -p '$(GOPATH)/pkg'
               mkdir -p '$(modulePath)'
@@ -52,6 +36,7 @@ stages:
               mv !(gopath) '$(modulePath)'
               echo '##vso[task.prependpath]$(GOBIN)'
               echo '##vso[task.prependpath]$(GOROOT)/bin'
+              go env
             name: "GoEnv"
             displayName: "Set up the Go environment"
 
@@ -61,6 +46,7 @@ stages:
               echo "##vso[task.setvariable variable=CommitHash;isOutput=true]$(git rev-parse HEAD)"
               echo "##vso[task.setvariable variable=Tag;isOutput=true]$(git describe --tags --always --dirty)"
               echo "##vso[task.setvariable variable=ImageTag;isOutput=true]$(git describe --tags --always --dirty)-test"
+              sudo chown -R $(whoami):$(whoami) .
             workingDirectory: "$(modulePath)"
             name: "EnvironmentalVariables"
             displayName: "Set environmental variables"
@@ -79,15 +65,13 @@ stages:
             displayName: "Install Go dependencies"
 
           - script: |
-              export GOOS=windows
-              make all-binaries VERSION=$(EnvironmentalVariables.Tag)
+              GOOS=windows make all-binaries VERSION=$(EnvironmentalVariables.Tag)
             workingDirectory: "$(modulePath)"
             name: "BuildWindows"
             displayName: "Build Windows"
 
           - script: |
-              export GOOS=linux
-              make all-binaries VERSION=$(EnvironmentalVariables.Tag)
+              GOOS=linux make all-binaries VERSION=$(EnvironmentalVariables.Tag)
             workingDirectory: "$(modulePath)"
             name: "BuildLinux"
             displayName: "Build Linux"
@@ -253,10 +237,8 @@ stages:
       - job: delete_remote_artifacts
         displayName: Delete remote artifacts
         pool:
-          name: Networking-ContainerNetworking
+          name: $(BUILD_POOL_NAME_DEFAULT)
           demands: agent.os -equals Linux
-        container:
-          image: "$(BUILD_IMAGE)"
         steps:
           - checkout: none
           - task: AzureCLI@1

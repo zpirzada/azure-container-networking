@@ -13,7 +13,7 @@ jobs:
 - job: setup
   displayName: "Configure Test Environment"
   pool:
-    name: Networking-ContainerNetworking
+    name: $(BUILD_POOL_NAME_DEFAULT)
     demands: 
     - agent.os -equals Linux
     - Role -equals Build
@@ -44,7 +44,7 @@ jobs:
 - job: Build_test
   displayName: "Build NPM and Kubernetes Test Suite"
   pool:
-    name: Networking-ContainerNetworking
+    name: $(BUILD_POOL_NAME_DEFAULT)
     demands: 
     - agent.os -equals Linux
     - Role -equals Build
@@ -87,7 +87,7 @@ jobs:
 - job: Create_cluster
   displayName: "Deploy AKS Cluster"
   pool:
-    name: Networking-ContainerNetworking
+    name: $(BUILD_POOL_NAME_DEFAULT)
     demands: 
     - agent.os -equals Linux
     - Role -equals Build
@@ -123,7 +123,7 @@ jobs:
   timeoutInMinutes: 360
   displayName: "Run Kubernetes Network Policy Test Suite"
   pool:
-    name: Networking-ContainerNetworking
+    name: $(BUILD_POOL_NAME_DEFAULT)
     demands: 
     - agent.os -equals Linux
     - Role -equals Build
@@ -190,7 +190,7 @@ jobs:
 - job: Clean_up
   displayName: "Cleanup"
   pool:
-    name: Networking-ContainerNetworking
+    name: $(BUILD_POOL_NAME_DEFAULT)
     demands: 
     - agent.os -equals Linux
     - Role -equals Build

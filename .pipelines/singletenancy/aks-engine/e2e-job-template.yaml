@@ -16,12 +16,12 @@ stages:
         displayName: Singletenancy AKS Engine Suite - (${{ parameters.name }})
         timeoutInMinutes: 120
         pool:
-          name: Networking-ContainerNetworking
+          name: $(BUILD_POOL_NAME_DEFAULT)
           demands: 
           - agent.os -equals Linux
           - Role -equals Build
         container:
-          image: ${{ parameters.pipelineBuildImage }}
+          image: mcr.microsoft.com/oss/azcu/go-dev:$(GO_DEV_IMAGE_TAG)
         variables:
           GOPATH: "$(Agent.TempDirectory)/go" # Go workspace path
           GOBIN: "$(GOPATH)/bin" # Go binaries path

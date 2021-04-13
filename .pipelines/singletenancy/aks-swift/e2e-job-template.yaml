@@ -12,7 +12,7 @@ stages:
         displayName: Singletenancy AKS on Swift Suite - (${{ parameters.name }})
         timeoutInMinutes: 120
         pool:
-          name: Networking-ContainerNetworking
+          name: "$(BUILD_POOL_NAME_SWIFT)"
           demands: 
           - agent.os -equals Linux
           - Role -equals $(CUSTOM_E2E_ROLE)
