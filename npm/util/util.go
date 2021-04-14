@@ -78,7 +78,7 @@ func GetIPSetListFromLabels(labels map[string]string) []string {
 		ipsetList = []string{}
 	)
 	for labelKey, labelVal := range labels {
-		ipsetList = append(ipsetList, labelKey, labelKey+":"+labelVal)
+		ipsetList = append(ipsetList, labelKey, labelKey+IpsetLabelDelimter+labelVal)
 
 	}
 	return ipsetList
@@ -93,17 +93,19 @@ func GetIPSetListCompareLabels(orig map[string]string, new map[string]string) ([
 	for keyOrig, valOrig := range orig {
 		if valNew, ok := new[keyOrig]; ok {
 			if valNew != valOrig {
-				notInNew = append(notInNew, keyOrig+":"+valOrig)
-				notInOrig = append(notInOrig, keyOrig+":"+valNew)
+				notInNew = append(notInNew, keyOrig+IpsetLabelDelimter+valOrig)
+				notInOrig = append(notInOrig, keyOrig+IpsetLabelDelimter+valNew)
 			}
 		} else {
-			notInNew = append(notInNew, keyOrig, keyOrig+":"+valOrig)
+			// {IMPORTANT} this order is important, key should be before and key+val later
+			notInNew = append(notInNew, keyOrig, keyOrig+IpsetLabelDelimter+valOrig)
 		}
 	}
 
 	for keyNew, valNew := range new {
 		if _, ok := orig[keyNew]; !ok {
-			notInOrig = append(notInOrig, keyNew, keyNew+":"+valNew)
+			// {IMPORTANT} this order is important, key should be before and key+val later
+			notInOrig = append(notInOrig, keyNew, keyNew+IpsetLabelDelimter+valNew)
 		}
 	}
 
@@ -303,8 +305,20 @@ func GetSetsFromLabels(labels map[string]string) []string {
 	l := []string{}
 
 	for k, v := range labels {
-		l = append(l, k, fmt.Sprintf("%s:%s", k, v))
+		l = append(l, k, fmt.Sprintf("%s%s%s", k, IpsetLabelDelimter, v))
 	}
 
 	return l
+}
+
+func GetIpSetFromLabelKV(k, v string) string {
+	return fmt.Sprintf("%s%s%s", k, IpsetLabelDelimter, v)
+}
+
+func GetLabelKVFromSet(ipsetName string) (string, string) {
+	strSplit := strings.Split(ipsetName, IpsetLabelDelimter)
+	if len(strSplit) > 1 {
+		return strSplit[0], strSplit[1]
+	}
+	return strSplit[0], ""
 }

@@ -129,6 +129,8 @@ const (
 	IpsetSCTPFlag string = "sctp:"
 	IpsetTCPFlag  string = "tcp:"
 
+	IpsetLabelDelimter string = ":"
+
 	AzureNpmFlag   string = "azure-npm"
 	AzureNpmPrefix string = "azure-npm-"
 

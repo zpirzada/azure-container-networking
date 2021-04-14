@@ -188,8 +188,10 @@ func (ipsMgr *IpsetManager) DeleteFromList(listName string, setName string) erro
 	exists, _ := ipsMgr.SetExists(setName)
 
 	// if set does not exist, then return because the ipset call will fail due to set not existing
+	// TODO make sure these are info and not errors, use NPmErr
 	if !exists {
-		return fmt.Errorf("Set [%s] does not exist when attempting to delete from list [%s]", setName, listName)
+		metrics.SendErrorLogAndMetric(util.IpsmID, "Set [%s] does not exist when attempting to delete from list [%s]", setName, listName)
+		return nil
 	}
 
 	//Check if list being added exists in the listmap, if it exists we don't care about the set type
@@ -197,11 +199,13 @@ func (ipsMgr *IpsetManager) DeleteFromList(listName string, setName string) erro
 
 	// if set does not exist, then return because the ipset call will fail due to set not existing
 	if !exists {
-		return fmt.Errorf("Set [%s] does not exist when attempting to add to list [%s]", setName, listName)
+		metrics.SendErrorLogAndMetric(util.IpsmID, "Set [%s] does not exist when attempting to add to list [%s]", setName, listName)
+		return nil
 	}
 
 	if listtype != util.IpsetSetListFlag {
-		return fmt.Errorf("Set [%s] is of the wrong type when attempting to delete list [%s], actual type [%s]", setName, listName, listtype)
+		metrics.SendErrorLogAndMetric(util.IpsmID, "Set [%s] is of the wrong type when attempting to delete list [%s], actual type [%s]", setName, listName, listtype)
+		return nil
 	}
 
 	if _, exists := ipsMgr.ListMap[listName]; !exists {
@@ -552,7 +556,6 @@ func (ipsMgr *IpsetManager) DestroyNpmIpsets() error {
 		return nil
 	}
 
-	log.Logf("{DestroyNpmIpsets} Reply from command %s executed is %s", cmdName+" "+cmdArgs, reply)
 	re := regexp.MustCompile("Name: (" + util.AzureNpmPrefix + "\\d+)")
 	ipsetRegexSlice := re.FindAllSubmatch(reply, -1)
 
