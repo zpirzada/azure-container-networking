@@ -61,6 +61,11 @@ var nodeLevelRegistry = prometheus.NewRegistry()
 var clusterLevelRegistry = prometheus.NewRegistry()
 var haveInitialized = false
 
+func ReInitializeAllMetrics() {
+	haveInitialized = false
+	InitializeAll()
+}
+
 // InitializeAll creates all the Prometheus Metrics. The metrics will be nil before this method is called.
 func InitializeAll() {
 	if !haveInitialized {
