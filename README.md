@@ -1,7 +1,6 @@
 # Microsoft Azure Container Networking
 
 [![Build Status](https://msazure.visualstudio.com/One/_apis/build/status/Custom/Networking/ContainerNetworking/Azure.azure-container-networking?branchName=master)](https://msazure.visualstudio.com/One/_build/latest?definitionId=95007&branchName=master) [![Go Report Card](https://goreportcard.com/badge/github.com/Azure/azure-container-networking)](https://goreportcard.com/report/github.com/Azure/azure-container-networking) ![GitHub release](https://img.shields.io/github/release/Azure/azure-container-networking.svg)
-[![codecov](https://codecov.io/gh/Azure/azure-container-networking/branch/master/graph/badge.svg)](https://codecov.io/gh/Azure/azure-container-networking)
 
 ## Overview
 This repository contains container networking services and plugins for Linux and Windows containers running on Azure:
