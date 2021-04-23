@@ -245,7 +245,7 @@ func (c *podController) deletePod(obj interface{}) {
 
 	var err error
 	var key string
-	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+	if key, err = cache.MetaNamespaceKeyFunc(podObj); err != nil {
 		utilruntime.HandleError(err)
 		metrics.SendErrorLogAndMetric(util.PodID, "[POD DELETE EVENT] Error: podKey is empty for %s pod in %s with UID %s",
 			podObj.ObjectMeta.Name, util.GetNSNameWithPrefix(podObj.Namespace), podObj.UID)

@@ -192,7 +192,7 @@ func (nsc *nameSpaceController) deleteNamespace(obj interface{}) {
 
 	var err error
 	var key string
-	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+	if key, err = cache.MetaNamespaceKeyFunc(nsObj); err != nil {
 		utilruntime.HandleError(err)
 		metrics.SendErrorLogAndMetric(util.NSID, "[NAMESPACE DELETE EVENT] Error: nameSpaceKey is empty for %s namespace", util.GetNSNameWithPrefix(nsObj.Name))
 		return
@@ -287,7 +287,7 @@ func (nsc *nameSpaceController) syncNameSpace(key string) error {
 	defer nsc.npMgr.Unlock()
 	if err != nil {
 		if errors.IsNotFound(err) {
-			utilruntime.HandleError(fmt.Errorf("NameSpace '%s' in work queue no longer exists", key))
+			klog.Infof("NameSpace %s not found, may be it is deleted", key)
 			// find the nsMap key and start cleaning up process (calling cleanDeletedNamespace function)
 			cachedNsKey := util.GetNSNameWithPrefix(key)
 			// cleanDeletedNamespace will check if the NS exists in cache, if it does, then proceeds with deletion

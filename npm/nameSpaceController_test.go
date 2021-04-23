@@ -16,6 +16,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 )
 
 var (
@@ -124,7 +125,7 @@ func updateNamespace(t *testing.T, f *nameSpaceFixture, oldNsObj, newNsObj *core
 	f.nsController.processNextWorkItem()
 }
 
-func deleteNamespace(t *testing.T, f *nameSpaceFixture, nsObj *corev1.Namespace) {
+func deleteNamespace(t *testing.T, f *nameSpaceFixture, nsObj *corev1.Namespace, isDeletedFinalStateUnknownObject IsDeletedFinalStateUnknownObject) {
 	addNamespace(t, f, nsObj)
 	t.Logf("Complete add namespace event")
 
@@ -132,7 +133,16 @@ func deleteNamespace(t *testing.T, f *nameSpaceFixture, nsObj *corev1.Namespace)
 	f.kubeInformer.Core().V1().Namespaces().Informer().GetIndexer().Delete(nsObj)
 
 	t.Logf("Calling delete namespace event")
-	f.nsController.deleteNamespace(nsObj)
+	if isDeletedFinalStateUnknownObject {
+		tombstone := cache.DeletedFinalStateUnknown{
+			Key: nsObj.Name,
+			Obj: nsObj,
+		}
+		f.nsController.deleteNamespace(tombstone)
+	} else {
+		f.nsController.deleteNamespace(nsObj)
+	}
+
 	if f.nsController.workqueue.Len() == 0 {
 		t.Logf("Delete Namespace: worker queue length is 0 ")
 		return
@@ -432,7 +442,7 @@ func TestDeleteNamespace(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	f.newNsController(stopCh)
-	deleteNamespace(t, f, nsObj)
+	deleteNamespace(t, f, nsObj, DeletedFinalStateknownObject)
 
 	testCases := []expectedNsValues{
 		{0, 1, 0},
@@ -442,6 +452,57 @@ func TestDeleteNamespace(t *testing.T) {
 	if _, exists := f.npMgr.NsMap[util.GetNSNameWithPrefix(nsObj.Name)]; exists {
 		t.Errorf("TestDeleteNamespace failed @ npMgr.nsMap check")
 	}
+}
+
+func TestDeleteNamespaceWithTombstone(t *testing.T) {
+	f := newNsFixture(t)
+	f.ipSetSave(util.IpsetTestConfigFile)
+	defer f.ipSetRestore(util.IpsetTestConfigFile)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	f.newNsController(stopCh)
+
+	nsObj := newNameSpace(
+		"test-namespace",
+		"0",
+		map[string]string{
+			"app": "test-namespace",
+		},
+	)
+	tombstone := cache.DeletedFinalStateUnknown{
+		Key: nsObj.Name,
+		Obj: nsObj,
+	}
+
+	f.nsController.deleteNamespace(tombstone)
+
+	testCases := []expectedNsValues{
+		{0, 1, 0},
+	}
+	checkNsTestResult("TestDeleteNamespaceWithTombstone", f, testCases)
+}
+
+func TestDeleteNamespaceWithTombstoneAfterAddingNameSpace(t *testing.T) {
+	nsObj := newNameSpace(
+		"test-namespace",
+		"0",
+		map[string]string{
+			"app": "test-namespace",
+		},
+	)
+
+	f := newNsFixture(t)
+	f.nsLister = append(f.nsLister, nsObj)
+	f.kubeobjects = append(f.kubeobjects, nsObj)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	f.newNsController(stopCh)
+
+	deleteNamespace(t, f, nsObj, DeletedFinalStateUnknownObject)
+	testCases := []expectedNsValues{
+		{0, 1, 0},
+	}
+	checkNsTestResult("TestDeleteNamespaceWithTombstoneAfterAddingNameSpace", f, testCases)
 }
 
 func TestGetNamespaceObjFromNsObj(t *testing.T) {
@@ -471,7 +532,7 @@ func checkNsTestResult(testName string, f *nameSpaceFixture, testCases []expecte
 			f.t.Errorf("PodMap length = %d, want %d. Map: %+v", got, test.expectedLenOfPodMap, f.npMgr.PodMap)
 		}
 		if got := len(f.npMgr.NsMap); got != test.expectedLenOfNsMap {
-			f.t.Errorf("npMgr length = %d, want %d. Map: %+v", got, test.expectedLenOfNsMap, f.npMgr.NsMap)
+			f.t.Errorf("NsMap length = %d, want %d. Map: %+v", got, test.expectedLenOfNsMap, f.npMgr.NsMap)
 		}
 		if got := f.nsController.workqueue.Len(); got != test.expectedLenOfWorkQueue {
 			f.t.Errorf("Workqueue length = %d, want %d", got, test.expectedLenOfWorkQueue)

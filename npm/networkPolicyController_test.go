@@ -20,6 +20,7 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 )
 
 type netPolFixture struct {
@@ -165,13 +166,22 @@ func addNetPol(t *testing.T, f *netPolFixture, netPolObj *networkingv1.NetworkPo
 	f.netPolController.processNextWorkItem()
 }
 
-func deleteNetPol(t *testing.T, f *netPolFixture, netPolObj *networkingv1.NetworkPolicy) {
+func deleteNetPol(t *testing.T, f *netPolFixture, netPolObj *networkingv1.NetworkPolicy, isDeletedFinalStateUnknownObject IsDeletedFinalStateUnknownObject) {
 	addNetPol(t, f, netPolObj)
 	t.Logf("Complete adding network policy event")
 
 	// simulate network policy deletion event and delete network policy object from sharedInformer cache
 	f.kubeInformer.Networking().V1().NetworkPolicies().Informer().GetIndexer().Delete(netPolObj)
-	f.netPolController.deleteNetworkPolicy(netPolObj)
+	if isDeletedFinalStateUnknownObject {
+		netPolKey := getKey(netPolObj, t)
+		tombstone := cache.DeletedFinalStateUnknown{
+			Key: netPolKey,
+			Obj: netPolObj,
+		}
+		f.netPolController.deleteNetworkPolicy(tombstone)
+	} else {
+		f.netPolController.deleteNetworkPolicy(netPolObj)
+	}
 
 	if f.netPolController.workqueue.Len() == 0 {
 		f.isEnqueueEventIntoWorkQueue = false
@@ -305,11 +315,52 @@ func TestDeleteNetworkPolicy(t *testing.T) {
 	defer close(stopCh)
 	f.newNetPolController(stopCh)
 
-	deleteNetPol(t, f, netPolObj)
+	deleteNetPol(t, f, netPolObj, DeletedFinalStateknownObject)
 	testCases := []expectedNetPolValues{
 		{1, 0, 0, false, true, 0, nil, 1, nil},
 	}
 	checkNetPolTestResult("TestDelNetPol", f, testCases)
+}
+
+func TestDeleteNetworkPolicyWithTombstone(t *testing.T) {
+	netPolObj := createNetPol()
+
+	f := newNetPolFixture(t)
+	f.isEnqueueEventIntoWorkQueue = false
+	f.netPolLister = append(f.netPolLister, netPolObj)
+	f.kubeobjects = append(f.kubeobjects, netPolObj)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	f.newNetPolController(stopCh)
+
+	netPolKey := getKey(netPolObj, t)
+	tombstone := cache.DeletedFinalStateUnknown{
+		Key: netPolKey,
+		Obj: netPolObj,
+	}
+
+	f.netPolController.deleteNetworkPolicy(tombstone)
+	testCases := []expectedNetPolValues{
+		{1, 0, 0, false, false, 0, nil, 0, nil},
+	}
+	checkNetPolTestResult("TestDeleteNetworkPolicyWithTombstone", f, testCases)
+}
+
+func TestDeleteNetworkPolicyWithTombstoneAfterAddingNetworkPolicy(t *testing.T) {
+	netPolObj := createNetPol()
+
+	f := newNetPolFixture(t)
+	f.netPolLister = append(f.netPolLister, netPolObj)
+	f.kubeobjects = append(f.kubeobjects, netPolObj)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	f.newNetPolController(stopCh)
+
+	deleteNetPol(t, f, netPolObj, DeletedFinalStateUnknownObject)
+	testCases := []expectedNetPolValues{
+		{1, 0, 0, false, true, 0, nil, 1, nil},
+	}
+	checkNetPolTestResult("TestDeleteNetworkPolicyWithTombstoneAfterAddingNetworkPolicy", f, testCases)
 }
 
 // this unit test is for the case where states of network policy are changed, but network policy controller does not need to reconcile.

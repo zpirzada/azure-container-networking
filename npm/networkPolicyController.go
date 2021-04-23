@@ -122,7 +122,7 @@ func (c *networkPolicyController) updateNetworkPolicy(old, new interface{}) {
 }
 
 func (c *networkPolicyController) deleteNetworkPolicy(obj interface{}) {
-	_, ok := obj.(*networkingv1.NetworkPolicy)
+	netPolObj, ok := obj.(*networkingv1.NetworkPolicy)
 	// DeleteFunc gets the final state of the resource (if it is known).
 	// Otherwise, it gets an object of type DeletedFinalStateUnknown.
 	// This can happen if the watch is closed and misses the delete event and
@@ -135,7 +135,7 @@ func (c *networkPolicyController) deleteNetworkPolicy(obj interface{}) {
 			return
 		}
 
-		if _, ok = tombstone.Obj.(*networkingv1.NetworkPolicy); !ok {
+		if netPolObj, ok = tombstone.Obj.(*networkingv1.NetworkPolicy); !ok {
 			metrics.SendErrorLogAndMetric(util.NetpolID, "[NETPOL DELETE EVENT] Received unexpected object type (error decoding object tombstone, invalid type): %v", obj)
 			utilruntime.HandleError(fmt.Errorf("error decoding object tombstone, invalid type"))
 			return
@@ -144,7 +144,7 @@ func (c *networkPolicyController) deleteNetworkPolicy(obj interface{}) {
 
 	var netPolkey string
 	var err error
-	if netPolkey, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
+	if netPolkey, err = cache.MetaNamespaceKeyFunc(netPolObj); err != nil {
 		utilruntime.HandleError(err)
 		return
 	}

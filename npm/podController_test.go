@@ -111,15 +111,6 @@ func createPod(name, ns, rv, podIP string, labels map[string]string, isHostNewtw
 	}
 }
 
-func getKey(podObj *corev1.Pod, t *testing.T) string {
-	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(podObj)
-	if err != nil {
-		t.Errorf("Unexpected error getting key for pod %s: %v", podObj.Name, err)
-		return ""
-	}
-	return key
-}
-
 func addPod(t *testing.T, f *podFixture, podObj *corev1.Pod) {
 	// simulate pod add event and add pod object to sharedInformer cache
 	f.podController.addPod(podObj)
@@ -132,14 +123,23 @@ func addPod(t *testing.T, f *podFixture, podObj *corev1.Pod) {
 	f.podController.processNextWorkItem()
 }
 
-// // TODO: who call this function for message - type?
-func deletePod(t *testing.T, f *podFixture, podObj *corev1.Pod) {
+func deletePod(t *testing.T, f *podFixture, podObj *corev1.Pod, isDeletedFinalStateUnknownObject IsDeletedFinalStateUnknownObject) {
 	addPod(t, f, podObj)
 	t.Logf("Complete add pod event")
 
 	// simulate pod delete event and delete pod object from sharedInformer cache
 	f.kubeInformer.Core().V1().Pods().Informer().GetIndexer().Delete(podObj)
-	f.podController.deletePod(podObj)
+
+	if isDeletedFinalStateUnknownObject {
+		podKey := getKey(podObj, t)
+		tombstone := cache.DeletedFinalStateUnknown{
+			Key: podKey,
+			Obj: podObj,
+		}
+		f.podController.deletePod(tombstone)
+	} else {
+		f.podController.deletePod(podObj)
+	}
 
 	if f.podController.workqueue.Len() == 0 {
 		t.Logf("Delete Pod: worker queue length is 0 ")
@@ -178,7 +178,7 @@ func checkPodTestResult(testName string, f *podFixture, testCases []expectedValu
 			f.t.Errorf("%s failed @ PodMap length = %d, want %d", testName, got, test.expectedLenOfPodMap)
 		}
 		if got := len(f.npMgr.NsMap); got != test.expectedLenOfNsMap {
-			f.t.Errorf("%s failed @ npMgr length = %d, want %d", testName, got, test.expectedLenOfNsMap)
+			f.t.Errorf("%s failed @ NsMap length = %d, want %d", testName, got, test.expectedLenOfNsMap)
 		}
 		if got := f.podController.workqueue.Len(); got != test.expectedLenOfWorkQueue {
 			f.t.Errorf("%s failed @ Workqueue length = %d, want %d", testName, got, test.expectedLenOfWorkQueue)
@@ -289,7 +289,7 @@ func TestDeletePod(t *testing.T) {
 	defer close(stopCh)
 	f.newPodController(stopCh)
 
-	deletePod(t, f, podObj)
+	deletePod(t, f, podObj, DeletedFinalStateknownObject)
 	testCases := []expectedValues{
 		{0, 2, 0},
 	}
@@ -313,7 +313,7 @@ func TestDeleteHostNetworkPod(t *testing.T) {
 	defer close(stopCh)
 	f.newPodController(stopCh)
 
-	deletePod(t, f, podObj)
+	deletePod(t, f, podObj, DeletedFinalStateknownObject)
 	testCases := []expectedValues{
 		{0, 1, 0},
 	}
@@ -321,6 +321,49 @@ func TestDeleteHostNetworkPod(t *testing.T) {
 	if _, exists := f.npMgr.PodMap[podKey]; exists {
 		t.Error("TestDeleteHostNetworkPod failed @ cached pod obj exists check")
 	}
+}
+
+func TestDeletePodWithTombstone(t *testing.T) {
+	labels := map[string]string{
+		"app": "test-pod",
+	}
+	podObj := createPod("test-pod", "test-namespace", "0", "1.2.3.4", labels, NonHostNetwork, corev1.PodRunning)
+	f := newFixture(t)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	f.newPodController(stopCh)
+
+	podKey := getKey(podObj, t)
+	tombstone := cache.DeletedFinalStateUnknown{
+		Key: podKey,
+		Obj: podObj,
+	}
+
+	f.podController.deletePod(tombstone)
+	testCases := []expectedValues{
+		{0, 1, 0},
+	}
+	checkPodTestResult("TestDeletePodWithTombstone", f, testCases)
+}
+
+func TestDeletePodWithTombstoneAfterAddingPod(t *testing.T) {
+	labels := map[string]string{
+		"app": "test-pod",
+	}
+	podObj := createPod("test-pod", "test-namespace", "0", "1.2.3.4", labels, NonHostNetwork, corev1.PodRunning)
+
+	f := newFixture(t)
+	f.podLister = append(f.podLister, podObj)
+	f.kubeobjects = append(f.kubeobjects, podObj)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	f.newPodController(stopCh)
+
+	deletePod(t, f, podObj, DeletedFinalStateUnknownObject)
+	testCases := []expectedValues{
+		{0, 2, 0},
+	}
+	checkPodTestResult("TestDeletePodWithTombstoneAfterAddingPod", f, testCases)
 }
 
 func TestLabelUpdatePod(t *testing.T) {
