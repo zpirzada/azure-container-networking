@@ -351,10 +351,18 @@ func (c *networkPolicyController) syncAddAndUpdateNetPol(netPolObj *networkingv1
 			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset named port %s with err: %v", set, err)
 		}
 	}
-	for _, list := range lists {
-		if err = ipsMgr.CreateList(list); err != nil {
-			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset list %s with err: %v", list, err)
+	// (TODO) now add the []string value of the lists into a new obj
+	// and this below createList needs to be checked, we have to create all the lists, but also need to create new ones based on the list values
+	for listKey, listLabelsMembers := range lists {
+		if err = ipsMgr.CreateList(listKey); err != nil {
+			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset list %s with err: %v", listKey, err)
 		}
+		for _, listMember := range listLabelsMembers {
+			if err = ipsMgr.AddToList(listKey, listMember); err != nil {
+				return fmt.Errorf("[syncAddAndUpdateNetPol] Error: Adding ipst member %s to ipset list %s with err: %v", listMember, listKey, err)
+			}
+		}
+		ipsMgr.IpSetReferIncOrDec(listKey, util.IpsetSetListFlag, ipsm.IncrementOp)
 	}
 
 	if err = c.createCidrsRule("in", netPolObj.ObjectMeta.Name, netPolObj.ObjectMeta.Namespace, ingressIPCidrs, ipsMgr); err != nil {
@@ -385,13 +393,20 @@ func (c *networkPolicyController) cleanUpNetworkPolicy(netPolKey string, isSafeC
 	ipsMgr := c.npMgr.NsMap[util.KubeAllNamespacesFlag].IpsMgr
 	iptMgr := c.npMgr.NsMap[util.KubeAllNamespacesFlag].iptMgr
 	// translate policy from "cachedNetPolObj"
-	_, _, _, ingressIPCidrs, egressIPCidrs, iptEntries := translatePolicy(cachedNetPolObj)
+	_, _, lists, ingressIPCidrs, egressIPCidrs, iptEntries := translatePolicy(cachedNetPolObj)
 
 	var err error
 	// delete iptables entries
 	for _, iptEntry := range iptEntries {
 		if err = iptMgr.Delete(iptEntry); err != nil {
 			return fmt.Errorf("[cleanUpNetworkPolicy] Error: failed to apply iptables rule. Rule: %+v with err: %v", iptEntry, err)
+		}
+	}
+	// (TODO) now add the []string value of the lists into a new obj
+	// and this below createList needs to be checked, we have to create all the lists, but also need to create new ones based on the list values
+	for listKey, _ := range lists {
+		if err = ipsMgr.DeleteList(listKey); err != nil {
+			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset list %s with err: %v", listKey, err)
 		}
 	}
 
