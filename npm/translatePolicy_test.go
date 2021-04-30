@@ -267,7 +267,8 @@ func TestCraftPartialIptEntryFromSelector(t *testing.T) {
 		},
 	}
 
-	iptEntrySpec := craftPartialIptEntrySpecFromSelector("testnamespace", srcSelector, util.IptablesSrcFlag, false)
+	// TODO add more test cases here form multi value
+	iptEntrySpec, _, _ := craftPartialIptEntrySpecFromSelector("testnamespace", srcSelector, util.IptablesSrcFlag, false)
 	expectedIptEntrySpec := []string{
 		util.IptablesModuleFlag,
 		util.IptablesSetModuleFlag,

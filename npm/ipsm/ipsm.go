@@ -16,6 +16,14 @@ import (
 	"github.com/Azure/azure-container-networking/npm/util"
 )
 
+// ReferCountOperation is used to indicate whether ipset refer count should be increased or decreased.
+type ReferCountOperation bool
+
+const (
+	IncrementOp ReferCountOperation = true
+	DecrmentOp  ReferCountOperation = false
+)
+
 type ipsEntry struct {
 	operationFlag string
 	name          string
@@ -36,11 +44,20 @@ type Ipset struct {
 	referCount int
 }
 
+func (ipset *Ipset) IncReferCount() {
+	ipset.referCount++
+}
+
+func (ipset *Ipset) DecReferCount() {
+	ipset.referCount--
+}
+
 // NewIpset creates a new instance for Ipset object.
 func NewIpset(setName string) *Ipset {
 	return &Ipset{
-		name:     setName,
-		elements: make(map[string]string),
+		name:       setName,
+		elements:   make(map[string]string),
+		referCount: 0,
 	}
 }
 
@@ -68,6 +85,21 @@ func (ipsMgr *IpsetManager) Exists(listName string, setName string, kind string)
 	}
 
 	return true
+}
+
+// IpSetReferIncOrDec checks if an element exists in setMap/listMap and then increases or decreases tis refer count.
+func (ipsMgr *IpsetManager) IpSetReferIncOrDec(ipsetName string, kind string, countOperation ReferCountOperation) {
+	m := ipsMgr.SetMap
+	if kind == util.IpsetSetListFlag {
+		m = ipsMgr.ListMap
+	}
+
+	switch countOperation {
+	case IncrementOp:
+		m[ipsetName].IncReferCount()
+	case DecrmentOp:
+		m[ipsetName].DecReferCount()
+	}
 }
 
 // SetExists checks if an ipset exists, and returns the type
@@ -117,6 +149,11 @@ func (ipsMgr *IpsetManager) DeleteList(listName string) error {
 	entry := &ipsEntry{
 		operationFlag: util.IpsetDestroyFlag,
 		set:           util.GetHashedName(listName),
+	}
+
+	if ipsMgr.ListMap[listName].referCount > 0 {
+		ipsMgr.IpSetReferIncOrDec(listName, util.IpsetSetListFlag, DecrmentOp)
+		return nil
 	}
 
 	if errCode, err := ipsMgr.Run(entry); err != nil {
@@ -417,33 +454,6 @@ func (ipsMgr *IpsetManager) DeleteFromSet(setName, ip, podKey string) error {
 
 	if len(ipsMgr.SetMap[setName].elements) == 0 {
 		ipsMgr.DeleteSet(setName)
-	}
-
-	return nil
-}
-
-// Clean removes all the empty sets & lists under the namespace.
-func (ipsMgr *IpsetManager) Clean() error {
-	for setName, set := range ipsMgr.SetMap {
-		if len(set.elements) > 0 {
-			continue
-		}
-
-		if err := ipsMgr.DeleteSet(setName); err != nil {
-			metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to clean ipset")
-			return err
-		}
-	}
-
-	for listName, list := range ipsMgr.ListMap {
-		if len(list.elements) > 0 {
-			continue
-		}
-
-		if err := ipsMgr.DeleteList(listName); err != nil {
-			metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to clean ipset list")
-			return err
-		}
 	}
 
 	return nil

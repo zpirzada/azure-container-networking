@@ -465,27 +465,6 @@ func TestDeleteFromSetWithPodCache(t *testing.T) {
 	}
 }
 
-func TestClean(t *testing.T) {
-	ipsMgr := NewIpsetManager()
-	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
-		t.Errorf("TestClean failed @ ipsMgr.Save")
-	}
-
-	defer func() {
-		if err := ipsMgr.Restore(util.IpsetTestConfigFile); err != nil {
-			t.Errorf("TestClean failed @ ipsMgr.Restore")
-		}
-	}()
-
-	if err := ipsMgr.CreateSet("test-set", append([]string{util.IpsetNetHashFlag})); err != nil {
-		t.Errorf("TestClean failed @ ipsMgr.CreateSet with err %+v", err)
-	}
-
-	if err := ipsMgr.Clean(); err != nil {
-		t.Errorf("TestClean failed @ ipsMgr.Clean")
-	}
-}
-
 func TestDestroy(t *testing.T) {
 	ipsMgr := NewIpsetManager()
 	if err := ipsMgr.Save(util.IpsetTestConfigFile); err != nil {
