@@ -1,9 +1,9 @@
 package npm
 
 import (
+	"container/heap"
 	"fmt"
 	"sort"
-	"container/heap"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -14,18 +14,18 @@ import (
 // An ReqHeap is a min-heap of labelSelectorRequirements.
 type ReqHeap []metav1.LabelSelectorRequirement
 
-func (h ReqHeap) Len() int { 
+func (h ReqHeap) Len() int {
 	return len(h)
 }
 
 func (h ReqHeap) Less(i, j int) bool {
 	sort.Strings(h[i].Values)
 	sort.Strings(h[j].Values)
-	
+
 	if int(h[i].Key[0]) < int(h[j].Key[0]) {
 		return true
 	}
-	
+
 	if int(h[i].Key[0]) > int(h[j].Key[0]) {
 		return false
 	}
@@ -37,7 +37,7 @@ func (h ReqHeap) Less(i, j int) bool {
 	if len(h[j].Values) == 0 {
 		return false
 	}
-	
+
 	if len(h[i].Values[0]) == 0 {
 		return true
 	}
@@ -61,8 +61,8 @@ func (h *ReqHeap) Push(x interface{}) {
 func (h *ReqHeap) Pop() interface{} {
 	old := *h
 	n := len(old)
-	x := old[n -1]
-	*h = old[0 : n - 1]
+	x := old[n-1]
+	*h = old[0 : n-1]
 
 	return x
 }
@@ -121,6 +121,16 @@ func sortSelector(selector *metav1.LabelSelector) {
 	selector.MatchExpressions = sortedReqs
 }
 
+// getSetNameForMultiValueSelector takes in label with multiple values without operator
+// and returns a new 2nd level ipset name
+func getSetNameForMultiValueSelector(key string, vals []string) string {
+	rtStr := key
+	for _, val := range vals {
+		rtStr = util.GetIpSetFromLabelKV(rtStr, val)
+	}
+	return rtStr
+}
+
 // HashSelector returns the hash value of the selector.
 func HashSelector(selector *metav1.LabelSelector) string {
 	sortSelector(selector)
@@ -128,13 +138,14 @@ func HashSelector(selector *metav1.LabelSelector) string {
 }
 
 // parseSelector takes a LabelSelector and returns a slice of processed labels, keys and values.
-func parseSelector(selector *metav1.LabelSelector) ([]string, []string, []string) {
+func parseSelector(selector *metav1.LabelSelector) ([]string, []string, map[string][]string) {
 	var (
 		labels []string
 		keys   []string
-		vals   []string
+		vals   map[string][]string
 	)
 
+	vals = make(map[string][]string)
 	if selector == nil {
 		return labels, keys, vals
 	}
@@ -142,7 +153,7 @@ func parseSelector(selector *metav1.LabelSelector) ([]string, []string, []string
 	if len(selector.MatchLabels) == 0 && len(selector.MatchExpressions) == 0 {
 		labels = append(labels, "")
 		keys = append(keys, "")
-		vals = append(vals, "")
+		vals[""] = append(vals[""], "")
 
 		return labels, keys, vals
 	}
@@ -151,38 +162,48 @@ func parseSelector(selector *metav1.LabelSelector) ([]string, []string, []string
 
 	for i := range sortedKeys {
 		labels = append(labels, sortedKeys[i]+":"+sortedVals[i])
+		vals[sortedKeys[i]] = append(vals[sortedKeys[i]], sortedVals[i])
 	}
 	keys = append(keys, sortedKeys...)
-	vals = append(vals, sortedVals...)
 
 	for _, req := range selector.MatchExpressions {
 		var k string
 		switch op := req.Operator; op {
+		// TODO remove this
+		// - key: pod
+		// operator: NotIn
+		// values:
+		// - b
+		// - c
+		// !pod b !pod:b
+		// !pod a !pod:a
+		//
 		case metav1.LabelSelectorOpIn:
 			for _, v := range req.Values {
 				k = req.Key
 				keys = append(keys, k)
-				vals = append(vals, v)
-				labels = append(labels, k+":"+v)
+				vals[k] = append(vals[k], v)
+				// TODO make sure this removed labels are covered in all cases
+				//labels = append(labels, k+":"+v)
 			}
 		case metav1.LabelSelectorOpNotIn:
 			for _, v := range req.Values {
 				k = util.IptablesNotFlag + req.Key
 				keys = append(keys, k)
-				vals = append(vals, v)
-				labels = append(labels, k+":"+v)
+				vals[k] = append(vals[k], v)
+				//labels = append(labels, k+":"+v)
 			}
 		// Exists matches pods with req.Key as key
 		case metav1.LabelSelectorOpExists:
 			k = req.Key
 			keys = append(keys, req.Key)
-			vals = append(vals, "")
+			vals[k] = append(vals[k], "")
 			labels = append(labels, k)
 		// DoesNotExist matches pods without req.Key as key
 		case metav1.LabelSelectorOpDoesNotExist:
 			k = util.IptablesNotFlag + req.Key
 			keys = append(keys, k)
-			vals = append(vals, "")
+			vals[k] = append(vals[k], "")
 			labels = append(labels, k)
 		default:
 			log.Errorf("Invalid operator [%s] for selector [%v] requirement", op, *selector)
