@@ -898,14 +898,15 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 	)
 
 	log.Logf("started parsing egress rule")
-
-	labelsWithOps, _, _ := parseSelector(&targetSelector)
-	ops, labels := GetOperatorsAndLabels(labelsWithOps)
-	sets = append(sets, labels...)
 	sets = append(sets, "ns-"+ns)
 	ipCidrs = make([][]string, len(rules))
+	lists = make(map[string][]string)
 
-	targetSelectorIptEntrySpec := craftPartialIptEntrySpecFromOpsAndLabels(ns, ops, labels, util.IptablesSrcFlag, false)
+	targetSelectorIptEntrySpec, labels, listLabelsWithMembers := craftPartialIptEntrySpecFromSelector(ns, &targetSelector, util.IptablesSrcFlag, false)
+	sets = append(sets, labels...)
+	for parsedKey, parsedValue := range listLabelsWithMembers {
+		lists[parsedKey] = append(lists[parsedKey], parsedValue...)
+	}
 	targetSelectorComment := craftPartialIptablesCommentFromSelector(ns, &targetSelector, false)
 	for i, rule := range rules {
 		allowExternal := false
@@ -1597,11 +1598,8 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 func getDefaultDropEntries(ns string, targetSelector metav1.LabelSelector, hasIngress, hasEgress bool) []*iptm.IptEntry {
 	var entries []*iptm.IptEntry
 
-	labelsWithOps, _, _ := parseSelector(&targetSelector)
-	ops, labels := GetOperatorsAndLabels(labelsWithOps)
-
-	targetSelectorIngressIptEntrySpec := craftPartialIptEntrySpecFromOpsAndLabels(ns, ops, labels, util.IptablesDstFlag, false)
-	targetSelectorEgressIptEntrySpec := craftPartialIptEntrySpecFromOpsAndLabels(ns, ops, labels, util.IptablesSrcFlag, false)
+	targetSelectorIngressIptEntrySpec, _, _ := craftPartialIptEntrySpecFromSelector(ns, &targetSelector, util.IptablesDstFlag, false)
+	targetSelectorEgressIptEntrySpec, _, _ := craftPartialIptEntrySpecFromSelector(ns, &targetSelector, util.IptablesSrcFlag, false)
 	targetSelectorComment := craftPartialIptablesCommentFromSelector(ns, &targetSelector, false)
 
 	if hasIngress {
