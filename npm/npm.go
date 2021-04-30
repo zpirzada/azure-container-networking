@@ -161,7 +161,7 @@ func (npMgr *NetworkPolicyManager) backup() {
 		time.Sleep(backupWaitTimeInSeconds * time.Second)
 
 		if err = iptMgr.Save(util.IptablesConfigFile); err != nil {
-			metrics.SendErrorLogAndMetric(util.NpmID, "Error: failed to back up Azure-NPM states")
+			metrics.SendErrorLogAndMetric(util.NpmID, "Error: failed to back up Azure-NPM states %s", err.Error())
 		}
 	}
 }
