@@ -2776,8 +2776,8 @@ func TestAllowAllFromAppBackend(t *testing.T) {
 	sets, _, lists, _, _, iptEntries := translatePolicy(allowAllEgress)
 
 	expectedSets := []string{
-		"app:backend",
 		"ns-testnamespace",
+		"app:backend",
 	}
 	if !reflect.DeepEqual(sets, expectedSets) {
 		t.Errorf("translatedPolicy failed @ ALLOW-all-FROM-app:backend-policy sets comparison")
