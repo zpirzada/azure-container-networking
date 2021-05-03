@@ -184,6 +184,9 @@ func parseSelector(selector *metav1.LabelSelector) ([]string, []string, map[stri
 				keys = append(keys, k)
 				vals[k] = append(vals[k], v)
 				// TODO make sure this removed labels are covered in all cases
+				// We are not adding the k:v to labels, because, labels are used to contruct
+				// partial IptEntries and if these below labels are added then we are inducing
+				// AND condition on value of a match expression
 				//labels = append(labels, k+":"+v)
 			}
 		case metav1.LabelSelectorOpNotIn:

@@ -131,9 +131,12 @@ func craftPartialIptEntrySpecFromSelector(ns string, selector *metav1.LabelSelec
 	for labelKeyWithOps, labelValueList := range nsLabelListKVs {
 		op, labelKey := GetOperatorAndLabel(labelKeyWithOps)
 		labelKVIpsetName := getSetNameForMultiValueSelector(labelKey, labelValueList)
-		ops = append(ops, op)
-		// TODO doubt check if this 2nd level needs to be added to the labels when labels are added to lists
-		//labels = append(labels, labelKVIpsetName)
+		if !util.StrExistsInSlice(labels, labelKVIpsetName) {
+			ops = append(ops, op)
+			// TODO doubt check if this 2nd level needs to be added to the labels when labels are added to lists
+			// check if the 2nd level is already part of labels
+			labels = append(labels, labelKVIpsetName)
+		}
 		for _, labelValue := range labelValueList {
 			ipsetName := util.GetIpSetFromLabelKV(labelKey, labelValue)
 			valueLabels = append(valueLabels, ipsetName)
@@ -161,6 +164,7 @@ func craftPartialIptablesCommentFromSelector(ns string, selector *metav1.LabelSe
 		return "ns-" + ns
 	}
 
+	// TODO check if we are missing any crucial comment
 	labelsWithOps, _, _ := parseSelector(selector)
 	ops, labelsWithoutOps := GetOperatorsAndLabels(labelsWithOps)
 
@@ -1669,6 +1673,7 @@ func translatePolicy(npObj *networkingv1.NetworkPolicy) ([]string, []string, map
 
 	npNs := npObj.ObjectMeta.Namespace
 	policyName := npObj.ObjectMeta.Name
+	resultListMap = make(map[string][]string)
 
 	if len(npObj.Spec.PolicyTypes) == 0 {
 		ingressSets, ingressNamedPorts, ingressLists, ingressIPCidrs, ingressEntries := translateIngress(npNs, policyName, npObj.Spec.PodSelector, npObj.Spec.Ingress)
