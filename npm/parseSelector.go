@@ -198,12 +198,10 @@ func parseSelector(selector *metav1.LabelSelector) ([]string, map[string][]strin
 		// Exists matches pods with req.Key as key
 		case metav1.LabelSelectorOpExists:
 			k = req.Key
-			vals[k] = append(vals[k], "")
 			labels = append(labels, k)
 		// DoesNotExist matches pods without req.Key as key
 		case metav1.LabelSelectorOpDoesNotExist:
 			k = util.IptablesNotFlag + req.Key
-			vals[k] = append(vals[k], "")
 			labels = append(labels, k)
 		default:
 			log.Errorf("Invalid operator [%s] for selector [%v] requirement", op, *selector)
