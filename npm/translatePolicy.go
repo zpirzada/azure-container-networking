@@ -171,11 +171,9 @@ func craftPartialIptablesCommentFromSelector(ns string, selector *metav1.LabelSe
 	ops, labelsWithoutOps := GetOperatorsAndLabels(labelsWithOps)
 	for labelKeyWithOps, labelValueList := range labelKVs {
 		op, labelKey := GetOperatorAndLabel(labelKeyWithOps)
-		for _, labelValue := range labelValueList {
-			ipsetName := util.GetIpSetFromLabelKV(labelKey, labelValue)
-			labelsWithoutOps = append(labelsWithoutOps, ipsetName)
-			ops = append(ops, op)
-		}
+		labelKVIpsetName := getSetNameForMultiValueSelector(labelKey, labelValueList)
+		labelsWithoutOps = append(labelsWithoutOps, labelKVIpsetName)
+		ops = append(ops, op)
 	}
 
 	var comment, prefix, postfix string
