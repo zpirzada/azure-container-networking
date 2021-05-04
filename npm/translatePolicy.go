@@ -127,6 +127,7 @@ func craftPartialIptEntrySpecFromSelector(ns string, selector *metav1.LabelSelec
 	labelsWithOps, nsLabelListKVs := parseSelector(selector)
 	ops, labels := GetOperatorsAndLabels(labelsWithOps)
 	valueLabels := []string{}
+	labelsForSpec := labels
 	listLabelsWithMembers := make(map[string][]string)
 	// TODO add comments very confusing for sure
 	for labelKeyWithOps, labelValueList := range nsLabelListKVs {
@@ -136,7 +137,7 @@ func craftPartialIptEntrySpecFromSelector(ns string, selector *metav1.LabelSelec
 			ops = append(ops, op)
 			// TODO doubt check if this 2nd level needs to be added to the labels when labels are added to lists
 			// check if the 2nd level is already part of labels
-			labels = append(labels, labelKVIpsetName)
+			labelsForSpec = append(labelsForSpec, labelKVIpsetName)
 		}
 		for _, labelValue := range labelValueList {
 			ipsetName := util.GetIpSetFromLabelKV(labelKey, labelValue)
@@ -144,7 +145,7 @@ func craftPartialIptEntrySpecFromSelector(ns string, selector *metav1.LabelSelec
 			listLabelsWithMembers[labelKVIpsetName] = append(listLabelsWithMembers[labelKVIpsetName], ipsetName)
 		}
 	}
-	iptEntrySpecs := craftPartialIptEntrySpecFromOpsAndLabels(ns, ops, labels, srcOrDstFlag, isNamespaceSelector)
+	iptEntrySpecs := craftPartialIptEntrySpecFromOpsAndLabels(ns, ops, labelsForSpec, srcOrDstFlag, isNamespaceSelector)
 	// only append valueLabels to labels after creating the Ipt Spec as valueLabels
 	// are included in labelKVIpsetName
 	labels = append(labels, valueLabels...)
@@ -213,8 +214,8 @@ func translateIngress(ns string, policyName string, targetSelector metav1.LabelS
 
 	targetSelectorIptEntrySpec, labels, listLabelsWithMembers := craftPartialIptEntrySpecFromSelector(ns, &targetSelector, util.IptablesDstFlag, false)
 	sets = append(sets, labels...)
-	for parsedKey, parsedValue := range listLabelsWithMembers {
-		lists[parsedKey] = append(lists[parsedKey], parsedValue...)
+	for parsedListName, parsedListMembers := range listLabelsWithMembers {
+		lists[parsedListName] = append(lists[parsedListName], parsedListMembers...)
 	}
 	targetSelectorComment := craftPartialIptablesCommentFromSelector(ns, &targetSelector, false)
 
@@ -473,9 +474,9 @@ func translateIngress(ns string, policyName string, targetSelector metav1.LabelS
 							lists[nsLabelsWithoutOps[i]] = nil
 						}
 					}
-					for parsedKey, parsedValue := range listLabelsWithMembers {
-						parsedKey = util.GetNSNameWithPrefix(parsedKey)
-						lists[parsedKey] = append(lists[parsedKey], parsedValue...)
+					for parsedListName, parsedListMembers := range listLabelsWithMembers {
+						parsedListName = util.GetNSNameWithPrefix(parsedListName)
+						lists[parsedListName] = append(lists[parsedListName], parsedListMembers...)
 					}
 				}
 				iptPartialNsComment := craftPartialIptablesCommentFromSelector("", fromRule.NamespaceSelector, true)
@@ -579,9 +580,9 @@ func translateIngress(ns string, policyName string, targetSelector metav1.LabelS
 					}
 				}
 				sets = append(sets, podLabelsWithoutOps...)
-				for parsedKey, parsedValue := range listPodLabelsWithMembers {
-					parsedKey = util.GetNSNameWithPrefix(parsedKey)
-					lists[parsedKey] = append(lists[parsedKey], parsedValue...)
+				for parsedListName, parsedListMembers := range listPodLabelsWithMembers {
+					parsedListName = util.GetNSNameWithPrefix(parsedListName)
+					lists[parsedListName] = append(lists[parsedListName], parsedListMembers...)
 				}
 				iptPartialPodComment := craftPartialIptablesCommentFromSelector(ns, fromRule.PodSelector, false)
 				if portRuleExists {
@@ -691,14 +692,14 @@ func translateIngress(ns string, policyName string, targetSelector metav1.LabelS
 					lists[nsLabelsWithoutOps[i]] = nil
 				}
 			}
-			for parsedKey, parsedValue := range listLabelsWithMembers {
-				parsedKey = util.GetNSNameWithPrefix(parsedKey)
-				lists[parsedKey] = append(lists[parsedKey], parsedValue...)
+			for parsedListName, parsedListMembers := range listLabelsWithMembers {
+				parsedListName = util.GetNSNameWithPrefix(parsedListName)
+				lists[parsedListName] = append(lists[parsedListName], parsedListMembers...)
 			}
 			iptPartialPodSpec, podLabelsWithoutOps, listPodLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", fromRule.PodSelector, util.IptablesSrcFlag, false)
 			sets = append(sets, podLabelsWithoutOps...)
-			for parsedKey, parsedValue := range listPodLabelsWithMembers {
-				lists[parsedKey] = append(lists[parsedKey], parsedValue...)
+			for parsedListName, parsedListMembers := range listPodLabelsWithMembers {
+				lists[parsedListName] = append(lists[parsedListName], parsedListMembers...)
 			}
 			iptPartialNsComment := craftPartialIptablesCommentFromSelector("", fromRule.NamespaceSelector, true)
 			iptPartialPodComment := craftPartialIptablesCommentFromSelector("", fromRule.PodSelector, false)
@@ -917,8 +918,8 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 
 	targetSelectorIptEntrySpec, labels, listLabelsWithMembers := craftPartialIptEntrySpecFromSelector(ns, &targetSelector, util.IptablesSrcFlag, false)
 	sets = append(sets, labels...)
-	for parsedKey, parsedValue := range listLabelsWithMembers {
-		lists[parsedKey] = append(lists[parsedKey], parsedValue...)
+	for parsedListName, parsedListMembers := range listLabelsWithMembers {
+		lists[parsedListName] = append(lists[parsedListName], parsedListMembers...)
 	}
 	targetSelectorComment := craftPartialIptablesCommentFromSelector(ns, &targetSelector, false)
 	for i, rule := range rules {
@@ -1181,9 +1182,9 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 							lists[nsLabelsWithoutOps[i]] = nil
 						}
 					}
-					for parsedKey, parsedValue := range listLabelsWithMembers {
-						parsedKey = util.GetNSNameWithPrefix(parsedKey)
-						lists[parsedKey] = append(lists[parsedKey], parsedValue...)
+					for parsedListName, parsedListMembers := range listLabelsWithMembers {
+						parsedListName = util.GetNSNameWithPrefix(parsedListName)
+						lists[parsedListName] = append(lists[parsedListName], parsedListMembers...)
 					}
 				}
 				iptPartialNsComment := craftPartialIptablesCommentFromSelector("", toRule.NamespaceSelector, true)
@@ -1285,11 +1286,11 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 						podLabelsWithoutOps[0] = util.GetNSNameWithPrefix(ns)
 					}
 				}
-				for parsedKey, parsedValue := range listPodLabelsWithMembers {
-					parsedKey = util.GetNSNameWithPrefix(parsedKey)
-					lists[parsedKey] = append(lists[parsedKey], parsedValue...)
-				}
 				sets = append(sets, podLabelsWithoutOps...)
+				for parsedListName, parsedListMembers := range listPodLabelsWithMembers {
+					parsedListName = util.GetNSNameWithPrefix(parsedListName)
+					lists[parsedListName] = append(lists[parsedListName], parsedListMembers...)
+				}
 				iptPartialPodComment := craftPartialIptablesCommentFromSelector(ns, toRule.PodSelector, false)
 				if portRuleExists {
 					for _, portRule := range rule.Ports {
@@ -1399,14 +1400,14 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 					lists[nsLabelsWithoutOps[i]] = nil
 				}
 			}
-			for parsedKey, parsedValue := range listLabelsWithMembers {
-				parsedKey = util.GetNSNameWithPrefix(parsedKey)
-				lists[parsedKey] = append(lists[parsedKey], parsedValue...)
+			for parsedListName, parsedListMembers := range listLabelsWithMembers {
+				parsedListName = util.GetNSNameWithPrefix(parsedListName)
+				lists[parsedListName] = append(lists[parsedListName], parsedListMembers...)
 			}
 			iptPartialPodSpec, podLabelsWithoutOps, listPodLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", toRule.PodSelector, util.IptablesDstFlag, false)
 			sets = append(sets, podLabelsWithoutOps...)
-			for parsedKey, parsedValue := range listPodLabelsWithMembers {
-				lists[parsedKey] = append(lists[parsedKey], parsedValue...)
+			for parsedListName, parsedListMembers := range listPodLabelsWithMembers {
+				lists[parsedListName] = append(lists[parsedListName], parsedListMembers...)
 			}
 			iptPartialNsComment := craftPartialIptablesCommentFromSelector("", toRule.NamespaceSelector, true)
 			iptPartialPodComment := craftPartialIptablesCommentFromSelector("", toRule.PodSelector, false)
