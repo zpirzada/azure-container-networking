@@ -359,7 +359,7 @@ func (c *networkPolicyController) syncAddAndUpdateNetPol(netPolObj *networkingv1
 		}
 		for _, listMember := range listLabelsMembers {
 			if err = ipsMgr.AddToList(listKey, listMember); err != nil {
-				return fmt.Errorf("[syncAddAndUpdateNetPol] Error: Adding ipst member %s to ipset list %s with err: %v", listMember, listKey, err)
+				return fmt.Errorf("[syncAddAndUpdateNetPol] Error: Adding ipset member %s to ipset list %s with err: %v", listMember, listKey, err)
 			}
 		}
 		ipsMgr.IpSetReferIncOrDec(listKey, util.IpsetSetListFlag, ipsm.IncrementOp)
