@@ -302,7 +302,7 @@ func TestParseSelector(t *testing.T) {
 	var selector, expectedSelector *metav1.LabelSelector
 	selector, expectedSelector = nil, nil
 	labels, vals := parseSelector(selector)
-	expectedLabels, expectedVals := []string{}, []string{}
+	expectedLabels, expectedVals := []string{}, make(map[string][]string)
 
 	if len(labels) != len(expectedLabels) {
 		t.Errorf("TestparseSelector failed @ labels length comparison")
@@ -318,7 +318,7 @@ func TestParseSelector(t *testing.T) {
 
 	selector = &metav1.LabelSelector{}
 	labels, vals = parseSelector(selector)
-	expectedLabels, expectedVals = []string{""}, []string{""}
+	expectedLabels = []string{""}
 	if len(labels) != len(expectedLabels) {
 		t.Errorf("TestparseSelector failed @ labels length comparison")
 	}
@@ -341,13 +341,12 @@ func TestParseSelector(t *testing.T) {
 	}
 
 	labels, vals = parseSelector(selector)
-	expectedLabels = []string{
-		"testIn:frontend",
-		"testIn:backend",
-	}
-	expectedVals = []string{
-		"frontend",
-		"backend",
+	expectedLabels = []string{}
+	expectedVals = map[string][]string{
+		"testIn": {
+			"frontend",
+			"backend",
+		},
 	}
 
 	if len(labels) != len(expectedLabels) {
@@ -358,7 +357,7 @@ func TestParseSelector(t *testing.T) {
 		t.Errorf("TestparseSelector failed @ vals length comparison")
 	}
 
-	if !reflect.DeepEqual(labels, expectedLabels) {
+	if labels != nil {
 		t.Errorf("TestparseSelector failed @ label comparison")
 	}
 	if !reflect.DeepEqual(vals, expectedVals) {
@@ -378,16 +377,18 @@ func TestParseSelector(t *testing.T) {
 	*me = append(*me, notIn)
 
 	labels, vals = parseSelector(selector)
-	addedLabels := []string{
-		"!testNotIn:frontend",
-		"!testNotIn:backend",
+	addedLabels := []string{}
+	addedVals := map[string][]string{
+		"!testNotIn": {
+			"frontend",
+			"backend",
+		},
 	}
-	addedVals := []string{
-		"frontend",
-		"backend",
-	}
+
 	expectedLabels = append(expectedLabels, addedLabels...)
-	expectedVals = append(expectedVals, addedVals...)
+	for k, v := range addedVals {
+		expectedVals[k] = append(expectedVals[k], v...)
+	}
 
 	if len(labels) != len(expectedLabels) {
 		t.Errorf("TestparseSelector failed @ labels length comparison")
@@ -397,7 +398,7 @@ func TestParseSelector(t *testing.T) {
 		t.Errorf("TestparseSelector failed @ vals length comparison")
 	}
 
-	if !reflect.DeepEqual(labels, expectedLabels) {
+	if labels != nil {
 		t.Errorf("TestparseSelector failed @ label comparison")
 	}
 	if !reflect.DeepEqual(vals, expectedVals) {
@@ -416,11 +417,11 @@ func TestParseSelector(t *testing.T) {
 	addedLabels = []string{
 		"testExists",
 	}
-	addedVals = []string{
-		"",
-	}
+	addedVals = map[string][]string{}
 	expectedLabels = append(expectedLabels, addedLabels...)
-	expectedVals = append(expectedVals, addedVals...)
+	for k, v := range addedVals {
+		expectedVals[k] = append(expectedVals[k], v...)
+	}
 
 	if len(labels) != len(expectedLabels) {
 		t.Errorf("TestparseSelector failed @ labels length comparison")
@@ -449,11 +450,11 @@ func TestParseSelector(t *testing.T) {
 	addedLabels = []string{
 		"!testDoesNotExist",
 	}
-	addedVals = []string{
-		"",
-	}
+	addedVals = map[string][]string{}
 	expectedLabels = append(expectedLabels, addedLabels...)
-	expectedVals = append(expectedVals, addedVals...)
+	for k, v := range addedVals {
+		expectedVals[k] = append(expectedVals[k], v...)
+	}
 
 	if len(labels) != len(expectedLabels) {
 		t.Errorf("TestparseSelector failed @ labels length comparison")
