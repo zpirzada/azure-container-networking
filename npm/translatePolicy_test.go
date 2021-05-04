@@ -344,7 +344,7 @@ func TestCraftPartialIptablesCommentFromSelector(t *testing.T) {
 		},
 	}
 	comment = craftPartialIptablesCommentFromSelector("testnamespace", selector, false)
-	expectedComment = "k0:v0-AND-k1:v10-AND-k1:v11-AND-!k2-IN-ns-testnamespace"
+	expectedComment = "k0:v0-AND-!k2-AND-k1:v10:v11-IN-ns-testnamespace"
 	if comment != expectedComment {
 		t.Errorf("TestCraftPartialIptablesCommentFromSelector failed @ normal selector comparison")
 		t.Errorf("comment:\n%v", comment)
@@ -372,7 +372,7 @@ func TestCraftPartialIptablesCommentFromSelector(t *testing.T) {
 		},
 	}
 	comment = craftPartialIptablesCommentFromSelector("", nsSelector, true)
-	expectedComment = "ns-k0:v0-AND-ns-k1:v10-AND-ns-k1:v11-AND-ns-!k2"
+	expectedComment = "ns-k0:v0-AND-ns-!k2-AND-ns-k1:v10:v11"
 	if comment != expectedComment {
 		t.Errorf("TestCraftPartialIptablesCommentFromSelector failed @ namespace selector comparison")
 		t.Errorf("comment:\n%v", comment)
