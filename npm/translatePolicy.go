@@ -122,8 +122,9 @@ func craftPartialIptEntrySpecFromOpsAndLabels(ns string, ops, labels []string, s
 }
 
 // craftPartialIptEntrySpecFromSelector :- ns must be "" for namespace selectors
+// TODO check all references of this func
 func craftPartialIptEntrySpecFromSelector(ns string, selector *metav1.LabelSelector, srcOrDstFlag string, isNamespaceSelector bool) ([]string, []string, map[string][]string) {
-	labelsWithOps, _, nsLabelListKVs := parseSelector(selector)
+	labelsWithOps, nsLabelListKVs := parseSelector(selector)
 	ops, labels := GetOperatorsAndLabels(labelsWithOps)
 	valueLabels := []string{}
 	listLabelsWithMembers := make(map[string][]string)
@@ -165,8 +166,16 @@ func craftPartialIptablesCommentFromSelector(ns string, selector *metav1.LabelSe
 	}
 
 	// TODO check if we are missing any crucial comment
-	labelsWithOps, _, _ := parseSelector(selector)
+	labelsWithOps, labelKVs := parseSelector(selector)
 	ops, labelsWithoutOps := GetOperatorsAndLabels(labelsWithOps)
+	for labelKeyWithOps, labelValueList := range labelKVs {
+		op, labelKey := GetOperatorAndLabel(labelKeyWithOps)
+		for _, labelValue := range labelValueList {
+			ipsetName := util.GetIpSetFromLabelKV(labelKey, labelValue)
+			labelsWithoutOps = append(labelsWithoutOps, ipsetName)
+			ops = append(ops, op)
+		}
+	}
 
 	var comment, prefix, postfix string
 	if isNamespaceSelector {

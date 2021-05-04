@@ -138,33 +138,27 @@ func HashSelector(selector *metav1.LabelSelector) string {
 }
 
 // parseSelector takes a LabelSelector and returns a slice of processed labels, keys and values.
-func parseSelector(selector *metav1.LabelSelector) ([]string, []string, map[string][]string) {
+func parseSelector(selector *metav1.LabelSelector) ([]string, map[string][]string) {
 	var (
 		labels []string
-		keys   []string
 		vals   map[string][]string
 	)
 
 	vals = make(map[string][]string)
 	if selector == nil {
-		return labels, keys, vals
+		return labels, vals
 	}
 
 	if len(selector.MatchLabels) == 0 && len(selector.MatchExpressions) == 0 {
 		labels = append(labels, "")
-		keys = append(keys, "")
-		vals[""] = append(vals[""], "")
-
-		return labels, keys, vals
+		return labels, vals
 	}
 
 	sortedKeys, sortedVals := util.SortMap(&selector.MatchLabels)
 
 	for i := range sortedKeys {
 		labels = append(labels, sortedKeys[i]+":"+sortedVals[i])
-		vals[sortedKeys[i]] = append(vals[sortedKeys[i]], sortedVals[i])
 	}
-	keys = append(keys, sortedKeys...)
 
 	for _, req := range selector.MatchExpressions {
 		var k string
@@ -179,33 +173,36 @@ func parseSelector(selector *metav1.LabelSelector) ([]string, []string, map[stri
 		// !pod a !pod:a
 		//
 		case metav1.LabelSelectorOpIn:
+			k = req.Key
+			if len(req.Values) == 1 {
+				labels = append(labels, k+":"+req.Values[0])
+				continue
+			}
 			for _, v := range req.Values {
-				k = req.Key
-				keys = append(keys, k)
 				vals[k] = append(vals[k], v)
 				// TODO make sure this removed labels are covered in all cases
-				// We are not adding the k:v to labels, because, labels are used to contruct
-				// partial IptEntries and if these below labels are added then we are inducing
+				// We are not adding the k:v to labels for multiple values, because, labels are used
+				// to contruct partial IptEntries and if these below labels are added then we are inducing
 				// AND condition on value of a match expression
 				//labels = append(labels, k+":"+v)
 			}
 		case metav1.LabelSelectorOpNotIn:
+			k = util.IptablesNotFlag + req.Key
+			if len(req.Values) == 1 {
+				labels = append(labels, k+":"+req.Values[0])
+				continue
+			}
 			for _, v := range req.Values {
-				k = util.IptablesNotFlag + req.Key
-				keys = append(keys, k)
 				vals[k] = append(vals[k], v)
-				//labels = append(labels, k+":"+v)
 			}
 		// Exists matches pods with req.Key as key
 		case metav1.LabelSelectorOpExists:
 			k = req.Key
-			keys = append(keys, req.Key)
 			vals[k] = append(vals[k], "")
 			labels = append(labels, k)
 		// DoesNotExist matches pods without req.Key as key
 		case metav1.LabelSelectorOpDoesNotExist:
 			k = util.IptablesNotFlag + req.Key
-			keys = append(keys, k)
 			vals[k] = append(vals[k], "")
 			labels = append(labels, k)
 		default:
@@ -213,5 +210,5 @@ func parseSelector(selector *metav1.LabelSelector) ([]string, []string, map[stri
 		}
 	}
 
-	return labels, keys, vals
+	return labels, vals
 }
