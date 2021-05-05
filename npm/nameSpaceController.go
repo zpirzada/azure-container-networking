@@ -41,6 +41,7 @@ type Namespace struct {
 }
 
 // newNS constructs a new namespace object.
+// (TODO): need to change newNS function. It always returns "nil"
 func newNs(name string) (*Namespace, error) {
 	ns := &Namespace{
 		name:      name,
