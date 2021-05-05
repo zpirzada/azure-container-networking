@@ -137,7 +137,11 @@ func HashSelector(selector *metav1.LabelSelector) string {
 	return util.Hash(fmt.Sprintf("%v", selector))
 }
 
-// parseSelector takes a LabelSelector and returns a slice of processed labels, keys and values.
+// parseSelector takes a LabelSelector and returns a slice of processed labels, Lists with members as values.
+// this function returns
+//
+//
+//
 func parseSelector(selector *metav1.LabelSelector) ([]string, map[string][]string) {
 	var (
 		labels []string
@@ -163,28 +167,17 @@ func parseSelector(selector *metav1.LabelSelector) ([]string, map[string][]strin
 	for _, req := range selector.MatchExpressions {
 		var k string
 		switch op := req.Operator; op {
-		// TODO remove this
-		// - key: pod
-		// operator: NotIn
-		// values:
-		// - b
-		// - c
-		// !pod b !pod:b
-		// !pod a !pod:a
-		//
 		case metav1.LabelSelectorOpIn:
 			k = req.Key
 			if len(req.Values) == 1 {
 				labels = append(labels, k+":"+req.Values[0])
 				continue
 			}
+			// We are not adding the k:v to labels for multiple values, because, labels are used
+			// to contruct partial IptEntries and if these below labels are added then we are inducing
+			// AND condition on values of a match expression instead of OR
 			for _, v := range req.Values {
 				vals[k] = append(vals[k], v)
-				// TODO make sure this removed labels are covered in all cases
-				// We are not adding the k:v to labels for multiple values, because, labels are used
-				// to contruct partial IptEntries and if these below labels are added then we are inducing
-				// AND condition on value of a match expression
-				//labels = append(labels, k+":"+v)
 			}
 		case metav1.LabelSelectorOpNotIn:
 			k = util.IptablesNotFlag + req.Key

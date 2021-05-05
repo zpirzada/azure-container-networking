@@ -351,8 +351,9 @@ func (c *networkPolicyController) syncAddAndUpdateNetPol(netPolObj *networkingv1
 			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset named port %s with err: %v", set, err)
 		}
 	}
-	// (TODO) now add the []string value of the lists into a new obj
-	// and this below createList needs to be checked, we have to create all the lists, but also need to create new ones based on the list values
+
+	// lists is a map with list name and members as value
+	// NPM will create the list first, add members to it and increments the refer count
 	for listKey, listLabelsMembers := range lists {
 		if err = ipsMgr.CreateList(listKey); err != nil {
 			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset list %s with err: %v", listKey, err)
@@ -402,9 +403,13 @@ func (c *networkPolicyController) cleanUpNetworkPolicy(netPolKey string, isSafeC
 			return fmt.Errorf("[cleanUpNetworkPolicy] Error: failed to apply iptables rule. Rule: %+v with err: %v", iptEntry, err)
 		}
 	}
-	// (TODO) now add the []string value of the lists into a new obj
-	// and this below createList needs to be checked, we have to create all the lists, but also need to create new ones based on the list values
+
+	// lists is a map with list name and members as value
 	for listKey, _ := range lists {
+		// We do not have delete the members before deleting set as,
+		// 1. ipset allows deleting a ipset list with members
+		// 2. if the refer count is more than one we should not remove members
+		// 3. for reduced datapath operations
 		if err = ipsMgr.DeleteList(listKey); err != nil {
 			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset list %s with err: %v", listKey, err)
 		}
