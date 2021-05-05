@@ -353,11 +353,16 @@ func (c *networkPolicyController) syncAddAndUpdateNetPol(netPolObj *networkingv1
 	}
 
 	// lists is a map with list name and members as value
-	// NPM will create the list first, add members to it and increments the refer count
-	for listKey, listLabelsMembers := range lists {
+	// NPM will create the list first and increments the refer count
+	for listKey, _ := range lists {
 		if err = ipsMgr.CreateList(listKey); err != nil {
 			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset list %s with err: %v", listKey, err)
 		}
+		ipsMgr.IpSetReferIncOrDec(listKey, util.IpsetSetListFlag, ipsm.IncrementOp)
+	}
+	// Then NPM will add members to the above list, this is to avoid members being added
+	// to lists before they are created.
+	for listKey, listLabelsMembers := range lists {
 		for _, listMember := range listLabelsMembers {
 			if err = ipsMgr.AddToList(listKey, listMember); err != nil {
 				return fmt.Errorf("[syncAddAndUpdateNetPol] Error: Adding ipset member %s to ipset list %s with err: %v", listMember, listKey, err)

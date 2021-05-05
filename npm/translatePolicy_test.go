@@ -2869,8 +2869,8 @@ func TestAllowMultiplePodSelectors(t *testing.T) {
 		},
 		"ns-ns:netpol-4537-x": {},
 		"ns-ns:netpol-4537-x:netpol-4537-y": {
-			"ns:netpol-4537-x",
-			"ns:netpol-4537-y",
+			"ns-ns:netpol-4537-x",
+			"ns-ns:netpol-4537-y",
 		},
 		"ns-ns:netpol-4537-y": {},
 		"pod:a:x": {
@@ -2926,7 +2926,7 @@ func TestAllowMultiplePodSelectors(t *testing.T) {
 				util.IptablesModuleFlag,
 				util.IptablesCommentModuleFlag,
 				util.IptablesCommentFlag,
-				"ALLOW-ns-!ns:netpol-4537-x:netpol-4537-y-AND-pod:b:c-AND-app:test:int-TO-pod:a:x-IN-ns-netpol-4537-x",
+				"ALLOW-ns-!ns:netpol-4537-x:netpol-4537-y-AND-app:test:int-AND-pod:b:c-TO-pod:a:x-IN-ns-netpol-4537-x",
 			},
 		},
 		&iptm.IptEntry{

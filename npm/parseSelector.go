@@ -138,10 +138,10 @@ func HashSelector(selector *metav1.LabelSelector) string {
 }
 
 // parseSelector takes a LabelSelector and returns a slice of processed labels, Lists with members as values.
-// this function returns
-//
-//
-//
+// this function returns a slice of all the label ipsets excluding multivalue matchExprs
+// and a map of labelKeys and labelIpsetname for multivalue match exprs
+// higher level functions will need to compute what sets or ipsets should be
+// used from this map
 func parseSelector(selector *metav1.LabelSelector) ([]string, map[string][]string) {
 	var (
 		labels []string
