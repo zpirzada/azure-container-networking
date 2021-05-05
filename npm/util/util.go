@@ -332,3 +332,12 @@ func StrExistsInSlice(items []string, val string) bool {
 	}
 	return false
 }
+
+func CompareSlices(list1, list2 []string) bool {
+	for _, item := range list1 {
+		if !StrExistsInSlice(list2, item) {
+			return false
+		}
+	}
+	return true
+}
