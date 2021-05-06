@@ -473,6 +473,46 @@ func TestParseSelector(t *testing.T) {
 	}
 }
 func TestFlattenNameSpaceSelector(t *testing.T) {
+	firstSelector := &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			metav1.LabelSelectorRequirement{
+				Key:      "testIn",
+				Operator: metav1.LabelSelectorOpIn,
+				Values: []string{
+					"backend",
+				},
+			},
+			metav1.LabelSelectorRequirement{
+				Key:      "pod",
+				Operator: metav1.LabelSelectorOpIn,
+				Values: []string{
+					"a",
+				},
+			},
+			metav1.LabelSelectorRequirement{
+				Key:      "testExists",
+				Operator: metav1.LabelSelectorOpExists,
+				Values:   []string{},
+			},
+			metav1.LabelSelectorRequirement{
+				Key:      "ns",
+				Operator: metav1.LabelSelectorOpIn,
+				Values: []string{
+					"t",
+				},
+			},
+		},
+		MatchLabels: map[string]string{
+			"c": "d",
+			"a": "b",
+		},
+	}
+
+	testSelectors := FlattenNameSpaceSelector(firstSelector)
+	if len(testSelectors) != 1 {
+		t.Errorf("TestFlattenNameSpaceSelector failed @ 1st selector length check %+v", testSelectors)
+	}
+
 	secondSelector := &metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			metav1.LabelSelectorRequirement{
@@ -511,9 +551,8 @@ func TestFlattenNameSpaceSelector(t *testing.T) {
 		},
 	}
 
-	testSelectors := FlattenNameSpaceSelector(secondSelector)
-
-	if len(testSelectors) != 4 {
-		t.Error(testSelectors)
+	testSelectors = FlattenNameSpaceSelector(secondSelector)
+	if len(testSelectors) != 8 {
+		t.Errorf("TestFlattenNameSpaceSelector failed @ 2nd selector length check %+v", testSelectors)
 	}
 }

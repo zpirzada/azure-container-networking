@@ -3,7 +3,6 @@
 package npm
 
 import (
-	"sort"
 	"strconv"
 
 	"github.com/Azure/azure-container-networking/log"
@@ -188,8 +187,6 @@ func craftPartialIptablesCommentFromSelector(ns string, selector *metav1.LabelSe
 		}
 	}
 
-	// sort the slices to remove ambuigivity on ordering of labels for comments
-	sort.Sort(sort.StringSlice(labelsWithoutOps))
 	for i, _ := range labelsWithoutOps {
 		comment += prefix + ops[i] + labelsWithoutOps[i]
 		comment += "-AND-"
