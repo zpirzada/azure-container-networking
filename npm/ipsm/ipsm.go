@@ -462,6 +462,33 @@ func (ipsMgr *IpsetManager) DeleteFromSet(setName, ip, podKey string) error {
 	return nil
 }
 
+// Clean removes all the empty sets & lists under the namespace.
+func (ipsMgr *IpsetManager) Clean() error {
+	for setName, set := range ipsMgr.SetMap {
+		if len(set.elements) > 0 {
+			continue
+		}
+
+		if err := ipsMgr.DeleteSet(setName); err != nil {
+			metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to clean ipset")
+			return err
+		}
+	}
+
+	for listName, list := range ipsMgr.ListMap {
+		if len(list.elements) > 0 {
+			continue
+		}
+
+		if err := ipsMgr.DeleteList(listName); err != nil {
+			metrics.SendErrorLogAndMetric(util.IpsmID, "Error: failed to clean ipset list")
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Destroy completely cleans ipset.
 func (ipsMgr *IpsetManager) Destroy() error {
 	entry := &ipsEntry{
