@@ -137,6 +137,91 @@ func HashSelector(selector *metav1.LabelSelector) string {
 	return util.Hash(fmt.Sprintf("%v", selector))
 }
 
+// flattenNameSpaceSelector will help flatten multiple NameSpace selector match Expressions values
+// into multiple label selectors helping with the OR condition.
+func FlattenNameSpaceSelector(nsSelector *metav1.LabelSelector) []metav1.LabelSelector {
+	//egress section
+	// for _, egressRule := range nsSelector {
+	// 	log.Logf("%+v", egressRule)
+	// }
+	if nsSelector == nil {
+		return []metav1.LabelSelector{*nsSelector}
+	}
+
+	if len(nsSelector.MatchExpressions) == 0 {
+		return []metav1.LabelSelector{*nsSelector}
+	}
+
+	baseSelector := &metav1.LabelSelector{
+		MatchLabels:      nsSelector.MatchLabels,
+		MatchExpressions: []metav1.LabelSelectorRequirement{},
+	}
+
+	multiValuePresent := false
+	multiValueMatchExprs := []metav1.LabelSelectorRequirement{}
+	for _, req := range nsSelector.MatchExpressions {
+		switch op := req.Operator; op {
+		case metav1.LabelSelectorOpIn:
+			if len(req.Values) == 1 {
+				baseSelector.MatchExpressions = append(baseSelector.MatchExpressions, req)
+				continue
+			}
+			multiValuePresent = true
+			multiValueMatchExprs = append(multiValueMatchExprs, req)
+		case metav1.LabelSelectorOpNotIn:
+			if len(req.Values) == 1 {
+				baseSelector.MatchExpressions = append(baseSelector.MatchExpressions, req)
+				continue
+			}
+			multiValuePresent = true
+			multiValueMatchExprs = append(multiValueMatchExprs, req)
+		case metav1.LabelSelectorOpExists:
+			baseSelector.MatchExpressions = append(baseSelector.MatchExpressions, req)
+		case metav1.LabelSelectorOpDoesNotExist:
+			baseSelector.MatchExpressions = append(baseSelector.MatchExpressions, req)
+		default:
+			log.Errorf("Invalid operator [%s] for selector [%v] requirement", op, *nsSelector)
+		}
+	}
+
+	// If there are no multiValue NS selector match expressions
+	// return the original NsSelector
+	if !multiValuePresent {
+		return []metav1.LabelSelector{*nsSelector}
+	}
+
+	// Now use the baseSelector and loop over multiValueMatchExprs to create all
+	// combinations of values
+	flatNsSelectors := []metav1.LabelSelector{
+		*baseSelector.DeepCopy(),
+	}
+	for _, req := range multiValueMatchExprs {
+		flatNsSelectors = zipMatchExprs(flatNsSelectors, req)
+	}
+
+	return flatNsSelectors
+}
+
+func zipMatchExprs(baseSelectors []metav1.LabelSelector, matchExpr metav1.LabelSelectorRequirement) []metav1.LabelSelector {
+	zippedLabelSelectors := []metav1.LabelSelector{}
+	for _, selector := range baseSelectors {
+		for _, value := range matchExpr.Values {
+			tempBaseSelector := selector.DeepCopy()
+			tempBaseSelector.MatchExpressions = append(
+				tempBaseSelector.MatchExpressions,
+				metav1.LabelSelectorRequirement{
+					Key:      matchExpr.Key,
+					Operator: matchExpr.Operator,
+					Values:   []string{value},
+				},
+			)
+			zippedLabelSelectors = append(zippedLabelSelectors, *tempBaseSelector)
+
+		}
+	}
+	return zippedLabelSelectors
+}
+
 // parseSelector takes a LabelSelector and returns a slice of processed labels, Lists with members as values.
 // this function returns a slice of all the label ipsets excluding multivalue matchExprs
 // and a map of labelKeys and labelIpsetname for multivalue match exprs

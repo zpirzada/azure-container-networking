@@ -476,111 +476,113 @@ func translateIngress(ns string, policyName string, targetSelector metav1.LabelS
 			}
 
 			if fromRule.PodSelector == nil && fromRule.NamespaceSelector != nil {
-				iptPartialNsSpec, nsLabelsWithoutOps, listLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", fromRule.NamespaceSelector, util.IptablesSrcFlag, true)
-				if len(nsLabelsWithoutOps) == 1 && nsLabelsWithoutOps[0] == "" {
-					// Empty namespaceSelector. This selects all namespaces
-					nsLabelsWithoutOps[0] = util.KubeAllNamespacesFlag
-					if _, ok := lists[nsLabelsWithoutOps[0]]; !ok {
-						lists[nsLabelsWithoutOps[0]] = nil
-					}
-				} else {
-					for i, _ := range nsLabelsWithoutOps {
-						// Add namespaces prefix to distinguish namespace ipset lists and pod ipsets
-						nsLabelsWithoutOps[i] = util.GetNSNameWithPrefix(nsLabelsWithoutOps[i])
-						if _, ok := lists[nsLabelsWithoutOps[i]]; !ok {
-							lists[nsLabelsWithoutOps[i]] = nil
+				for _, nsSelector := range FlattenNameSpaceSelector(fromRule.NamespaceSelector) {
+					iptPartialNsSpec, nsLabelsWithoutOps, listLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", &nsSelector, util.IptablesSrcFlag, true)
+					if len(nsLabelsWithoutOps) == 1 && nsLabelsWithoutOps[0] == "" {
+						// Empty namespaceSelector. This selects all namespaces
+						nsLabelsWithoutOps[0] = util.KubeAllNamespacesFlag
+						if _, ok := lists[nsLabelsWithoutOps[0]]; !ok {
+							lists[nsLabelsWithoutOps[0]] = nil
 						}
-					}
-					appendSelectorLabelsToLists(lists, listLabelsWithMembers, true)
-				}
-				iptPartialNsComment := craftPartialIptablesCommentFromSelector("", fromRule.NamespaceSelector, true)
-				if portRuleExists {
-					for _, portRule := range rule.Ports {
-						switch portCheck := getPortType(portRule); portCheck {
-						case "namedport":
-							portName := util.NamedPortIPSetPrefix + portRule.Port.String()
-							namedPorts = append(namedPorts, portName)
-							entry := &iptm.IptEntry{
-								Chain: util.IptablesAzureIngressPortChain,
-								Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+					} else {
+						for i, _ := range nsLabelsWithoutOps {
+							// Add namespaces prefix to distinguish namespace ipset lists and pod ipsets
+							nsLabelsWithoutOps[i] = util.GetNSNameWithPrefix(nsLabelsWithoutOps[i])
+							if _, ok := lists[nsLabelsWithoutOps[i]]; !ok {
+								lists[nsLabelsWithoutOps[i]] = nil
 							}
-							entry.Specs = append(
-								entry.Specs,
-								iptPartialNsSpec...,
-							)
-							entry.Specs = append(
-								entry.Specs,
-								util.IptablesModuleFlag,
-								util.IptablesSetModuleFlag,
-								util.IptablesMatchSetFlag,
-								util.GetHashedName(portName),
-								util.IptablesDstFlag+","+util.IptablesDstFlag,
-								util.IptablesJumpFlag,
-								util.IptablesMark,
-								util.IptablesSetMarkFlag,
-								util.IptablesAzureIngressMarkHex,
-								util.IptablesModuleFlag,
-								util.IptablesCommentModuleFlag,
-								util.IptablesCommentFlag,
-								"ALLOW-"+iptPartialNsComment+
-									"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
-									"-TO-"+targetSelectorComment,
-							)
-							entries = append(entries, entry)
-						case "validport":
-							entry := &iptm.IptEntry{
-								Chain: util.IptablesAzureIngressPortChain,
-								Specs: append([]string(nil), targetSelectorIptEntrySpec...),
-							}
-							entry.Specs = append(
-								entry.Specs,
-								iptPartialNsSpec...,
-							)
-							entry.Specs = append(
-								entry.Specs,
-								craftPartialIptEntrySpecFromPort(portRule, util.IptablesDstPortFlag)...,
-							)
-							entry.Specs = append(
-								entry.Specs,
-								util.IptablesJumpFlag,
-								util.IptablesMark,
-								util.IptablesSetMarkFlag,
-								util.IptablesAzureIngressMarkHex,
-								util.IptablesModuleFlag,
-								util.IptablesCommentModuleFlag,
-								util.IptablesCommentFlag,
-								"ALLOW-"+iptPartialNsComment+
-									"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
-									"-TO-"+targetSelectorComment,
-							)
-							entries = append(entries, entry)
-						default:
-							log.Logf("Invalid NetworkPolicyPort.")
 						}
+						appendSelectorLabelsToLists(lists, listLabelsWithMembers, true)
 					}
-				} else {
-					entry := &iptm.IptEntry{
-						Chain: util.IptablesAzureIngressFromChain,
-						Specs: append([]string(nil), iptPartialNsSpec...),
+					iptPartialNsComment := craftPartialIptablesCommentFromSelector("", &nsSelector, true)
+					if portRuleExists {
+						for _, portRule := range rule.Ports {
+							switch portCheck := getPortType(portRule); portCheck {
+							case "namedport":
+								portName := util.NamedPortIPSetPrefix + portRule.Port.String()
+								namedPorts = append(namedPorts, portName)
+								entry := &iptm.IptEntry{
+									Chain: util.IptablesAzureIngressPortChain,
+									Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+								}
+								entry.Specs = append(
+									entry.Specs,
+									iptPartialNsSpec...,
+								)
+								entry.Specs = append(
+									entry.Specs,
+									util.IptablesModuleFlag,
+									util.IptablesSetModuleFlag,
+									util.IptablesMatchSetFlag,
+									util.GetHashedName(portName),
+									util.IptablesDstFlag+","+util.IptablesDstFlag,
+									util.IptablesJumpFlag,
+									util.IptablesMark,
+									util.IptablesSetMarkFlag,
+									util.IptablesAzureIngressMarkHex,
+									util.IptablesModuleFlag,
+									util.IptablesCommentModuleFlag,
+									util.IptablesCommentFlag,
+									"ALLOW-"+iptPartialNsComment+
+										"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
+										"-TO-"+targetSelectorComment,
+								)
+								entries = append(entries, entry)
+							case "validport":
+								entry := &iptm.IptEntry{
+									Chain: util.IptablesAzureIngressPortChain,
+									Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+								}
+								entry.Specs = append(
+									entry.Specs,
+									iptPartialNsSpec...,
+								)
+								entry.Specs = append(
+									entry.Specs,
+									craftPartialIptEntrySpecFromPort(portRule, util.IptablesDstPortFlag)...,
+								)
+								entry.Specs = append(
+									entry.Specs,
+									util.IptablesJumpFlag,
+									util.IptablesMark,
+									util.IptablesSetMarkFlag,
+									util.IptablesAzureIngressMarkHex,
+									util.IptablesModuleFlag,
+									util.IptablesCommentModuleFlag,
+									util.IptablesCommentFlag,
+									"ALLOW-"+iptPartialNsComment+
+										"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
+										"-TO-"+targetSelectorComment,
+								)
+								entries = append(entries, entry)
+							default:
+								log.Logf("Invalid NetworkPolicyPort.")
+							}
+						}
+					} else {
+						entry := &iptm.IptEntry{
+							Chain: util.IptablesAzureIngressFromChain,
+							Specs: append([]string(nil), iptPartialNsSpec...),
+						}
+						entry.Specs = append(
+							entry.Specs,
+							targetSelectorIptEntrySpec...,
+						)
+						entry.Specs = append(
+							entry.Specs,
+							util.IptablesJumpFlag,
+							util.IptablesMark,
+							util.IptablesSetMarkFlag,
+							util.IptablesAzureIngressMarkHex,
+							util.IptablesModuleFlag,
+							util.IptablesCommentModuleFlag,
+							util.IptablesCommentFlag,
+							"ALLOW-"+iptPartialNsComment+
+								"-TO-"+targetSelectorComment,
+						)
+						entries = append(entries, entry)
+						addedIngressFromEntry = true
 					}
-					entry.Specs = append(
-						entry.Specs,
-						targetSelectorIptEntrySpec...,
-					)
-					entry.Specs = append(
-						entry.Specs,
-						util.IptablesJumpFlag,
-						util.IptablesMark,
-						util.IptablesSetMarkFlag,
-						util.IptablesAzureIngressMarkHex,
-						util.IptablesModuleFlag,
-						util.IptablesCommentModuleFlag,
-						util.IptablesCommentFlag,
-						"ALLOW-"+iptPartialNsComment+
-							"-TO-"+targetSelectorComment,
-					)
-					entries = append(entries, entry)
-					addedIngressFromEntry = true
 				}
 				continue
 			}
@@ -695,123 +697,124 @@ func translateIngress(ns string, policyName string, targetSelector metav1.LabelS
 			if !util.IsNewNwPolicyVerFlag {
 				continue
 			}
-
-			// we pass empty ns for the podspec and comment here because it's a combo of both selectors and not limited to network policy namespace
-			iptPartialNsSpec, nsLabelsWithoutOps, listLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", fromRule.NamespaceSelector, util.IptablesSrcFlag, true) // Add namespaces prefix to distinguish namespace ipsets and pod ipsets
-			for i, _ := range nsLabelsWithoutOps {
-				nsLabelsWithoutOps[i] = util.GetNSNameWithPrefix(nsLabelsWithoutOps[i])
-				if _, ok := lists[nsLabelsWithoutOps[i]]; !ok {
-					lists[nsLabelsWithoutOps[i]] = nil
-				}
-			}
-			appendSelectorLabelsToLists(lists, listLabelsWithMembers, true)
-			iptPartialPodSpec, podLabelsWithoutOps, listPodLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", fromRule.PodSelector, util.IptablesSrcFlag, false)
-			sets = append(sets, podLabelsWithoutOps...)
-			appendSelectorLabelsToLists(lists, listPodLabelsWithMembers, false)
-			iptPartialNsComment := craftPartialIptablesCommentFromSelector("", fromRule.NamespaceSelector, true)
-			iptPartialPodComment := craftPartialIptablesCommentFromSelector("", fromRule.PodSelector, false)
-			if portRuleExists {
-				for _, portRule := range rule.Ports {
-					switch portCheck := getPortType(portRule); portCheck {
-					case "namedport":
-						portName := util.NamedPortIPSetPrefix + portRule.Port.String()
-						namedPorts = append(namedPorts, portName)
-						entry := &iptm.IptEntry{
-							Chain: util.IptablesAzureIngressPortChain,
-							Specs: append([]string(nil), iptPartialNsSpec...),
-						}
-						entry.Specs = append(
-							entry.Specs,
-							iptPartialPodSpec...,
-						)
-						entry.Specs = append(
-							entry.Specs,
-							targetSelectorIptEntrySpec...,
-						)
-						entry.Specs = append(
-							entry.Specs,
-							util.IptablesModuleFlag,
-							util.IptablesSetModuleFlag,
-							util.IptablesMatchSetFlag,
-							util.GetHashedName(portName),
-							util.IptablesDstFlag+","+util.IptablesDstFlag,
-							util.IptablesJumpFlag,
-							util.IptablesMark,
-							util.IptablesSetMarkFlag,
-							util.IptablesAzureIngressMarkHex,
-							util.IptablesModuleFlag,
-							util.IptablesCommentModuleFlag,
-							util.IptablesCommentFlag,
-							"ALLOW-"+iptPartialNsComment+
-								"-AND-"+iptPartialPodComment+
-								"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
-								"-TO-"+targetSelectorComment,
-						)
-						entries = append(entries, entry)
-					case "validport":
-						entry := &iptm.IptEntry{
-							Chain: util.IptablesAzureIngressPortChain,
-							Specs: append([]string(nil), iptPartialNsSpec...),
-						}
-						entry.Specs = append(
-							entry.Specs,
-							iptPartialPodSpec...,
-						)
-						entry.Specs = append(
-							entry.Specs,
-							targetSelectorIptEntrySpec...,
-						)
-						entry.Specs = append(
-							entry.Specs,
-							craftPartialIptEntrySpecFromPort(portRule, util.IptablesDstPortFlag)...,
-						)
-						entry.Specs = append(
-							entry.Specs,
-							util.IptablesJumpFlag,
-							util.IptablesMark,
-							util.IptablesSetMarkFlag,
-							util.IptablesAzureIngressMarkHex,
-							util.IptablesModuleFlag,
-							util.IptablesCommentModuleFlag,
-							util.IptablesCommentFlag,
-							"ALLOW-"+iptPartialNsComment+
-								"-AND-"+iptPartialPodComment+
-								"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
-								"-TO-"+targetSelectorComment,
-						)
-						entries = append(entries, entry)
-					default:
-						log.Logf("Invalid NetworkPolicyPort.")
+			for _, nsSelector := range FlattenNameSpaceSelector(fromRule.NamespaceSelector) {
+				// we pass empty ns for the podspec and comment here because it's a combo of both selectors and not limited to network policy namespace
+				iptPartialNsSpec, nsLabelsWithoutOps, listLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", &nsSelector, util.IptablesSrcFlag, true) // Add namespaces prefix to distinguish namespace ipsets and pod ipsets
+				for i, _ := range nsLabelsWithoutOps {
+					nsLabelsWithoutOps[i] = util.GetNSNameWithPrefix(nsLabelsWithoutOps[i])
+					if _, ok := lists[nsLabelsWithoutOps[i]]; !ok {
+						lists[nsLabelsWithoutOps[i]] = nil
 					}
 				}
-			} else {
-				entry := &iptm.IptEntry{
-					Chain: util.IptablesAzureIngressFromChain,
-					Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+				appendSelectorLabelsToLists(lists, listLabelsWithMembers, true)
+				iptPartialPodSpec, podLabelsWithoutOps, listPodLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", fromRule.PodSelector, util.IptablesSrcFlag, false)
+				sets = append(sets, podLabelsWithoutOps...)
+				appendSelectorLabelsToLists(lists, listPodLabelsWithMembers, false)
+				iptPartialNsComment := craftPartialIptablesCommentFromSelector("", &nsSelector, true)
+				iptPartialPodComment := craftPartialIptablesCommentFromSelector("", fromRule.PodSelector, false)
+				if portRuleExists {
+					for _, portRule := range rule.Ports {
+						switch portCheck := getPortType(portRule); portCheck {
+						case "namedport":
+							portName := util.NamedPortIPSetPrefix + portRule.Port.String()
+							namedPorts = append(namedPorts, portName)
+							entry := &iptm.IptEntry{
+								Chain: util.IptablesAzureIngressPortChain,
+								Specs: append([]string(nil), iptPartialNsSpec...),
+							}
+							entry.Specs = append(
+								entry.Specs,
+								iptPartialPodSpec...,
+							)
+							entry.Specs = append(
+								entry.Specs,
+								targetSelectorIptEntrySpec...,
+							)
+							entry.Specs = append(
+								entry.Specs,
+								util.IptablesModuleFlag,
+								util.IptablesSetModuleFlag,
+								util.IptablesMatchSetFlag,
+								util.GetHashedName(portName),
+								util.IptablesDstFlag+","+util.IptablesDstFlag,
+								util.IptablesJumpFlag,
+								util.IptablesMark,
+								util.IptablesSetMarkFlag,
+								util.IptablesAzureIngressMarkHex,
+								util.IptablesModuleFlag,
+								util.IptablesCommentModuleFlag,
+								util.IptablesCommentFlag,
+								"ALLOW-"+iptPartialNsComment+
+									"-AND-"+iptPartialPodComment+
+									"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
+									"-TO-"+targetSelectorComment,
+							)
+							entries = append(entries, entry)
+						case "validport":
+							entry := &iptm.IptEntry{
+								Chain: util.IptablesAzureIngressPortChain,
+								Specs: append([]string(nil), iptPartialNsSpec...),
+							}
+							entry.Specs = append(
+								entry.Specs,
+								iptPartialPodSpec...,
+							)
+							entry.Specs = append(
+								entry.Specs,
+								targetSelectorIptEntrySpec...,
+							)
+							entry.Specs = append(
+								entry.Specs,
+								craftPartialIptEntrySpecFromPort(portRule, util.IptablesDstPortFlag)...,
+							)
+							entry.Specs = append(
+								entry.Specs,
+								util.IptablesJumpFlag,
+								util.IptablesMark,
+								util.IptablesSetMarkFlag,
+								util.IptablesAzureIngressMarkHex,
+								util.IptablesModuleFlag,
+								util.IptablesCommentModuleFlag,
+								util.IptablesCommentFlag,
+								"ALLOW-"+iptPartialNsComment+
+									"-AND-"+iptPartialPodComment+
+									"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
+									"-TO-"+targetSelectorComment,
+							)
+							entries = append(entries, entry)
+						default:
+							log.Logf("Invalid NetworkPolicyPort.")
+						}
+					}
+				} else {
+					entry := &iptm.IptEntry{
+						Chain: util.IptablesAzureIngressFromChain,
+						Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+					}
+					entry.Specs = append(
+						entry.Specs,
+						iptPartialNsSpec...,
+					)
+					entry.Specs = append(
+						entry.Specs,
+						iptPartialPodSpec...,
+					)
+					entry.Specs = append(
+						entry.Specs,
+						util.IptablesJumpFlag,
+						util.IptablesMark,
+						util.IptablesSetMarkFlag,
+						util.IptablesAzureIngressMarkHex,
+						util.IptablesModuleFlag,
+						util.IptablesCommentModuleFlag,
+						util.IptablesCommentFlag,
+						"ALLOW-"+iptPartialNsComment+
+							"-AND-"+iptPartialPodComment+
+							"-TO-"+targetSelectorComment,
+					)
+					entries = append(entries, entry)
+					addedIngressFromEntry = true
 				}
-				entry.Specs = append(
-					entry.Specs,
-					iptPartialNsSpec...,
-				)
-				entry.Specs = append(
-					entry.Specs,
-					iptPartialPodSpec...,
-				)
-				entry.Specs = append(
-					entry.Specs,
-					util.IptablesJumpFlag,
-					util.IptablesMark,
-					util.IptablesSetMarkFlag,
-					util.IptablesAzureIngressMarkHex,
-					util.IptablesModuleFlag,
-					util.IptablesCommentModuleFlag,
-					util.IptablesCommentFlag,
-					"ALLOW-"+iptPartialNsComment+
-						"-AND-"+iptPartialPodComment+
-						"-TO-"+targetSelectorComment,
-				)
-				entries = append(entries, entry)
-				addedIngressFromEntry = true
 			}
 		}
 
@@ -1172,111 +1175,113 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 			}
 
 			if toRule.PodSelector == nil && toRule.NamespaceSelector != nil {
-				iptPartialNsSpec, nsLabelsWithoutOps, listLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", toRule.NamespaceSelector, util.IptablesDstFlag, true)
-				if len(nsLabelsWithoutOps) == 1 && nsLabelsWithoutOps[0] == "" {
-					// Empty namespaceSelector. This selects all namespaces
-					nsLabelsWithoutOps[0] = util.KubeAllNamespacesFlag
-					if _, ok := lists[nsLabelsWithoutOps[0]]; !ok {
-						lists[nsLabelsWithoutOps[0]] = nil
-					}
-				} else {
-					for i, _ := range nsLabelsWithoutOps {
-						// Add namespaces prefix to distinguish namespace ipset lists and pod ipsets
-						nsLabelsWithoutOps[i] = util.GetNSNameWithPrefix(nsLabelsWithoutOps[i])
-						if _, ok := lists[nsLabelsWithoutOps[i]]; !ok {
-							lists[nsLabelsWithoutOps[i]] = nil
+				for _, nsSelector := range FlattenNameSpaceSelector(toRule.NamespaceSelector) {
+					iptPartialNsSpec, nsLabelsWithoutOps, listLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", &nsSelector, util.IptablesDstFlag, true)
+					if len(nsLabelsWithoutOps) == 1 && nsLabelsWithoutOps[0] == "" {
+						// Empty namespaceSelector. This selects all namespaces
+						nsLabelsWithoutOps[0] = util.KubeAllNamespacesFlag
+						if _, ok := lists[nsLabelsWithoutOps[0]]; !ok {
+							lists[nsLabelsWithoutOps[0]] = nil
 						}
-					}
-					appendSelectorLabelsToLists(lists, listLabelsWithMembers, true)
-				}
-				iptPartialNsComment := craftPartialIptablesCommentFromSelector("", toRule.NamespaceSelector, true)
-				if portRuleExists {
-					for _, portRule := range rule.Ports {
-						switch portCheck := getPortType(portRule); portCheck {
-						case "namedport":
-							portName := util.NamedPortIPSetPrefix + portRule.Port.String()
-							namedPorts = append(namedPorts, portName)
-							entry := &iptm.IptEntry{
-								Chain: util.IptablesAzureEgressPortChain,
-								Specs: append([]string(nil), iptPartialNsSpec...),
+					} else {
+						for i, _ := range nsLabelsWithoutOps {
+							// Add namespaces prefix to distinguish namespace ipset lists and pod ipsets
+							nsLabelsWithoutOps[i] = util.GetNSNameWithPrefix(nsLabelsWithoutOps[i])
+							if _, ok := lists[nsLabelsWithoutOps[i]]; !ok {
+								lists[nsLabelsWithoutOps[i]] = nil
 							}
-							entry.Specs = append(
-								entry.Specs,
-								targetSelectorIptEntrySpec...,
-							)
-							entry.Specs = append(
-								entry.Specs,
-								util.IptablesModuleFlag,
-								util.IptablesSetModuleFlag,
-								util.IptablesMatchSetFlag,
-								util.GetHashedName(portName),
-								util.IptablesDstFlag+","+util.IptablesDstFlag,
-								util.IptablesJumpFlag,
-								util.IptablesMark,
-								util.IptablesSetMarkFlag,
-								util.IptablesAzureEgressXMarkHex,
-								util.IptablesModuleFlag,
-								util.IptablesCommentModuleFlag,
-								util.IptablesCommentFlag,
-								"ALLOW-"+iptPartialNsComment+
-									"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
-									"-FROM-"+targetSelectorComment,
-							)
-							entries = append(entries, entry)
-						case "validport":
-							entry := &iptm.IptEntry{
-								Chain: util.IptablesAzureEgressPortChain,
-								Specs: append([]string(nil), iptPartialNsSpec...),
-							}
-							entry.Specs = append(
-								entry.Specs,
-								craftPartialIptEntrySpecFromPort(portRule, util.IptablesDstPortFlag)...,
-							)
-							entry.Specs = append(
-								entry.Specs,
-								targetSelectorIptEntrySpec...,
-							)
-							entry.Specs = append(
-								entry.Specs,
-								util.IptablesJumpFlag,
-								util.IptablesMark,
-								util.IptablesSetMarkFlag,
-								util.IptablesAzureEgressXMarkHex,
-								util.IptablesModuleFlag,
-								util.IptablesCommentModuleFlag,
-								util.IptablesCommentFlag,
-								"ALLOW-"+iptPartialNsComment+
-									"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
-									"-FROM-"+targetSelectorComment,
-							)
-							entries = append(entries, entry)
-						default:
-							log.Logf("Invalid NetworkPolicyPort.")
 						}
+						appendSelectorLabelsToLists(lists, listLabelsWithMembers, true)
 					}
-				} else {
-					entry := &iptm.IptEntry{
-						Chain: util.IptablesAzureEgressToChain,
-						Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+					iptPartialNsComment := craftPartialIptablesCommentFromSelector("", &nsSelector, true)
+					if portRuleExists {
+						for _, portRule := range rule.Ports {
+							switch portCheck := getPortType(portRule); portCheck {
+							case "namedport":
+								portName := util.NamedPortIPSetPrefix + portRule.Port.String()
+								namedPorts = append(namedPorts, portName)
+								entry := &iptm.IptEntry{
+									Chain: util.IptablesAzureEgressPortChain,
+									Specs: append([]string(nil), iptPartialNsSpec...),
+								}
+								entry.Specs = append(
+									entry.Specs,
+									targetSelectorIptEntrySpec...,
+								)
+								entry.Specs = append(
+									entry.Specs,
+									util.IptablesModuleFlag,
+									util.IptablesSetModuleFlag,
+									util.IptablesMatchSetFlag,
+									util.GetHashedName(portName),
+									util.IptablesDstFlag+","+util.IptablesDstFlag,
+									util.IptablesJumpFlag,
+									util.IptablesMark,
+									util.IptablesSetMarkFlag,
+									util.IptablesAzureEgressXMarkHex,
+									util.IptablesModuleFlag,
+									util.IptablesCommentModuleFlag,
+									util.IptablesCommentFlag,
+									"ALLOW-"+iptPartialNsComment+
+										"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
+										"-FROM-"+targetSelectorComment,
+								)
+								entries = append(entries, entry)
+							case "validport":
+								entry := &iptm.IptEntry{
+									Chain: util.IptablesAzureEgressPortChain,
+									Specs: append([]string(nil), iptPartialNsSpec...),
+								}
+								entry.Specs = append(
+									entry.Specs,
+									craftPartialIptEntrySpecFromPort(portRule, util.IptablesDstPortFlag)...,
+								)
+								entry.Specs = append(
+									entry.Specs,
+									targetSelectorIptEntrySpec...,
+								)
+								entry.Specs = append(
+									entry.Specs,
+									util.IptablesJumpFlag,
+									util.IptablesMark,
+									util.IptablesSetMarkFlag,
+									util.IptablesAzureEgressXMarkHex,
+									util.IptablesModuleFlag,
+									util.IptablesCommentModuleFlag,
+									util.IptablesCommentFlag,
+									"ALLOW-"+iptPartialNsComment+
+										"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag)+
+										"-FROM-"+targetSelectorComment,
+								)
+								entries = append(entries, entry)
+							default:
+								log.Logf("Invalid NetworkPolicyPort.")
+							}
+						}
+					} else {
+						entry := &iptm.IptEntry{
+							Chain: util.IptablesAzureEgressToChain,
+							Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+						}
+						entry.Specs = append(
+							entry.Specs,
+							iptPartialNsSpec...,
+						)
+						entry.Specs = append(
+							entry.Specs,
+							util.IptablesJumpFlag,
+							util.IptablesMark,
+							util.IptablesSetMarkFlag,
+							util.IptablesAzureEgressXMarkHex,
+							util.IptablesModuleFlag,
+							util.IptablesCommentModuleFlag,
+							util.IptablesCommentFlag,
+							"ALLOW-"+targetSelectorComment+
+								"-TO-"+iptPartialNsComment,
+						)
+						entries = append(entries, entry)
+						addedEgressToEntry = true
 					}
-					entry.Specs = append(
-						entry.Specs,
-						iptPartialNsSpec...,
-					)
-					entry.Specs = append(
-						entry.Specs,
-						util.IptablesJumpFlag,
-						util.IptablesMark,
-						util.IptablesSetMarkFlag,
-						util.IptablesAzureEgressXMarkHex,
-						util.IptablesModuleFlag,
-						util.IptablesCommentModuleFlag,
-						util.IptablesCommentFlag,
-						"ALLOW-"+targetSelectorComment+
-							"-TO-"+iptPartialNsComment,
-					)
-					entries = append(entries, entry)
-					addedEgressToEntry = true
 				}
 				continue
 			}
@@ -1390,124 +1395,125 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 			if !util.IsNewNwPolicyVerFlag {
 				continue
 			}
-
-			// we pass true for the podspec and comment here because it's a combo of both selectors and not limited to network policy namespace
-			iptPartialNsSpec, nsLabelsWithoutOps, listLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", toRule.NamespaceSelector, util.IptablesDstFlag, true)
-			// Add namespaces prefix to distinguish namespace ipsets and pod ipsets
-			for i, _ := range nsLabelsWithoutOps {
-				nsLabelsWithoutOps[i] = "ns-" + nsLabelsWithoutOps[i]
-				if _, ok := lists[nsLabelsWithoutOps[i]]; !ok {
-					lists[nsLabelsWithoutOps[i]] = nil
-				}
-			}
-			appendSelectorLabelsToLists(lists, listLabelsWithMembers, true)
-			iptPartialPodSpec, podLabelsWithoutOps, listPodLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", toRule.PodSelector, util.IptablesDstFlag, false)
-			sets = append(sets, podLabelsWithoutOps...)
-			appendSelectorLabelsToLists(lists, listPodLabelsWithMembers, false)
-			iptPartialNsComment := craftPartialIptablesCommentFromSelector("", toRule.NamespaceSelector, true)
-			iptPartialPodComment := craftPartialIptablesCommentFromSelector("", toRule.PodSelector, false)
-			if portRuleExists {
-				for _, portRule := range rule.Ports {
-					switch portCheck := getPortType(portRule); portCheck {
-					case "namedport":
-						portName := util.NamedPortIPSetPrefix + portRule.Port.String()
-						namedPorts = append(namedPorts, portName)
-						entry := &iptm.IptEntry{
-							Chain: util.IptablesAzureEgressPortChain,
-							Specs: append([]string(nil), targetSelectorIptEntrySpec...),
-						}
-						entry.Specs = append(
-							entry.Specs,
-							iptPartialNsSpec...,
-						)
-						entry.Specs = append(
-							entry.Specs,
-							iptPartialPodSpec...,
-						)
-						entry.Specs = append(
-							entry.Specs,
-							util.IptablesModuleFlag,
-							util.IptablesSetModuleFlag,
-							util.IptablesMatchSetFlag,
-							util.GetHashedName(portName),
-							util.IptablesDstFlag+","+util.IptablesDstFlag,
-							util.IptablesJumpFlag,
-							util.IptablesMark,
-							util.IptablesSetMarkFlag,
-							util.IptablesAzureEgressXMarkHex,
-							util.IptablesModuleFlag,
-							util.IptablesCommentModuleFlag,
-							util.IptablesCommentFlag,
-							"ALLOW-"+targetSelectorComment+
-								"-TO-"+iptPartialNsComment+
-								"-AND-"+iptPartialPodComment+
-								"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag),
-						)
-						entries = append(entries, entry)
-					case "validport":
-						entry := &iptm.IptEntry{
-							Chain: util.IptablesAzureEgressPortChain,
-							Specs: append([]string(nil), targetSelectorIptEntrySpec...),
-						}
-						entry.Specs = append(
-							entry.Specs,
-							iptPartialNsSpec...,
-						)
-						entry.Specs = append(
-							entry.Specs,
-							iptPartialPodSpec...,
-						)
-						entry.Specs = append(
-							entry.Specs,
-							craftPartialIptEntrySpecFromPort(portRule, util.IptablesDstPortFlag)...,
-						)
-						entry.Specs = append(
-							entry.Specs,
-							util.IptablesJumpFlag,
-							util.IptablesMark,
-							util.IptablesSetMarkFlag,
-							util.IptablesAzureEgressXMarkHex,
-							util.IptablesModuleFlag,
-							util.IptablesCommentModuleFlag,
-							util.IptablesCommentFlag,
-							"ALLOW-"+targetSelectorComment+
-								"-TO-"+iptPartialNsComment+
-								"-AND-"+iptPartialPodComment+
-								"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag),
-						)
-						entries = append(entries, entry)
-					default:
-						log.Logf("Invalid NetworkPolicyPort.")
+			for _, nsSelector := range FlattenNameSpaceSelector(toRule.NamespaceSelector) {
+				// we pass true for the podspec and comment here because it's a combo of both selectors and not limited to network policy namespace
+				iptPartialNsSpec, nsLabelsWithoutOps, listLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", &nsSelector, util.IptablesDstFlag, true)
+				// Add namespaces prefix to distinguish namespace ipsets and pod ipsets
+				for i, _ := range nsLabelsWithoutOps {
+					nsLabelsWithoutOps[i] = "ns-" + nsLabelsWithoutOps[i]
+					if _, ok := lists[nsLabelsWithoutOps[i]]; !ok {
+						lists[nsLabelsWithoutOps[i]] = nil
 					}
 				}
-			} else {
-				entry := &iptm.IptEntry{
-					Chain: util.IptablesAzureEgressToChain,
-					Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+				appendSelectorLabelsToLists(lists, listLabelsWithMembers, true)
+				iptPartialPodSpec, podLabelsWithoutOps, listPodLabelsWithMembers := craftPartialIptEntrySpecFromSelector("", toRule.PodSelector, util.IptablesDstFlag, false)
+				sets = append(sets, podLabelsWithoutOps...)
+				appendSelectorLabelsToLists(lists, listPodLabelsWithMembers, false)
+				iptPartialNsComment := craftPartialIptablesCommentFromSelector("", &nsSelector, true)
+				iptPartialPodComment := craftPartialIptablesCommentFromSelector("", toRule.PodSelector, false)
+				if portRuleExists {
+					for _, portRule := range rule.Ports {
+						switch portCheck := getPortType(portRule); portCheck {
+						case "namedport":
+							portName := util.NamedPortIPSetPrefix + portRule.Port.String()
+							namedPorts = append(namedPorts, portName)
+							entry := &iptm.IptEntry{
+								Chain: util.IptablesAzureEgressPortChain,
+								Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+							}
+							entry.Specs = append(
+								entry.Specs,
+								iptPartialNsSpec...,
+							)
+							entry.Specs = append(
+								entry.Specs,
+								iptPartialPodSpec...,
+							)
+							entry.Specs = append(
+								entry.Specs,
+								util.IptablesModuleFlag,
+								util.IptablesSetModuleFlag,
+								util.IptablesMatchSetFlag,
+								util.GetHashedName(portName),
+								util.IptablesDstFlag+","+util.IptablesDstFlag,
+								util.IptablesJumpFlag,
+								util.IptablesMark,
+								util.IptablesSetMarkFlag,
+								util.IptablesAzureEgressXMarkHex,
+								util.IptablesModuleFlag,
+								util.IptablesCommentModuleFlag,
+								util.IptablesCommentFlag,
+								"ALLOW-"+targetSelectorComment+
+									"-TO-"+iptPartialNsComment+
+									"-AND-"+iptPartialPodComment+
+									"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag),
+							)
+							entries = append(entries, entry)
+						case "validport":
+							entry := &iptm.IptEntry{
+								Chain: util.IptablesAzureEgressPortChain,
+								Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+							}
+							entry.Specs = append(
+								entry.Specs,
+								iptPartialNsSpec...,
+							)
+							entry.Specs = append(
+								entry.Specs,
+								iptPartialPodSpec...,
+							)
+							entry.Specs = append(
+								entry.Specs,
+								craftPartialIptEntrySpecFromPort(portRule, util.IptablesDstPortFlag)...,
+							)
+							entry.Specs = append(
+								entry.Specs,
+								util.IptablesJumpFlag,
+								util.IptablesMark,
+								util.IptablesSetMarkFlag,
+								util.IptablesAzureEgressXMarkHex,
+								util.IptablesModuleFlag,
+								util.IptablesCommentModuleFlag,
+								util.IptablesCommentFlag,
+								"ALLOW-"+targetSelectorComment+
+									"-TO-"+iptPartialNsComment+
+									"-AND-"+iptPartialPodComment+
+									"-AND-"+craftPartialIptablesCommentFromPort(portRule, util.IptablesDstPortFlag),
+							)
+							entries = append(entries, entry)
+						default:
+							log.Logf("Invalid NetworkPolicyPort.")
+						}
+					}
+				} else {
+					entry := &iptm.IptEntry{
+						Chain: util.IptablesAzureEgressToChain,
+						Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+					}
+					entry.Specs = append(
+						entry.Specs,
+						iptPartialNsSpec...,
+					)
+					entry.Specs = append(
+						entry.Specs,
+						iptPartialPodSpec...,
+					)
+					entry.Specs = append(
+						entry.Specs,
+						util.IptablesJumpFlag,
+						util.IptablesMark,
+						util.IptablesSetMarkFlag,
+						util.IptablesAzureEgressXMarkHex,
+						util.IptablesModuleFlag,
+						util.IptablesCommentModuleFlag,
+						util.IptablesCommentFlag,
+						"ALLOW-"+targetSelectorComment+
+							"-TO-"+iptPartialNsComment+
+							"-AND-"+iptPartialPodComment,
+					)
+					entries = append(entries, entry)
+					addedEgressToEntry = true
 				}
-				entry.Specs = append(
-					entry.Specs,
-					iptPartialNsSpec...,
-				)
-				entry.Specs = append(
-					entry.Specs,
-					iptPartialPodSpec...,
-				)
-				entry.Specs = append(
-					entry.Specs,
-					util.IptablesJumpFlag,
-					util.IptablesMark,
-					util.IptablesSetMarkFlag,
-					util.IptablesAzureEgressXMarkHex,
-					util.IptablesModuleFlag,
-					util.IptablesCommentModuleFlag,
-					util.IptablesCommentFlag,
-					"ALLOW-"+targetSelectorComment+
-						"-TO-"+iptPartialNsComment+
-						"-AND-"+iptPartialPodComment,
-				)
-				entries = append(entries, entry)
-				addedEgressToEntry = true
 			}
 		}
 
@@ -1680,6 +1686,9 @@ func translatePolicy(npObj *networkingv1.NetworkPolicy) ([]string, []string, map
 	policyName := npObj.ObjectMeta.Name
 	resultListMap = make(map[string][]string)
 
+	// Since nested ipset list:sets are not allowed. We cannot use 2nd level Ipsets
+	// for NameSpaceSelectors with multiple values
+	// NPM will need to duplicate rules for each value in NSSelector
 	if len(npObj.Spec.PolicyTypes) == 0 {
 		ingressSets, ingressNamedPorts, ingressLists, ingressIPCidrs, ingressEntries := translateIngress(npNs, policyName, npObj.Spec.PodSelector, npObj.Spec.Ingress)
 		resultSets = append(resultSets, ingressSets...)
