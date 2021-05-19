@@ -124,11 +124,11 @@ func sortSelector(selector *metav1.LabelSelector) {
 // getSetNameForMultiValueSelector takes in label with multiple values without operator
 // and returns a new 2nd level ipset name
 func getSetNameForMultiValueSelector(key string, vals []string) string {
-	rtStr := key
+	returnString := key
 	for _, val := range vals {
-		rtStr = util.GetIpSetFromLabelKV(rtStr, val)
+		returnString = util.GetIpSetFromLabelKV(returnString, val)
 	}
-	return rtStr
+	return returnString
 }
 
 // HashSelector returns the hash value of the selector.
@@ -160,27 +160,19 @@ func FlattenNameSpaceSelector(nsSelector *metav1.LabelSelector) []metav1.LabelSe
 	multiValuePresent := false
 	multiValueMatchExprs := []metav1.LabelSelectorRequirement{}
 	for _, req := range nsSelector.MatchExpressions {
-		switch op := req.Operator; op {
-		case metav1.LabelSelectorOpIn:
+
+		if (req.Operator == metav1.LabelSelectorOpIn) || (req.Operator == metav1.LabelSelectorOpNotIn) {
 			if len(req.Values) == 1 {
 				baseSelector.MatchExpressions = append(baseSelector.MatchExpressions, req)
 				continue
 			}
 			multiValuePresent = true
 			multiValueMatchExprs = append(multiValueMatchExprs, req)
-		case metav1.LabelSelectorOpNotIn:
-			if len(req.Values) == 1 {
-				baseSelector.MatchExpressions = append(baseSelector.MatchExpressions, req)
-				continue
-			}
-			multiValuePresent = true
-			multiValueMatchExprs = append(multiValueMatchExprs, req)
-		case metav1.LabelSelectorOpExists:
+
+		} else if (req.Operator == metav1.LabelSelectorOpExists) || (req.Operator == metav1.LabelSelectorOpDoesNotExist) {
 			baseSelector.MatchExpressions = append(baseSelector.MatchExpressions, req)
-		case metav1.LabelSelectorOpDoesNotExist:
-			baseSelector.MatchExpressions = append(baseSelector.MatchExpressions, req)
-		default:
-			log.Errorf("Invalid operator [%s] for selector [%v] requirement", op, *nsSelector)
+		} else {
+			log.Errorf("Invalid operator [%s] for selector [%v] requirement", req.Operator, *nsSelector)
 		}
 	}
 

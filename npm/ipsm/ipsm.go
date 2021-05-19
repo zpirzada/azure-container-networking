@@ -21,7 +21,7 @@ type ReferCountOperation bool
 
 const (
 	IncrementOp ReferCountOperation = true
-	DecrmentOp  ReferCountOperation = false
+	DecrementOp ReferCountOperation = false
 )
 
 type ipsEntry struct {
@@ -44,11 +44,11 @@ type Ipset struct {
 	referCount int
 }
 
-func (ipset *Ipset) IncReferCount() {
+func (ipset *Ipset) incReferCount() {
 	ipset.referCount++
 }
 
-func (ipset *Ipset) DecReferCount() {
+func (ipset *Ipset) decReferCount() {
 	ipset.referCount--
 }
 
@@ -87,7 +87,7 @@ func (ipsMgr *IpsetManager) Exists(listName string, setName string, kind string)
 	return true
 }
 
-// IpSetReferIncOrDec checks if an element exists in setMap/listMap and then increases or decreases tis refer count.
+// IpSetReferIncOrDec checks if an element exists in setMap/listMap and then increases or decreases this referCount.
 func (ipsMgr *IpsetManager) IpSetReferIncOrDec(ipsetName string, kind string, countOperation ReferCountOperation) {
 	m := ipsMgr.SetMap
 	if kind == util.IpsetSetListFlag {
@@ -96,9 +96,9 @@ func (ipsMgr *IpsetManager) IpSetReferIncOrDec(ipsetName string, kind string, co
 
 	switch countOperation {
 	case IncrementOp:
-		m[ipsetName].IncReferCount()
-	case DecrmentOp:
-		m[ipsetName].DecReferCount()
+		m[ipsetName].incReferCount()
+	case DecrementOp:
+		m[ipsetName].decReferCount()
 	}
 }
 
@@ -152,7 +152,7 @@ func (ipsMgr *IpsetManager) DeleteList(listName string) error {
 	}
 
 	if ipsMgr.ListMap[listName].referCount > 0 {
-		ipsMgr.IpSetReferIncOrDec(listName, util.IpsetSetListFlag, DecrmentOp)
+		ipsMgr.IpSetReferIncOrDec(listName, util.IpsetSetListFlag, DecrementOp)
 		return nil
 	}
 
