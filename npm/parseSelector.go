@@ -124,11 +124,11 @@ func sortSelector(selector *metav1.LabelSelector) {
 // getSetNameForMultiValueSelector takes in label with multiple values without operator
 // and returns a new 2nd level ipset name
 func getSetNameForMultiValueSelector(key string, vals []string) string {
-	returnString := key
+	newIpSet := key
 	for _, val := range vals {
-		returnString = util.GetIpSetFromLabelKV(returnString, val)
+		newIpSet = util.GetIpSetFromLabelKV(newIpSet, val)
 	}
-	return returnString
+	return newIpSet
 }
 
 // HashSelector returns the hash value of the selector.
@@ -140,10 +140,41 @@ func HashSelector(selector *metav1.LabelSelector) string {
 // flattenNameSpaceSelector will help flatten multiple NameSpace selector match Expressions values
 // into multiple label selectors helping with the OR condition.
 func FlattenNameSpaceSelector(nsSelector *metav1.LabelSelector) []metav1.LabelSelector {
-	//egress section
-	// for _, egressRule := range nsSelector {
-	// 	log.Logf("%+v", egressRule)
-	// }
+	/*
+			This function helps to create multiple labelSelectors when given a single multivalue nsSelector
+			Take below exmaple: this nsSelector has 2 values in a matchSelector.
+			- namespaceSelector:
+		        matchExpressions:
+		        - key: ns
+		          operator: NotIn
+		          values:
+		          - netpol-x
+		          - netpol-y
+
+			goal is to convert this single nsSelector into multiple nsSelectors to preserve OR condition
+			between multiple values of the matchExpr i.e. this function will return
+
+			- namespaceSelector:
+		        matchExpressions:
+		        - key: ns
+		          operator: NotIn
+		          values:
+		          - netpol-x
+			- namespaceSelector:
+		        matchExpressions:
+		        - key: ns
+		          operator: NotIn
+		          values:
+		          - netpol-y
+
+			then, translate policy will replicate each of these nsSelectors to add two different rules in iptables,
+			resulting in OR condition between the values.
+
+			Check TestFlattenNameSpaceSelector 2nd subcase for complex scenario
+	*/
+
+	// To avoid any additional length checks, just return a slice of labelSelectors
+	// with original nsSelector
 	if nsSelector == nil {
 		return []metav1.LabelSelector{*nsSelector}
 	}
@@ -152,6 +183,8 @@ func FlattenNameSpaceSelector(nsSelector *metav1.LabelSelector) []metav1.LabelSe
 		return []metav1.LabelSelector{*nsSelector}
 	}
 
+	// create a baseSelector which needs to be same across all
+	// new labelSelectors
 	baseSelector := &metav1.LabelSelector{
 		MatchLabels:      nsSelector.MatchLabels,
 		MatchExpressions: []metav1.LabelSelectorRequirement{},
@@ -161,15 +194,20 @@ func FlattenNameSpaceSelector(nsSelector *metav1.LabelSelector) []metav1.LabelSe
 	multiValueMatchExprs := []metav1.LabelSelectorRequirement{}
 	for _, req := range nsSelector.MatchExpressions {
 
+		// Only In and NotIn operators of matchExprs have multiple values
+		// NPM will ignore single value matchExprs of these operators.
+		// for multiple values, it will create a slice of them to be used for Zipping with baseSelector
+		// to create multiple nsSelectors to preserve OR condition across all labels and expressions
 		if (req.Operator == metav1.LabelSelectorOpIn) || (req.Operator == metav1.LabelSelectorOpNotIn) {
 			if len(req.Values) == 1 {
+				// for length 1, add the matchExpr to baseSelector
 				baseSelector.MatchExpressions = append(baseSelector.MatchExpressions, req)
-				continue
+			} else {
+				multiValuePresent = true
+				multiValueMatchExprs = append(multiValueMatchExprs, req)
 			}
-			multiValuePresent = true
-			multiValueMatchExprs = append(multiValueMatchExprs, req)
-
 		} else if (req.Operator == metav1.LabelSelectorOpExists) || (req.Operator == metav1.LabelSelectorOpDoesNotExist) {
+			// since Exists and NotExists do not contain any values, NPM can safely add them to the baseSelector
 			baseSelector.MatchExpressions = append(baseSelector.MatchExpressions, req)
 		} else {
 			log.Errorf("Invalid operator [%s] for selector [%v] requirement", req.Operator, *nsSelector)
@@ -194,6 +232,11 @@ func FlattenNameSpaceSelector(nsSelector *metav1.LabelSelector) []metav1.LabelSe
 	return flatNsSelectors
 }
 
+// zipMatchExprs helps with zipping a given matchExpr with given baseLabelSelectors
+// this func will loop over each baseSelector in the slice,
+// deepCopies each baseSelector, combines with given matchExpr by looping over each value
+// and creating a new LabelSelector with given baseSelector and value matchExpr
+// then returns a new slice of these zipped LabelSelectors
 func zipMatchExprs(baseSelectors []metav1.LabelSelector, matchExpr metav1.LabelSelectorRequirement) []metav1.LabelSelector {
 	zippedLabelSelectors := []metav1.LabelSelector{}
 	for _, selector := range baseSelectors {
@@ -248,22 +291,22 @@ func parseSelector(selector *metav1.LabelSelector) ([]string, map[string][]strin
 			k = req.Key
 			if len(req.Values) == 1 {
 				labels = append(labels, k+":"+req.Values[0])
-				continue
-			}
-			// We are not adding the k:v to labels for multiple values, because, labels are used
-			// to contruct partial IptEntries and if these below labels are added then we are inducing
-			// AND condition on values of a match expression instead of OR
-			for _, v := range req.Values {
-				vals[k] = append(vals[k], v)
+			} else {
+				// We are not adding the k:v to labels for multiple values, because, labels are used
+				// to contruct partial IptEntries and if these below labels are added then we are inducing
+				// AND condition on values of a match expression instead of OR
+				for _, v := range req.Values {
+					vals[k] = append(vals[k], v)
+				}
 			}
 		case metav1.LabelSelectorOpNotIn:
 			k = util.IptablesNotFlag + req.Key
 			if len(req.Values) == 1 {
 				labels = append(labels, k+":"+req.Values[0])
-				continue
-			}
-			for _, v := range req.Values {
-				vals[k] = append(vals[k], v)
+			} else {
+				for _, v := range req.Values {
+					vals[k] = append(vals[k], v)
+				}
 			}
 		// Exists matches pods with req.Key as key
 		case metav1.LabelSelectorOpExists:

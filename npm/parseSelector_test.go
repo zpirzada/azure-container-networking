@@ -513,6 +513,10 @@ func TestFlattenNameSpaceSelector(t *testing.T) {
 		t.Errorf("TestFlattenNameSpaceSelector failed @ 1st selector length check %+v", testSelectors)
 	}
 
+	if !reflect.DeepEqual(testSelectors[0], *firstSelector) {
+		t.Errorf("TestFlattenNameSpaceSelector failed @ 1st selector deepEqual check.\n Expected: %+v \n Actual: %+v", *firstSelector, testSelectors[0])
+	}
+
 	secondSelector := &metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			metav1.LabelSelectorRequirement{
@@ -554,5 +558,390 @@ func TestFlattenNameSpaceSelector(t *testing.T) {
 	testSelectors = FlattenNameSpaceSelector(secondSelector)
 	if len(testSelectors) != 8 {
 		t.Errorf("TestFlattenNameSpaceSelector failed @ 2nd selector length check %+v", testSelectors)
+	}
+
+	expectedSelectors := []metav1.LabelSelector{
+		metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				metav1.LabelSelectorRequirement{
+					Key:      "testExists",
+					Operator: metav1.LabelSelectorOpExists,
+					Values:   []string{},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "testIn",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"backend",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "pod",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"a",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "ns",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"t",
+					},
+				},
+			},
+			MatchLabels: map[string]string{
+				"c": "d",
+				"a": "b",
+			},
+		},
+		metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				metav1.LabelSelectorRequirement{
+					Key:      "testExists",
+					Operator: metav1.LabelSelectorOpExists,
+					Values:   []string{},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "testIn",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"backend",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "pod",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"a",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "ns",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"y",
+					},
+				},
+			},
+			MatchLabels: map[string]string{
+				"c": "d",
+				"a": "b",
+			},
+		},
+		metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				metav1.LabelSelectorRequirement{
+					Key:      "testExists",
+					Operator: metav1.LabelSelectorOpExists,
+					Values:   []string{},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "testIn",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"backend",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "pod",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"b",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "ns",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"t",
+					},
+				},
+			},
+			MatchLabels: map[string]string{
+				"c": "d",
+				"a": "b",
+			},
+		},
+		metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				metav1.LabelSelectorRequirement{
+					Key:      "testExists",
+					Operator: metav1.LabelSelectorOpExists,
+					Values:   []string{},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "testIn",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"backend",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "pod",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"b",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "ns",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"y",
+					},
+				},
+			},
+			MatchLabels: map[string]string{
+				"c": "d",
+				"a": "b",
+			},
+		},
+		metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				metav1.LabelSelectorRequirement{
+					Key:      "testExists",
+					Operator: metav1.LabelSelectorOpExists,
+					Values:   []string{},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "testIn",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"frontend",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "pod",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"a",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "ns",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"t",
+					},
+				},
+			},
+			MatchLabels: map[string]string{
+				"c": "d",
+				"a": "b",
+			},
+		},
+		metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				metav1.LabelSelectorRequirement{
+					Key:      "testExists",
+					Operator: metav1.LabelSelectorOpExists,
+					Values:   []string{},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "testIn",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"frontend",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "pod",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"a",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "ns",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"y",
+					},
+				},
+			},
+			MatchLabels: map[string]string{
+				"c": "d",
+				"a": "b",
+			},
+		},
+		metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				metav1.LabelSelectorRequirement{
+					Key:      "testExists",
+					Operator: metav1.LabelSelectorOpExists,
+					Values:   []string{},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "testIn",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"frontend",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "pod",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"b",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "ns",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"t",
+					},
+				},
+			},
+			MatchLabels: map[string]string{
+				"c": "d",
+				"a": "b",
+			},
+		},
+		metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				metav1.LabelSelectorRequirement{
+					Key:      "testExists",
+					Operator: metav1.LabelSelectorOpExists,
+					Values:   []string{},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "testIn",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"frontend",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "pod",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"b",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "ns",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"y",
+					},
+				},
+			},
+			MatchLabels: map[string]string{
+				"c": "d",
+				"a": "b",
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(expectedSelectors, testSelectors) {
+		t.Errorf("TestFlattenNameSpaceSelector failed @ 2nd selector deepEqual check.\n Expected: %+v \n Actual: %+v", expectedSelectors, testSelectors)
+	}
+}
+
+func TestFlattenNameSpaceSelectorWoMatchLabels(t *testing.T) {
+	firstSelector := &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			metav1.LabelSelectorRequirement{
+				Key:      "testIn",
+				Operator: metav1.LabelSelectorOpIn,
+				Values: []string{
+					"backend",
+				},
+			},
+			metav1.LabelSelectorRequirement{
+				Key:      "pod",
+				Operator: metav1.LabelSelectorOpIn,
+				Values: []string{
+					"a",
+				},
+			},
+			metav1.LabelSelectorRequirement{
+				Key:      "testExists",
+				Operator: metav1.LabelSelectorOpExists,
+				Values:   []string{},
+			},
+			metav1.LabelSelectorRequirement{
+				Key:      "ns",
+				Operator: metav1.LabelSelectorOpIn,
+				Values: []string{
+					"t",
+					"y",
+				},
+			},
+		},
+	}
+
+	testSelectors := FlattenNameSpaceSelector(firstSelector)
+	if len(testSelectors) != 2 {
+		t.Errorf("TestFlattenNameSpaceSelector failed @ 1st selector length check %+v", testSelectors)
+	}
+
+	expectedSelectors := []metav1.LabelSelector{
+		metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				metav1.LabelSelectorRequirement{
+					Key:      "testIn",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"backend",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "pod",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"a",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "testExists",
+					Operator: metav1.LabelSelectorOpExists,
+					Values:   []string{},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "ns",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"t",
+					},
+				},
+			},
+		},
+		metav1.LabelSelector{
+			MatchExpressions: []metav1.LabelSelectorRequirement{
+				metav1.LabelSelectorRequirement{
+					Key:      "testIn",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"backend",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "pod",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"a",
+					},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "testExists",
+					Operator: metav1.LabelSelectorOpExists,
+					Values:   []string{},
+				},
+				metav1.LabelSelectorRequirement{
+					Key:      "ns",
+					Operator: metav1.LabelSelectorOpIn,
+					Values: []string{
+						"y",
+					},
+				},
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(testSelectors, expectedSelectors) {
+		t.Errorf("TestFlattenNameSpaceSelector failed @ 1st selector deepEqual check.\n Expected: %+v \n Actual: %+v", expectedSelectors, testSelectors)
 	}
 }
