@@ -38,6 +38,12 @@ var (
 		util.IptablesAzureIngressDropsChain,
 		util.IptablesAzureEgressDropsChain,
 	}
+
+	// IptablesAzureDropsChainList contains list of all NPM DROP chains
+	IptablesAzureDropsChainList = []string{
+		util.IptablesAzureIngressDropsChain,
+		util.IptablesAzureEgressDropsChain,
+	}
 )
 
 // IptEntry represents an iptables rule.
@@ -54,6 +60,15 @@ type IptEntry struct {
 // IptablesManager stores iptables entries.
 type IptablesManager struct {
 	OperationFlag string
+}
+
+func isDropsChain(chainName string) bool {
+	for _, chain := range IptablesAzureDropsChainList {
+		if chain == chainName {
+			return true
+		}
+	}
+	return false
 }
 
 // NewIptablesManager creates a new instance for IptablesManager object.
@@ -359,7 +374,9 @@ func (iptMgr *IptablesManager) Add(entry *IptEntry) error {
 
 	log.Logf("Adding iptables entry: %+v.", entry)
 
-	if entry.IsJumpEntry {
+	// Since there is a RETURN statement added to each DROP chain, we need to make sure
+	// any new DROP rule added to ingress or egress DROPS chain is added at the BOTTOM
+	if entry.IsJumpEntry || isDropsChain(entry.Chain) {
 		iptMgr.OperationFlag = util.IptablesAppendFlag
 	} else {
 		iptMgr.OperationFlag = util.IptablesInsertionFlag

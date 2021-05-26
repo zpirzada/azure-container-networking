@@ -17,6 +17,8 @@ func getAllChainsAndRules() [][]string {
 		getAzureNPMEgressChainRules,
 		getAzureNPMEgressPortChainRules,
 		getAzureNPMEgressToChainRules,
+		getAzureNPMIngressDropsChainRules,
+		getAzureNPMEgressDropsChainRules,
 	}
 
 	chainsAndRules := [][]string{}
@@ -190,6 +192,25 @@ func getAzureNPMIngressFromChainRules() [][]string {
 	}
 }
 
+// getAzureNPMIngressDropsChainRules returns rules for AZURE-NPM-INGRESS-DROPS
+func getAzureNPMIngressDropsChainRules() [][]string {
+	return [][]string{
+		{
+			util.IptablesAzureIngressDropsChain,
+			util.IptablesJumpFlag,
+			util.IptablesReturn,
+			util.IptablesModuleFlag,
+			util.IptablesMarkVerb,
+			util.IptablesMarkFlag,
+			util.IptablesAzureIngressMarkHex,
+			util.IptablesModuleFlag,
+			util.IptablesCommentModuleFlag,
+			util.IptablesCommentFlag,
+			fmt.Sprintf("RETURN-on-INGRESS-mark-%s", util.IptablesAzureIngressMarkHex),
+		},
+	}
+}
+
 // getAzureNPMEgressChainRules returns rules for AZURE-NPM-INGRESS-PORT
 func getAzureNPMEgressChainRules() [][]string {
 	return [][]string{
@@ -282,6 +303,38 @@ func getAzureNPMEgressToChainRules() [][]string {
 		},
 		{
 			util.IptablesAzureEgressToChain,
+			util.IptablesJumpFlag,
+			util.IptablesReturn,
+			util.IptablesModuleFlag,
+			util.IptablesMarkVerb,
+			util.IptablesMarkFlag,
+			util.IptablesAzureEgressMarkHex,
+			util.IptablesModuleFlag,
+			util.IptablesCommentModuleFlag,
+			util.IptablesCommentFlag,
+			fmt.Sprintf("RETURN-on-EGRESS-mark-%s", util.IptablesAzureEgressMarkHex),
+		},
+	}
+}
+
+// getAzureNPMEgressDropsChainRules returns rules for AZURE-NPM-EGRESS-DROPS
+func getAzureNPMEgressDropsChainRules() [][]string {
+	return [][]string{
+		{
+			util.IptablesAzureEgressDropsChain,
+			util.IptablesJumpFlag,
+			util.IptablesReturn,
+			util.IptablesModuleFlag,
+			util.IptablesMarkVerb,
+			util.IptablesMarkFlag,
+			util.IptablesAzureAcceptMarkHex,
+			util.IptablesModuleFlag,
+			util.IptablesCommentModuleFlag,
+			util.IptablesCommentFlag,
+			fmt.Sprintf("RETURN-on-EGRESS-and-INGRESS-mark-%s", util.IptablesAzureAcceptMarkHex),
+		},
+		{
+			util.IptablesAzureEgressDropsChain,
 			util.IptablesJumpFlag,
 			util.IptablesReturn,
 			util.IptablesModuleFlag,
