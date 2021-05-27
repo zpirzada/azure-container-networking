@@ -13,10 +13,8 @@ func getAllChainsAndRules() [][]string {
 		getAzureNPMAcceptChainRules,
 		getAzureNPMIngressChainRules,
 		getAzureNPMIngressPortChainRules,
-		getAzureNPMIngressFromChainRules,
 		getAzureNPMEgressChainRules,
 		getAzureNPMEgressPortChainRules,
-		getAzureNPMEgressToChainRules,
 		getAzureNPMIngressDropsChainRules,
 		getAzureNPMEgressDropsChainRules,
 	}
@@ -170,24 +168,14 @@ func getAzureNPMIngressPortChainRules() [][]string {
 			util.IptablesCommentFlag,
 			fmt.Sprintf("RETURN-on-INGRESS-mark-%s", util.IptablesAzureIngressMarkHex),
 		},
-	}
-}
-
-// getAzureNPMIngressFromChainRules returns rules for AZURE-NPM-INGRESS-PORT
-func getAzureNPMIngressFromChainRules() [][]string {
-	return [][]string{
 		{
-			util.IptablesAzureIngressFromChain,
+			util.IptablesAzureIngressPortChain,
 			util.IptablesJumpFlag,
-			util.IptablesReturn,
-			util.IptablesModuleFlag,
-			util.IptablesMarkVerb,
-			util.IptablesMarkFlag,
-			util.IptablesAzureIngressMarkHex,
+			util.IptablesAzureIngressFromChain,
 			util.IptablesModuleFlag,
 			util.IptablesCommentModuleFlag,
 			util.IptablesCommentFlag,
-			fmt.Sprintf("RETURN-on-INGRESS-mark-%s", util.IptablesAzureIngressMarkHex),
+			fmt.Sprintf("ALL-JUMP-TO-%s", util.IptablesAzureIngressFromChain),
 		},
 	}
 }
@@ -282,37 +270,14 @@ func getAzureNPMEgressPortChainRules() [][]string {
 			util.IptablesCommentFlag,
 			fmt.Sprintf("RETURN-on-EGRESS-mark-%s", util.IptablesAzureEgressMarkHex),
 		},
-	}
-}
-
-// getAzureNPMEgressToChainRules returns rules for AZURE-NPM-INGRESS-PORT
-func getAzureNPMEgressToChainRules() [][]string {
-	return [][]string{
 		{
-			util.IptablesAzureEgressToChain,
+			util.IptablesAzureEgressPortChain,
 			util.IptablesJumpFlag,
-			util.IptablesReturn,
-			util.IptablesModuleFlag,
-			util.IptablesMarkVerb,
-			util.IptablesMarkFlag,
-			util.IptablesAzureAcceptMarkHex,
+			util.IptablesAzureEgressToChain,
 			util.IptablesModuleFlag,
 			util.IptablesCommentModuleFlag,
 			util.IptablesCommentFlag,
-			fmt.Sprintf("RETURN-on-EGRESS-and-INGRESS-mark-%s", util.IptablesAzureAcceptMarkHex),
-		},
-		{
-			util.IptablesAzureEgressToChain,
-			util.IptablesJumpFlag,
-			util.IptablesReturn,
-			util.IptablesModuleFlag,
-			util.IptablesMarkVerb,
-			util.IptablesMarkFlag,
-			util.IptablesAzureEgressMarkHex,
-			util.IptablesModuleFlag,
-			util.IptablesCommentModuleFlag,
-			util.IptablesCommentFlag,
-			fmt.Sprintf("RETURN-on-EGRESS-mark-%s", util.IptablesAzureEgressMarkHex),
+			fmt.Sprintf("ALL-JUMP-TO-%s", util.IptablesAzureEgressToChain),
 		},
 	}
 }
