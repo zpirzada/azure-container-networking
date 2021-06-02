@@ -218,12 +218,6 @@ func (cnsClient *CNSClient) RequestIPAddress(orchestratorContext []byte) (*cns.I
 		response *cns.IPConfigResponse
 	)
 
-	defer func() {
-		if err != nil {
-			cnsClient.ReleaseIPAddress(orchestratorContext)
-		}
-	}()
-
 	var body bytes.Buffer
 
 	url := cnsClient.connectionURL + cns.RequestIPConfig
@@ -231,6 +225,12 @@ func (cnsClient *CNSClient) RequestIPAddress(orchestratorContext []byte) (*cns.I
 	payload := &cns.IPConfigRequest{
 		OrchestratorContext: orchestratorContext,
 	}
+
+	defer func() {
+		if err != nil {
+			cnsClient.ReleaseIPAddress(payload)
+		}
+	}()
 
 	err = json.NewEncoder(&body).Encode(payload)
 	if err != nil {
@@ -266,8 +266,8 @@ func (cnsClient *CNSClient) RequestIPAddress(orchestratorContext []byte) (*cns.I
 	return response, err
 }
 
-// ReleaseIPAddress calls releaseIPAddress on CNS
-func (cnsClient *CNSClient) ReleaseIPAddress(orchestratorContext []byte) error {
+// ReleaseIPAddress calls releaseIPAddress on CNS, ipaddress ex: (10.0.0.1)
+func (cnsClient *CNSClient) ReleaseIPAddress(ipconfig *cns.IPConfigRequest) error {
 	var (
 		err  error
 		res  *http.Response
@@ -275,17 +275,14 @@ func (cnsClient *CNSClient) ReleaseIPAddress(orchestratorContext []byte) error {
 	)
 
 	url := cnsClient.connectionURL + cns.ReleaseIPConfig
-	log.Printf("ReleaseIPAddress url %v", url)
 
-	payload := &cns.IPConfigRequest{
-		OrchestratorContext: orchestratorContext,
-	}
-
-	err = json.NewEncoder(&body).Encode(payload)
+	err = json.NewEncoder(&body).Encode(ipconfig)
 	if err != nil {
 		log.Errorf("encoding json failed with %v", err)
 		return err
 	}
+
+	log.Printf("Releasing ipconfig %s", string(body.Bytes()))
 
 	res, err = cnsClient.httpc.Post(url, contentTypeJSON, &body)
 	if err != nil {
