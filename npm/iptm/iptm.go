@@ -228,8 +228,8 @@ func (iptMgr *IptablesManager) UninitNpmChains() error {
 // AddAllRulesToChains Checks and adds all the rules in NPM chains
 func (iptMgr *IptablesManager) AddAllRulesToChains() error {
 
-	allChainsAndRules := getAllChainsAndRules()
-	for _, rule := range allChainsAndRules {
+	allDefaultRules := getAllDefaultRules()
+	for _, rule := range allDefaultRules {
 		entry := &IptEntry{
 			Chain: rule[0],
 			Specs: rule[1:],
@@ -376,7 +376,7 @@ func (iptMgr *IptablesManager) Add(entry *IptEntry) error {
 
 	// Since there is a RETURN statement added to each DROP chain, we need to make sure
 	// any new DROP rule added to ingress or egress DROPS chain is added at the BOTTOM
-	if entry.IsJumpEntry || isDropsChain(entry.Chain) {
+	if isDropsChain(entry.Chain) {
 		iptMgr.OperationFlag = util.IptablesAppendFlag
 	} else {
 		iptMgr.OperationFlag = util.IptablesInsertionFlag
