@@ -567,9 +567,12 @@ func main() {
 		}
 		go func(ep, vnet, node string) {
 			// Periodically poll DNC for node updates
+			tickerChannel := time.Tick(time.Duration(cnsconfig.ManagedSettings.NodeSyncIntervalInSeconds) * time.Second)
 			for {
-				<-time.NewTicker(time.Duration(cnsconfig.ManagedSettings.NodeSyncIntervalInSeconds) * time.Second).C
-				httpRestService.SyncNodeStatus(ep, vnet, node, json.RawMessage{})
+				select {
+				case <-tickerChannel:
+					httpRestService.SyncNodeStatus(ep, vnet, node, json.RawMessage{})
+				}
 			}
 		}(privateEndpoint, infravnet, nodeID)
 	}
@@ -743,9 +746,14 @@ func InitializeMultiTenantController(httpRestService cns.HTTPService, cnsconfig 
 	rootCxt := context.Background()
 	go func() {
 		// Periodically poll vfp programmed NC version from NMAgent
+		tickerChannel := time.Tick(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond)
 		for {
-			<-time.NewTicker(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond).C
-			httpRestServiceImpl.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
+			select {
+			case <-tickerChannel:
+				httpRestServiceImpl.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
+			case <-rootCxt.Done():
+				return
+			}
 		}
 	}()
 
@@ -842,9 +850,14 @@ func InitializeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 	rootCxt := context.Background()
 	go func() {
 		// Periodically poll vfp programmed NC version from NMAgent
+		tickerChannel := time.Tick(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond)
 		for {
-			<-time.NewTicker(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond).C
-			httpRestServiceImplementation.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
+			select {
+			case <-tickerChannel:
+				httpRestServiceImplementation.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
+            case <-rootCxt.Done():
+                return
+			}
 		}
 
 		logger.Printf("[Azure CNS] Exiting SyncHostNCVersion")
