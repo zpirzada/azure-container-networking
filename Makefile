@@ -470,7 +470,10 @@ PRETTYGOTEST := $(shell command -v gotest 2> /dev/null)
 
 LINT_PKG ?= .
 
-lint: $(GOLANGCI_LINT) ## Fast lint
+lint: $(GOLANGCI_LINT) ## Fast lint vs default branch showing only new issues
+	$(GOLANGCI_LINT) run --new-from-rev=master -v $(LINT_PKG)/...
+
+lint-old: $(GOLANGCI_LINT) ## Fast lint including previous issues
 	$(GOLANGCI_LINT) run -v $(LINT_PKG)/...
 
 # run all tests
