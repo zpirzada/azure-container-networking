@@ -718,7 +718,7 @@ func InitializeMultiTenantController(httpRestService cns.HTTPService, cnsconfig 
 
 	// Set orchestrator type
 	orchestrator := cns.SetOrchestratorTypeRequest{
-		OrchestratorType: cns.KubernetesCRD,
+		OrchestratorType: cns.Kubernetes,
 	}
 	httpRestServiceImpl.SetNodeOrchestrator(&orchestrator)
 
