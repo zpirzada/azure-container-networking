@@ -313,6 +313,13 @@ func translateIngress(ns string, policyName string, targetSelector metav1.LabelS
 						Chain: util.IptablesAzureIngressPortChain,
 						Specs: append([]string(nil), targetSelectorIptEntrySpec...),
 					}
+					if portRule.Protocol != nil {
+						entry.Specs = append(
+							entry.Specs,
+							util.IptablesProtFlag,
+							string(*portRule.Protocol),
+						)
+					}
 					entry.Specs = append(
 						entry.Specs,
 						util.IptablesModuleFlag,
@@ -384,6 +391,13 @@ func translateIngress(ns string, policyName string, targetSelector metav1.LabelS
 								entry := &iptm.IptEntry{
 									Chain: util.IptablesAzureIngressPortChain,
 									Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+								}
+								if portRule.Protocol != nil {
+									entry.Specs = append(
+										entry.Specs,
+										util.IptablesProtFlag,
+										string(*portRule.Protocol),
+									)
 								}
 								entry.Specs = append(
 									entry.Specs,
@@ -616,6 +630,13 @@ func translateIngress(ns string, policyName string, targetSelector metav1.LabelS
 								Chain: util.IptablesAzureIngressPortChain,
 								Specs: append([]string(nil), targetSelectorIptEntrySpec...),
 							}
+							if portRule.Protocol != nil {
+								entry.Specs = append(
+									entry.Specs,
+									util.IptablesProtFlag,
+									string(*portRule.Protocol),
+								)
+							}
 							entry.Specs = append(
 								entry.Specs,
 								iptPartialPodSpec...,
@@ -727,6 +748,13 @@ func translateIngress(ns string, policyName string, targetSelector metav1.LabelS
 							entry := &iptm.IptEntry{
 								Chain: util.IptablesAzureIngressPortChain,
 								Specs: append([]string(nil), iptPartialNsSpec...),
+							}
+							if portRule.Protocol != nil {
+								entry.Specs = append(
+									entry.Specs,
+									util.IptablesProtFlag,
+									string(*portRule.Protocol),
+								)
 							}
 							entry.Specs = append(
 								entry.Specs,
@@ -942,6 +970,13 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 						Chain: util.IptablesAzureEgressPortChain,
 						Specs: append([]string(nil), targetSelectorIptEntrySpec...),
 					}
+					if portRule.Protocol != nil {
+						entry.Specs = append(
+							entry.Specs,
+							util.IptablesProtFlag,
+							string(*portRule.Protocol),
+						)
+					}
 					entry.Specs = append(
 						entry.Specs,
 						util.IptablesModuleFlag,
@@ -1013,6 +1048,13 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 								entry := &iptm.IptEntry{
 									Chain: util.IptablesAzureEgressPortChain,
 									Specs: append([]string(nil), targetSelectorIptEntrySpec...),
+								}
+								if portRule.Protocol != nil {
+									entry.Specs = append(
+										entry.Specs,
+										util.IptablesProtFlag,
+										string(*portRule.Protocol),
+									)
 								}
 								entry.Specs = append(
 									entry.Specs,
@@ -1254,6 +1296,13 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 								entry.Specs,
 								targetSelectorIptEntrySpec...,
 							)
+							if portRule.Protocol != nil {
+								entry.Specs = append(
+									entry.Specs,
+									util.IptablesProtFlag,
+									string(*portRule.Protocol),
+								)
+							}
 							entry.Specs = append(
 								entry.Specs,
 								util.IptablesModuleFlag,
@@ -1371,6 +1420,13 @@ func translateEgress(ns string, policyName string, targetSelector metav1.LabelSe
 								entry.Specs,
 								iptPartialPodSpec...,
 							)
+							if portRule.Protocol != nil {
+								entry.Specs = append(
+									entry.Specs,
+									util.IptablesProtFlag,
+									string(*portRule.Protocol),
+								)
+							}
 							entry.Specs = append(
 								entry.Specs,
 								util.IptablesModuleFlag,
