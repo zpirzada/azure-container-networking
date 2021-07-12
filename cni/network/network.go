@@ -41,6 +41,7 @@ const (
 	ipVersion             = "4"
 	ipamV6                = "azure-vnet-ipamv6"
 	defaultRequestTimeout = 15 * time.Second
+	azureCniName          = "azure-vnet"
 )
 
 // CNI Operation Types
@@ -145,12 +146,6 @@ func (plugin *netPlugin) Start(config *common.PluginConfig) error {
 	common.LogNetworkInterfaces()
 
 	// Initialize network manager.
-	err = plugin.nm.Initialize(config, rehydrateNetworkInfoOnReboot)
-	if err != nil {
-		log.Printf("[cni-net] Failed to initialize network manager, err:%v.", err)
-		return err
-	}
-
 	log.Printf("[cni-net] Plugin started.")
 
 	return nil
@@ -282,7 +277,6 @@ func (plugin *netPlugin) setCNIReportDetails(nwCfg *cni.NetworkConfig, opType st
 	plugin.report.SubContext = fmt.Sprintf("%+v", nwCfg)
 	plugin.report.EventMessage = msg
 	plugin.report.BridgeDetails.NetworkMode = nwCfg.Mode
-	plugin.report.InterfaceDetails.SecondaryCAUsedCount = plugin.nm.GetNumberOfEndpoints("", nwCfg.Name)
 }
 
 func addNatIPV6SubnetInfo(nwCfg *cni.NetworkConfig,
@@ -301,6 +295,33 @@ func addNatIPV6SubnetInfo(nwCfg *cni.NetworkConfig,
 	}
 }
 
+func acquireLockForStore(config *common.PluginConfig, plugin *netPlugin) error {
+	var err error
+	if err = plugin.Store.Lock(true); err != nil {
+		log.Printf("[CNI] Failed to lock store: %v. check if process running", err)
+		if isSafe, _ := plugin.IsSafeToRemoveLock(azureCniName); isSafe {
+			log.Printf("[CNI] Removing lock file as process holding lock exited")
+			if err = releaseLockForStore(plugin); err != nil {
+				log.Errorf("Failed to release lock file, err:%v.\n", err)
+			}
+		}
+	}
+
+	return err
+}
+
+func releaseLockForStore(plugin *netPlugin) error {
+	if plugin.Store != nil {
+		err := plugin.Store.Unlock(false)
+		if err != nil {
+			log.Printf("[cni] Failed to unlock store: %v.", err)
+			return err
+		}
+	}
+
+	log.Printf("Released lock file")
+	return nil
+}
 //
 // CNI implementation
 // https://github.com/containernetworking/cni/blob/master/SPEC.md
@@ -348,6 +369,22 @@ func (plugin *netPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	iptables.DisableIPTableLock = nwCfg.DisableIPTableLock
 	plugin.setCNIReportDetails(nwCfg, CNI_ADD, "")
+
+	// acquire cni lock file
+	// TODO: check if we need pluginconfig and if not remove it
+	config := &common.PluginConfig{Store: plugin.Store}
+	if err := acquireLockForStore(config, plugin); err != nil {
+		log.Errorf("Couldn't acquire lock: %+v", err)
+		return err
+	}
+
+	defer releaseLockForStore(plugin)
+
+	// restore network state
+	if err = plugin.nm.Initialize(config, rehydrateNetworkInfoOnReboot); err != nil {
+		log.Printf("[cni-net] Failed to initialize network manager, err:%+v.", err)
+		return err
+	}
 
 	defer func() {
 		operationTimeMs := time.Since(startTime).Milliseconds()
@@ -774,6 +811,20 @@ func (plugin *netPlugin) Get(args *cniSkel.CmdArgs) error {
 
 	iptables.DisableIPTableLock = nwCfg.DisableIPTableLock
 
+	config := &common.PluginConfig{Store: plugin.Store}
+	if err := acquireLockForStore(config, plugin); err != nil {
+		log.Errorf("Couldn't acquire lock: %+v", err)
+		return err
+	}
+
+	defer releaseLockForStore(plugin)
+
+	// restore network state
+	if err = plugin.nm.Initialize(config, rehydrateNetworkInfoOnReboot); err != nil {
+		log.Printf("[cni-net] Failed to initialize network manager, err:%+v.", err)
+		return err
+	}
+
 	// Parse Pod arguments.
 	if k8sPodName, k8sNamespace, err = plugin.getPodInfo(args.Args); err != nil {
 		return err
@@ -858,6 +909,21 @@ func (plugin *netPlugin) Delete(args *cniSkel.CmdArgs) error {
 	}
 
 	log.Printf("[cni-net] Read network configuration %+v.", nwCfg)
+
+	// acquire cni lock file
+	config := &common.PluginConfig{Store: plugin.Store}
+	if err := acquireLockForStore(config, plugin); err != nil {
+		log.Errorf("Couldn't acquire lock: %+v", err)
+		return err
+	}
+
+	defer releaseLockForStore(plugin)
+
+	// restore network state
+	if err = plugin.nm.Initialize(config, rehydrateNetworkInfoOnReboot); err != nil {
+		log.Printf("[cni-net] Failed to initialize network manager, err:%+v.", err)
+		return err
+	}
 
 	// Parse Pod arguments.
 	if k8sPodName, k8sNamespace, err = plugin.getPodInfo(args.Args); err != nil {
@@ -1020,6 +1086,21 @@ func (plugin *netPlugin) Update(args *cniSkel.CmdArgs) error {
 
 	iptables.DisableIPTableLock = nwCfg.DisableIPTableLock
 	plugin.setCNIReportDetails(nwCfg, CNI_UPDATE, "")
+
+	// acquire cni lock file
+	config := &common.PluginConfig{Store: plugin.Store}
+	if err := acquireLockForStore(config, plugin); err != nil {
+		log.Errorf("Couldn't acquire lock: %+v", err)
+		return err
+	}
+
+	defer releaseLockForStore(plugin)
+
+	// restore network state
+	if err = plugin.nm.Initialize(config, rehydrateNetworkInfoOnReboot); err != nil {
+		log.Printf("[cni-net] Failed to initialize network manager, err:%+v.", err)
+		return err
+	}
 
 	defer func() {
 		operationTimeMs := time.Since(startTime).Milliseconds()
