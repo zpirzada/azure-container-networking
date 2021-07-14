@@ -180,13 +180,21 @@ func main() {
 		log.Printf("Failed to create network plugin, err:%v.\n", err)
 		return
 	}
-	// CNI initializes store
+
+	// CNI Acquires lock
 	if err = netPlugin.Plugin.InitializeKeyValueStore(&config); err != nil {
 		log.Errorf("Failed to initialize key-value store of network plugin, err:%v.\n", err)
 		tb := telemetry.NewTelemetryBuffer()
 		if tberr := tb.Connect(); tberr == nil {
 			reportPluginError(reportManager, tb, err)
 			tb.Close()
+		}
+
+		if isSafe, _ := netPlugin.Plugin.IsSafeToRemoveLock(name); isSafe {
+			log.Printf("[CNI] Removing lock file as process holding lock exited")
+			if errUninit := netPlugin.Plugin.UninitializeKeyValueStore(true); errUninit != nil {
+				log.Errorf("Failed to uninitialize key-value store of network plugin, err:%v.\n", errUninit)
+			}
 		}
 
 		return
