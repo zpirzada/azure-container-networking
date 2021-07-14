@@ -11,6 +11,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/aitelemetry"
 	"github.com/Azure/azure-container-networking/log"
+
 	"github.com/Azure/azure-container-networking/npm/ipsm"
 	"github.com/Azure/azure-container-networking/npm/iptm"
 	"github.com/Azure/azure-container-networking/npm/metrics"
@@ -142,7 +143,7 @@ func (npMgr *NetworkPolicyManager) SendClusterMetrics() {
 
 // restore restores iptables from backup file
 func (npMgr *NetworkPolicyManager) restore() {
-	iptMgr := iptm.NewIptablesManager()
+	iptMgr := iptm.NewIptablesManager(npMgr.Exec, iptm.NewIptOperationShim())
 	var err error
 	for i := 0; i < restoreMaxRetries; i++ {
 		if err = iptMgr.Restore(util.IptablesConfigFile); err == nil {
@@ -158,7 +159,7 @@ func (npMgr *NetworkPolicyManager) restore() {
 
 // backup takes snapshots of iptables filter table and saves it periodically.
 func (npMgr *NetworkPolicyManager) backup(stopCh <-chan struct{}) {
-	iptMgr := iptm.NewIptablesManager()
+	iptMgr := iptm.NewIptablesManager(npMgr.Exec, iptm.NewIptOperationShim())
 	ticker := time.NewTicker(time.Second * time.Duration(backupWaitTimeInSeconds))
 	defer ticker.Stop()
 
@@ -209,7 +210,7 @@ func (npMgr *NetworkPolicyManager) Start(stopCh <-chan struct{}) error {
 func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory informers.SharedInformerFactory, exec utilexec.Interface, npmVersion string) *NetworkPolicyManager {
 	// Clear out left over iptables states
 	log.Logf("Azure-NPM creating, cleaning iptables")
-	iptMgr := iptm.NewIptablesManager()
+	iptMgr := iptm.NewIptablesManager(exec, iptm.NewIptOperationShim())
 	iptMgr.UninitNpmChains()
 
 	log.Logf("Azure-NPM creating, cleaning existing Azure NPM IPSets")
@@ -286,7 +287,7 @@ func NewNetworkPolicyManager(clientset *kubernetes.Clientset, informerFactory in
 
 // reconcileChains checks for ordering of AZURE-NPM chain in FORWARD chain periodically.
 func (npMgr *NetworkPolicyManager) reconcileChains(stopCh <-chan struct{}) {
-	iptMgr := iptm.NewIptablesManager()
+	iptMgr := iptm.NewIptablesManager(npMgr.Exec, iptm.NewIptOperationShim())
 	ticker := time.NewTicker(time.Minute * time.Duration(reconcileChainTimeInMinutes))
 	defer ticker.Stop()
 
