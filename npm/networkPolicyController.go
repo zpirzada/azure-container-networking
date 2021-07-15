@@ -344,12 +344,14 @@ func (c *networkPolicyController) syncAddAndUpdateNetPol(netPolObj *networkingv1
 		if err = ipsMgr.CreateSet(set, []string{util.IpsetNetHashFlag}); err != nil {
 			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset %s with err: %v", set, err)
 		}
+		ipsMgr.IpSetReferInc(set)
 	}
 	for _, set := range namedPorts {
 		klog.Infof("Creating set: %v, hashedSet: %v", set, util.GetHashedName(set))
 		if err = ipsMgr.CreateSet(set, []string{util.IpsetIPPortHashFlag}); err != nil {
 			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset named port %s with err: %v", set, err)
 		}
+		ipsMgr.IpSetReferInc(set)
 	}
 
 	// lists is a map with list name and members as value
@@ -358,7 +360,7 @@ func (c *networkPolicyController) syncAddAndUpdateNetPol(netPolObj *networkingv1
 		if err = ipsMgr.CreateList(listKey); err != nil {
 			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset list %s with err: %v", listKey, err)
 		}
-		ipsMgr.IpSetReferIncOrDec(listKey, util.IpsetSetListFlag, ipsm.IncrementOp)
+		ipsMgr.IpSetReferInc(listKey)
 	}
 	// Then NPM will add members to the above list, this is to avoid members being added
 	// to lists before they are created.
@@ -368,7 +370,7 @@ func (c *networkPolicyController) syncAddAndUpdateNetPol(netPolObj *networkingv1
 				return fmt.Errorf("[syncAddAndUpdateNetPol] Error: Adding ipset member %s to ipset list %s with err: %v", listMember, listKey, err)
 			}
 		}
-		ipsMgr.IpSetReferIncOrDec(listKey, util.IpsetSetListFlag, ipsm.IncrementOp)
+		ipsMgr.IpSetReferInc(listKey)
 	}
 
 	if err = c.createCidrsRule("in", netPolObj.ObjectMeta.Name, netPolObj.ObjectMeta.Namespace, ingressIPCidrs, ipsMgr); err != nil {
@@ -415,6 +417,7 @@ func (c *networkPolicyController) cleanUpNetworkPolicy(netPolKey string, isSafeC
 		// 1. ipset allows deleting a ipset list with members
 		// 2. if the refer count is more than one we should not remove members
 		// 3. for reduced datapath operations
+		ipsMgr.IpSetReferDec(listKey)
 		if err = ipsMgr.DeleteList(listKey); err != nil {
 			return fmt.Errorf("[syncAddAndUpdateNetPol] Error: creating ipset list %s with err: %v", listKey, err)
 		}

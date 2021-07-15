@@ -143,6 +143,10 @@ const (
 	NamedPortIPSetPrefix string = "namedport:"
 
 	NamespacePrefix string = "ns-"
+
+	// Prefixes for ipsets which are lists
+	// this separates normal ipsets from the lists
+	SetListPrefix string = "setlist-"
 )
 
 //NPM telemetry constants.

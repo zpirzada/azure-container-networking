@@ -326,11 +326,11 @@ func TestAddToSet(t *testing.T) {
 		t.Errorf("AddToSet failed @ ipsMgr.AddToSet when port is specified but ip is empty: %v", err)
 	}
 
-	if err := ipsMgr.AddToSet(testSetName, fmt.Sprintf("%s", "1.1.1.1"), util.IpsetIPPortHashFlag, "0"); err != nil {
+	if err := ipsMgr.AddToSet(testSetName, "1.1.1.1", util.IpsetIPPortHashFlag, "0"); err != nil {
 		t.Errorf("AddToSet failed @ ipsMgr.AddToSet when only ip is specified: %v", err)
 	}
 
-	if err := ipsMgr.AddToSet(testSetName, fmt.Sprintf(""), util.IpsetIPPortHashFlag, "0"); err == nil {
+	if err := ipsMgr.AddToSet(testSetName, "", util.IpsetIPPortHashFlag, "0"); err == nil {
 		t.Errorf("AddToSet failed @ ipsMgr.AddToSet when no ip is specified: %v", err)
 	}
 

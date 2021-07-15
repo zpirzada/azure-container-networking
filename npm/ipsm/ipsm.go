@@ -17,14 +17,6 @@ import (
 	utilexec "k8s.io/utils/exec"
 )
 
-// ReferCountOperation is used to indicate whether ipset refer count should be increased or decreased.
-type ReferCountOperation bool
-
-const (
-	IncrementOp ReferCountOperation = true
-	DecrementOp ReferCountOperation = false
-)
-
 type ipsEntry struct {
 	operationFlag string
 	name          string
@@ -90,18 +82,29 @@ func (ipsMgr *IpsetManager) Exists(listName string, setName string, kind string)
 	return true
 }
 
-// IpSetReferIncOrDec checks if an element exists in setMap/listMap and then increases or decreases this referCount.
-func (ipsMgr *IpsetManager) IpSetReferIncOrDec(ipsetName string, kind string, countOperation ReferCountOperation) {
-	m := ipsMgr.SetMap
-	if kind == util.IpsetSetListFlag {
-		m = ipsMgr.ListMap
-	}
+// IpSetReferInc checks if an element exists in setMap/listMap and then increases its referCount.
+func (ipsMgr *IpsetManager) IpSetReferInc(ipsetName string) {
+	exists, kind := ipsMgr.SetExists(ipsetName)
+	if exists { //ipset exists
+		m := ipsMgr.SetMap
+		if kind == util.IpsetSetListFlag {
+			m = ipsMgr.ListMap
+		}
 
-	switch countOperation {
-	case IncrementOp:
-		m[ipsetName].incReferCount()
-	case DecrementOp:
-		m[ipsetName].decReferCount()
+		m[ipsetName].incReferCount() //increase the refer count
+	}
+}
+
+// IpSetReferDec checks if an element exists in setMap/listMap and then decreases its referCount.
+func (ipsMgr *IpsetManager) IpSetReferDec(ipsetName string) {
+	exists, kind := ipsMgr.SetExists(ipsetName)
+	if exists { //ipset exists
+		m := ipsMgr.SetMap
+		if kind == util.IpsetSetListFlag {
+			m = ipsMgr.ListMap
+		}
+
+		m[ipsetName].decReferCount() //decrease the refer count
 	}
 }
 
@@ -155,7 +158,6 @@ func (ipsMgr *IpsetManager) DeleteList(listName string) error {
 	}
 
 	if ipsMgr.ListMap[listName].referCount > 0 {
-		ipsMgr.IpSetReferIncOrDec(listName, util.IpsetSetListFlag, DecrementOp)
 		return nil
 	}
 
@@ -184,7 +186,7 @@ func (ipsMgr *IpsetManager) AddToList(listName string, setName string) error {
 
 	// if set does not exist, then return because the ipset call will fail due to set not existing
 	if !exists {
-		return fmt.Errorf("Set [%s] does not exist when attempting to add to list [%s]", setName, listName)
+		return fmt.Errorf("set [%s] does not exist when attempting to add to list [%s]", setName, listName)
 	}
 
 	// Check if the list that is being added to exists
@@ -192,7 +194,7 @@ func (ipsMgr *IpsetManager) AddToList(listName string, setName string) error {
 
 	// Make sure that set returned is of list type, otherwise return because we can't add a set to a non setlist type
 	if exists && listtype != util.IpsetSetListFlag {
-		return fmt.Errorf("Failed to add set [%s] to list [%s], but list is of type [%s]", setName, listName, listtype)
+		return fmt.Errorf("failed to add set [%s] to list [%s], but list is of type [%s]", setName, listName, listtype)
 	} else if !exists {
 		// if the list doesn't exist, create it
 		if err := ipsMgr.CreateList(listName); err != nil {
@@ -213,10 +215,11 @@ func (ipsMgr *IpsetManager) AddToList(listName string, setName string) error {
 
 	// add set to list
 	if errCode, err := ipsMgr.Run(entry); err != nil && errCode != 1 {
-		return fmt.Errorf("Error: failed to create ipset rules. rule: %+v, error: %v", entry, err)
+		return fmt.Errorf("error: failed to create ipset rules. rule: %+v, error: %v", entry, err)
 	}
 
 	ipsMgr.ListMap[listName].elements[setName] = ""
+	ipsMgr.IpSetReferInc(setName) //increase the refer count of setname
 
 	return nil
 }
@@ -266,9 +269,8 @@ func (ipsMgr *IpsetManager) DeleteFromList(listName string, setName string) erro
 	}
 
 	// Now cleanup the cache
-	if _, exists := ipsMgr.ListMap[listName].elements[setName]; exists {
-		delete(ipsMgr.ListMap[listName].elements, setName)
-	}
+	delete(ipsMgr.ListMap[listName].elements, setName)
+	ipsMgr.IpSetReferDec(setName) //decrease the refer count of setname
 
 	if len(ipsMgr.ListMap[listName].elements) == 0 {
 		if err := ipsMgr.DeleteList(listName); err != nil {
