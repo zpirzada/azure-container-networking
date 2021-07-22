@@ -116,8 +116,10 @@ func (r *multiTenantCrdReconciler) Reconcile(request reconcile.Request) (reconci
 	}
 	prefixLength, _ := ipNet.Mask.Size()
 	networkContainerRequest := cns.CreateNetworkContainerRequest{
-		NetworkContainerid:  nc.Spec.UUID,
-		OrchestratorContext: orchestratorContext,
+		NetworkContainerid:   nc.Spec.UUID,
+		OrchestratorContext:  orchestratorContext,
+		NetworkContainerType: cns.Kubernetes,
+		Version:              "0",
 		IPConfiguration: cns.IPConfiguration{
 			IPSubnet: cns.IPSubnet{
 				IPAddress:    nc.Status.IP,
