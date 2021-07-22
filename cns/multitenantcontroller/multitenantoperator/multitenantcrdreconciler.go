@@ -20,9 +20,12 @@ import (
 )
 
 const (
-	NCStateInitialized = "Initialized" // NC has been initialized by DNC.
-	NCStateSucceeded   = "Succeeded"   // NC has been persisted by CNS
-	NCStateTerminated  = "Terminated"  // NC has been cleaned up from CNS
+	// NCStateInitialized indicates the NC has been initialized by DNC.
+	NCStateInitialized = "Initialized"
+	// NCStateSucceeded indicates the NC has been persisted by CNS.
+	NCStateSucceeded = "Succeeded"
+	// NCStateTerminated indicates the NC has been terminated by CNS.
+	NCStateTerminated = "Terminated"
 )
 
 // multiTenantCrdReconciler reconciles multi-tenant network containers.
@@ -35,20 +38,23 @@ type multiTenantCrdReconciler struct {
 // Reconcile is called on multi-tenant CRD status changes.
 func (r *multiTenantCrdReconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	ctx := context.Background()
-	var nc ncapi.MultiTenantNetworkContainer
+	logger.Printf("Reconcling MultiTenantNetworkContainer %v", request.NamespacedName.String())
 
+	var nc ncapi.MultiTenantNetworkContainer
 	if err := r.KubeClient.Get(ctx, request.NamespacedName, &nc); err != nil {
 		if apierrors.IsNotFound(err) {
+			logger.Printf("MultiTenantNetworkContainer %s not found, skip reconciling", request.NamespacedName.String())
 			return ctrl.Result{}, nil
 		}
 
-		logger.Errorf("Failed to fetch network container: %v", err)
+		logger.Errorf("Failed to fetch network container %s: %v", request.NamespacedName.String(), err)
 		return ctrl.Result{}, err
 	}
 
 	if !nc.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Do nothing if the NC has already in Terminated state.
 		if nc.Status.State == NCStateTerminated {
+			logger.Printf("MultiTenantNetworkContainer %s already terminated, skip reconciling", request.NamespacedName.String())
 			return ctrl.Result{}, nil
 		}
 
@@ -57,36 +63,25 @@ func (r *multiTenantCrdReconciler) Reconcile(request reconcile.Request) (reconci
 			NetworkContainerid: nc.Spec.UUID,
 		})
 		if err != nil {
-			logger.Errorf("Failed to delete NC %s from CNS: %v", nc.Spec.UUID, err)
+			logger.Errorf("Failed to delete NC %s (UUID: %s) from CNS: %v", request.NamespacedName.String(), nc.Spec.UUID, err)
 			return ctrl.Result{}, err
 		}
 
 		// Update NC state to Terminated.
 		nc.Status.State = NCStateTerminated
 		if err := r.KubeClient.Status().Update(ctx, &nc); err != nil {
-			logger.Errorf("Failed to update network container state for %s: %v", nc.Spec.UUID, err)
+			logger.Errorf("Failed to update network container state for %s (UUID: %s): %v", request.NamespacedName.String(), nc.Spec.UUID, err)
 			return ctrl.Result{}, err
 		}
 
-		logger.Printf("NC has been terminated for %s", nc.Spec.UUID)
+		logger.Printf("NC has been terminated for %s (UUID: %s)", request.NamespacedName.String(), nc.Spec.UUID)
 		return ctrl.Result{}, nil
 	}
 
 	// Do nothing if the network container hasn't been initialized yet from control plane.
 	if nc.Status.State != NCStateInitialized {
+		logger.Printf("MultiTenantNetworkContainer %s hasn't initialized yet, skip reconciling", request.NamespacedName.String())
 		return ctrl.Result{}, nil
-	}
-
-	// Check CNS NC states.
-	_, err := r.CNSClient.GetNC(cns.GetNetworkContainerRequest{
-		NetworkContainerid: nc.Spec.UUID,
-	})
-	if err == nil {
-		logger.Printf("NC %s has already been created in CNS", nc.Spec.UUID)
-		return ctrl.Result{}, nil
-	} else if err.Error() != "NotFound" {
-		logger.Errorf("Failed to fetch NC from CNS: %v", err)
-		return ctrl.Result{}, err
 	}
 
 	// Parse KubernetesPodInfo as orchestratorContext.
@@ -97,6 +92,19 @@ func (r *multiTenantCrdReconciler) Reconcile(request reconcile.Request) (reconci
 	orchestratorContext, err := json.Marshal(podInfo)
 	if err != nil {
 		logger.Errorf("Failed to marshal podInfo (%v): %v", podInfo, err)
+		return ctrl.Result{}, err
+	}
+
+	// Check CNS NC states.
+	_, err = r.CNSClient.GetNC(cns.GetNetworkContainerRequest{
+		NetworkContainerid:  nc.Spec.UUID,
+		OrchestratorContext: orchestratorContext,
+	})
+	if err == nil {
+		logger.Printf("NC %s (UUID: %s) has already been created in CNS", request.NamespacedName.String(), nc.Spec.UUID)
+		return ctrl.Result{}, nil
+	} else if err.Error() != "NotFound" {
+		logger.Errorf("Failed to fetch NC %s (UUID: %s) from CNS: %v", request.NamespacedName.String(), nc.Spec.UUID, err)
 		return ctrl.Result{}, err
 	}
 
@@ -119,18 +127,18 @@ func (r *multiTenantCrdReconciler) Reconcile(request reconcile.Request) (reconci
 		},
 	}
 	if err = r.CNSClient.CreateOrUpdateNC(networkContainerRequest); err != nil {
-		logger.Errorf("Failed to persist state for NC %s to CNS: %v", nc.Spec.UUID, err)
+		logger.Errorf("Failed to persist state for NC %s (UUID: %s) to CNS: %v", request.NamespacedName.String(), nc.Spec.UUID, err)
 		return ctrl.Result{}, err
 	}
 
 	// Update NC state to Succeeded.
 	nc.Status.State = NCStateSucceeded
 	if err := r.KubeClient.Status().Update(ctx, &nc); err != nil {
-		logger.Errorf("Failed to update network container state for %s: %v", nc.Spec.UUID, err)
+		logger.Errorf("Failed to update network container state for %s (UUID: %s): %v", request.NamespacedName.String(), nc.Spec.UUID, err)
 		return ctrl.Result{}, err
 	}
 
-	logger.Printf("Reconciled NC %s", nc.Spec.UUID)
+	logger.Printf("Reconciled NC %s (UUID: %s)", request.NamespacedName.String(), nc.Spec.UUID)
 	return reconcile.Result{}, nil
 }
 
