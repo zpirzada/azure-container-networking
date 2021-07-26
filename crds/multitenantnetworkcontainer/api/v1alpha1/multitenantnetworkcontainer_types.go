@@ -48,6 +48,8 @@ type MultiTenantNetworkContainerStatus struct {
 	State string `json:"state,omitempty"`
 	// The subnet CIDR
 	IPSubnet string `json:"ipSubnet,omitempty"`
+	// The primary interface identifier
+	PrimaryInterfaceIdentifier string `json:"primaryInterfaceIdentifier,omitempty"`
 }
 
 // +kubebuilder:object:root=true

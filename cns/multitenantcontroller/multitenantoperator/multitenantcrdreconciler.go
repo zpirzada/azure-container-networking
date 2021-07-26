@@ -127,7 +127,9 @@ func (r *multiTenantCrdReconciler) Reconcile(request reconcile.Request) (reconci
 			},
 			GatewayIPAddress: nc.Status.Gateway,
 		},
+		PrimaryInterfaceIdentifier: nc.Status.PrimaryInterfaceIdentifier,
 	}
+	logger.Printf("CreateOrUpdateNC with networkContainerRequest: %#v", networkContainerRequest)
 	if err = r.CNSClient.CreateOrUpdateNC(networkContainerRequest); err != nil {
 		logger.Errorf("Failed to persist state for NC %s (UUID: %s) to CNS: %v", request.NamespacedName.String(), nc.Spec.UUID, err)
 		return ctrl.Result{}, err
