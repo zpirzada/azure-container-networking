@@ -70,6 +70,9 @@ spec:
             ipSubnet:
               description: The subnet CIDR
               type: string
+            primaryInterfaceIdentifier:
+              description: The primary interface identifier
+              type: string
             state:
               description: The state of network container
               type: string
