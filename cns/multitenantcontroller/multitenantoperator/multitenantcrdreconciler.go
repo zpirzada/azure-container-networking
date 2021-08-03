@@ -127,6 +127,10 @@ func (r *multiTenantCrdReconciler) Reconcile(ctx context.Context, request reconc
 			GatewayIPAddress: nc.Status.Gateway,
 		},
 		PrimaryInterfaceIdentifier: nc.Status.PrimaryInterfaceIdentifier,
+		MultiTenancyInfo: cns.MultiTenancyInfo{
+			EncapType: nc.Status.MultiTenantInfo.EncapType,
+			ID:        int(nc.Status.MultiTenantInfo.ID),
+		},
 	}
 	logger.Printf("CreateOrUpdateNC with networkContainerRequest: %#v", networkContainerRequest)
 	if err = r.CNSClient.CreateOrUpdateNC(networkContainerRequest); err != nil {
