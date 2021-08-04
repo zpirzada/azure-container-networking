@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"reflect"
 	"strings"
 
 	"github.com/Azure/azure-container-networking/cns"
@@ -105,6 +106,13 @@ func (r *multiTenantCrdReconciler) Reconcile(ctx context.Context, request reconc
 	} else if err.Error() != "NotFound" {
 		logger.Errorf("Failed to fetch NC %s (UUID: %s) from CNS: %v", request.NamespacedName.String(), nc.Spec.UUID, err)
 		return ctrl.Result{}, err
+	}
+
+	// Check that the MultiTenantInfo is set
+	if reflect.DeepEqual(ncapi.MultiTenantInfo{}, nc.Status.MultiTenantInfo) {
+		logger.Errorf("expected NC status multitenant info to not be empty for object %s", request.NamespacedName)
+		// There is no reason to requeue since we will reconcile this object when the multitenant info is added
+		return ctrl.Result{}, nil
 	}
 
 	// Persist NC states into CNS.
