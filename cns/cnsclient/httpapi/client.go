@@ -52,7 +52,7 @@ func (client *Client) GetNC(req cns.GetNetworkContainerRequest) (cns.GetNetworkC
 	resp, returnCode := client.RestService.GetNetworkContainerInternal(req)
 	if returnCode != 0 {
 		if returnCode == types.UnknownContainerID {
-			return resp, errors.New("containerID not found")
+			return resp, errors.New(returnCode.String())
 		}
 		return resp, errors.Errorf("failed to get NC, request: %+v, errorCode: %d", req, returnCode)
 	}
