@@ -51,6 +51,8 @@ github.com/containernetworking/cni/pkg/types
 github.com/containernetworking/cni/pkg/types/020
 github.com/containernetworking/cni/pkg/types/current
 github.com/containernetworking/cni/pkg/version
+# github.com/daixiang0/gci v0.2.9
+## explicit
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
@@ -87,7 +89,7 @@ github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 github.com/gogo/protobuf/sortkeys
 # github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 github.com/golang/groupcache/lru
-# github.com/golang/mock v1.4.1
+# github.com/golang/mock v1.5.0
 ## explicit
 github.com/golang/mock/gomock
 # github.com/golang/protobuf v1.5.2
@@ -153,7 +155,7 @@ github.com/ishidawataru/sctp
 github.com/json-iterator/go
 # github.com/logrusorgru/aurora v2.0.3+incompatible
 ## explicit
-# github.com/magiconair/properties v1.8.1
+# github.com/magiconair/properties v1.8.5
 github.com/magiconair/properties
 # github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369
 github.com/matttproud/golang_protobuf_extensions/pbutil
@@ -161,7 +163,7 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 ## explicit
 github.com/microsoft/ApplicationInsights-Go/appinsights
 github.com/microsoft/ApplicationInsights-Go/appinsights/contracts
-# github.com/mitchellh/mapstructure v1.1.2
+# github.com/mitchellh/mapstructure v1.4.1
 github.com/mitchellh/mapstructure
 # github.com/moby/spdystream v0.2.0
 github.com/moby/spdystream
@@ -211,9 +213,10 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/pelletier/go-toml v1.2.0
+# github.com/pelletier/go-toml v1.9.3
 github.com/pelletier/go-toml
 # github.com/pkg/errors v0.9.1
+## explicit
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
@@ -243,20 +246,20 @@ github.com/rs/cors
 github.com/satori/go.uuid
 # github.com/sirupsen/logrus v1.7.0
 github.com/sirupsen/logrus
-# github.com/spf13/afero v1.2.2
+# github.com/spf13/afero v1.6.0
 github.com/spf13/afero
 github.com/spf13/afero/mem
-# github.com/spf13/cast v1.3.0
+# github.com/spf13/cast v1.3.1
 github.com/spf13/cast
-# github.com/spf13/cobra v1.1.1
+# github.com/spf13/cobra v1.2.1
 ## explicit
 github.com/spf13/cobra
-# github.com/spf13/jwalterweatherman v1.0.0
+# github.com/spf13/jwalterweatherman v1.1.0
 github.com/spf13/jwalterweatherman
 # github.com/spf13/pflag v1.0.5
 ## explicit
 github.com/spf13/pflag
-# github.com/spf13/viper v1.7.0
+# github.com/spf13/viper v1.8.1
 ## explicit
 github.com/spf13/viper
 # github.com/stretchr/testify v1.7.0
@@ -269,7 +272,7 @@ github.com/subosito/gotenv
 ## explicit
 # github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f
 ## explicit
-# go.opencensus.io v0.22.3
+# go.opencensus.io v0.23.0
 go.opencensus.io
 go.opencensus.io/internal
 go.opencensus.io/trace
@@ -290,7 +293,7 @@ golang.org/x/net/internal/socks
 golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
-# golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+# golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
 # golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
@@ -341,21 +344,21 @@ google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a
+# google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.27.1
+# google.golang.org/grpc v1.38.0
 ## explicit
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
 google.golang.org/grpc/balancer
 google.golang.org/grpc/balancer/base
+google.golang.org/grpc/balancer/grpclb/state
 google.golang.org/grpc/balancer/roundrobin
 google.golang.org/grpc/binarylog/grpc_binarylog_v1
 google.golang.org/grpc/codes
 google.golang.org/grpc/connectivity
 google.golang.org/grpc/credentials
-google.golang.org/grpc/credentials/internal
 google.golang.org/grpc/encoding
 google.golang.org/grpc/encoding/proto
 google.golang.org/grpc/grpclog
@@ -365,16 +368,24 @@ google.golang.org/grpc/internal/balancerload
 google.golang.org/grpc/internal/binarylog
 google.golang.org/grpc/internal/buffer
 google.golang.org/grpc/internal/channelz
+google.golang.org/grpc/internal/credentials
 google.golang.org/grpc/internal/envconfig
+google.golang.org/grpc/internal/grpclog
 google.golang.org/grpc/internal/grpcrand
 google.golang.org/grpc/internal/grpcsync
+google.golang.org/grpc/internal/grpcutil
+google.golang.org/grpc/internal/metadata
+google.golang.org/grpc/internal/resolver
 google.golang.org/grpc/internal/resolver/dns
 google.golang.org/grpc/internal/resolver/passthrough
+google.golang.org/grpc/internal/resolver/unix
+google.golang.org/grpc/internal/serviceconfig
+google.golang.org/grpc/internal/status
 google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
+google.golang.org/grpc/internal/transport/networktype
 google.golang.org/grpc/keepalive
 google.golang.org/grpc/metadata
-google.golang.org/grpc/naming
 google.golang.org/grpc/peer
 google.golang.org/grpc/resolver
 google.golang.org/grpc/serviceconfig
@@ -419,7 +430,7 @@ google.golang.org/protobuf/types/known/timestamppb
 gopkg.in/fsnotify.v1
 # gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
-# gopkg.in/ini.v1 v1.51.0
+# gopkg.in/ini.v1 v1.62.0
 gopkg.in/ini.v1
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 gopkg.in/tomb.v1

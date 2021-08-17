@@ -132,7 +132,10 @@ func getNetworkTupleCommon(
 func getNPMPod(input *Input, npmCache *NPMCache) (*npm.NpmPod, error) {
 	switch input.Type {
 	case PODNAME:
-		return npmCache.PodMap[input.Content], nil
+		if pod, ok := npmCache.PodMap[input.Content]; ok {
+			return pod, nil
+		}
+		return nil, errInvalidInput
 	case IPADDRS:
 		if pod, ok := ipPodMap[input.Content]; ok {
 			return pod, nil
@@ -397,15 +400,14 @@ func matchCIDRBLOCKS(pod *npm.NpmPod, setInfo *pb.RuleResponse_SetInfo) bool {
 	for _, entry := range setInfo.Contents {
 		entrySplitted := strings.Split(entry, " ")
 		if len(entrySplitted) > 1 { // nomatch condition. i.e [172.17.1.0/24 nomatch]
-			_, ipnet, _ := net.ParseCIDR(entrySplitted[0])
+			_, ipnet, _ := net.ParseCIDR(strings.TrimSpace(entrySplitted[0]))
 			podIP := net.ParseIP(pod.PodIP)
-
 			if ipnet.Contains(podIP) {
 				matched = false
 				break
 			}
 		} else {
-			_, ipnet, _ := net.ParseCIDR(entrySplitted[0])
+			_, ipnet, _ := net.ParseCIDR(strings.TrimSpace(entrySplitted[0]))
 			podIP := net.ParseIP(pod.PodIP)
 			if ipnet.Contains(podIP) {
 				matched = true

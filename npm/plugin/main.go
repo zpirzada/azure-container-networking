@@ -3,11 +3,14 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/npm"
+	"github.com/Azure/azure-container-networking/npm/cmd"
 	restserver "github.com/Azure/azure-container-networking/npm/http/server"
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -19,8 +22,8 @@ import (
 )
 
 const (
-	waitForTelemetryInSeconds = 60
-	resyncPeriodInMinutes     = 15
+	// waitForTelemetryInSeconds = 60 unused
+	resyncPeriodInMinutes = 15
 )
 
 // Version is populated by make during build.
@@ -31,13 +34,19 @@ func initLogging() error {
 	log.SetLevel(log.LevelInfo)
 	if err := log.SetTargetLogDirectory(log.TargetStdout, ""); err != nil {
 		log.Logf("Failed to configure logging, err:%v.", err)
-		return err
+		return fmt.Errorf("%w", err)
 	}
 
 	return nil
 }
 
 func main() {
+	if len(os.Args) > 1 {
+		// Cobra will handle invalid command, will prompt user to run `--help` for usage
+		cmd.Execute()
+		return
+	}
+
 	klog.Infof("Start NPM version: %s", version)
 
 	var err error
@@ -77,7 +86,11 @@ func main() {
 	factory := informers.NewSharedInformerFactory(clientset, resyncPeriod)
 
 	npMgr := npm.NewNetworkPolicyManager(clientset, factory, exec.New(), version)
-	metrics.CreateTelemetryHandle(version, npm.GetAIMetadata())
+	err = metrics.CreateTelemetryHandle(version, npm.GetAIMetadata())
+	if err != nil {
+		klog.Infof("CreateTelemetryHandle failed with error %v.", err)
+		panic(err.Error())
+	}
 
 	restserver := restserver.NewNpmRestServer(restserver.DefaultHTTPListeningAddress)
 	go restserver.NPMRestServerListenAndServe(npMgr)
