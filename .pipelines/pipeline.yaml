@@ -213,11 +213,11 @@ stages:
             displayName: "Publish Code Coverage Results"
             condition: always()
 
-  - template: singletenancy/aks-swift/e2e-job-template.yaml
-    parameters:
-      name: "aks_on_swift_e2e"
-      displayName: AKS on Swift
-      pipelineBuildImage: "$(BUILD_IMAGE)"
+  #- template: singletenancy/aks-swift/e2e-job-template.yaml
+  #  parameters:
+  #    name: "aks_on_swift_e2e"
+  #    displayName: AKS on Swift
+  #    pipelineBuildImage: "$(BUILD_IMAGE)"
 
   - template: singletenancy/aks-engine/e2e-job-template.yaml
     parameters:
