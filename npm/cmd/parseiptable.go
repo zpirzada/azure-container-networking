@@ -1,9 +1,9 @@
-package cmd
+package main
 
 import (
 	"fmt"
 
-	"github.com/Azure/azure-container-networking/npm/debugTools/dataplane/parse"
+	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/parse"
 	"github.com/spf13/cobra"
 )
 
@@ -12,7 +12,7 @@ var parseIPtableCmd = &cobra.Command{
 	Use:   "parseiptable",
 	Short: "Parse iptable into Go object, dumping it to the console",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		iptableSaveF, _ := cmd.Flags().GetString("iptF")
+		iptableSaveF, _ := cmd.Flags().GetString("iptables-file")
 		if iptableSaveF == "" {
 			iptable, err := parse.Iptables("filter")
 			if err != nil {
@@ -33,5 +33,5 @@ var parseIPtableCmd = &cobra.Command{
 
 func init() {
 	debugCmd.AddCommand(parseIPtableCmd)
-	parseIPtableCmd.Flags().StringP("iptF", "i", "", "Set the iptable-save file path (optional)")
+	parseIPtableCmd.Flags().StringP("iptables-file", "i", "", "Set the iptable-save file path (optional)")
 }

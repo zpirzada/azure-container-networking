@@ -13,10 +13,10 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-container-networking/npm/cache"
-	NPMIPtable "github.com/Azure/azure-container-networking/npm/debugTools/dataplane/iptables"
-	"github.com/Azure/azure-container-networking/npm/debugTools/dataplane/parse"
-	"github.com/Azure/azure-container-networking/npm/debugTools/pb"
 	"github.com/Azure/azure-container-networking/npm/http/api"
+	NPMIPtable "github.com/Azure/azure-container-networking/npm/pkg/dataplane/iptables"
+	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/parse"
+	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/pb"
 	"github.com/Azure/azure-container-networking/npm/util"
 	"google.golang.org/protobuf/encoding/protojson"
 )

@@ -1,9 +1,9 @@
-package cmd
+package main
 
 import (
 	"fmt"
 
-	"github.com/Azure/azure-container-networking/npm/debugTools/dataplane"
+	dataplane "github.com/Azure/azure-container-networking/npm/pkg/dataplane/debug"
 	"github.com/spf13/cobra"
 )
 
@@ -16,8 +16,8 @@ var convertIPtableCmd = &cobra.Command{
 		if iptableName == "" {
 			iptableName = "filter"
 		}
-		npmCacheF, _ := cmd.Flags().GetString("npmF")
-		iptableSaveF, _ := cmd.Flags().GetString("iptF")
+		npmCacheF, _ := cmd.Flags().GetString("cache-file")
+		iptableSaveF, _ := cmd.Flags().GetString("iptables-file")
 		c := &dataplane.Converter{}
 		if npmCacheF == "" && iptableSaveF == "" {
 			ipTableRulesRes, err := c.GetJSONRulesFromIptables(iptableName)
@@ -38,6 +38,6 @@ var convertIPtableCmd = &cobra.Command{
 
 func init() {
 	debugCmd.AddCommand(convertIPtableCmd)
-	convertIPtableCmd.Flags().StringP("iptF", "i", "", "Set the iptable-save file path (optional)")
-	convertIPtableCmd.Flags().StringP("npmF", "n", "", "Set the NPM cache file path (optional)")
+	convertIPtableCmd.Flags().StringP("iptables-file", "i", "", "Set the iptable-save file path (optional)")
+	convertIPtableCmd.Flags().StringP("cache-file", "c", "", "Set the NPM cache file path (optional)")
 }

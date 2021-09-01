@@ -1,11 +1,20 @@
-package cmd
+package main
 
 import (
 	"fmt"
 
-	"github.com/Azure/azure-container-networking/npm/debugTools/dataplane"
+	dataplane "github.com/Azure/azure-container-networking/npm/pkg/dataplane/debug"
+	"github.com/Azure/azure-container-networking/npm/util/errors"
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	debugCmd.AddCommand(getTuplesCmd)
+	getTuplesCmd.Flags().StringP("src", "s", "", "set the source")
+	getTuplesCmd.Flags().StringP("dst", "d", "", "set the destination")
+	getTuplesCmd.Flags().StringP("iptables-file", "i", "", "Set the iptable-save file path (optional)")
+	getTuplesCmd.Flags().StringP("cache-file", "c", "", "Set the NPM cache file path (optional)")
+}
 
 // getTuplesCmd represents the getTuples command
 var getTuplesCmd = &cobra.Command{
@@ -14,14 +23,14 @@ var getTuplesCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		src, _ := cmd.Flags().GetString("src")
 		if src == "" {
-			return fmt.Errorf("%w", errSrcNotSpecified)
+			return fmt.Errorf("%w", errors.ErrSrcNotSpecified)
 		}
 		dst, _ := cmd.Flags().GetString("dst")
 		if dst == "" {
-			return fmt.Errorf("%w", errDstNotSpecified)
+			return fmt.Errorf("%w", errors.ErrDstNotSpecified)
 		}
-		npmCacheF, _ := cmd.Flags().GetString("npmF")
-		iptableSaveF, _ := cmd.Flags().GetString("iptF")
+		npmCacheF, _ := cmd.Flags().GetString("cache-file")
+		iptableSaveF, _ := cmd.Flags().GetString("iptables-file")
 		srcType := dataplane.GetInputType(src)
 		dstType := dataplane.GetInputType(dst)
 		srcInput := &dataplane.Input{Content: src, Type: srcType}
@@ -46,12 +55,4 @@ var getTuplesCmd = &cobra.Command{
 
 		return nil
 	},
-}
-
-func init() {
-	debugCmd.AddCommand(getTuplesCmd)
-	getTuplesCmd.Flags().StringP("src", "s", "", "set the source")
-	getTuplesCmd.Flags().StringP("dst", "d", "", "set the destination")
-	getTuplesCmd.Flags().StringP("iptF", "i", "", "Set the iptable-save file path (optional)")
-	getTuplesCmd.Flags().StringP("npmF", "n", "", "Set the NPM cache file path (optional)")
 }
