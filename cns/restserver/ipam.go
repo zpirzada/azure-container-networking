@@ -182,97 +182,49 @@ func (service *HTTPRestService) GetPodIPConfigState() map[string]cns.IPConfigura
 	return podIPConfigState
 }
 
-func (service *HTTPRestService) getPodIPIDByOrchestratorContexthandler(w http.ResponseWriter, r *http.Request) {
-	var (
-		resp          cns.GetPodContextResponse
-		statusCode    types.ResponseCode
-		returnMessage string
-		err           error
-	)
-
-	statusCode = types.UnexpectedError
-
-	defer func() {
-		if err != nil {
-			resp.Response.ReturnCode = statusCode
-			resp.Response.Message = returnMessage
-		}
-
-		err = service.Listener.Encode(w, &resp)
-		logger.Response(service.Name, resp, resp.Response.ReturnCode, err)
-	}()
-
-	resp.PodContext = service.GetPodIPIDByOrchestratorContext()
-}
-
-func (service *HTTPRestService) GetPodIPIDByOrchestratorContext() map[string]string {
+func (service *HTTPRestService) handleDebugPodContext(w http.ResponseWriter, r *http.Request) {
 	service.RLock()
 	defer service.RUnlock()
-	return service.PodIPIDByPodInterfaceKey
-}
-
-func (service *HTTPRestService) GetHTTPRestDataHandler(w http.ResponseWriter, r *http.Request) {
-	var (
-		resp          GetHTTPServiceDataResponse
-		returnMessage string
-		err           error
-	)
-
-	defer func() {
-		if err != nil {
-			resp.Response.ReturnCode = types.UnexpectedError
-			resp.Response.Message = returnMessage
-		}
-
-		err = service.Listener.Encode(w, &resp)
-		logger.Response(service.Name, resp, resp.Response.ReturnCode, err)
-	}()
-
-	resp.HTTPRestServiceData = service.GetHTTPStruct()
-}
-
-func (service *HTTPRestService) GetHTTPStruct() HTTPRestServiceData {
-	service.RLock()
-	defer service.RUnlock()
-
-	return HTTPRestServiceData{
-		PodIPIDByPodInterfaceKey: service.PodIPIDByPodInterfaceKey,
-		PodIPConfigState:         service.PodIPConfigState,
-		IPAMPoolMonitor:          service.IPAMPoolMonitor.GetStateSnapshot(),
+	resp := cns.GetPodContextResponse{
+		PodContext: service.PodIPIDByPodInterfaceKey,
 	}
+	err := service.Listener.Encode(w, &resp)
+	logger.Response(service.Name, resp, resp.Response.ReturnCode, err)
 }
 
-func (service *HTTPRestService) getIPAddressesHandler(w http.ResponseWriter, r *http.Request) {
-	var (
-		req           cns.GetIPAddressesRequest
-		resp          cns.GetIPAddressStatusResponse
-		statusCode    types.ResponseCode
-		returnMessage string
-		err           error
-	)
+func (service *HTTPRestService) handleDebugRestData(w http.ResponseWriter, r *http.Request) {
+	service.RLock()
+	defer service.RUnlock()
+	resp := GetHTTPServiceDataResponse{
+		HTTPRestServiceData: HTTPRestServiceData{
+			PodIPIDByPodInterfaceKey: service.PodIPIDByPodInterfaceKey,
+			PodIPConfigState:         service.PodIPConfigState,
+			IPAMPoolMonitor:          service.IPAMPoolMonitor.GetStateSnapshot(),
+		},
+	}
+	err := service.Listener.Encode(w, &resp)
+	logger.Response(service.Name, resp, resp.Response.ReturnCode, err)
+}
 
-	statusCode = types.UnexpectedError
-
-	defer func() {
-		if err != nil {
-			resp.Response.ReturnCode = statusCode
-			resp.Response.Message = returnMessage
+func (service *HTTPRestService) handleDebugIPAddresses(w http.ResponseWriter, r *http.Request) {
+	var req cns.GetIPAddressesRequest
+	if err := service.Listener.Decode(w, r, &req); err != nil {
+		resp := cns.GetIPAddressStatusResponse{
+			Response: cns.Response{
+				ReturnCode: types.UnexpectedError,
+				Message:    err.Error(),
+			},
 		}
-
 		err = service.Listener.Encode(w, &resp)
 		logger.ResponseEx(service.Name, req, resp, resp.Response.ReturnCode, err)
-	}()
-
-	err = service.Listener.Decode(w, r, &req)
-	if err != nil {
-		returnMessage = err.Error()
-		logger.Errorf("getIPAddressesHandler decode failed because %v, GetIPAddressesRequest is %v",
-			returnMessage, req)
 		return
 	}
-
-	// Get all IPConfigs matching a state, and append to a slice of IPAddressState
-	resp.IPConfigurationStatus = filter.MatchAnyIPConfigState(service.PodIPConfigState, filter.PredicatesForStates(req.IPConfigStateFilter...)...)
+	// Get all IPConfigs matching a state and return in the response
+	resp := cns.GetIPAddressStatusResponse{
+		IPConfigurationStatus: filter.MatchAnyIPConfigState(service.PodIPConfigState, filter.PredicatesForStates(req.IPConfigStateFilter...)...),
+	}
+	err := service.Listener.Encode(w, &resp)
+	logger.ResponseEx(service.Name, req, resp, resp.Response.ReturnCode, err)
 }
 
 // GetAllocatedIPConfigs returns a filtered list of IPs which are in
