@@ -1,3 +1,5 @@
+SHELL=/bin/bash
+
 # Source files common to all targets.
 COREFILES = \
 	$(wildcard common/*.go) \
@@ -74,6 +76,8 @@ NPMFILES = \
 # Build defaults.
 GOOS ?= linux
 GOARCH ?= amd64
+GOOSES ?= "linux windows" # To override at the cli do: GOOSES="\"darwin bsd\""
+GOARCHES ?= "amd64 arm64" # To override at the cli do: GOARCHES="\"ppc64 mips\""
 
 # Build directories.
 ROOT_DIR = $(shell pwd)
@@ -166,6 +170,14 @@ VERSION ?= $(shell git describe --tags --always --dirty)
 CNS_AI_ID = ce672799-8f08-4235-8c12-08563dc2acef
 cnsaipath=github.com/Azure/azure-container-networking/cns/logger.aiMetadata
 ENSURE_OUTPUT_DIR_EXISTS := $(shell mkdir -p $(OUTPUT_DIR))
+
+.PHONY: all-binaries-platforms
+all-binaries-platforms: ## Make all platform binaries
+	@for goos in "$(GOOSES)"; do \
+		for goarch in "$(GOARCHES)"; do \
+			make all-binaries GOOS=$$goos GOARCH=$$goarch; \
+		done \
+	done
 
 # Shorthand target names for convenience.
 azure-cnm-plugin: $(CNM_BUILD_DIR)/azure-vnet-plugin$(EXE_EXT) cnm-archive
@@ -268,12 +280,6 @@ all-containerized:
 	docker cp $(BUILD_CONTAINER_NAME):$(BUILD_CONTAINER_REPO_PATH)/$(BUILD_DIR) $(OUTPUT_DIR)
 	docker rm $(BUILD_CONTAINER_NAME)
 	docker rmi $(BUILD_CONTAINER_IMAGE):$(VERSION)
-
-# Make both linux and windows binaries
-.PHONY: all-binaries-platforms
-all-binaries-platforms:
-	export GOOS=linux; make all-binaries
-	export GOOS=windows; make all-binaries
 
 
 .PHONY: tools
