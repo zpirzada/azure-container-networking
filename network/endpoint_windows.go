@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
-
+	"github.com/Azure/azure-container-networking/network/hnswrapper"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network/netlinkinterface"
 	"github.com/Azure/azure-container-networking/network/policy"
@@ -17,6 +17,11 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 )
+
+
+// this hnsv2 variable is package level variable in network
+// we do this to avoid passing around os specific objects in platform agnostic code
+var hnsv2 hnswrapper.HnsV2WrapperInterface = hnswrapper.Hnsv2wrapper{}
 
 const (
 	// hcnSchemaVersionMajor indicates major version number for hcn schema
@@ -330,7 +335,7 @@ func (nw *network) newEndpointImplHnsV2(cli apipaClient, epInfo *EndpointInfo) (
 
 	// Create the HCN endpoint.
 	log.Printf("[net] Creating hcn endpoint: %+v", hcnEndpoint)
-	hnsResponse, err := hcnEndpoint.Create()
+	hnsResponse, err := hnsv2.CreateEndpoint(hcnEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create endpoint: %s due to error: %v", hcnEndpoint.Name, err)
 	}
@@ -340,24 +345,24 @@ func (nw *network) newEndpointImplHnsV2(cli apipaClient, epInfo *EndpointInfo) (
 	defer func() {
 		if err != nil {
 			log.Printf("[net] Deleting hcn endpoint with id: %s", hnsResponse.Id)
-			err = hnsResponse.Delete()
+			err = hnsv2.DeleteEndpoint(hnsResponse)
 			log.Printf("[net] Completed hcn endpoint deletion for id: %s with error: %v", hnsResponse.Id, err)
 		}
 	}()
 
 	var namespace *hcn.HostComputeNamespace
-	if namespace, err = hcn.GetNamespaceByID(epInfo.NetNsPath); err != nil {
+	if namespace, err = hnsv2.GetNamespaceByID(epInfo.NetNsPath); err != nil {
 		return nil, fmt.Errorf("Failed to get hcn namespace: %s due to error: %v", epInfo.NetNsPath, err)
 	}
 
-	if err = hcn.AddNamespaceEndpoint(namespace.Id, hnsResponse.Id); err != nil {
+	if err = hnsv2.AddNamespaceEndpoint(namespace.Id, hnsResponse.Id); err != nil {
 		return nil, fmt.Errorf("[net] Failed to add endpoint: %s to hcn namespace: %s due to error: %v",
 			hnsResponse.Id, namespace.Id, err)
 	}
 
 	defer func() {
 		if err != nil {
-			if errRemoveNsEp := hcn.RemoveNamespaceEndpoint(namespace.Id, hnsResponse.Id); errRemoveNsEp != nil {
+			if errRemoveNsEp := hnsv2.RemoveNamespaceEndpoint(namespace.Id, hnsResponse.Id); errRemoveNsEp != nil {
 				log.Printf("[net] Failed to remove endpoint: %s from namespace: %s due to error: %v",
 					hnsResponse.Id, hnsResponse.Id, errRemoveNsEp)
 			}
@@ -457,17 +462,17 @@ func (nw *network) deleteEndpointImplHnsV2(cli apipaClient, ep *endpoint) error 
 
 	log.Printf("[net] Deleting hcn endpoint with id: %s", ep.HnsId)
 
-	if hcnEndpoint, err = hcn.GetEndpointByID(ep.HnsId); err != nil {
+	if hcnEndpoint, err = hnsv2.GetEndpointByID(ep.HnsId); err != nil {
 		return fmt.Errorf("Failed to get hcn endpoint with id: %s due to err: %v", ep.HnsId, err)
 	}
 
 	// Remove this endpoint from the namespace
-	if err = hcn.RemoveNamespaceEndpoint(hcnEndpoint.HostComputeNamespace, hcnEndpoint.Id); err != nil {
+	if err = hnsv2.RemoveNamespaceEndpoint(hcnEndpoint.HostComputeNamespace, hcnEndpoint.Id); err != nil {
 		return fmt.Errorf("Failed to remove hcn endpoint: %s from namespace: %s due to error: %v", ep.HnsId,
 			hcnEndpoint.HostComputeNamespace, err)
 	}
 
-	if err = hcnEndpoint.Delete(); err != nil {
+	if err = hnsv2.DeleteEndpoint(hcnEndpoint); err != nil {
 		return fmt.Errorf("Failed to delete hcn endpoint: %s due to error: %v", ep.HnsId, err)
 	}
 
