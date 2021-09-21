@@ -15,7 +15,6 @@ import (
 
 	"github.com/Azure/azure-container-networking/cni"
 	"github.com/Azure/azure-container-networking/cns"
-	cnscli "github.com/Azure/azure-container-networking/cns/client"
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/network"
@@ -46,11 +45,34 @@ type MultitenancyClient interface {
 		podName string,
 		podNamespace string,
 		ifName string) (*cniTypesCurr.Result, *cns.GetNetworkContainerResponse, net.IPNet, error)
+
+	Init(cnsclient cnsclient, netioshim netioshim)
 }
 
-type Multitenancy struct{}
+type Multitenancy struct {
+	// cnsclient is used to communicate with CNS
+	cnsclient cnsclient
+
+	// netioshim is used to interact with networking syscalls
+	netioshim netioshim
+}
+
+type netioshim interface {
+	GetInterfaceSubnetWithSpecificIP(ipAddr string) *net.IPNet
+}
+
+type AzureNetIOShim struct{}
+
+func (a AzureNetIOShim) GetInterfaceSubnetWithSpecificIP(ipAddr string) *net.IPNet {
+	return common.GetInterfaceSubnetWithSpecificIP(ipAddr)
+}
 
 var errNmaResponse = errors.New("nmagent request status code")
+
+func (m *Multitenancy) Init(cnsclient cnsclient, netioshim netioshim) {
+	m.cnsclient = cnsclient
+	m.netioshim = netioshim
+}
 
 // DetermineSnatFeatureOnHost - Temporary function to determine whether we need to disable SNAT due to NMAgent support
 func (m *Multitenancy) DetermineSnatFeatureOnHost(snatFile, nmAgentSupportedApisURL string) (snatForDNS, snatOnHost bool, err error) {
@@ -171,28 +193,24 @@ func (m *Multitenancy) GetContainerNetworkConfiguration(
 	}
 
 	log.Printf("Podname without suffix %v", podNameWithoutSuffix)
-	return getContainerNetworkConfigurationInternal(ctx, nwCfg.CNSUrl, podNamespace, podNameWithoutSuffix, ifName)
+	return m.getContainerNetworkConfigurationInternal(ctx, nwCfg.CNSUrl, podNamespace, podNameWithoutSuffix, ifName)
 }
 
-func getContainerNetworkConfigurationInternal(
+func (m *Multitenancy) getContainerNetworkConfigurationInternal(
 	ctx context.Context, cnsURL string, namespace string, podName string, ifName string) (*cniTypesCurr.Result, *cns.GetNetworkContainerResponse, net.IPNet, error) {
-	client, err := cnscli.New(cnsURL, cnscli.DefaultTimeout)
-	if err != nil {
-		log.Printf("Failed to get CNS client. Error: %v", err)
-		return nil, nil, net.IPNet{}, err
-	}
 
 	podInfo := cns.KubernetesPodInfo{
 		PodName:      podName,
 		PodNamespace: namespace,
 	}
+
 	orchestratorContext, err := json.Marshal(podInfo)
 	if err != nil {
 		log.Printf("Marshalling KubernetesPodInfo failed with %v", err)
 		return nil, nil, net.IPNet{}, err
 	}
 
-	networkConfig, err := client.GetNetworkConfiguration(ctx, orchestratorContext)
+	networkConfig, err := m.cnsclient.GetNetworkConfiguration(ctx, orchestratorContext)
 	if err != nil {
 		log.Printf("GetNetworkConfiguration failed with %v", err)
 		return nil, nil, net.IPNet{}, err
@@ -200,7 +218,7 @@ func getContainerNetworkConfigurationInternal(
 
 	log.Printf("Network config received from cns %+v", networkConfig)
 
-	subnetPrefix := common.GetInterfaceSubnetWithSpecificIp(networkConfig.PrimaryInterfaceIdentifier)
+	subnetPrefix := m.netioshim.GetInterfaceSubnetWithSpecificIP(networkConfig.PrimaryInterfaceIdentifier)
 	if subnetPrefix == nil {
 		errBuf := fmt.Sprintf("Interface not found for this ip %v", networkConfig.PrimaryInterfaceIdentifier)
 		log.Printf(errBuf)
@@ -265,7 +283,9 @@ func getInfraVnetIP(
 		nwCfg.Ipam.Subnet = ipNet.String()
 
 		log.Printf("call ipam to allocate ip from subnet %v", nwCfg.Ipam.Subnet)
-		azIpamResult, err := plugin.DelegateAdd(nwCfg.Ipam.Type, nwCfg)
+		subnetPrefix := &net.IPNet{}
+		options := make(map[string]interface{})
+		azIpamResult, _, err := plugin.ipamInvoker.Add(nwCfg, nil, subnetPrefix, options)
 		if err != nil {
 			err = plugin.Errorf("Failed to allocate address: %v", err)
 			return nil, err
@@ -289,7 +309,9 @@ func cleanupInfraVnetIP(
 		_, ipNet, _ := net.ParseCIDR(infraIPNet.String())
 		nwCfg.Ipam.Subnet = ipNet.String()
 		nwCfg.Ipam.Address = infraIPNet.IP.String()
-		plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg)
+		if err := plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg); err != nil {
+			log.Errorf("failed to cleanup infravnet ip with err %w", err)
+		}
 	}
 }
 

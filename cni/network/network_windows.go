@@ -197,10 +197,10 @@ func (plugin *NetPlugin) getNetworkName(podName, podNs, ifName string, nwCfg *cn
 }
 
 func setupInfraVnetRoutingForMultitenancy(
-	nwCfg *cni.NetworkConfig,
-	azIpamResult *cniTypesCurr.Result,
-	epInfo *network.EndpointInfo,
-	result *cniTypesCurr.Result) {
+	_ *cni.NetworkConfig,
+	_ *cniTypesCurr.Result,
+	_ *network.EndpointInfo,
+	_ *cniTypesCurr.Result) {
 }
 
 func getNetworkDNSSettings(nwCfg *cni.NetworkConfig, _ *cniTypesCurr.Result) (network.DNSInfo, error) {
