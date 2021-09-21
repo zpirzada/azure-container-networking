@@ -32,7 +32,7 @@ func ResetNumIPSets() {
 // TODO might be more efficient to keep track of the count
 func NumIPSetsIsPositive() bool {
 	val, err := GetNumIPSets()
-	return val > 0 && err != nil
+	return val > 0 && err == nil
 }
 
 // RecordIPSetExecTime adds an observation of execution time for adding an IPSet.
@@ -42,6 +42,7 @@ func RecordIPSetExecTime(timer *Timer) {
 }
 
 // AddEntryToIPSet increments the number of entries for IPSet setName.
+// It doesn't ever update the number of IPSets.
 func AddEntryToIPSet(setName string) {
 	numIPSetEntries.Inc()
 	ipsetInventoryMap[setName]++ // adds the setName with value 1 if it doesn't exist
@@ -63,6 +64,7 @@ func RemoveEntryFromIPSet(setName string) {
 }
 
 // RemoveAllEntriesFromIPSet sets the number of entries for ipset setName to 0.
+// It doesn't ever update the number of IPSets.
 func RemoveAllEntriesFromIPSet(setName string) {
 	numIPSetEntries.Add(-getEntryCountForIPSet(setName))
 	delete(ipsetInventoryMap, setName)
@@ -76,6 +78,7 @@ func DeleteIPSet(setName string) {
 }
 
 // ResetIPSetEntries sets the number of entries to 0 for all IPSets.
+// It doesn't ever update the number of IPSets.
 func ResetIPSetEntries() {
 	numIPSetEntries.Set(0)
 	ipsetInventoryMap = make(map[string]int)
@@ -95,6 +98,8 @@ func GetNumIPSetEntries() (int, error) {
 
 // GetNumEntriesForIPSet returns the number entries for IPSet setName.
 // This function is slow.
+// TODO could use the map if this function needs to be faster.
+// If updated, replace GetNumEntriesForIPSet() with getVecValue() in assertEqualMapAndMetricElements() in ipsets_test.go
 func GetNumEntriesForIPSet(setName string) (int, error) {
 	labels := getIPSetInventoryLabels(setName)
 	return getVecValue(ipsetInventory, labels)

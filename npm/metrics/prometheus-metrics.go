@@ -1,13 +1,11 @@
 package metrics
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	dto "github.com/prometheus/client_model/go"
 )
 
 const namespace = "npm"
@@ -136,41 +134,4 @@ func createSummary(name string, helpMessage string, isNodeLevel bool) prometheus
 	)
 	register(summary, name, isNodeLevel)
 	return summary
-}
-
-// getValue returns a Gauge metric's value.
-// This function is slow.
-func getValue(gaugeMetric prometheus.Gauge) (int, error) {
-	dtoMetric, err := getDTOMetric(gaugeMetric)
-	if err != nil {
-		return 0, err
-	}
-	return int(dtoMetric.Gauge.GetValue()), nil
-}
-
-// getVecValue Gauge Vec metric's value, or 0 if the label doesn't exist for the metric.
-// This function is slow.
-func getVecValue(gaugeVecMetric *prometheus.GaugeVec, labels prometheus.Labels) (int, error) {
-	return getValue(gaugeVecMetric.With(labels))
-}
-
-// getCountValue the number of times a Summary metric has recorded an observation.
-// This function is slow.
-func getCountValue(summaryMetric prometheus.Summary) (int, error) {
-	dtoMetric, err := getDTOMetric(summaryMetric)
-	if err != nil {
-		return 0, err
-	}
-	return int(dtoMetric.Summary.GetSampleCount()), nil
-}
-
-func getDTOMetric(collector prometheus.Collector) (*dto.Metric, error) {
-	channel := make(chan prometheus.Metric, 1)
-	collector.Collect(channel)
-	metric := &dto.Metric{}
-	err := (<-channel).Write(metric)
-	if err != nil {
-		err = fmt.Errorf("error while extracting Prometheus metric value: %w", err)
-	}
-	return metric, err
 }

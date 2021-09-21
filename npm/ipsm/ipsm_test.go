@@ -13,7 +13,6 @@ import (
 	testutils "github.com/Azure/azure-container-networking/test/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/utils/exec"
 )
 
 const (
@@ -507,7 +506,38 @@ func TestDestroyNpmIpsets(t *testing.T) {
 	testSet1Name := util.AzureNpmPrefix + "123456"
 	testSet2Name := util.AzureNpmPrefix + "56543"
 
-	ipsMgr := NewIpsetManager(exec.New())
+	ipsetListFormat := `Name: %s
+	Type: hash:net
+	Revision: 6
+	Header: family inet hashsize 1024 maxelem 65536
+	Size in memory: 448
+	References: 0
+	Number of entries: 0
+	Members:
+	
+	Name: %s
+	Type: hash:net
+	Revision: 6
+	Header: family inet hashsize 1024 maxelem 65536
+	Size in memory: 448
+	References: 0
+	Number of entries: 0
+	Members:`
+	ipsetListStdout := fmt.Sprintf(ipsetListFormat, testSet1Name, testSet2Name)
+
+	calls := []testutils.TestCmd{
+		{Cmd: []string{"ipset", "-N", "-exist", util.GetHashedName(testSet1Name), "nethash"}},
+		{Cmd: []string{"ipset", "-N", "-exist", util.GetHashedName(testSet2Name), "nethash"}},
+		{Cmd: []string{"ipset", "list"}, Stdout: ipsetListStdout},
+		{Cmd: []string{"ipset", "-F", "-exist", testSet1Name}},
+		{Cmd: []string{"ipset", "-X", "-exist", testSet1Name}},
+		{Cmd: []string{"ipset", "-F", "-exist", testSet2Name}},
+		{Cmd: []string{"ipset", "-X", "-exist", testSet2Name}},
+	}
+
+	fexec := testutils.GetFakeExecWithScripts(calls)
+	ipsMgr := NewIpsetManager(fexec)
+	defer testutils.VerifyCalls(t, fexec, calls)
 
 	execCount := resetPrometheusAndGetExecCount(t)
 	expectedSets := []expectedSetInfo{{0, testSet1Name}, {0, testSet1Name}}
