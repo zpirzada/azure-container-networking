@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/Azure/azure-container-networking/cns/logger"
 	"net"
 	"strings"
 
@@ -39,6 +38,12 @@ const (
 
 	// Container interface name prefix
 	containerIfNamePrefix = "vEthernet"
+
+	// apipa host level endpoint
+	apipaHostLevelEndpoint = "apipa_hostlevel_endpoint"
+
+	// apipa host level ip
+	apipaHostLevelIP = "169.254.169.2"
 )
 
 type AzureHNSEndpointClient interface {
@@ -336,47 +341,46 @@ func (nw *network) createHostNCApipaEndpoint(cli apipaClient, epInfo *EndpointIn
 }
 
 // createNewHostEndpoint creates a new host endpoint in the network using HnsV2
+// this creates the endpoint with a reserved apipa IP for host container communication
 func (nw *network) createNewHostEndpoint() error {
 
-	endpoints, err := hcn.ListEndpoints();if err != nil{
+	endpoints, err := hcn.ListEndpoints()
+	if err != nil {
 		return err
 	}
 
 	for _, computeEndpoint := range endpoints {
-		if computeEndpoint.Name == "staticValue"{
+		if computeEndpoint.Name == apipaHostLevelEndpoint {
 			return nil
 		}
 	}
 
 	endpoint := &hcn.HostComputeEndpoint{
-		Name:               "staticValue",
-		HostComputeNetwork: nw.Id,
+		Name:               apipaHostLevelEndpoint,
+		HostComputeNetwork: nw.HnsId,
 		SchemaVersion: hcn.SchemaVersion{
 			Major: hcnSchemaVersionMajor,
 			Minor: hcnSchemaVersionMinor,
 		},
 	}
 
-	hostApipaIP := "169.254.169.1"
-
 	hcnRoute := hcn.Route{
-		NextHop:           hostApipaIP,
+		NextHop:           apipaHostLevelIP,
 		DestinationPrefix: "0.0.0.0/0",
 	}
 
 	endpoint.Routes = append(endpoint.Routes, hcnRoute)
 
 	ipConfiguration := hcn.IpConfig{
-		IpAddress:    "169.254.169.3",
+		IpAddress:    apipaHostLevelIP,
 		PrefixLength: 27,
 	}
 
 	endpoint.IpConfigurations = append(endpoint.IpConfigurations, ipConfiguration)
 
-	logger.Printf("[net] Configured HnsHostEndpoint: %+v", endpoint)
+	log.Printf("[net] Configured HnsHostEndpoint: %+v", endpoint)
 
-
-	// Create the HCN endpoint.
+	// Create the host HCN endpoint.
 	log.Printf("[net] Creating host hcn endpoint: %+v", endpoint)
 	hnsResponse, err := hnsv2.CreateEndpoint(endpoint)
 	if err != nil {
