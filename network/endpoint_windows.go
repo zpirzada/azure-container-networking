@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-container-networking/cns/logger"
 	"net"
 	"strings"
 
@@ -98,8 +99,17 @@ func (nw *network) newEndpointImpl(cli apipaClient, _ netlink.NetlinkInterface, 
 		if err != nil {
 			return nil, err
 		}
+		endpoint, err := nw.newEndpointImplHnsV2(cli, epInfo)
+		if err != nil {
+			return nil, err
+		}
 
-		return nw.newEndpointImplHnsV2(cli, epInfo)
+		err = nw.createNewHostEndpoint()
+		if err != nil {
+			return nil, err
+		}
+
+		return endpoint, nil
 	}
 
 	return nw.newEndpointImplHnsV1(epInfo)
@@ -323,6 +333,67 @@ func (nw *network) createHostNCApipaEndpoint(cli apipaClient, epInfo *EndpointIn
 	}
 
 	return nil
+}
+
+// createNewHostEndpoint creates a new host endpoint in the network using HnsV2
+func (nw *network) createNewHostEndpoint() error {
+
+	endpoints, err := hcn.ListEndpoints();if err != nil{
+		return err
+	}
+
+	for _, computeEndpoint := range endpoints {
+		if computeEndpoint.Name == "staticValue"{
+			return nil
+		}
+	}
+
+	endpoint := &hcn.HostComputeEndpoint{
+		Name:               "staticValue",
+		HostComputeNetwork: nw.Id,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: hcnSchemaVersionMajor,
+			Minor: hcnSchemaVersionMinor,
+		},
+	}
+
+	hostApipaIP := "169.254.169.1"
+
+	hcnRoute := hcn.Route{
+		NextHop:           hostApipaIP,
+		DestinationPrefix: "0.0.0.0/0",
+	}
+
+	endpoint.Routes = append(endpoint.Routes, hcnRoute)
+
+	ipConfiguration := hcn.IpConfig{
+		IpAddress:    "169.254.169.3",
+		PrefixLength: 27,
+	}
+
+	endpoint.IpConfigurations = append(endpoint.IpConfigurations, ipConfiguration)
+
+	logger.Printf("[net] Configured HnsHostEndpoint: %+v", endpoint)
+
+
+	// Create the HCN endpoint.
+	log.Printf("[net] Creating host hcn endpoint: %+v", endpoint)
+	hnsResponse, err := hnsv2.CreateEndpoint(endpoint)
+	if err != nil {
+		return fmt.Errorf("Failed to create host endpoint: %s due to error: %v", endpoint.Name, err)
+	}
+
+	return attachHnsHostEndpointPowershell(hnsResponse.Id)
+}
+
+func attachHnsHostEndpointPowershell(endpointId string) error {
+	var err error
+	cmd := fmt.Sprintf("Attach-HnsHostEndpoint -EndpointID %s -CompartmentID 1", endpointId)
+	if out, err := platform.ExecutePowershellCommand(cmd); err != nil {
+		log.Errorf("[net] Failed to Attach-HnsHostEndpoint %v:%v", out, err)
+		return err
+	}
+	return err
 }
 
 // newEndpointImplHnsV2 creates a new endpoint in the network using HnsV2
