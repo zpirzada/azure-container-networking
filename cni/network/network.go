@@ -696,24 +696,25 @@ func (plugin *NetPlugin) createEndpointInternal(
 	}
 
 	epInfo = network.EndpointInfo{
-		Id:                 endpointID,
-		ContainerID:        args.ContainerID,
-		NetNsPath:          args.Netns,
-		IfName:             args.IfName,
-		Data:               make(map[string]interface{}),
-		DNS:                epDNSInfo,
-		Policies:           policies,
-		IPsToRouteViaHost:  nwCfg.IPsToRouteViaHost,
-		EnableSnatOnHost:   nwCfg.EnableSnatOnHost,
-		EnableMultiTenancy: nwCfg.MultiTenancy,
-		EnableInfraVnet:    enableInfraVnet,
-		EnableSnatForDns:   enableSnatForDNS,
-		PODName:            k8sPodName,
-		PODNameSpace:       k8sNamespace,
-		SkipHotAttachEp:    false, // Hot attach at the time of endpoint creation
-		IPV6Mode:           nwCfg.IPV6Mode,
-		VnetCidrs:          nwCfg.VnetCidrs,
-		ServiceCidrs:       nwCfg.ServiceCidrs,
+		Id:                    endpointID,
+		ContainerID:           args.ContainerID,
+		NetNsPath:             args.Netns,
+		IfName:                args.IfName,
+		Data:                  make(map[string]interface{}),
+		DNS:                   epDNSInfo,
+		Policies:              policies,
+		IPsToRouteViaHost:     nwCfg.IPsToRouteViaHost,
+		EnableSnatOnHost:      nwCfg.EnableSnatOnHost,
+		EnableMultiTenancy:    nwCfg.MultiTenancy,
+		EnableInfraVnet:       enableInfraVnet,
+		EnableSnatForDns:      enableSnatForDNS,
+		PODName:               k8sPodName,
+		PODNameSpace:          k8sNamespace,
+		SkipHotAttachEp:       false, // Hot attach at the time of endpoint creation
+		IPV6Mode:              nwCfg.IPV6Mode,
+		VnetCidrs:             nwCfg.VnetCidrs,
+		ServiceCidrs:          nwCfg.ServiceCidrs,
+		EnableHostHnsEndpoint: nwCfg.EnableHostHnsEndpoint,
 	}
 
 	epPolicies := getPoliciesFromRuntimeCfg(nwCfg)

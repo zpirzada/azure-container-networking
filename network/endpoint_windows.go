@@ -108,10 +108,11 @@ func (nw *network) newEndpointImpl(cli apipaClient, _ netlink.NetlinkInterface, 
 		if err != nil {
 			return nil, err
 		}
-
-		err = nw.createNewHostEndpoint()
-		if err != nil {
-			return nil, err
+		if epInfo.EnableHostHnsEndpoint {
+			err = nw.createNewHostEndpoint()
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return endpoint, nil
@@ -343,7 +344,6 @@ func (nw *network) createHostNCApipaEndpoint(cli apipaClient, epInfo *EndpointIn
 // createNewHostEndpoint creates a new host endpoint in the network using HnsV2
 // this creates the endpoint with a reserved apipa IP for host container communication
 func (nw *network) createNewHostEndpoint() error {
-
 	endpoints, err := hcn.ListEndpoints()
 	if err != nil {
 		return err

@@ -79,6 +79,7 @@ type EndpointInfo struct {
 	IPV6Mode                 string
 	VnetCidrs                string
 	ServiceCidrs             string
+	EnableHostHnsEndpoint    bool
 }
 
 // RouteInfo contains information about an IP route.
