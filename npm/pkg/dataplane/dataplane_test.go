@@ -5,6 +5,9 @@ import (
 
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
+	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/mocks"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewDataPlane(t *testing.T) {
@@ -150,4 +153,14 @@ func TestAddToSet(t *testing.T) {
 			t.Errorf("GetIPSet() for %s returned nil", k)
 		}
 	}
+}
+
+// gomock sample usage for generated mock dataplane
+func TestAddToList(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	m := mocks.NewMockGenericDataplane(ctrl)
+	m.EXPECT().AddToList("test", []string{"test"}).Return(nil)
+	require.NoError(t, m.AddToList("test", []string{"test"}))
 }
