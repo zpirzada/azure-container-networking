@@ -1,18 +1,24 @@
 package policies
 
+import (
+	"github.com/Azure/azure-container-networking/common"
+)
+
 type PolicyMap struct {
 	cache map[string]*NPMNetworkPolicy
 }
 
 type PolicyManager struct {
 	policyMap *PolicyMap
+	ioShim    *common.IOShim
 }
 
-func NewPolicyManager() *PolicyManager {
+func NewPolicyManager(ioShim *common.IOShim) *PolicyManager {
 	return &PolicyManager{
 		policyMap: &PolicyMap{
 			cache: make(map[string]*NPMNetworkPolicy),
 		},
+		ioShim: ioShim,
 	}
 }
 

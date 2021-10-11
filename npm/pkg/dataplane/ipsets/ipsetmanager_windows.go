@@ -22,10 +22,7 @@ func (iMgr *IPSetManager) applyIPSets() error {
 		return err
 	}
 
-	setPolNames, err := getAllSetPolicyNames(network.Policies)
-	if err != nil {
-		return err
-	}
+	setPolNames := getAllSetPolicyNames(network.Policies)
 
 	setPolSettings, err := iMgr.calculateNewSetPolicies(setPolNames)
 	if err != nil {
@@ -58,7 +55,7 @@ func (iMgr *IPSetManager) applyIPSets() error {
 		)
 	}
 
-	err = network.AddPolicy(policyNetworkRequest)
+	err = iMgr.ioShim.Hns.AddNetworkPolicy(network, policyNetworkRequest)
 	if err != nil {
 		return err
 	}
@@ -108,7 +105,7 @@ func (iMgr *IPSetManager) getHCnNetwork() (*hcn.HostComputeNetwork, error) {
 	if iMgr.iMgrCfg.networkName == "" {
 		iMgr.iMgrCfg.networkName = "azure"
 	}
-	network, err := hcn.GetNetworkByName("azure")
+	network, err := iMgr.ioShim.Hns.GetNetworkByName("azure")
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +117,7 @@ func isValidIPSet(set *IPSet) error {
 		return fmt.Errorf("IPSet " + set.Name + " is missing Name")
 	}
 
-	if set.Type == Unknown {
+	if set.Type == UnknownType {
 		return fmt.Errorf("IPSet " + set.Type.String() + " is missing Type")
 	}
 
@@ -162,7 +159,7 @@ func convertToSetPolicy(set *IPSet) (*hcn.SetPolicySetting, error) {
 	return setPolicy, nil
 }
 
-func getAllSetPolicyNames(networkPolicies []hcn.NetworkPolicy) ([]string, error) {
+func getAllSetPolicyNames(networkPolicies []hcn.NetworkPolicy) []string {
 	setPols := []string{}
 	for _, netpol := range networkPolicies {
 		if netpol.Type == hcn.SetPolicy {
@@ -175,5 +172,5 @@ func getAllSetPolicyNames(networkPolicies []hcn.NetworkPolicy) ([]string, error)
 			setPols = append(setPols, set.Name)
 		}
 	}
-	return setPols, nil
+	return setPols
 }

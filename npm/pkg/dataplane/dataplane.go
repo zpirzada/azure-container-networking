@@ -3,8 +3,10 @@ package dataplane
 import (
 	"fmt"
 
+	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
+	"github.com/Azure/azure-container-networking/npm/util"
 	npmerrors "github.com/Azure/azure-container-networking/npm/util/errors"
 	"k8s.io/klog"
 )
@@ -21,6 +23,7 @@ type DataPlane struct {
 	nodeName  string
 	// key is PodKey
 	endpointCache map[string]*NPMEndpoint
+	ioShim        *common.IOShim
 }
 
 type NPMEndpoint struct {
@@ -44,17 +47,21 @@ type UpdateNPMPod struct {
 	IPSetsToRemove []string
 }
 
-func NewDataPlane(nodeName string) *DataPlane {
+func NewDataPlane(nodeName string, ioShim *common.IOShim) *DataPlane {
 	return &DataPlane{
-		policyMgr:     policies.NewPolicyManager(),
-		ipsetMgr:      ipsets.NewIPSetManager(AzureNetworkName),
+		policyMgr:     policies.NewPolicyManager(ioShim),
+		ipsetMgr:      ipsets.NewIPSetManager(AzureNetworkName, ioShim),
 		endpointCache: make(map[string]*NPMEndpoint),
 		nodeName:      nodeName,
+		ioShim:        ioShim,
 	}
 }
 
 // InitializeDataPlane helps in setting up dataplane for NPM
 func (dp *DataPlane) InitializeDataPlane() error {
+	// Create Kube-All-NS IPSet
+	kubeAllSet := ipsets.NewIPSetMetadata(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNameSpace)
+	dp.CreateIPSet(kubeAllSet)
 	return dp.initializeDataPlane()
 }
 
@@ -65,19 +72,19 @@ func (dp *DataPlane) ResetDataPlane() error {
 }
 
 // CreateIPSet takes in a set object and updates local cache with this set
-func (dp *DataPlane) CreateIPSet(setName string, setType ipsets.SetType) {
-	dp.ipsetMgr.CreateIPSet(setName, setType)
+func (dp *DataPlane) CreateIPSet(setMetadata *ipsets.IPSetMetadata) {
+	dp.ipsetMgr.CreateIPSet(setMetadata)
 }
 
 // DeleteSet checks for members and references of the given "set" type ipset
 // if not used then will delete it from cache
-func (dp *DataPlane) DeleteIPSet(name string) {
-	dp.ipsetMgr.DeleteIPSet(name)
+func (dp *DataPlane) DeleteIPSet(setMetadata *ipsets.IPSetMetadata) {
+	dp.ipsetMgr.DeleteIPSet(setMetadata.GetPrefixName())
 }
 
 // AddToSet takes in a list of IPSet names along with IP member
 // and then updates it local cache
-func (dp *DataPlane) AddToSet(setNames []string, ip, podKey string) error {
+func (dp *DataPlane) AddToSet(setNames []*ipsets.IPSetMetadata, ip, podKey string) error {
 	err := dp.ipsetMgr.AddToSet(setNames, ip, podKey)
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while adding to set: %w", err)
@@ -87,7 +94,7 @@ func (dp *DataPlane) AddToSet(setNames []string, ip, podKey string) error {
 
 // RemoveFromSet takes in list of setnames from which a given IP member should be
 // removed and will update the local cache
-func (dp *DataPlane) RemoveFromSet(setNames []string, ip, podKey string) error {
+func (dp *DataPlane) RemoveFromSet(setNames []*ipsets.IPSetMetadata, ip, podKey string) error {
 	err := dp.ipsetMgr.RemoveFromSet(setNames, ip, podKey)
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while removing from set: %w", err)
@@ -97,7 +104,7 @@ func (dp *DataPlane) RemoveFromSet(setNames []string, ip, podKey string) error {
 
 // AddToList takes a list name and list of sets which are to be added as members
 // to given list
-func (dp *DataPlane) AddToList(listName string, setNames []string) error {
+func (dp *DataPlane) AddToList(listName *ipsets.IPSetMetadata, setNames []*ipsets.IPSetMetadata) error {
 	err := dp.ipsetMgr.AddToList(listName, setNames)
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while adding to list: %w", err)
@@ -107,7 +114,7 @@ func (dp *DataPlane) AddToList(listName string, setNames []string) error {
 
 // RemoveFromList takes a list name and list of sets which are to be removed as members
 // to given list
-func (dp *DataPlane) RemoveFromList(listName string, setNames []string) error {
+func (dp *DataPlane) RemoveFromList(listName *ipsets.IPSetMetadata, setNames []*ipsets.IPSetMetadata) error {
 	err := dp.ipsetMgr.RemoveFromList(listName, setNames)
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while removing from list: %w", err)
@@ -147,14 +154,14 @@ func (dp *DataPlane) ApplyDataPlane() error {
 func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 	klog.Infof("[DataPlane] Add Policy called for %s", policy.Name)
 	// Create and add references for Selector IPSets first
-	err := dp.addIPSetReferences(policy.PodSelectorIPSets, policy.Name, ipsets.SelectorType)
+	err := dp.createIPSetsAndReferences(policy.PodSelectorIPSets, policy.Name, ipsets.SelectorType)
 	if err != nil {
 		klog.Infof("[DataPlane] error while adding Selector IPSet references: %s", err.Error())
 		return fmt.Errorf("[DataPlane] error while adding Selector IPSet references: %w", err)
 	}
 
 	// Create and add references for Rule IPSets
-	err = dp.addIPSetReferences(policy.RuleIPSets, policy.Name, ipsets.NetPolType)
+	err = dp.createIPSetsAndReferences(policy.RuleIPSets, policy.Name, ipsets.NetPolType)
 	if err != nil {
 		klog.Infof("[DataPlane] error while adding Rule IPSet references: %s", err.Error())
 		return fmt.Errorf("[DataPlane] error while adding Rule IPSet references: %w", err)
@@ -194,13 +201,13 @@ func (dp *DataPlane) RemovePolicy(policyName string) error {
 		return fmt.Errorf("[DataPlane] error while removing policy: %w", err)
 	}
 	// Remove references for Rule IPSets first
-	err = dp.deleteIPSetReferences(policy.RuleIPSets, policy.Name, ipsets.NetPolType)
+	err = dp.deleteIPSetsAndReferences(policy.RuleIPSets, policy.Name, ipsets.NetPolType)
 	if err != nil {
 		return err
 	}
 
 	// Remove references for Selector IPSets
-	err = dp.deleteIPSetReferences(policy.PodSelectorIPSets, policy.Name, ipsets.SelectorType)
+	err = dp.deleteIPSetsAndReferences(policy.PodSelectorIPSets, policy.Name, ipsets.SelectorType)
 	if err != nil {
 		return err
 	}
@@ -239,16 +246,16 @@ func (dp *DataPlane) UpdatePolicy(policy *policies.NPMNetworkPolicy) error {
 	return nil
 }
 
-func (dp *DataPlane) addIPSetReferences(sets map[string]*ipsets.IPSet, netpolName string, referenceType ipsets.ReferenceType) error {
+func (dp *DataPlane) createIPSetsAndReferences(sets map[string]*ipsets.TranslatedIPSet, netpolName string, referenceType ipsets.ReferenceType) error {
 	// Create IPSets first along with reference updates
+	npmErrorString := npmerrors.AddSelectorReference
+	if referenceType == ipsets.NetPolType {
+		npmErrorString = npmerrors.AddNetPolReference
+	}
 	for _, set := range sets {
-		dp.ipsetMgr.CreateIPSet(set.Name, set.Type)
-		err := dp.ipsetMgr.AddReference(set.Name, netpolName, referenceType)
+		dp.ipsetMgr.CreateIPSet(set.Metadata)
+		err := dp.ipsetMgr.AddReference(set.Metadata.GetPrefixName(), netpolName, referenceType)
 		if err != nil {
-			npmErrorString := npmerrors.AddSelectorReference
-			if referenceType == ipsets.NetPolType {
-				npmErrorString = npmerrors.AddNetPolReference
-			}
 			return npmerrors.Errorf(npmErrorString, false, fmt.Sprintf("[dataplane] failed to add reference with err: %s", err.Error()))
 		}
 	}
@@ -257,22 +264,26 @@ func (dp *DataPlane) addIPSetReferences(sets map[string]*ipsets.IPSet, netpolNam
 	// if so this below addition would throw an error because rule ipsets are not created
 	// Check if any list sets are provided with members to add
 	for _, set := range sets {
-		// Check if any 2nd level IPSets are generated by Controller with members
-		// Apply members to the list set
-		if set.Kind == ipsets.ListSet {
-			if len(set.MemberIPSets) > 0 {
-				memberList := []string{}
-				for _, memberSet := range set.MemberIPSets {
-					memberList = append(memberList, memberSet.Name)
-				}
-				err := dp.ipsetMgr.AddToList(set.Name, memberList)
+		// Check if any CIDR block IPSets needs to be applied
+		setType := set.Metadata.Type
+		if setType == ipsets.CIDRBlocks {
+			for ip, podKey := range set.IPPodKey {
+				err := dp.ipsetMgr.AddToSet([]*ipsets.IPSetMetadata{set.Metadata}, ip, podKey)
 				if err != nil {
-					npmErrorString := npmerrors.AddSelectorReference
-					if referenceType == ipsets.NetPolType {
-						npmErrorString = npmerrors.AddNetPolReference
-					}
+					return npmerrors.Errorf(npmErrorString, false, fmt.Sprintf("[dataplane] failed to AddToSet in addIPSetReferences with err: %s", err.Error()))
+				}
+			}
+		} else if ipsets.GetSetKind(setType) == ipsets.ListSet {
+			// Check if any 2nd level IPSets are generated by Controller with members
+			// Apply members to the list set
+			if len(set.MemberIPSets) > 0 {
+				memberList := []*ipsets.IPSetMetadata{}
+				for _, memberSet := range set.MemberIPSets {
+					memberList = append(memberList, memberSet.Metadata)
+				}
+				err := dp.ipsetMgr.AddToList(set.Metadata, memberList)
+				if err != nil {
 					return npmerrors.Errorf(npmErrorString, false, fmt.Sprintf("[dataplane] failed to AddToList in addIPSetReferences with err: %s", err.Error()))
-
 				}
 			}
 		}
@@ -281,16 +292,16 @@ func (dp *DataPlane) addIPSetReferences(sets map[string]*ipsets.IPSet, netpolNam
 	return nil
 }
 
-func (dp *DataPlane) deleteIPSetReferences(sets map[string]*ipsets.IPSet, netpolName string, referenceType ipsets.ReferenceType) error {
+func (dp *DataPlane) deleteIPSetsAndReferences(sets map[string]*ipsets.TranslatedIPSet, netpolName string, referenceType ipsets.ReferenceType) error {
+	npmErrorString := npmerrors.DeleteSelectorReference
+	if referenceType == ipsets.NetPolType {
+		npmErrorString = npmerrors.DeleteNetPolReference
+	}
 	for _, set := range sets {
 		// TODO ignore set does not exist error
 		// TODO add delete ipset after removing members
-		err := dp.ipsetMgr.DeleteReference(set.Name, netpolName, referenceType)
+		err := dp.ipsetMgr.DeleteReference(set.Metadata.GetPrefixName(), netpolName, referenceType)
 		if err != nil {
-			npmErrorString := npmerrors.DeleteSelectorReference
-			if referenceType == ipsets.NetPolType {
-				npmErrorString = npmerrors.DeleteNetPolReference
-			}
 			return npmerrors.Errorf(npmErrorString, false, fmt.Sprintf("[dataplane] failed to deleteIPSetReferences with err: %s", err.Error()))
 		}
 	}
@@ -301,26 +312,31 @@ func (dp *DataPlane) deleteIPSetReferences(sets map[string]*ipsets.IPSet, netpol
 	// and both have same members
 	// then we should not delete k1:v0:v1 members ( special case for nested ipsets )
 	for _, set := range sets {
-		// Delete if any 2nd level IPSets are generated by Controller with members
-		if set.Kind == ipsets.ListSet {
-			if len(set.MemberIPSets) > 0 {
-				memberList := []string{}
-				for _, memberSet := range set.MemberIPSets {
-					memberList = append(memberList, memberSet.Name)
-				}
-				err := dp.ipsetMgr.RemoveFromList(set.Name, memberList)
+		// Check if any CIDR block IPSets needs to be applied
+		setType := set.Metadata.Type
+		if setType == ipsets.CIDRBlocks {
+			for ip, podKey := range set.IPPodKey {
+				err := dp.ipsetMgr.RemoveFromSet([]*ipsets.IPSetMetadata{set.Metadata}, ip, podKey)
 				if err != nil {
-					npmErrorString := npmerrors.DeleteSelectorReference
-					if referenceType == ipsets.NetPolType {
-						npmErrorString = npmerrors.DeleteNetPolReference
-					}
+					return npmerrors.Errorf(npmErrorString, false, fmt.Sprintf("[dataplane] failed to RemoveFromSet in deleteIPSetReferences with err: %s", err.Error()))
+				}
+			}
+		} else if ipsets.GetSetKind(set.Metadata.Type) == ipsets.ListSet {
+			// Delete if any 2nd level IPSets are generated by Controller with members
+			if len(set.MemberIPSets) > 0 {
+				memberList := []*ipsets.IPSetMetadata{}
+				for _, memberSet := range set.MemberIPSets {
+					memberList = append(memberList, memberSet.Metadata)
+				}
+				err := dp.ipsetMgr.RemoveFromList(set.Metadata, memberList)
+				if err != nil {
 					return npmerrors.Errorf(npmErrorString, false, fmt.Sprintf("[dataplane] failed to RemoveFromList in deleteIPSetReferences with err: %s", err.Error()))
 				}
 			}
 		}
 
 		// Try to delete these IPSets
-		dp.ipsetMgr.DeleteIPSet(set.Name)
+		dp.ipsetMgr.DeleteIPSet(set.Metadata.GetPrefixName())
 	}
 	return nil
 }
