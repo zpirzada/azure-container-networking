@@ -41,6 +41,8 @@ func TestNewAndDeleteEndpointImplHnsV2(t *testing.T){
 		t.Fatal(err)
 	}
 
+	nw.createNewHostEndpoint()
+
 	err = nw.deleteEndpointImplHnsV2(nil, endpoint)
 
 	if err != nil {

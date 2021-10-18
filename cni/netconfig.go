@@ -65,6 +65,7 @@ type NetworkConfig struct {
 	DisableIPTableLock            bool     `json:"disableIPTableLock,omitempty"`
 	CNSUrl                        string   `json:"cnsurl,omitempty"`
 	ExecutionMode                 string   `json:"executionMode,omitempty"`
+	EnableHostHnsEndpoint		  bool     `json:"enableHostHnsEndpoint,omitempty"`
 	Ipam                          struct {
 		Type          string `json:"type"`
 		Environment   string `json:"environment,omitempty"`

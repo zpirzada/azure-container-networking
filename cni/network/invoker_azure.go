@@ -69,7 +69,7 @@ func (invoker *AzureIPAMInvoker) Add(nwCfg *cni.NetworkConfig, _ *cniSkel.CmdArg
 
 	if nwCfg.IPV6Mode != "" {
 		nwCfg6 := *nwCfg
-		nwCfg6.Ipam.Environment = common.OptEnvironmentIPv6NodeIpam
+		nwCfg6.Ipam.Environment = common.OptEnvironmentFileIpam
 		nwCfg6.Ipam.Type = ipamV6
 
 		if len(invoker.nwInfo.Subnets) > 1 {
