@@ -59,19 +59,19 @@ type route netlink.Route
 // NewNetworkImpl creates a new container network.
 func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInterface) (*network, error) {
 	// Connect the external interface.
-	var vlanid int
+	var (
+		vlanid int
+		ifName string
+	)
 	opt, _ := nwInfo.Options[genericData].(map[string]interface{})
 	log.Printf("opt %+v options %+v", opt, nwInfo.Options)
 
 	switch nwInfo.Mode {
 	case opModeTunnel:
-		err := nm.handleCommonOptions(extIf.Name, nwInfo)
-		if err != nil {
-			log.Printf("tunnel handleCommonOptions failed with error %s", err.Error())
-		}
 		fallthrough
 	case opModeBridge:
 		log.Printf("create bridge")
+		ifName = extIf.BridgeName
 		if err := nm.connectExternalInterface(extIf, nwInfo); err != nil {
 			return nil, err
 		}
@@ -79,12 +79,9 @@ func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInt
 		if opt != nil && opt[VlanIDKey] != nil {
 			vlanid, _ = strconv.Atoi(opt[VlanIDKey].(string))
 		}
-		err := nm.handleCommonOptions(extIf.BridgeName, nwInfo)
-		if err != nil {
-			log.Printf("bridge handleCommonOptions failed with error %s", err.Error())
-		}
 	case opModeTransparent:
 		log.Printf("Transparent mode")
+		ifName = extIf.Name
 		if nwInfo.IPV6Mode != "" {
 			nu := networkutils.NewNetworkUtils(nm.netlink, nm.plClient)
 			if err := nu.EnableIPV6Forwarding(); err != nil {
@@ -93,6 +90,12 @@ func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInt
 		}
 	default:
 		return nil, errNetworkModeInvalid
+	}
+
+	err := nm.handleCommonOptions(ifName, nwInfo)
+	if err != nil {
+		log.Printf("handleCommonOptions failed with error %s", err.Error())
+		return nil, err
 	}
 
 	// Create the network object.
@@ -109,10 +112,10 @@ func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInt
 	return nw, nil
 }
 
-func (nm *networkManager) handleCommonOptions(ifname string, nwInfo *NetworkInfo) error {
+func (nm *networkManager) handleCommonOptions(ifName string, nwInfo *NetworkInfo) error {
 	var err error
 	if routes, exists := nwInfo.Options[RoutesKey]; exists {
-		err = nm.addBridgeRoutes(ifname, routes.([]RouteInfo))
+		err = addRoutes(nm.netlink, nm.netio, ifName, routes.([]RouteInfo))
 		if err != nil {
 			return err
 		}
@@ -568,34 +571,6 @@ func (*networkManager) addToIptables(cmds []iptables.IPTableEntry) error {
 		}
 		log.Printf("Succesfully run iptables rule %v", cmd)
 	}
-	return nil
-}
-
-func (nm *networkManager) addBridgeRoutes(bridgeName string, routes []RouteInfo) error {
-	log.Printf("Adding routes...")
-	for _, route := range routes {
-		route.DevName = bridgeName
-		devIf, _ := net.InterfaceByName(route.DevName)
-		ifIndex := devIf.Index
-		gwfamily := netlink.GetIPAddressFamily(route.Gw)
-
-		nlRoute := &netlink.Route{
-			Family:    gwfamily,
-			Dst:       &route.Dst,
-			Gw:        route.Gw,
-			LinkIndex: ifIndex,
-		}
-
-		if err := nm.netlink.AddIPRoute(nlRoute); err != nil {
-			if !strings.Contains(strings.ToLower(err.Error()), "file exists") {
-				return fmt.Errorf("Failed to add %+v to host interface with error: %v", nlRoute, err)
-			}
-			log.Printf("[cni-net] route already exists: dst %+v, gw %+v, interfaceName %v", nlRoute.Dst, nlRoute.Gw, route.DevName)
-		}
-
-		log.Printf("[cni-net] Added route %+v", route)
-	}
-
 	return nil
 }
 
