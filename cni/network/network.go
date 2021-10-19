@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"strconv"
 	"time"
@@ -99,6 +100,26 @@ type snatConfiguration struct {
 	EnableSnatOnHost bool
 	EnableSnatForDns bool
 }
+
+const (
+	HoneyCombGoalStateFile = "D:\\Data\\AP_Containers\\NetworkGoalState\\NetworkGoalState.json"
+)
+
+
+// Honeycomb goal state.
+type HoneyCombGoalState struct {
+	ContainerGroupNetworkGoalStates []struct {
+		ContainerGroupName string `json:"ContainerGroupName"`
+		IPV6Prefix string `json:"IPV6Prefix"`
+		IPV6Gateway string `json:"IPV6Gateway"`
+		IPV4HLIPPrefix string `json:"IPV4HLIPPrefix"`
+		IPV6Address string `json:"IPV6Address"`
+		MAC string `json:"MAC"`
+		IPV4HLIPAddress string `json:"IPV4HLIPAddress"`
+	} `json:"ContainerGroupNetworkGoalStates"`
+}
+
+
 
 // NewPlugin creates a new NetPlugin object.
 func NewPlugin(name string,
@@ -504,7 +525,7 @@ func (plugin *NetPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	// Allocate from azure ipam
 	if !nwCfg.MultiTenancy {
-		result, resultV6, err = plugin.ipamInvoker.Add(nwCfg, args, &subnetPrefix, options)
+		result, resultV6, err = HoneyCombIpamAdd(nwCfg, args, &subnetPrefix, options, k8sPodName)
 		if err != nil {
 			return err
 		}
@@ -558,6 +579,57 @@ func (plugin *NetPlugin) cleanupAllocationOnError(
 			log.Errorf("Failed to cleanup ipv6 allocation on failure: %v", er)
 		}
 	}
+}
+
+func nextIP(ip net.IP) {
+	for j := len(ip) - 1; j >= 0; j-- {
+		ip[j]++
+		if ip[j] > 0 {
+			break
+		}
+	}
+}
+
+func HoneyCombIpamAdd(nwCfg *cni.NetworkConfig, _ *cniSkel.CmdArgs, subnetPrefix *net.IPNet, options map[string]interface{}, podName string) (*cniTypesCurr.Result, *cniTypesCurr.Result, error) {
+	plan, _ := ioutil.ReadFile(HoneyCombGoalStateFile)
+	var data HoneyCombGoalState
+	err := json.Unmarshal(plan, &data)
+	if err != nil {
+		log.Errorf("Failed to read HoneyComb goalState file: %v", err)
+		return nil, nil, err
+	}
+	for _, goalState := range data.ContainerGroupNetworkGoalStates {
+		if goalState.ContainerGroupName == podName {
+			//v6 result object creation.
+			resultv6 := cniTypesCurr.Result{CNIVersion: "0.2.0"}
+			_, netv6, _ := net.ParseCIDR(goalState.IPV6Prefix)
+			netv6.IP = net.ParseIP(goalState.IPV6Address)
+			ipConfigv6 := cniTypesCurr.IPConfig{Version: "6", Address: *netv6, Gateway: net.ParseIP(goalState.IPV6Gateway)}
+			log.Printf("[cni-net] ipConfigv6: %+v", ipConfigv6)
+			resultv6.IPs = append(resultv6.IPs, &ipConfigv6)
+			log.Printf("[cni-net] resultv6: %+v", resultv6)
+
+			//v4 result object creation
+			result := cniTypesCurr.Result{CNIVersion: "0.2.0"}
+			gatewayIP, netv4, _ := net.ParseCIDR(goalState.IPV4HLIPPrefix)
+			netv4.IP = net.ParseIP(goalState.IPV4HLIPAddress)
+			nextIP(gatewayIP)
+			log.Printf("[cni-net] Gateway IPv4: %v", gatewayIP)
+			ipConfigv4 := cniTypesCurr.IPConfig{Version: "4", Address: *netv4, Gateway: gatewayIP}
+			log.Printf("[cni-net] ipConfigv4: %+v", ipConfigv4)
+			result.IPs = append(result.IPs, &ipConfigv4)
+			_, routeNet, _ := net.ParseCIDR("0.0.0.0/32")
+			result.Routes = append(result.Routes, &cniTypes.Route{Dst: *routeNet, GW: net.ParseIP(goalState.IPV6Gateway)})			
+			log.Printf("[cni-net] result: %+v", result)
+
+			//setting subnetPrefix
+			sub := &result.IPs[0].Address
+			*subnetPrefix = *sub
+
+			return &result, &resultv6, err
+		}
+	}
+	return nil, nil, err
 }
 
 func (plugin *NetPlugin) createNetworkInternal(
@@ -677,17 +749,17 @@ func (plugin *NetPlugin) createEndpointInternal(
 		return epInfo, err
 	}
 
-	if nwCfg.IPV6Mode == network.IPV6Nat {
-		var ipv6Policy policy.Policy
+	// if nwCfg.IPV6Mode == network.IPV6Nat {
+	// 	var ipv6Policy policy.Policy
 
-		ipv6Policy, err = addIPV6EndpointPolicy(*nwInfo)
-		if err != nil {
-			err = plugin.Errorf("Failed to set ipv6 endpoint policy: %v", err)
-			return epInfo, err
-		}
+	// 	ipv6Policy, err = addIPV6EndpointPolicy(*nwInfo)
+	// 	if err != nil {
+	// 		err = plugin.Errorf("Failed to set ipv6 endpoint policy: %v", err)
+	// 		return epInfo, err
+	// 	}
 
-		policies = append(policies, ipv6Policy)
-	}
+	// 	policies = append(policies, ipv6Policy)
+	// }
 
 	vethName := fmt.Sprintf("%s.%s", k8sNamespace, k8sPodName)
 	if nwCfg.Mode != opModeTransparent {

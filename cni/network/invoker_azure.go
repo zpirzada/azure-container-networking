@@ -90,44 +90,44 @@ func (invoker *AzureIPAMInvoker) Add(nwCfg *cni.NetworkConfig, _ *cniSkel.CmdArg
 }
 
 func (invoker *AzureIPAMInvoker) Delete(address *net.IPNet, nwCfg *cni.NetworkConfig, _ *cniSkel.CmdArgs, options map[string]interface{}) error {
-	if nwCfg == nil {
-		return invoker.plugin.Errorf("nil nwCfg passed to CNI ADD, stack: %+v", string(debug.Stack()))
-	}
+	// if nwCfg == nil {
+	// 	return invoker.plugin.Errorf("nil nwCfg passed to CNI ADD, stack: %+v", string(debug.Stack()))
+	// }
 
-	if len(invoker.nwInfo.Subnets) > 0 {
-		nwCfg.Ipam.Subnet = invoker.nwInfo.Subnets[0].Prefix.String()
-	}
+	// if len(invoker.nwInfo.Subnets) > 0 {
+	// 	nwCfg.Ipam.Subnet = invoker.nwInfo.Subnets[0].Prefix.String()
+	// }
 
-	if address == nil {
-		if err := invoker.plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg); err != nil {
-			return invoker.plugin.Errorf("Attempted to release address with error:  %v", err)
-		}
-	} else if len(address.IP.To4()) == 4 {
-		nwCfg.Ipam.Address = address.IP.String()
-		log.Printf("Releasing ipv4 address :%s pool: %s",
-			nwCfg.Ipam.Address, nwCfg.Ipam.Subnet)
-		if err := invoker.plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg); err != nil {
-			log.Printf("Failed to release ipv4 address: %v", err)
-			return invoker.plugin.Errorf("Failed to release ipv4 address: %v", err)
-		}
-	} else if len(address.IP.To16()) == 16 {
-		nwCfgIpv6 := *nwCfg
-		nwCfgIpv6.Ipam.Environment = common.OptEnvironmentIPv6NodeIpam
-		nwCfgIpv6.Ipam.Type = ipamV6
-		nwCfgIpv6.Ipam.Address = address.IP.String()
-		if len(invoker.nwInfo.Subnets) > 1 {
-			nwCfgIpv6.Ipam.Subnet = invoker.nwInfo.Subnets[1].Prefix.String()
-		}
+	// if address == nil {
+	// 	if err := invoker.plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg); err != nil {
+	// 		return invoker.plugin.Errorf("Attempted to release address with error:  %v", err)
+	// 	}
+	// } else if len(address.IP.To4()) == 4 {
+	// 	nwCfg.Ipam.Address = address.IP.String()
+	// 	log.Printf("Releasing ipv4 address :%s pool: %s",
+	// 		nwCfg.Ipam.Address, nwCfg.Ipam.Subnet)
+	// 	if err := invoker.plugin.DelegateDel(nwCfg.Ipam.Type, nwCfg); err != nil {
+	// 		log.Printf("Failed to release ipv4 address: %v", err)
+	// 		return invoker.plugin.Errorf("Failed to release ipv4 address: %v", err)
+	// 	}
+	// } else if len(address.IP.To16()) == 16 {
+	// 	nwCfgIpv6 := *nwCfg
+	// 	nwCfgIpv6.Ipam.Environment = common.OptEnvironmentIPv6NodeIpam
+	// 	nwCfgIpv6.Ipam.Type = ipamV6
+	// 	nwCfgIpv6.Ipam.Address = address.IP.String()
+	// 	if len(invoker.nwInfo.Subnets) > 1 {
+	// 		nwCfgIpv6.Ipam.Subnet = invoker.nwInfo.Subnets[1].Prefix.String()
+	// 	}
 
-		log.Printf("Releasing ipv6 address :%s pool: %s",
-			nwCfgIpv6.Ipam.Address, nwCfgIpv6.Ipam.Subnet)
-		if err := invoker.plugin.DelegateDel(nwCfgIpv6.Ipam.Type, &nwCfgIpv6); err != nil {
-			log.Printf("Failed to release ipv6 address: %v", err)
-			return invoker.plugin.Errorf("Failed to release ipv6 address: %v", err)
-		}
-	} else {
-		return invoker.plugin.Errorf("Address is incorrect, not valid IPv4 or IPv6, stack: %+v", string(debug.Stack()))
-	}
-
+	// 	log.Printf("Releasing ipv6 address :%s pool: %s",
+	// 		nwCfgIpv6.Ipam.Address, nwCfgIpv6.Ipam.Subnet)
+	// 	if err := invoker.plugin.DelegateDel(nwCfgIpv6.Ipam.Type, &nwCfgIpv6); err != nil {
+	// 		log.Printf("Failed to release ipv6 address: %v", err)
+	// 		return invoker.plugin.Errorf("Failed to release ipv6 address: %v", err)
+	// 	}
+	// } else {
+	// 	return invoker.plugin.Errorf("Address is incorrect, not valid IPv4 or IPv6, stack: %+v", string(debug.Stack()))
+	// }
+	log.Printf("returning nil")
 	return nil
 }
