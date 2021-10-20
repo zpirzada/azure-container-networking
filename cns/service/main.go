@@ -27,7 +27,6 @@ import (
 	"github.com/Azure/azure-container-networking/cns/common"
 	"github.com/Azure/azure-container-networking/cns/configuration"
 	"github.com/Azure/azure-container-networking/cns/hnsclient"
-	"github.com/Azure/azure-container-networking/cns/imdsclient"
 	"github.com/Azure/azure-container-networking/cns/ipampool"
 	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/cns/multitenantcontroller"
@@ -36,6 +35,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/restserver"
 	kubecontroller "github.com/Azure/azure-container-networking/cns/singletenantcontroller"
 	cnstypes "github.com/Azure/azure-container-networking/cns/types"
+	"github.com/Azure/azure-container-networking/cns/wireserver"
 	acn "github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/crd"
 	"github.com/Azure/azure-container-networking/crd/nodenetworkconfig"
@@ -486,7 +486,8 @@ func main() {
 		return
 	}
 	// Create CNS object.
-	httpRestService, err := restserver.NewHTTPRestService(&config, new(imdsclient.ImdsClient), nmaclient)
+
+	httpRestService, err := restserver.NewHTTPRestService(&config, &wireserver.Client{HTTPClient: &http.Client{}}, nmaclient)
 	if err != nil {
 		logger.Errorf("Failed to create CNS object, err:%v.\n", err)
 		return

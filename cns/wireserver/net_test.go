@@ -1,4 +1,4 @@
-package imdsclient
+package wireserver
 
 import (
 	"net"
