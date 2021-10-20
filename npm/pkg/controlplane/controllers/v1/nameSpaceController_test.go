@@ -1,6 +1,6 @@
 // Copyright 2018 Microsoft. All rights reserved.
 // MIT License
-package npm
+package controllers
 
 import (
 	"reflect"
@@ -9,15 +9,16 @@ import (
 
 	"github.com/Azure/azure-container-networking/npm/ipsm"
 	"github.com/Azure/azure-container-networking/npm/util"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/exec"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeinformers "k8s.io/client-go/informers"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/exec"
 )
 
 var (
@@ -41,7 +42,7 @@ type nameSpaceFixture struct {
 	kubeobjects []runtime.Object
 
 	ipsMgr       *ipsm.IpsetManager
-	nsController *nameSpaceController
+	nsController *NamespaceController
 	kubeInformer kubeinformers.SharedInformerFactory
 }
 
@@ -59,7 +60,7 @@ func (f *nameSpaceFixture) newNsController(stopCh chan struct{}) {
 	kubeclient := k8sfake.NewSimpleClientset(f.kubeobjects...)
 	f.kubeInformer = kubeinformers.NewSharedInformerFactory(kubeclient, noResyncPeriodFunc())
 
-	npmNamespaceCache := &npmNamespaceCache{nsMap: make(map[string]*Namespace)}
+	npmNamespaceCache := &NpmNamespaceCache{NsMap: make(map[string]*Namespace)}
 	f.nsController = NewNameSpaceController(
 		f.kubeInformer.Core().V1().Namespaces(), f.ipsMgr, npmNamespaceCache)
 
@@ -157,7 +158,7 @@ func TestAddNamespace(t *testing.T) {
 	}
 	checkNsTestResult("TestAddNamespace", f, testCases)
 
-	if _, exists := f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(nsObj.Name)]; !exists {
+	if _, exists := f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(nsObj.Name)]; !exists {
 		t.Errorf("TestAddNamespace failed @ npMgr.nsMap check")
 	}
 }
@@ -194,13 +195,13 @@ func TestUpdateNamespace(t *testing.T) {
 	}
 	checkNsTestResult("TestUpdateNamespace", f, testCases)
 
-	if _, exists := f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(newNsObj.Name)]; !exists {
+	if _, exists := f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(newNsObj.Name)]; !exists {
 		t.Errorf("TestUpdateNamespace failed @ npMgr.nsMap check")
 	}
 
 	if !reflect.DeepEqual(
 		newNsObj.Labels,
-		f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(oldNsObj.Name)].LabelsMap,
+		f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(oldNsObj.Name)].LabelsMap,
 	) {
 		t.Fatalf("TestUpdateNamespace failed @ npMgr.nsMap labelMap check")
 	}
@@ -238,13 +239,13 @@ func TestAddNamespaceLabel(t *testing.T) {
 	}
 	checkNsTestResult("TestAddNamespaceLabel", f, testCases)
 
-	if _, exists := f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(newNsObj.Name)]; !exists {
+	if _, exists := f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(newNsObj.Name)]; !exists {
 		t.Errorf("TestAddNamespaceLabel failed @ nsMap check")
 	}
 
 	if !reflect.DeepEqual(
 		newNsObj.Labels,
-		f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(oldNsObj.Name)].LabelsMap,
+		f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(oldNsObj.Name)].LabelsMap,
 	) {
 		t.Fatalf("TestAddNamespaceLabel failed @ nsMap labelMap check")
 	}
@@ -283,13 +284,13 @@ func TestAddNamespaceLabelSameRv(t *testing.T) {
 	}
 	checkNsTestResult("TestAddNamespaceLabelSameRv", f, testCases)
 
-	if _, exists := f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(newNsObj.Name)]; !exists {
+	if _, exists := f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(newNsObj.Name)]; !exists {
 		t.Errorf("TestAddNamespaceLabelSameRv failed @ nsMap check")
 	}
 
 	if !reflect.DeepEqual(
 		oldNsObj.Labels,
-		f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(oldNsObj.Name)].LabelsMap,
+		f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(oldNsObj.Name)].LabelsMap,
 	) {
 		t.Fatalf("TestAddNamespaceLabelSameRv failed @ nsMap labelMap check")
 	}
@@ -330,13 +331,13 @@ func TestDeleteandUpdateNamespaceLabel(t *testing.T) {
 	}
 	checkNsTestResult("TestDeleteandUpdateNamespaceLabel", f, testCases)
 
-	if _, exists := f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(newNsObj.Name)]; !exists {
+	if _, exists := f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(newNsObj.Name)]; !exists {
 		t.Errorf("TestDeleteandUpdateNamespaceLabel failed @ nsMap check")
 	}
 
 	if !reflect.DeepEqual(
 		newNsObj.Labels,
-		f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(oldNsObj.Name)].LabelsMap,
+		f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(oldNsObj.Name)].LabelsMap,
 	) {
 		t.Fatalf("TestDeleteandUpdateNamespaceLabel failed @ nsMap labelMap check")
 	}
@@ -382,13 +383,13 @@ func TestNewNameSpaceUpdate(t *testing.T) {
 	}
 	checkNsTestResult("TestDeleteandUpdateNamespaceLabel", f, testCases)
 
-	if _, exists := f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(newNsObj.Name)]; !exists {
+	if _, exists := f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(newNsObj.Name)]; !exists {
 		t.Errorf("TestDeleteandUpdateNamespaceLabel failed @ nsMap check")
 	}
 
 	if !reflect.DeepEqual(
 		newNsObj.Labels,
-		f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(oldNsObj.Name)].LabelsMap,
+		f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(oldNsObj.Name)].LabelsMap,
 	) {
 		t.Fatalf("TestDeleteandUpdateNamespaceLabel failed @ nsMap labelMap check")
 	}
@@ -418,7 +419,7 @@ func TestDeleteNamespace(t *testing.T) {
 	}
 	checkNsTestResult("TestDeleteNamespace", f, testCases)
 
-	if _, exists := f.nsController.npmNamespaceCache.nsMap[util.GetNSNameWithPrefix(nsObj.Name)]; exists {
+	if _, exists := f.nsController.npmNamespaceCache.NsMap[util.GetNSNameWithPrefix(nsObj.Name)]; exists {
 		t.Errorf("TestDeleteNamespace failed @ nsMap check")
 	}
 }
@@ -496,12 +497,30 @@ func TestIsSystemNs(t *testing.T) {
 
 func checkNsTestResult(testName string, f *nameSpaceFixture, testCases []expectedNsValues) {
 	for _, test := range testCases {
-		if got := len(f.nsController.npmNamespaceCache.nsMap); got != test.expectedLenOfNsMap {
+		if got := len(f.nsController.npmNamespaceCache.NsMap); got != test.expectedLenOfNsMap {
 			f.t.Errorf("NsMap length = %d, want %d. Map: %+v",
-				got, test.expectedLenOfNsMap, f.nsController.npmNamespaceCache.nsMap)
+				got, test.expectedLenOfNsMap, f.nsController.npmNamespaceCache.NsMap)
 		}
 		if got := f.nsController.workqueue.Len(); got != test.expectedLenOfWorkQueue {
 			f.t.Errorf("Workqueue length = %d, want %d", got, test.expectedLenOfWorkQueue)
 		}
 	}
+}
+
+func TestNSMapMarshalJSON(t *testing.T) {
+	npmNSCache := &NpmNamespaceCache{NsMap: make(map[string]*Namespace)}
+	nsName := "ns-test"
+	ns := &Namespace{
+		name: nsName,
+		LabelsMap: map[string]string{
+			"test-key": "test-value",
+		},
+	}
+
+	npmNSCache.NsMap[nsName] = ns
+	nsMapRaw, err := npmNSCache.MarshalJSON()
+	require.NoError(t, err)
+
+	expect := []byte(`{"ns-test":{"LabelsMap":{"test-key":"test-value"}}}`)
+	assert.ElementsMatch(t, expect, nsMapRaw)
 }

@@ -68,7 +68,7 @@ func NewDataPlane(nodeName string, ioShim *common.IOShim) *DataPlane {
 // InitializeDataPlane helps in setting up dataplane for NPM
 func (dp *DataPlane) InitializeDataPlane() error {
 	// Create Kube-All-NS IPSet
-	kubeAllSet := ipsets.NewIPSetMetadata(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNameSpace)
+	kubeAllSet := ipsets.NewIPSetMetadata(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNamespace)
 	dp.CreateIPSet(kubeAllSet)
 	return dp.initializeDataPlane()
 }
@@ -137,7 +137,6 @@ func (dp *DataPlane) ShouldUpdatePod() bool {
 
 // UpdatePod is to be called by pod_controller ONLY when a new pod is CREATED.
 func (dp *DataPlane) UpdatePod(pod *UpdateNPMPod) error {
-	// TODO check pod is in this Node if yes continue
 	err := dp.updatePod(pod)
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while updating pod: %w", err)

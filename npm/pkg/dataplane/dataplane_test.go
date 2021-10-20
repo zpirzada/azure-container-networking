@@ -28,7 +28,7 @@ var (
 		Name: "ns1/testpolicy",
 		PodSelectorIPSets: []*ipsets.TranslatedIPSet{
 			{
-				Metadata: ipsets.NewIPSetMetadata("setns1", ipsets.NameSpace),
+				Metadata: ipsets.NewIPSetMetadata("setns1", ipsets.Namespace),
 			},
 			setPodKey1,
 			{
@@ -40,7 +40,7 @@ var (
 		},
 		RuleIPSets: []*ipsets.TranslatedIPSet{
 			{
-				Metadata: ipsets.NewIPSetMetadata("setns2", ipsets.NameSpace),
+				Metadata: ipsets.NewIPSetMetadata("setns2", ipsets.Namespace),
 			},
 			{
 				Metadata: ipsets.NewIPSetMetadata("setpodkey2", ipsets.KeyLabelOfPod),
@@ -73,7 +73,7 @@ func TestNewDataPlane(t *testing.T) {
 		t.Error("NewDataPlane() returned nil")
 	}
 
-	setMetadata := ipsets.NewIPSetMetadata("test", ipsets.NameSpace)
+	setMetadata := ipsets.NewIPSetMetadata("test", ipsets.Namespace)
 	dp.CreateIPSet(setMetadata)
 }
 
@@ -104,11 +104,11 @@ func TestCreateAndDeleteIpSets(t *testing.T) {
 	setsTocreate := []*ipsets.IPSetMetadata{
 		{
 			Name: "test",
-			Type: ipsets.NameSpace,
+			Type: ipsets.Namespace,
 		},
 		{
 			Name: "test1",
-			Type: ipsets.NameSpace,
+			Type: ipsets.Namespace,
 		},
 	}
 
@@ -145,11 +145,11 @@ func TestAddToSet(t *testing.T) {
 	setsTocreate := []*ipsets.IPSetMetadata{
 		{
 			Name: "test",
-			Type: ipsets.NameSpace,
+			Type: ipsets.Namespace,
 		},
 		{
 			Name: "test1",
-			Type: ipsets.NameSpace,
+			Type: ipsets.Namespace,
 		},
 	}
 
