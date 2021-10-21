@@ -102,24 +102,21 @@ type snatConfiguration struct {
 }
 
 const (
-	HoneyCombGoalStateFile = "D:\\Data\\AP_Containers\\NetworkGoalState\\NetworkGoalState.json"
+	honeyCombGoalStateFile = "D:\\Data\\AP_Containers\\NetworkGoalState\\NetworkGoalState.json"
 )
-
 
 // Honeycomb goal state.
 type HoneyCombGoalState struct {
 	ContainerGroupNetworkGoalStates []struct {
 		ContainerGroupName string `json:"ContainerGroupName"`
-		IPV6Prefix string `json:"IPV6Prefix"`
-		IPV6Gateway string `json:"IPV6Gateway"`
-		IPV4HLIPPrefix string `json:"IPV4HLIPPrefix"`
-		IPV6Address string `json:"IPV6Address"`
-		MAC string `json:"MAC"`
-		IPV4HLIPAddress string `json:"IPV4HLIPAddress"`
+		IPV6Prefix         string `json:"IPV6Prefix"`
+		IPV6Gateway        string `json:"IPV6Gateway"`
+		IPV4HLIPPrefix     string `json:"IPV4HLIPPrefix"`
+		IPV6Address        string `json:"IPV6Address"`
+		MAC                string `json:"MAC"`
+		IPV4HLIPAddress    string `json:"IPV4HLIPAddress"`
 	} `json:"ContainerGroupNetworkGoalStates"`
 }
-
-
 
 // NewPlugin creates a new NetPlugin object.
 func NewPlugin(name string,
@@ -525,7 +522,7 @@ func (plugin *NetPlugin) Add(args *cniSkel.CmdArgs) error {
 
 	// Allocate from azure ipam
 	if !nwCfg.MultiTenancy {
-		result, resultV6, err = HoneyCombIpamAdd(nwCfg, args, &subnetPrefix, options, k8sPodName)
+		result, resultV6, err = honeyCombIpamAdd(nwCfg, args, &subnetPrefix, options, k8sPodName)
 		if err != nil {
 			return err
 		}
@@ -570,12 +567,12 @@ func (plugin *NetPlugin) cleanupAllocationOnError(
 	options map[string]interface{}) {
 
 	if result != nil && len(result.IPs) > 0 {
-		if er := plugin.ipamInvoker.Delete(&result.IPs[0].Address, nwCfg, args, options); er != nil {
+		if er := honeyCombIpamDelete(&result.IPs[0].Address, nwCfg, args, options); er != nil {
 			log.Errorf("Failed to cleanup ip allocation on failure: %v", er)
 		}
 	}
 	if resultV6 != nil && len(resultV6.IPs) > 0 {
-		if er := plugin.ipamInvoker.Delete(&resultV6.IPs[0].Address, nwCfg, args, options); er != nil {
+		if er := honeyCombIpamDelete(&resultV6.IPs[0].Address, nwCfg, args, options); er != nil {
 			log.Errorf("Failed to cleanup ipv6 allocation on failure: %v", er)
 		}
 	}
@@ -590,8 +587,8 @@ func nextIP(ip net.IP) {
 	}
 }
 
-func HoneyCombIpamAdd(nwCfg *cni.NetworkConfig, _ *cniSkel.CmdArgs, subnetPrefix *net.IPNet, options map[string]interface{}, podName string) (*cniTypesCurr.Result, *cniTypesCurr.Result, error) {
-	plan, _ := ioutil.ReadFile(HoneyCombGoalStateFile)
+func honeyCombIpamAdd(nwCfg *cni.NetworkConfig, _ *cniSkel.CmdArgs, subnetPrefix *net.IPNet, options map[string]interface{}, podName string) (*cniTypesCurr.Result, *cniTypesCurr.Result, error) {
+	plan, _ := ioutil.ReadFile(honeyCombGoalStateFile)
 	var data HoneyCombGoalState
 	err := json.Unmarshal(plan, &data)
 	if err != nil {
@@ -619,7 +616,7 @@ func HoneyCombIpamAdd(nwCfg *cni.NetworkConfig, _ *cniSkel.CmdArgs, subnetPrefix
 			log.Printf("[cni-net] ipConfigv4: %+v", ipConfigv4)
 			result.IPs = append(result.IPs, &ipConfigv4)
 			_, routeNet, _ := net.ParseCIDR("0.0.0.0/32")
-			result.Routes = append(result.Routes, &cniTypes.Route{Dst: *routeNet, GW: net.ParseIP(goalState.IPV6Gateway)})			
+			result.Routes = append(result.Routes, &cniTypes.Route{Dst: *routeNet, GW: net.ParseIP(goalState.IPV6Gateway)})
 			log.Printf("[cni-net] result: %+v", result)
 
 			//setting subnetPrefix
@@ -630,6 +627,11 @@ func HoneyCombIpamAdd(nwCfg *cni.NetworkConfig, _ *cniSkel.CmdArgs, subnetPrefix
 		}
 	}
 	return nil, nil, err
+}
+
+func honeyCombIpamDelete(address *net.IPNet, nwCfg *cni.NetworkConfig, _ *cniSkel.CmdArgs, options map[string]interface{}) error {
+	log.Printf("Completed delete operation")
+	return nil
 }
 
 func (plugin *NetPlugin) createNetworkInternal(
@@ -1031,7 +1033,7 @@ func (plugin *NetPlugin) Delete(args *cniSkel.CmdArgs) error {
 		if !nwCfg.MultiTenancy {
 			// attempt to release address associated with this Endpoint id
 			// This is to ensure clean up is done even in failure cases
-			err = plugin.ipamInvoker.Delete(nil, nwCfg, args, nwInfo.Options)
+			err = honeyCombIpamDelete(nil, nwCfg, args, nwInfo.Options)
 			if err != nil {
 				log.Printf("Network not found, attempted to release address with error:  %v", err)
 			}
@@ -1050,7 +1052,7 @@ func (plugin *NetPlugin) Delete(args *cniSkel.CmdArgs) error {
 			// attempt to release address associated with this Endpoint id
 			// This is to ensure clean up is done even in failure cases
 			log.Printf("release ip ep not found")
-			if err = plugin.ipamInvoker.Delete(nil, nwCfg, args, nwInfo.Options); err != nil {
+			if err = honeyCombIpamDelete(nil, nwCfg, args, nwInfo.Options); err != nil {
 				log.Printf("Endpoint not found, attempted to release address with error: %v", err)
 			}
 		}
@@ -1080,7 +1082,7 @@ func (plugin *NetPlugin) Delete(args *cniSkel.CmdArgs) error {
 		// Call into IPAM plugin to release the endpoint's addresses.
 		for _, address := range epInfo.IPAddresses {
 			log.Printf("release ip:%s", address.IP.String())
-			err = plugin.ipamInvoker.Delete(&address, nwCfg, args, nwInfo.Options)
+			err = honeyCombIpamDelete(&address, nwCfg, args, nwInfo.Options)
 			if err != nil {
 				err = plugin.Errorf("Failed to release address %v with error: %v", address, err)
 				return err
@@ -1089,7 +1091,7 @@ func (plugin *NetPlugin) Delete(args *cniSkel.CmdArgs) error {
 	} else if epInfo.EnableInfraVnet {
 		nwCfg.Ipam.Subnet = nwInfo.Subnets[0].Prefix.String()
 		nwCfg.Ipam.Address = epInfo.InfraVnetIP.IP.String()
-		err = plugin.ipamInvoker.Delete(nil, nwCfg, args, nwInfo.Options)
+		err = honeyCombIpamDelete(nil, nwCfg, args, nwInfo.Options)
 		if err != nil {
 			log.Printf("Failed to release address: %v", err)
 			err = plugin.Errorf("Failed to release address %v with error: %v", nwCfg.Ipam.Address, err)
