@@ -2,6 +2,7 @@ package policies
 
 import (
 	"github.com/Azure/azure-container-networking/common"
+	"k8s.io/klog"
 )
 
 type PolicyMap struct {
@@ -22,6 +23,10 @@ func NewPolicyManager(ioShim *common.IOShim) *PolicyManager {
 	}
 }
 
+func (pMgr *PolicyManager) Reset() error {
+	return pMgr.reset()
+}
+
 func (pMgr *PolicyManager) PolicyExists(name string) bool {
 	_, ok := pMgr.policyMap.cache[name]
 	return ok
@@ -32,7 +37,11 @@ func (pMgr *PolicyManager) GetPolicy(name string) (*NPMNetworkPolicy, bool) {
 	return policy, ok
 }
 
-func (pMgr *PolicyManager) AddPolicy(policy *NPMNetworkPolicy, endpointList []string) error {
+func (pMgr *PolicyManager) AddPolicy(policy *NPMNetworkPolicy, endpointList map[string]string) error {
+	if len(policy.ACLs) == 0 {
+		klog.Infof("[DataPlane] No ACLs in policy %s to apply", policy.Name)
+		return nil
+	}
 	// Call actual dataplane function to apply changes
 	err := pMgr.addPolicy(policy, endpointList)
 	if err != nil {
@@ -43,9 +52,18 @@ func (pMgr *PolicyManager) AddPolicy(policy *NPMNetworkPolicy, endpointList []st
 	return nil
 }
 
-func (pMgr *PolicyManager) RemovePolicy(name string, endpointList []string) error {
+func (pMgr *PolicyManager) RemovePolicy(name string, endpointList map[string]string) error {
+	policy, ok := pMgr.GetPolicy(name)
+	if !ok {
+		return nil
+	}
+
+	if len(policy.ACLs) == 0 {
+		klog.Infof("[DataPlane] No ACLs in policy %s to remove", policy.Name)
+		return nil
+	}
 	// Call actual dataplane function to apply changes
-	err := pMgr.removePolicy(name, endpointList)
+	err := pMgr.removePolicy(policy, endpointList)
 	if err != nil {
 		return err
 	}
