@@ -3,6 +3,7 @@ package ipsets
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/npm/util"
@@ -386,4 +387,8 @@ func (set *IPSet) canSetBeSelectorIPSet() bool {
 		set.Type == KeyValueLabelOfPod ||
 		set.Type == Namespace ||
 		set.Type == NestedLabelOfPod)
+}
+
+func (ipset *TranslatedIPSet) Equals(otherIPSet *TranslatedIPSet) bool {
+	return reflect.DeepEqual(ipset, otherIPSet)
 }

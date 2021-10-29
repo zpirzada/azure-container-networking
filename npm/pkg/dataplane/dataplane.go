@@ -29,8 +29,6 @@ var (
 		IPSetMode:   ipsets.ApplyAllIPSets,
 		NetworkName: AzureNetworkName,
 	}
-	// ErrResetDataPlane  error while resetting dataplane
-	ErrResetDataPlane = fmt.Errorf("Failed to reset dataplane")
 )
 
 type DataPlane struct {
@@ -89,16 +87,26 @@ func (dp *DataPlane) InitializeDataPlane() error {
 	// Create Kube-All-NS IPSet
 	kubeAllSet := ipsets.NewIPSetMetadata(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNamespace)
 	dp.CreateIPSets([]*ipsets.IPSetMetadata{kubeAllSet})
-	return dp.initializeDataPlane()
+	if err := dp.initializeDataPlane(); err != nil {
+		return npmerrors.ErrorWrapper(npmerrors.InitializeDataPlane, false, "failed to initialize overall dataplane", err)
+	}
+	// TODO update when piped error is fixed in fexec
+	// if err := dp.policyMgr.Initialize(); err != nil {
+	// 	return npmerrors.ErrorWrapper(npmerrors.InitializeDataPlane, false, "failed to initialize policy dataplane", err)
+	// }
+	return nil
 }
 
 // ResetDataPlane helps in cleaning up dataplane sets and policies programmed
 // by NPM, retunring a clean slate
 func (dp *DataPlane) ResetDataPlane() error {
-	err := dp.ipsetMgr.ResetIPSets()
-	if err != nil {
-		return ErrResetDataPlane
+	if err := dp.ipsetMgr.ResetIPSets(); err != nil {
+		return npmerrors.ErrorWrapper(npmerrors.ResetDataPlane, false, "failed to reset ipsets dataplane", err)
 	}
+	// TODO update when piped error is fixed in fexec
+	// if err := dp.policyMgr.Reset(); err != nil {
+	// 	return npmerrors.ErrorWrapper(npmerrors.ResetDataPlane, false, "failed to reset policy dataplane", err)
+	// }
 	return dp.resetDataPlane()
 }
 
@@ -280,12 +288,12 @@ func (dp *DataPlane) UpdatePolicy(policy *policies.NPMNetworkPolicy) error {
 	// and remove/apply only the delta of IPSets and policies
 
 	// Taking the easy route here, delete existing policy
-	err := dp.policyMgr.RemovePolicy(policy.Name, nil)
+	err := dp.RemovePolicy(policy.Name)
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while updating policy: %w", err)
 	}
 	// and add the new updated policy
-	err = dp.policyMgr.AddPolicy(policy, nil)
+	err = dp.AddPolicy(policy)
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while updating policy: %w", err)
 	}
