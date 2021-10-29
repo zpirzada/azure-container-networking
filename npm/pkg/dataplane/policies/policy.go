@@ -1,7 +1,10 @@
 package policies
 
 import (
+	"strconv"
+
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
+	"github.com/Azure/azure-container-networking/npm/util"
 	networkingv1 "k8s.io/api/networking/v1"
 )
 
@@ -47,6 +50,37 @@ type ACLPolicy struct {
 	Protocol Protocol
 }
 
+func (aclPolicy *ACLPolicy) hasKnownDirection() bool {
+	return aclPolicy.Direction == Ingress ||
+		aclPolicy.Direction == Egress ||
+		aclPolicy.Direction == Both
+}
+
+func (aclPolicy *ACLPolicy) hasIngress() bool {
+	return aclPolicy.Direction == Ingress || aclPolicy.Direction == Both
+}
+
+func (aclPolicy *ACLPolicy) hasEgress() bool {
+	return aclPolicy.Direction == Egress || aclPolicy.Direction == Both
+}
+
+func (aclPolicy *ACLPolicy) hasKnownProtocol() bool {
+	return aclPolicy.Protocol != "" && (aclPolicy.Protocol == TCP ||
+		aclPolicy.Protocol == UDP ||
+		aclPolicy.Protocol == SCTP ||
+		aclPolicy.Protocol == ICMP ||
+		aclPolicy.Protocol == AnyProtocol)
+}
+
+func (aclPolicy *ACLPolicy) hasKnownTarget() bool {
+	return aclPolicy.Target == Allowed || aclPolicy.Target == Dropped
+}
+
+func (aclPolicy *ACLPolicy) satisifiesPortAndProtocolConstraints() bool {
+	return aclPolicy.Protocol != AnyProtocol ||
+		(len(aclPolicy.SrcPorts) == 0 && len(aclPolicy.DstPorts) == 0)
+}
+
 // SetInfo helps capture additional details in a matchSet
 // example match set in linux:
 //             ! azure-npm-123 src,src
@@ -56,12 +90,29 @@ type ACLPolicy struct {
 type SetInfo struct {
 	IPSet     *ipsets.IPSetMetadata
 	Included  bool
-	MatchType string // match type can be “src”, “src,dst” or “dst,dst” etc
+	MatchType MatchType
 }
 
+// Ports represents a range of ports.
+// To specify one port, set Port and EndPort to the same value.
+// uint16 is used since there are 2^16 - 1 TCP/UDP ports (0 is invalid)
+// and 2^16 SCTP ports. ICMP is connectionless and doesn't use ports.
 type Ports struct {
 	Port    int32
 	EndPort int32
+}
+
+func (portRange *Ports) isValidRange() bool {
+	return portRange.Port <= portRange.EndPort
+}
+
+func (portRange *Ports) toIPTablesString() string {
+	start := strconv.Itoa(int(portRange.Port))
+	if portRange.Port == portRange.EndPort {
+		return start
+	}
+	end := strconv.Itoa(int(portRange.EndPort))
+	return start + ":" + end
 }
 
 type Verdict string
@@ -69,6 +120,8 @@ type Verdict string
 type Direction string
 
 type Protocol string
+
+type MatchType int8
 
 const (
 	// Ingress when packet is entering a container
@@ -92,5 +145,29 @@ const (
 	// ICMP Protocol
 	ICMP Protocol = "icmp"
 	// AnyProtocol can be used for all other protocols
-	AnyProtocol Protocol = "any"
+	AnyProtocol Protocol = "all"
 )
+
+// Possible MatchTypes.
+// MatchTypes with 2 locations (e.g. DstDst) are for ip and port respectively.
+const (
+	SrcMatch    MatchType = 0
+	DstMatch    MatchType = 1
+	DstDstMatch MatchType = 3
+)
+
+var matchTypeStrings = map[MatchType]string{
+	SrcMatch:    util.IptablesSrcFlag,
+	DstMatch:    util.IptablesDstFlag,
+	DstDstMatch: util.IptablesDstFlag + "," + util.IptablesDstFlag,
+}
+
+// match type is only used in Linux
+func (setInfo *SetInfo) hasKnownMatchType() bool {
+	_, exists := matchTypeStrings[setInfo.MatchType]
+	return exists
+}
+
+func (matchType MatchType) toIPTablesString() string {
+	return matchTypeStrings[matchType]
+}

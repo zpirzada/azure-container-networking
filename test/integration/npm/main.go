@@ -8,53 +8,28 @@ import (
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
-	"github.com/Azure/azure-container-networking/npm/util"
 )
 
 const MaxSleepTime = 15
 
-type testSet struct {
-	metadata   *ipsets.IPSetMetadata
-	hashedName string
-}
-
-func createTestSet(name string, setType ipsets.SetType) *testSet {
-	set := &testSet{
-		metadata: &ipsets.IPSetMetadata{
-			Name: name,
-			Type: setType,
-		},
-	}
-	set.hashedName = util.GetHashedName(set.metadata.GetPrefixName())
-	return set
-}
-
 var (
-	nodeName            = "testNode"
-	testNSSet           = createTestSet("test-ns-set", ipsets.Namespace)
-	testKeyPodSet       = createTestSet("test-keyPod-set", ipsets.KeyLabelOfPod)
-	testKVPodSet        = createTestSet("test-kvPod-set", ipsets.KeyValueLabelOfPod)
-	testNamedportSet    = createTestSet("test-namedport-set", ipsets.NamedPorts)
-	testCIDRSet         = createTestSet("test-cidr-set", ipsets.CIDRBlocks)
-	testKeyNSList       = createTestSet("test-keyNS-list", ipsets.KeyLabelOfNamespace)
-	testKVNSList        = createTestSet("test-kvNS-list", ipsets.KeyValueLabelOfNamespace)
-	testNestedLabelList = createTestSet("test-nestedlabel-list", ipsets.NestedLabelOfPod)
-	testNetPol          = &policies.NPMNetworkPolicy{
+	nodeName   = "testNode"
+	testNetPol = &policies.NPMNetworkPolicy{
 		Name: "test/test-netpol",
 		PodSelectorIPSets: []*ipsets.TranslatedIPSet{
 			{
-				Metadata: testNSSet.metadata,
+				Metadata: ipsets.TestNSSet.Metadata,
 			},
 			{
-				Metadata: testKeyPodSet.metadata,
+				Metadata: ipsets.TestKeyPodSet.Metadata,
 			},
 		},
 		RuleIPSets: []*ipsets.TranslatedIPSet{
 			{
-				Metadata: testNSSet.metadata,
+				Metadata: ipsets.TestNSSet.Metadata,
 			},
 			{
-				Metadata: testKeyPodSet.metadata,
+				Metadata: ipsets.TestKeyPodSet.Metadata,
 			},
 		},
 		ACLs: []*policies.ACLPolicy{
@@ -69,29 +44,24 @@ var (
 				Direction: policies.Ingress,
 				SrcList: []policies.SetInfo{
 					{
-						IPSet:     testNSSet.metadata,
+						IPSet:     ipsets.TestNSSet.Metadata,
 						Included:  true,
-						MatchType: "src",
+						MatchType: policies.SrcMatch,
 					},
 					{
-						IPSet:     testKeyPodSet.metadata,
+						IPSet:     ipsets.TestKeyPodSet.Metadata,
 						Included:  true,
-						MatchType: "src",
+						MatchType: policies.SrcMatch,
 					},
 				},
 			},
 		},
 	}
-	// testKeyNSList       = createTestSet("test-keyNS-list", ipsets.KeyLabelOfNameSpace)
-	// testKVNSList        = createTestSet("test-kvNS-list", ipsets.KeyValueLabelOfNameSpace)
-	// testNestedLabelList = createTestSet("test-nestedlabel-list", ipsets.NestedLabelOfPod)
 )
 
 func main() {
 	dp, err := dataplane.NewDataPlane(nodeName, common.NewIOShim())
-	if err != nil {
-		panic(err)
-	}
+	panicOnError(err)
 	printAndWait()
 
 	podMetadata := &dataplane.PodMetadata{
@@ -101,63 +71,73 @@ func main() {
 	}
 
 	// add all types of ipsets, some with members added
-	if err := dp.AddToSets([]*ipsets.IPSetMetadata{testNSSet.metadata}, podMetadata); err != nil {
-		panic(err)
-	}
+	panicOnError(dp.AddToSets([]*ipsets.IPSetMetadata{ipsets.TestNSSet.Metadata}, podMetadata))
 	podMetadataB := &dataplane.PodMetadata{
 		PodKey:   "b",
 		PodIP:    "10.0.0.1",
 		NodeName: "",
 	}
-	if err := dp.AddToSets([]*ipsets.IPSetMetadata{testNSSet.metadata}, podMetadataB); err != nil {
-		panic(err)
-	}
+	panicOnError(dp.AddToSets([]*ipsets.IPSetMetadata{ipsets.TestNSSet.Metadata}, podMetadataB))
 	podMetadataC := &dataplane.PodMetadata{
 		PodKey:   "c",
 		PodIP:    "10.240.0.24",
 		NodeName: nodeName,
 	}
-	if err := dp.AddToSets([]*ipsets.IPSetMetadata{testKeyPodSet.metadata, testNSSet.metadata}, podMetadataC); err != nil {
-		panic(err)
-	}
-	dp.CreateIPSets([]*ipsets.IPSetMetadata{testKVPodSet.metadata, testNamedportSet.metadata, testCIDRSet.metadata})
+	panicOnError(dp.AddToSets([]*ipsets.IPSetMetadata{ipsets.TestKeyPodSet.Metadata, ipsets.TestNSSet.Metadata}, podMetadataC))
+	dp.CreateIPSets([]*ipsets.IPSetMetadata{ipsets.TestKVPodSet.Metadata, ipsets.TestNamedportSet.Metadata, ipsets.TestCIDRSet.Metadata})
 
 	// can't do lists on my computer
 
-	if err := dp.ApplyDataPlane(); err != nil {
-		panic(err)
-	}
+	panicOnError(dp.ApplyDataPlane())
 
 	printAndWait()
 
-	if err := dp.AddToLists([]*ipsets.IPSetMetadata{testKeyNSList.metadata, testKVNSList.metadata}, []*ipsets.IPSetMetadata{testNSSet.metadata}); err != nil {
-		panic(err)
-	}
+	panicOnError(dp.AddToLists([]*ipsets.IPSetMetadata{ipsets.TestKeyNSList.Metadata, ipsets.TestKVNSList.Metadata}, []*ipsets.IPSetMetadata{ipsets.TestNSSet.Metadata}))
 
-	if err := dp.AddToLists([]*ipsets.IPSetMetadata{testNestedLabelList.metadata}, []*ipsets.IPSetMetadata{testKVPodSet.metadata, testKeyPodSet.metadata}); err != nil {
-		panic(err)
-	}
+	panicOnError(dp.AddToLists([]*ipsets.IPSetMetadata{ipsets.TestNestedLabelList.Metadata}, []*ipsets.IPSetMetadata{ipsets.TestKVPodSet.Metadata, ipsets.TestKeyPodSet.Metadata}))
 
 	// remove members from some sets and delete some sets
-	if err := dp.RemoveFromSets([]*ipsets.IPSetMetadata{testNSSet.metadata}, podMetadataB); err != nil {
-		panic(err)
-	}
-	dp.DeleteIPSet(testKVPodSet.metadata)
-	if err := dp.ApplyDataPlane(); err != nil {
-		panic(err)
-	}
+	panicOnError(dp.RemoveFromSets([]*ipsets.IPSetMetadata{ipsets.TestNSSet.Metadata}, podMetadataB))
+	dp.DeleteIPSet(ipsets.TestKVPodSet.Metadata)
+	panicOnError(dp.ApplyDataPlane())
 
 	printAndWait()
-	if err := dp.RemoveFromSets([]*ipsets.IPSetMetadata{testNSSet.metadata}, podMetadata); err != nil {
-		panic(err)
-	}
-	dp.DeleteIPSet(testNSSet.metadata)
-	if err := dp.ApplyDataPlane(); err != nil {
-		panic(err)
-	}
+	panicOnError(dp.RemoveFromSets([]*ipsets.IPSetMetadata{ipsets.TestNSSet.Metadata}, podMetadata))
+
+	dp.DeleteIPSet(ipsets.TestNSSet.Metadata)
+	panicOnError(dp.ApplyDataPlane())
 	printAndWait()
 
-	if err := dp.AddPolicy(testNetPol); err != nil {
+	panicOnError(dp.AddPolicy(testNetPol))
+
+	testPolicyManager()
+}
+
+func testPolicyManager() {
+	pMgr := policies.NewPolicyManager(common.NewIOShim())
+
+	panicOnError(pMgr.Reset())
+	printAndWait()
+
+	panicOnError(pMgr.AddPolicy(policies.TestNetworkPolicies[0], nil))
+	printAndWait()
+
+	panicOnError(pMgr.AddPolicy(policies.TestNetworkPolicies[1], nil))
+	printAndWait()
+
+	// remove something that doesn't exist
+	panicOnError(pMgr.RemovePolicy(policies.TestNetworkPolicies[2].Name, nil))
+	printAndWait()
+
+	panicOnError(pMgr.AddPolicy(policies.TestNetworkPolicies[2], nil))
+	printAndWait()
+
+	// remove something that exists
+	panicOnError(pMgr.RemovePolicy(policies.TestNetworkPolicies[1].Name, nil))
+}
+
+func panicOnError(err error) {
+	if err != nil {
 		panic(err)
 	}
 }
@@ -169,49 +149,3 @@ func printAndWait() {
 		time.Sleep(time.Second)
 	}
 }
-
-// NOTE for Linux
-/*
-	ipset test SETNAME ENTRYNAME:
-		Warning: 10.0.0.5 is in set azure-npm-2031808719.
-		10.0.0.4 is NOT in set azure-npm-2031808719.
-
-	ipset list (references are from setlist or iptables):
-		Name: azure-npm-3382169694
-		Type: hash:net
-		Revision: 6
-		Header: family inet hashsize 1024 maxelem 65536
-		Size in memory: 512
-		References: 0
-		Number of entries: 1
-		Members:
-		10.0.0.0
-
-		Name: azure-npm-2031808719
-		Type: hash:net
-		Revision: 6
-		Header: family inet hashsize 1024 maxelem 65536
-		Size in memory: 512
-		References: 0
-		Number of entries: 1
-		Members:
-		10.0.0.5
-
-		Name: azure-npm-164288419
-		Type: hash:ip,port
-		Revision: 5
-		Header: family inet hashsize 1024 maxelem 65536
-		Size in memory: 192
-		References: 0
-		Number of entries: 0
-		Members:
-
-		Name: azure-npm-3216600258
-		Type: hash:net
-		Revision: 6
-		Header: family inet hashsize 1024 maxelem 4294967295
-		Size in memory: 448
-		References: 0
-		Number of entries: 0
-		Members:
-*/
