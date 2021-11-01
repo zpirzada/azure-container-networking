@@ -1,27 +1,30 @@
 package policies
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/util"
-	networkingv1 "k8s.io/api/networking/v1"
 )
 
 type NPMNetworkPolicy struct {
-	// Netpol Key
-	Name string
+	Name      string
+	NameSpace string
+	// TODO(jungukcho)
+	// ipsets.IPSetMetadata is common data in both PodSelectorIPSets and PodSelectorList.
+	// So, they can be one datastructure holding all information without redundancy.
 	// PodSelectorIPSets holds all the IPSets generated from Pod Selector
 	PodSelectorIPSets []*ipsets.TranslatedIPSet
+	// PodSelectorList holds target pod information to avoid duplicatoin in SrcList and DstList fields in ACLs
+	PodSelectorList []SetInfo
 	// RuleIPSets holds all IPSets generated from policy's rules
 	// and not from pod selector IPSets
-	//
 	RuleIPSets []*ipsets.TranslatedIPSet
 	ACLs       []*ACLPolicy
 	// podIP is key and endpoint ID as value
 	// Will be populated by dataplane and policy manager
 	PodEndpoints map[string]string
-	RawNP        *networkingv1.NetworkPolicy
 }
 
 // ACLPolicy equivalent to a single iptable rule in linux
@@ -42,12 +45,29 @@ type ACLPolicy struct {
 	Target Verdict
 	// Direction defines the flow of traffic
 	Direction Direction
-	// SrcPorts holds the source port information
-	SrcPorts []Ports
 	// DstPorts holds the destination port information
-	DstPorts []Ports
+	// TODO(jungukcho): It may be better to use pointer to differentiate default value.
+	DstPorts Ports
 	// Protocol is the value of traffic protocol
 	Protocol Protocol
+}
+
+const policyIDPrefix = "azure-acl"
+
+// aclPolicyID returns azure-acl-<network policy namespace>-<network policy name> format
+// to differentiate ACLs among different network policies,
+// but aclPolicy in the same network policy has the same aclPolicyID.
+func aclPolicyID(policyNS, policyName string) string {
+	return fmt.Sprintf("%s-%s-%s", policyIDPrefix, policyNS, policyName)
+}
+
+func NewACLPolicy(policyNS, policyName string, target Verdict, direction Direction) *ACLPolicy {
+	acl := &ACLPolicy{
+		PolicyID:  aclPolicyID(policyNS, policyName),
+		Target:    target,
+		Direction: direction,
+	}
+	return acl
 }
 
 func (aclPolicy *ACLPolicy) hasKnownDirection() bool {
@@ -77,16 +97,19 @@ func (aclPolicy *ACLPolicy) hasKnownTarget() bool {
 }
 
 func (aclPolicy *ACLPolicy) satisifiesPortAndProtocolConstraints() bool {
-	return aclPolicy.Protocol != AnyProtocol ||
-		(len(aclPolicy.SrcPorts) == 0 && len(aclPolicy.DstPorts) == 0)
+	// TODO(jungukcho): need to check second condition
+	return (aclPolicy.Protocol != AnyProtocol) || (aclPolicy.DstPorts.Port == 0 && aclPolicy.DstPorts.EndPort == 0)
 }
 
-// SetInfo helps capture additional details in a matchSet
-// example match set in linux:
-//             ! azure-npm-123 src,src
-// "!" this indicates a negative match of an IPset for src,src
-// Included flag captures the negative or positive match
-// MatchType captures match flags
+// SetInfo helps capture additional details in a matchSet.
+// Included flag captures the negative or positive match.
+// Included is true when match set does not have "!".
+// Included is false when match set have "!".
+// MatchType captures match direction flags.
+// For example match set in linux:
+//             ! azure-npm-123 src
+// "!" this indicates a negative match (Included is false) of an azure-npm-123
+// MatchType is "src"
 type SetInfo struct {
 	IPSet     *ipsets.IPSetMetadata
 	Included  bool
@@ -97,6 +120,15 @@ type SetInfo struct {
 // To specify one port, set Port and EndPort to the same value.
 // uint16 is used since there are 2^16 - 1 TCP/UDP ports (0 is invalid)
 // and 2^16 SCTP ports. ICMP is connectionless and doesn't use ports.
+// NewSetInfo creates SetInfo.
+func NewSetInfo(name string, setType ipsets.SetType, included bool, matchType MatchType) SetInfo {
+	return SetInfo{
+		IPSet:     ipsets.NewIPSetMetadata(name, setType),
+		Included:  included,
+		MatchType: matchType,
+	}
+}
+
 type Ports struct {
 	Port    int32
 	EndPort int32
