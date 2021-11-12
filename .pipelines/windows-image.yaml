@@ -15,7 +15,7 @@ stages:
             dir "C:\Program Files\Docker\"
             docker version
             docker info
-            Get-Service docker | Restart-Service
+            Start-Service Docker
             powershell.exe -command "& { . .\windows.ps1; azure-npm-image $(tag)-windows-amd64 }"
           name: "build_npm"
           displayName: "Build"
