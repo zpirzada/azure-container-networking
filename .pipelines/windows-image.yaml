@@ -12,10 +12,10 @@ stages:
           name: "$(BUILD_POOL_NAME_DEFAULT_WINDOWS)"
       steps:
         - powershell: |
-            dir "C:\Program Files\Docker\"
-            docker version
-            docker info
-            Start-Service Docker
+            # dir "C:\Program Files\Docker\"
+            # docker version
+            # docker info
+            # Start-Service Docker
             powershell.exe -command "& { . .\windows.ps1; azure-npm-image $(tag)-windows-amd64 }"
           name: "build_npm"
           displayName: "Build"
