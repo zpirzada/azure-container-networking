@@ -3,7 +3,6 @@ package translation
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
@@ -86,7 +85,7 @@ func namedPortRuleInfo(portRule *networkingv1.NetworkPolicyPort) (namedPortIPSet
 		return nil, protocol
 	}
 
-	namedPortIPSet = ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+portRule.Port.String(), ipsets.NamedPorts, []string{})
+	namedPortIPSet = ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+portRule.Port.String(), ipsets.NamedPorts)
 	return namedPortIPSet, protocol
 }
 
@@ -141,7 +140,7 @@ func ipBlockIPSet(policyName, ns string, direction policies.Direction, ipBlockSe
 	}
 
 	ipBlockIPSetName := ipBlockSetName(policyName, ns, direction, ipBlockSetIndex)
-	ipBlockIPSet := ipsets.NewTranslatedIPSet(ipBlockIPSetName, ipsets.CIDRBlocks, members)
+	ipBlockIPSet := ipsets.NewTranslatedIPSet(ipBlockIPSetName, ipsets.CIDRBlocks, members...)
 	return ipBlockIPSet
 }
 
@@ -155,110 +154,6 @@ func ipBlockRule(policyName, ns string, direction policies.Direction, ipBlockSet
 	return ipBlockIPSet, setInfo
 }
 
-func podLabelType(label string) ipsets.SetType {
-	// TODO(jungukcho): this is unnecessary function which has extra computation
-	// will be removed after optimizing parseSelector function
-	labels := strings.Split(label, ":")
-	switch LenOfLabels := len(labels); LenOfLabels {
-	case onlyKeyLabel:
-		return ipsets.KeyLabelOfPod
-	case keyValueLabel:
-		return ipsets.KeyValueLabelOfPod
-	default: // in case of nested value (i.e., len(labels) >= 3
-		return ipsets.NestedLabelOfPod
-	}
-}
-
-// podSelectorRule returns srcList for ACL by using ops and labelsForSpec
-func podSelectorRule(matchType policies.MatchType, ops, ipSetForACL []string) []policies.SetInfo {
-	podSelectorList := []policies.SetInfo{}
-	for i := 0; i < len(ipSetForACL); i++ {
-		noOp := ops[i] == ""
-		labelType := podLabelType(ipSetForACL[i])
-		setInfo := policies.NewSetInfo(ipSetForACL[i], labelType, noOp, matchType)
-		podSelectorList = append(podSelectorList, setInfo)
-	}
-	return podSelectorList
-}
-
-func podSelectorIPSets(ipSetForSingleVal []string, ipSetNameForMultiVal map[string][]string) []*ipsets.TranslatedIPSet {
-	podSelectorIPSets := []*ipsets.TranslatedIPSet{}
-	for _, hashSetName := range ipSetForSingleVal {
-		labelType := podLabelType(hashSetName)
-		ipset := ipsets.NewTranslatedIPSet(hashSetName, labelType, []string{})
-		podSelectorIPSets = append(podSelectorIPSets, ipset)
-	}
-
-	for listSetName, hashIPSetList := range ipSetNameForMultiVal {
-		ipset := ipsets.NewTranslatedIPSet(listSetName, ipsets.NestedLabelOfPod, hashIPSetList)
-		podSelectorIPSets = append(podSelectorIPSets, ipset)
-	}
-
-	return podSelectorIPSets
-}
-
-// targetPodSelectorInfo converts podSelector information to operators and corresponding label information.
-// The label information has various types based on type of labels (e.g., single value or multiple value in labels).
-func targetPodSelectorInfo(selector *metav1.LabelSelector) (ops, ipSetForACL, ipSetForSingleVal []string, ipSetNameForMultiVal map[string][]string) {
-	// TODO(jungukcho) : need to revise parseSelector function to reduce computations and enhance readability
-	// 1. use better variables to indicate included instead of "".
-	// 2. Classify type of set in parseSelector to avoid multiple computations
-	// 3. Resolve makezero lint errors (nozero)
-	singleValueLabelsWithOps, multiValuesLabelsWithOps := parseSelector(selector)
-	ops, ipSetForSingleVal = GetOperatorsAndLabels(singleValueLabelsWithOps)
-
-	ipSetNameForMultiVal = make(map[string][]string)
-	LenOfIPSetForACL := len(ipSetForSingleVal) + len(multiValuesLabelsWithOps)
-	ipSetForACL = make([]string, LenOfIPSetForACL)
-	IndexOfIPSetForACL := copy(ipSetForACL, ipSetForSingleVal)
-
-	for multiValueLabelKeyWithOps, multiValueLabelList := range multiValuesLabelsWithOps {
-		op, multiValueLabelKey := GetOperatorAndLabel(multiValueLabelKeyWithOps)
-		ops = append(ops, op) // nozero
-
-		ipSetNameForMultiValueLabel := getSetNameForMultiValueSelector(multiValueLabelKey, multiValueLabelList)
-		ipSetForACL[IndexOfIPSetForACL] = ipSetNameForMultiValueLabel
-		IndexOfIPSetForACL++
-
-		for _, labelValue := range multiValueLabelList {
-			ipsetName := util.GetIpSetFromLabelKV(multiValueLabelKey, labelValue)
-			ipSetForSingleVal = append(ipSetForSingleVal, ipsetName) // nozero
-			ipSetNameForMultiVal[ipSetNameForMultiValueLabel] = append(ipSetNameForMultiVal[ipSetNameForMultiValueLabel], ipsetName)
-		}
-	}
-	return ops, ipSetForACL, ipSetForSingleVal, ipSetNameForMultiVal
-}
-
-// allPodsSelectorInNs returns translatedIPSet and SetInfo
-// in case podSelector field has {} which means all pods in the ns namespace.
-func allPodsSelectorInNs(ns string, matchType policies.MatchType) ([]*ipsets.TranslatedIPSet, []policies.SetInfo) {
-	// TODO(jungukcho): important this is common component - double-check whether it has duplicated one or not
-	ipset := ipsets.NewTranslatedIPSet(ns, ipsets.Namespace, []string{})
-	podSelectorIPSets := []*ipsets.TranslatedIPSet{ipset}
-
-	setInfo := policies.NewSetInfo(ns, ipsets.Namespace, included, matchType)
-	podSelectorList := []policies.SetInfo{setInfo}
-	return podSelectorIPSets, podSelectorList
-}
-
-// PodSelector translates podSelector of spec field and NetworkPolicyPeer in networkpolicy object to translatedIPSet and SetInfo.
-// TODO(jungukcho): change name of function to podSelector since it uses both podSelector of spec field and NetworkPolicyPeer in networkpolicy object.
-func targetPodSelector(ns string, matchType policies.MatchType, selector *metav1.LabelSelector) ([]*ipsets.TranslatedIPSet, []policies.SetInfo) {
-	// (TODO): some data in singleValueLabels and multiValuesLabels are duplicated
-	ops, ipSetForACL, ipSetForSingleVal, ipSetNameForMultiVal := targetPodSelectorInfo(selector)
-	// select all pods in a namespace
-	if len(ops) == 1 && len(ipSetForSingleVal) == 1 && ops[0] == "" && ipSetForSingleVal[0] == "" {
-		podSelectorIPSets, podSelectorList := allPodsSelectorInNs(ns, matchType)
-		return podSelectorIPSets, podSelectorList
-	}
-
-	// TODO(jungukcho): may need to check ordering hashset and listset if ipSetNameForMultiVal exists.
-	// refer to last test set in TestPodSelectorIPSets
-	podSelectorIPSets := podSelectorIPSets(ipSetForSingleVal, ipSetNameForMultiVal)
-	podSelectorList := podSelectorRule(matchType, ops, ipSetForACL)
-	return podSelectorIPSets, podSelectorList
-}
-
 // PodSelector translates podSelector of NetworkPolicyPeer field in networkpolicy object to translatedIPSet and SetInfo.
 // This function is called only when the NetworkPolicyPeer has namespaceSelector field.
 func podSelector(matchType policies.MatchType, selector *metav1.LabelSelector) ([]*ipsets.TranslatedIPSet, []policies.SetInfo) {
@@ -269,11 +164,10 @@ func podSelector(matchType policies.MatchType, selector *metav1.LabelSelector) (
 
 	for i := 0; i < LenOfPodSelectors; i++ {
 		ps := podSelectors[i]
-		podSelectorIPSets = append(podSelectorIPSets, ipsets.NewTranslatedIPSet(ps.setName, ps.setType, ps.members))
+		podSelectorIPSets = append(podSelectorIPSets, ipsets.NewTranslatedIPSet(ps.setName, ps.setType, ps.members...))
 		// if value is nested value, create translatedIPSet with the nested value
 		for j := 0; j < len(ps.members); j++ {
-			var nilSlices []string
-			podSelectorIPSets = append(podSelectorIPSets, ipsets.NewTranslatedIPSet(ps.members[j], ipsets.KeyValueLabelOfPod, nilSlices))
+			podSelectorIPSets = append(podSelectorIPSets, ipsets.NewTranslatedIPSet(ps.members[j], ipsets.KeyValueLabelOfPod))
 		}
 
 		podSelectorList[i] = policies.NewSetInfo(ps.setName, ps.setType, ps.include, matchType)
@@ -288,66 +182,9 @@ func podSelectorWithNS(ns string, matchType policies.MatchType, selector *metav1
 	podSelectorIPSets, podSelectorList := podSelector(matchType, selector)
 
 	// Add translatedIPSet and SetInfo based on namespace
-	// TODO(jungukcho) this nilSlices will be removed.
-	var nilSlices []string
-	podSelectorIPSets = append(podSelectorIPSets, ipsets.NewTranslatedIPSet(ns, ipsets.Namespace, nilSlices))
+	podSelectorIPSets = append(podSelectorIPSets, ipsets.NewTranslatedIPSet(ns, ipsets.Namespace))
 	podSelectorList = append(podSelectorList, policies.NewSetInfo(ns, ipsets.Namespace, included, matchType))
 	return podSelectorIPSets, podSelectorList
-}
-
-func nsLabelType(label string) ipsets.SetType {
-	// TODO(jungukcho): this is unnecessary function which has extra computation
-	// will be removed after optimizing parseSelector function
-	labels := strings.Split(label, ":")
-	if len(labels) == onlyKeyLabel {
-		return ipsets.KeyLabelOfNamespace
-	} else if len(labels) == keyValueLabel {
-		return ipsets.KeyValueLabelOfNamespace
-	}
-
-	// (TODO): check whether this is possible
-	return ipsets.UnknownType
-}
-
-func nameSpaceSelectorRule(matchType policies.MatchType, ops, nsSelectorInfo []string) []policies.SetInfo {
-	nsSelectorList := []policies.SetInfo{}
-	for i := 0; i < len(nsSelectorInfo); i++ {
-		noOp := ops[i] == ""
-		labelType := nsLabelType(nsSelectorInfo[i])
-		setInfo := policies.NewSetInfo(nsSelectorInfo[i], labelType, noOp, matchType)
-		nsSelectorList = append(nsSelectorList, setInfo)
-	}
-	return nsSelectorList
-}
-
-func nameSpaceSelectorIPSets(singleValueLabels []string) []*ipsets.TranslatedIPSet {
-	nsSelectorIPSets := []*ipsets.TranslatedIPSet{}
-	for _, listSet := range singleValueLabels {
-		labelType := nsLabelType(listSet)
-		translatedIPSet := ipsets.NewTranslatedIPSet(listSet, labelType, []string{})
-		nsSelectorIPSets = append(nsSelectorIPSets, translatedIPSet)
-	}
-	return nsSelectorIPSets
-}
-
-func nameSpaceSelectorInfo(selector *metav1.LabelSelector) (ops, singleValueLabels []string) {
-	// parse namespace label selector.
-	// Ignore multiple values from parseSelector since Namespace selector does not have multiple values.
-	// TODO(jungukcho): will revise parseSelector for easy understanding between podSelector and namespaceSelector
-	singleValueLabelsWithOps, _ := parseSelector(selector)
-	ops, singleValueLabels = GetOperatorsAndLabels(singleValueLabelsWithOps)
-	return ops, singleValueLabels
-}
-
-// allNameSpaceRule returns translatedIPSet and SetInfo
-// in case namespaceSelector field has {} which means all namespaces.
-func allNameSpaceRule(matchType policies.MatchType) ([]*ipsets.TranslatedIPSet, []policies.SetInfo) {
-	translatedIPSet := ipsets.NewTranslatedIPSet(util.KubeAllNamespacesFlag, ipsets.Namespace, []string{})
-	nsSelectorIPSets := []*ipsets.TranslatedIPSet{translatedIPSet}
-
-	setInfo := policies.NewSetInfo(util.KubeAllNamespacesFlag, ipsets.Namespace, included, matchType)
-	nsSelectorList := []policies.SetInfo{setInfo}
-	return nsSelectorIPSets, nsSelectorList
 }
 
 // nameSpaceSelector translates namespaceSelector of NetworkPolicyPeer in networkpolicy object to translatedIPSet and SetInfo.
@@ -359,7 +196,7 @@ func nameSpaceSelector(matchType policies.MatchType, selector *metav1.LabelSelec
 
 	for i := 0; i < LenOfnsSelectors; i++ {
 		nsc := nsSelectors[i]
-		nsSelectorIPSets[i] = ipsets.NewTranslatedIPSet(nsc.setName, nsc.setType, []string{})
+		nsSelectorIPSets[i] = ipsets.NewTranslatedIPSet(nsc.setName, nsc.setType)
 		nsSelectorList[i] = policies.NewSetInfo(nsc.setName, nsc.setType, nsc.include, matchType)
 	}
 
@@ -368,8 +205,8 @@ func nameSpaceSelector(matchType policies.MatchType, selector *metav1.LabelSelec
 
 // allowAllTraffic returns translatedIPSet and SetInfo in case of allow all internal traffic.
 func allowAllTraffic(matchType policies.MatchType) (*ipsets.TranslatedIPSet, policies.SetInfo) {
-	allowAllIPSets := ipsets.NewTranslatedIPSet(util.KubeAllNamespacesFlag, ipsets.Namespace, []string{})
-	setInfo := policies.NewSetInfo(util.KubeAllNamespacesFlag, ipsets.Namespace, included, matchType)
+	allowAllIPSets := ipsets.NewTranslatedIPSet(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNamespace)
+	setInfo := policies.NewSetInfo(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNamespace, included, matchType)
 	return allowAllIPSets, setInfo
 }
 
@@ -487,7 +324,7 @@ func translateIngress(npmNetPol *policies.NPMNetworkPolicy, targetSelector *meta
 
 			// #2.2 handle nameSpaceSelector and port if exist
 			if fromRule.PodSelector == nil && fromRule.NamespaceSelector != nil {
-				flattenNSSelctor := FlattenNameSpaceSelector(fromRule.NamespaceSelector)
+				flattenNSSelctor := flattenNameSpaceSelector(fromRule.NamespaceSelector)
 				for i := range flattenNSSelctor {
 					nsSelectorIPSets, nsSrcList := nameSpaceSelector(policies.SrcMatch, &flattenNSSelctor[i])
 					npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, nsSelectorIPSets...)
@@ -517,7 +354,7 @@ func translateIngress(npmNetPol *policies.NPMNetworkPolicy, targetSelector *meta
 			podSelectorIPSets, podSelectorSrcList := podSelector(policies.SrcMatch, fromRule.PodSelector)
 			npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, podSelectorIPSets...)
 
-			flattenNSSelctor := FlattenNameSpaceSelector(fromRule.NamespaceSelector)
+			flattenNSSelctor := flattenNameSpaceSelector(fromRule.NamespaceSelector)
 			for i := range flattenNSSelctor {
 				nsSelectorIPSets, nsSrcList := nameSpaceSelector(policies.SrcMatch, &flattenNSSelctor[i])
 				npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, nsSelectorIPSets...)
