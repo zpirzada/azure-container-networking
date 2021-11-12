@@ -13,9 +13,10 @@ stages:
       steps:
         - powershell: |
             dir "C:\Program Files\Docker\"
-            ./Program Files\Docker\Docker\docker version
-            ./Program Files\Docker\Docker\docker info
-            ./Program Files\Docker\Docker\dockerd.exe
+            docker version
+            docker info
+            dir "C:\Program Files\Docker\"
+            .\dockerd.exe
             powershell.exe -command "& { . .\windows.ps1; azure-npm-image $(tag)-windows-amd64 }"
           name: "build_npm"
           displayName: "Build"
