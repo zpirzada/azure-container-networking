@@ -13,9 +13,9 @@ stages:
       steps:
         - powershell: |
             dir "C:\Program Files\Docker\"
-            ./Program Files\Docker\Docker\docker version"
-            ./Program Files\Docker\Docker\docker info"
-            ./Program Files\Docker\Docker\dockerd.exe"
+            ./Program Files\Docker\Docker\docker version
+            ./Program Files\Docker\Docker\docker info
+            ./Program Files\Docker\Docker\dockerd.exe
             powershell.exe -command "& { . .\windows.ps1; azure-npm-image $(tag)-windows-amd64 }"
           name: "build_npm"
           displayName: "Build"
@@ -28,9 +28,6 @@ stages:
             addPipelineData: false
 
         - powershell: |
-            dir "C:\Program Files\Docker\"
-            cd "C:\Program Files\Docker\Docker"
-            ./DockerCli.exe -SwitchDaemon
             docker tag acnpublic.azurecr.io/azure-npm:$(tag)-windows-amd64 acnpublic.azurecr.io/azure-npm:$(tag)-windows-amd64-test
             docker push acnpublic.azurecr.io/azure-npm:$(tag)-windows-amd64-test
           name: "push_npm"
