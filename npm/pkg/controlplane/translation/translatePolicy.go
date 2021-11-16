@@ -13,7 +13,7 @@ import (
 )
 
 /*
-TODO
+TODO(jungukcho)
 1. namespace is default in label in K8s. Need to check whether I missed something.
 - Targeting a Namespace by its name
 (https://kubernetes.io/docs/concepts/services-networking/network-policies/#targeting-a-namespace-by-its-name)
@@ -100,9 +100,10 @@ func namedPortRule(portRule *networkingv1.NetworkPolicyPort) (*ipsets.Translated
 }
 
 func portRule(ruleIPSets []*ipsets.TranslatedIPSet, acl *policies.ACLPolicy, portRule *networkingv1.NetworkPolicyPort, portType netpolPortType) []*ipsets.TranslatedIPSet {
+	// port rule is always applied to destination side.
 	if portType == namedPortType {
 		namedPortIPSet, namedPortRuleDstList, protocol := namedPortRule(portRule)
-		acl.DstList = append(acl.DstList, namedPortRuleDstList)
+		acl.AddSetInfo([]policies.SetInfo{namedPortRuleDstList})
 		acl.Protocol = policies.Protocol(protocol)
 		ruleIPSets = append(ruleIPSets, namedPortIPSet)
 	} else if portType == numericPortType {
@@ -114,7 +115,7 @@ func portRule(ruleIPSets []*ipsets.TranslatedIPSet, acl *policies.ACLPolicy, por
 	return ruleIPSets
 }
 
-// ipBlockIPSet returns ipset name of the IPBlock.
+// ipBlockSetName returns ipset name of the IPBlock.
 // It is our contract to format "<policyname>-in-ns-<namespace>-<ipblock index><direction of ipblock (i.e., ingress: IN, egress: OUT>"
 // as ipset name of the IPBlock.
 // For example, in case network policy object has
@@ -126,7 +127,7 @@ func ipBlockSetName(policyName, ns string, direction policies.Direction, ipBlock
 	return fmt.Sprintf(ipBlocksetNameFormat, policyName, ns, ipBlockSetIndex, direction)
 }
 
-// ipBlockIPSet
+// ipBlockIPSet return translatedIPSet based based on ipBlockRule.
 func ipBlockIPSet(policyName, ns string, direction policies.Direction, ipBlockSetIndex int, ipBlockRule *networkingv1.IPBlock) *ipsets.TranslatedIPSet {
 	if ipBlockRule == nil || ipBlockRule.CIDR == "" {
 		return nil
@@ -144,13 +145,17 @@ func ipBlockIPSet(policyName, ns string, direction policies.Direction, ipBlockSe
 	return ipBlockIPSet
 }
 
-func ipBlockRule(policyName, ns string, direction policies.Direction, ipBlockSetIndex int, ipBlockRule *networkingv1.IPBlock) (*ipsets.TranslatedIPSet, policies.SetInfo) {
+// ipBlockRule translates IPBlock field in networkpolicy object to translatedIPSet and SetInfo.
+// ipBlockSetIndex parameter is used to diffentiate ipBlock fields in one networkpolicy object.
+func ipBlockRule(policyName, ns string, direction policies.Direction, matchType policies.MatchType, ipBlockSetIndex int,
+	ipBlockRule *networkingv1.IPBlock) (*ipsets.TranslatedIPSet, policies.SetInfo) {
+
 	if ipBlockRule == nil || ipBlockRule.CIDR == "" {
 		return nil, policies.SetInfo{}
 	}
 
 	ipBlockIPSet := ipBlockIPSet(policyName, ns, direction, ipBlockSetIndex, ipBlockRule)
-	setInfo := policies.NewSetInfo(ipBlockIPSet.Metadata.Name, ipsets.CIDRBlocks, included, policies.SrcMatch)
+	setInfo := policies.NewSetInfo(ipBlockIPSet.Metadata.Name, ipsets.CIDRBlocks, included, matchType)
 	return ipBlockIPSet, setInfo
 }
 
@@ -158,11 +163,11 @@ func ipBlockRule(policyName, ns string, direction policies.Direction, ipBlockSet
 // This function is called only when the NetworkPolicyPeer has namespaceSelector field.
 func podSelector(matchType policies.MatchType, selector *metav1.LabelSelector) ([]*ipsets.TranslatedIPSet, []policies.SetInfo) {
 	podSelectors := parsePodSelector(selector)
-	LenOfPodSelectors := len(podSelectors)
+	lenOfPodSelectors := len(podSelectors)
 	podSelectorIPSets := []*ipsets.TranslatedIPSet{}
-	podSelectorList := make([]policies.SetInfo, LenOfPodSelectors)
+	podSelectorList := make([]policies.SetInfo, lenOfPodSelectors)
 
-	for i := 0; i < LenOfPodSelectors; i++ {
+	for i := 0; i < lenOfPodSelectors; i++ {
 		ps := podSelectors[i]
 		podSelectorIPSets = append(podSelectorIPSets, ipsets.NewTranslatedIPSet(ps.setName, ps.setType, ps.members...))
 		// if value is nested value, create translatedIPSet with the nested value
@@ -190,11 +195,11 @@ func podSelectorWithNS(ns string, matchType policies.MatchType, selector *metav1
 // nameSpaceSelector translates namespaceSelector of NetworkPolicyPeer in networkpolicy object to translatedIPSet and SetInfo.
 func nameSpaceSelector(matchType policies.MatchType, selector *metav1.LabelSelector) ([]*ipsets.TranslatedIPSet, []policies.SetInfo) {
 	nsSelectors := parseNSSelector(selector)
-	LenOfnsSelectors := len(nsSelectors)
-	nsSelectorIPSets := make([]*ipsets.TranslatedIPSet, LenOfnsSelectors)
-	nsSelectorList := make([]policies.SetInfo, LenOfnsSelectors)
+	lenOfnsSelectors := len(nsSelectors)
+	nsSelectorIPSets := make([]*ipsets.TranslatedIPSet, lenOfnsSelectors)
+	nsSelectorList := make([]policies.SetInfo, lenOfnsSelectors)
 
-	for i := 0; i < LenOfnsSelectors; i++ {
+	for i := 0; i < lenOfnsSelectors; i++ {
 		nsc := nsSelectors[i]
 		nsSelectorIPSets[i] = ipsets.NewTranslatedIPSet(nsc.setName, nsc.setType)
 		nsSelectorList[i] = policies.NewSetInfo(nsc.setName, nsc.setType, nsc.include, matchType)
@@ -203,22 +208,16 @@ func nameSpaceSelector(matchType policies.MatchType, selector *metav1.LabelSelec
 	return nsSelectorIPSets, nsSelectorList
 }
 
-// allowAllTraffic returns translatedIPSet and SetInfo in case of allow all internal traffic.
-func allowAllTraffic(matchType policies.MatchType) (*ipsets.TranslatedIPSet, policies.SetInfo) {
+// allowAllInternal returns translatedIPSet and SetInfo in case of allowing all internal traffic excluding external.
+func allowAllInternal(matchType policies.MatchType) (*ipsets.TranslatedIPSet, policies.SetInfo) {
 	allowAllIPSets := ipsets.NewTranslatedIPSet(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNamespace)
 	setInfo := policies.NewSetInfo(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNamespace, included, matchType)
 	return allowAllIPSets, setInfo
 }
 
-// defaultDropACL returns ACLPolicy to drop traffic which is not allowed.
-func defaultDropACL(policyNS, policyName string, direction policies.Direction) *policies.ACLPolicy {
-	dropACL := policies.NewACLPolicy(policyNS, policyName, policies.Dropped, direction)
-	return dropACL
-}
-
 // ruleExists returns type of rules from networkingv1.NetworkPolicyIngressRule or networkingv1.NetworkPolicyEgressRule
 func ruleExists(ports []networkingv1.NetworkPolicyPort, peer []networkingv1.NetworkPolicyPeer) (allowExternal, portRuleExists, peerRuleExists bool) {
-	// TODO(jungukcho): need to clarify and summarize below flags
+	// TODO(jungukcho): need to clarify and summarize below flags + more comments
 	portRuleExists = len(ports) > 0
 	if peer != nil {
 		if len(peer) == 0 {
@@ -242,11 +241,11 @@ func ruleExists(ports []networkingv1.NetworkPolicyPort, peer []networkingv1.Netw
 }
 
 // peerAndPortRule deals with composite rules including ports and peers
-// (e.g., IPBlock, podSelector, namespaceSelector, or both podSelector and namespaceSelector)
-func peerAndPortRule(npmNetPol *policies.NPMNetworkPolicy, ports []networkingv1.NetworkPolicyPort, setInfo []policies.SetInfo) {
+// (e.g., IPBlock, podSelector, namespaceSelector, or both podSelector and namespaceSelector).
+func peerAndPortRule(npmNetPol *policies.NPMNetworkPolicy, direction policies.Direction, ports []networkingv1.NetworkPolicyPort, setInfo []policies.SetInfo) {
 	if len(ports) == 0 {
-		acl := policies.NewACLPolicy(npmNetPol.NameSpace, npmNetPol.Name, policies.Allowed, policies.Ingress)
-		acl.SrcList = setInfo
+		acl := policies.NewACLPolicy(npmNetPol.NameSpace, npmNetPol.Name, policies.Allowed, direction)
+		acl.AddSetInfo(setInfo)
 		npmNetPol.ACLs = append(npmNetPol.ACLs, acl)
 		return
 	}
@@ -259,125 +258,199 @@ func peerAndPortRule(npmNetPol *policies.NPMNetworkPolicy, ports []networkingv1.
 			continue
 		}
 
-		acl := policies.NewACLPolicy(npmNetPol.NameSpace, npmNetPol.Name, policies.Allowed, policies.Ingress)
-		acl.SrcList = setInfo
+		acl := policies.NewACLPolicy(npmNetPol.NameSpace, npmNetPol.Name, policies.Allowed, direction)
+		acl.AddSetInfo(setInfo)
 		npmNetPol.RuleIPSets = portRule(npmNetPol.RuleIPSets, acl, &ports[i], portKind)
 		npmNetPol.ACLs = append(npmNetPol.ACLs, acl)
 	}
 }
 
-// translateIngress traslates podSelector of spec field and NetworkPolicyIngressRule in networkpolicy object
-// to NPMNetworkPolicy object.
-func translateIngress(npmNetPol *policies.NPMNetworkPolicy, targetSelector *metav1.LabelSelector, rules []networkingv1.NetworkPolicyIngressRule) {
-	npmNetPol.PodSelectorIPSets, npmNetPol.PodSelectorList = podSelectorWithNS(npmNetPol.NameSpace, policies.DstMatch, targetSelector)
+// translateRule translates ingress or egress rules and update npmNetPol object.
+func translateRule(npmNetPol *policies.NPMNetworkPolicy, direction policies.Direction, matchType policies.MatchType, ruleIndex int,
+	ports []networkingv1.NetworkPolicyPort, peers []networkingv1.NetworkPolicyPeer) {
+	// TODO(jungukcho): need to clean up it.
+	// Leave allowExternal variable now while the condition is checked before calling this function.
+	allowExternal, portRuleExists, peerRuleExists := ruleExists(ports, peers)
 
-	for i, rule := range rules {
-		allowExternal, portRuleExists, fromRuleExists := ruleExists(rule.Ports, rule.From)
+	// #0. TODO(jungukcho): cannot come up when this condition is met.
+	// The code inside if condition is to handle allowing all internal traffic, but the case is handled in #2.4.
+	// So, this code may not execute. After confirming this, need to delete it.
+	if !portRuleExists && !peerRuleExists && !allowExternal {
+		acl := policies.NewACLPolicy(npmNetPol.NameSpace, npmNetPol.Name, policies.Allowed, direction)
+		ruleIPSets, allowAllInternalSetInfo := allowAllInternal(matchType)
+		npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, ruleIPSets)
+		acl.AddSetInfo([]policies.SetInfo{allowAllInternalSetInfo})
+		npmNetPol.ACLs = append(npmNetPol.ACLs, acl)
+		return
+	}
 
-		// #0. TODO(jungukcho): cannot come up when this condition is met.
-		if !portRuleExists && !fromRuleExists && !allowExternal {
-			acl := policies.NewACLPolicy(npmNetPol.NameSpace, npmNetPol.Name, policies.Allowed, policies.Ingress)
-			ruleIPSets, setInfo := allowAllTraffic(policies.SrcMatch)
-			npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, ruleIPSets)
-			acl.SrcList = append(acl.SrcList, setInfo)
-			npmNetPol.ACLs = append(npmNetPol.ACLs, acl)
-			continue
-		}
-
-		// #1. Only Ports fields exist in rule
-		if portRuleExists && !fromRuleExists && !allowExternal {
-			for i := range rule.Ports {
-				portKind, err := portType(rule.Ports[i])
-				if err != nil {
-					klog.Infof("Invalid NetworkPolicyPort %s", err)
-					continue
-				}
-
-				portACL := policies.NewACLPolicy(npmNetPol.NameSpace, npmNetPol.Name, policies.Allowed, policies.Ingress)
-				npmNetPol.RuleIPSets = portRule(npmNetPol.RuleIPSets, portACL, &rule.Ports[i], portKind)
-				npmNetPol.ACLs = append(npmNetPol.ACLs, portACL)
-			}
-			continue
-		}
-
-		// #2. From fields exist in rule
-		for j, fromRule := range rule.From {
-			// #2.1 Handle IPBlock and port if exist
-			if fromRule.IPBlock != nil {
-				if len(fromRule.IPBlock.CIDR) > 0 {
-					ipBlockIPSet, ipBlockSetInfo := ipBlockRule(npmNetPol.Name, npmNetPol.NameSpace, policies.Ingress, i, fromRule.IPBlock)
-					npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, ipBlockIPSet)
-					// all IPBlock entries (i.e., cidr and except) will be added in one ipset per from rule
-					if j != 0 {
-						continue
-					}
-					peerAndPortRule(npmNetPol, rule.Ports, []policies.SetInfo{ipBlockSetInfo})
-				}
-				// Do not check further since IPBlock field is exclusive in NetworkPolicyPeer (i.e., fromRule in this code).
+	// #1. Only Ports fields exist in rule
+	if portRuleExists && !peerRuleExists && !allowExternal {
+		for i := range ports {
+			portKind, err := portType(ports[i])
+			if err != nil {
+				klog.Infof("Invalid NetworkPolicyPort %s", err)
 				continue
 			}
 
-			// if there is no podSelector or namespaceSelector in fromRule, no need to check below code.
-			if fromRule.PodSelector == nil && fromRule.NamespaceSelector == nil {
-				continue
-			}
-
-			// #2.2 handle nameSpaceSelector and port if exist
-			if fromRule.PodSelector == nil && fromRule.NamespaceSelector != nil {
-				flattenNSSelctor := flattenNameSpaceSelector(fromRule.NamespaceSelector)
-				for i := range flattenNSSelctor {
-					nsSelectorIPSets, nsSrcList := nameSpaceSelector(policies.SrcMatch, &flattenNSSelctor[i])
-					npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, nsSelectorIPSets...)
-					peerAndPortRule(npmNetPol, rule.Ports, nsSrcList)
-				}
-				continue
-			}
-
-			// #2.3 handle podSelector and port if exist
-			if fromRule.PodSelector != nil && fromRule.NamespaceSelector == nil {
-				// TODO check old code if we need any ns- prefix for pod selectors
-				podSelectorIPSets, podSelectorSrcList := podSelectorWithNS(npmNetPol.NameSpace, policies.SrcMatch, fromRule.PodSelector)
-				npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, podSelectorIPSets...)
-				peerAndPortRule(npmNetPol, rule.Ports, podSelectorSrcList)
-				continue
-			}
-
-			// fromRule has both namespaceSelector and podSelector set.
-			// We should match the selected pods in the selected namespaces.
-			// This allows traffic from podSelector intersects namespaceSelector
-			// This is only supported in kubernetes version >= 1.11
-			if !util.IsNewNwPolicyVerFlag {
-				continue
-			}
-
-			// #2.4 handle namespaceSelector and podSelector and port if exist
-			podSelectorIPSets, podSelectorSrcList := podSelector(policies.SrcMatch, fromRule.PodSelector)
-			npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, podSelectorIPSets...)
-
-			flattenNSSelctor := flattenNameSpaceSelector(fromRule.NamespaceSelector)
-			for i := range flattenNSSelctor {
-				nsSelectorIPSets, nsSrcList := nameSpaceSelector(policies.SrcMatch, &flattenNSSelctor[i])
-				npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, nsSelectorIPSets...)
-				nsSrcList = append(nsSrcList, podSelectorSrcList...)
-				peerAndPortRule(npmNetPol, rule.Ports, nsSrcList)
-			}
-		}
-
-		// TODO(jungukcho): move this code in entry point of this function?
-		if allowExternal {
-			allowExternalACL := policies.NewACLPolicy(npmNetPol.NameSpace, npmNetPol.Name, policies.Allowed, policies.Ingress)
-			npmNetPol.ACLs = append(npmNetPol.ACLs, allowExternalACL)
+			portACL := policies.NewACLPolicy(npmNetPol.NameSpace, npmNetPol.Name, policies.Allowed, direction)
+			npmNetPol.RuleIPSets = portRule(npmNetPol.RuleIPSets, portACL, &ports[i], portKind)
+			npmNetPol.ACLs = append(npmNetPol.ACLs, portACL)
 		}
 	}
 
-	klog.Info("finished parsing ingress rule")
+	// #2. From or To fields exist in rule
+	for j, peer := range peers {
+		// #2.1 Handle IPBlock and port if exist
+		if peer.IPBlock != nil {
+			if len(peer.IPBlock.CIDR) > 0 {
+				ipBlockIPSet, ipBlockSetInfo := ipBlockRule(npmNetPol.Name, npmNetPol.NameSpace, direction, matchType, ruleIndex, peer.IPBlock)
+				npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, ipBlockIPSet)
+				// all fields (i.e., cidr and except) in peer.IPBlock will be added in one ipset per peer
+				if j != 0 {
+					continue
+				}
+				peerAndPortRule(npmNetPol, direction, ports, []policies.SetInfo{ipBlockSetInfo})
+			}
+			// Do not need to run below code to translate PodSelector and NamespaceSelector
+			// since IPBlock field is exclusive in NetworkPolicyPeer (i.e., peer in this code).
+			continue
+		}
+
+		// if there is no PodSelector or NamespaceSelector in peer, no need to run the rest of codes.
+		if peer.PodSelector == nil && peer.NamespaceSelector == nil {
+			continue
+		}
+
+		// #2.2 handle nameSpaceSelector and port if exist
+		if peer.PodSelector == nil && peer.NamespaceSelector != nil {
+			// Before translating NamespaceSelector, flattenNameSpaceSelector function call should be called
+			// to handle multiple values in matchExpressions spec.
+			flattenNSSelector := flattenNameSpaceSelector(peer.NamespaceSelector)
+			for i := range flattenNSSelector {
+				nsSelectorIPSets, nsSelectorList := nameSpaceSelector(matchType, &flattenNSSelector[i])
+				npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, nsSelectorIPSets...)
+				peerAndPortRule(npmNetPol, direction, ports, nsSelectorList)
+			}
+			continue
+		}
+
+		// #2.3 handle podSelector and port if exist
+		if peer.PodSelector != nil && peer.NamespaceSelector == nil {
+			podSelectorIPSets, podSelectorList := podSelectorWithNS(npmNetPol.NameSpace, matchType, peer.PodSelector)
+			npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, podSelectorIPSets...)
+			peerAndPortRule(npmNetPol, direction, ports, podSelectorList)
+			continue
+		}
+
+		// peer has both namespaceSelector and podSelector set.
+		// We should match the selected pods in the selected namespaces.
+		// This allows traffic from podSelector intersects namespaceSelector
+		// This is only supported in kubernetes version >= 1.11
+		if !util.IsNewNwPolicyVerFlag {
+			continue
+		}
+
+		// #2.4 handle namespaceSelector and podSelector and port if exist
+		podSelectorIPSets, podSelectorList := podSelector(matchType, peer.PodSelector)
+		npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, podSelectorIPSets...)
+
+		// Before translating NamespaceSelector, flattenNameSpaceSelector function call should be called
+		// to handle multiple values in matchExpressions spec.
+		flattenNSSelector := flattenNameSpaceSelector(peer.NamespaceSelector)
+		for i := range flattenNSSelector {
+			nsSelectorIPSets, nsSelectorList := nameSpaceSelector(matchType, &flattenNSSelector[i])
+			npmNetPol.RuleIPSets = append(npmNetPol.RuleIPSets, nsSelectorIPSets...)
+			nsSelectorList = append(nsSelectorList, podSelectorList...)
+			peerAndPortRule(npmNetPol, direction, ports, nsSelectorList)
+		}
+	}
 }
 
-func existIngress(npObj *networkingv1.NetworkPolicy) bool {
-	return !(npObj.Spec.Ingress != nil &&
-		len(npObj.Spec.Ingress) == 1 &&
-		len(npObj.Spec.Ingress[0].Ports) == 0 &&
-		len(npObj.Spec.Ingress[0].From) == 0)
+// defaultDropACL returns ACLPolicy to drop traffic which is not allowed.
+func defaultDropACL(policyNS, policyName string, direction policies.Direction) *policies.ACLPolicy {
+	dropACL := policies.NewACLPolicy(policyNS, policyName, policies.Dropped, direction)
+	return dropACL
+}
+
+// allowAllPolicy adds acl to allow all traffic including internal (i.e,. K8s cluster) and external (i.e., internet)
+func allowAllPolicy(npmNetPol *policies.NPMNetworkPolicy, direction policies.Direction) {
+	allowAllACL := policies.NewACLPolicy(npmNetPol.NameSpace, npmNetPol.Name, policies.Allowed, direction)
+	npmNetPol.ACLs = append(npmNetPol.ACLs, allowAllACL)
+}
+
+// isAllowAllToIngress returns true if this network policy allows all traffic from internal (i.e,. K8s cluster) and external (i.e., internet)
+// Otherwise, it returns false.
+func isAllowAllToIngress(ingress []networkingv1.NetworkPolicyIngressRule) bool {
+	return len(ingress) == 1 &&
+		len(ingress[0].Ports) == 0 &&
+		len(ingress[0].From) == 0
+}
+
+// ingressPolicy traslates NetworkPolicyIngressRule in NetworkPolicy object
+// to NPMNetworkPolicy object.
+func ingressPolicy(npmNetPol *policies.NPMNetworkPolicy, ingress []networkingv1.NetworkPolicyIngressRule) {
+	// #1. Allow all traffic from both internal and external.
+	// In yaml file, it is specified with '{}'.
+	if isAllowAllToIngress(ingress) {
+		allowAllPolicy(npmNetPol, policies.Ingress)
+		return
+	}
+
+	// #2. If ingress is nil (in yaml file, it is specified with '[]'), it means "Deny all" - it does not allow receiving any traffic from others.
+	if ingress == nil {
+		// Except for allow all traffic case in #1, the rest of them should have default drop rules.
+		dropACL := defaultDropACL(npmNetPol.NameSpace, npmNetPol.Name, policies.Ingress)
+		npmNetPol.ACLs = append(npmNetPol.ACLs, dropACL)
+		return
+	}
+
+	// #3. Ingress rule is not AllowAll (including internal and external) and DenyAll policy.
+	// So, start translating ingress policy.
+	for i, rule := range ingress {
+		translateRule(npmNetPol, policies.Ingress, policies.SrcMatch, i, rule.Ports, rule.From)
+	}
+	// Except for allow all traffic case in #1, the rest of them should have default drop rules.
+	dropACL := defaultDropACL(npmNetPol.NameSpace, npmNetPol.Name, policies.Ingress)
+	npmNetPol.ACLs = append(npmNetPol.ACLs, dropACL)
+}
+
+// isAllowAllToEgress returns true if this network policy allows all traffic to internal (i.e,. K8s cluster) and external (i.e., internet)
+// Otherwise, it returns false.
+func isAllowAllToEgress(egress []networkingv1.NetworkPolicyEgressRule) bool {
+	return len(egress) == 1 &&
+		len(egress[0].Ports) == 0 &&
+		len(egress[0].To) == 0
+}
+
+// egressPolicy traslates NetworkPolicyEgressRule in networkpolicy object
+// to NPMNetworkPolicy object.
+func egressPolicy(npmNetPol *policies.NPMNetworkPolicy, egress []networkingv1.NetworkPolicyEgressRule) {
+	// #1. Allow all traffic to both internal and external.
+	// In yaml file, it is specified with '{}'.
+	if isAllowAllToEgress(egress) {
+		allowAllPolicy(npmNetPol, policies.Egress)
+		return
+	}
+
+	// #2. If egress is nil (in yaml file, it is specified with '[]'), it means "Deny all" - it does not allow sending traffic to others.
+	if egress != nil {
+		// Except for allow all traffic case in #1, the rest of them should have default drop rules.
+		dropACL := defaultDropACL(npmNetPol.NameSpace, npmNetPol.Name, policies.Egress)
+		npmNetPol.ACLs = append(npmNetPol.ACLs, dropACL)
+		return
+	}
+
+	// #3. Egress rule is not AllowAll (including internal and external) and DenyAll.
+	// So, start translating egress policy.
+	for i, rule := range egress {
+		translateRule(npmNetPol, policies.Egress, policies.DstMatch, i, rule.Ports, rule.To)
+	}
+
+	// #3. Except for allow all traffic case in #1, the rest of them should have default drop rules.
+	// Add drop ACL to drop the rest of traffic which is not specified in Egress Spec.
+	dropACL := defaultDropACL(npmNetPol.NameSpace, npmNetPol.Name, policies.Egress)
+	npmNetPol.ACLs = append(npmNetPol.ACLs, dropACL)
 }
 
 // TranslatePolicy traslates networkpolicy object to NPMNetworkPolicy object
@@ -388,20 +461,20 @@ func TranslatePolicy(npObj *networkingv1.NetworkPolicy) *policies.NPMNetworkPoli
 		NameSpace: npObj.ObjectMeta.Namespace,
 	}
 
-	if len(npObj.Spec.PolicyTypes) == 0 {
-		translateIngress(npmNetPol, &npObj.Spec.PodSelector, npObj.Spec.Ingress)
-		return npmNetPol
-	}
+	// podSelector in spec.PodSelector is common for ingress and egress.
+	// Process this podSelector first.
+	npmNetPol.PodSelectorIPSets, npmNetPol.PodSelectorList = podSelectorWithNS(npmNetPol.NameSpace, policies.EitherMatch, &npObj.Spec.PodSelector)
 
+	// Each NetworkPolicy includes a policyTypes list which may include either Ingress, Egress, or both.
+	// If no policyTypes are specified on a NetworkPolicy then by default Ingress will always be set
+	// and Egress will be set if the NetworkPolicy has any egress rules.
 	for _, ptype := range npObj.Spec.PolicyTypes {
 		if ptype == networkingv1.PolicyTypeIngress {
-			translateIngress(npmNetPol, &npObj.Spec.PodSelector, npObj.Spec.Ingress)
+			ingressPolicy(npmNetPol, npObj.Spec.Ingress)
+		} else {
+			egressPolicy(npmNetPol, npObj.Spec.Egress)
 		}
 	}
 
-	if hasIngress := existIngress(npObj); hasIngress {
-		dropACL := defaultDropACL(npmNetPol.NameSpace, npmNetPol.Name, policies.Ingress)
-		npmNetPol.ACLs = append(npmNetPol.ACLs, dropACL)
-	}
 	return npmNetPol
 }

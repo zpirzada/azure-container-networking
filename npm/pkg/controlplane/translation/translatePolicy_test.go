@@ -18,10 +18,6 @@ const (
 	namedPortStr string = "serve-tcp"
 )
 
-// TODO(jungukcho)
-// 1. will use variables in UTs instead of constant "src",  and "dst" for better managements
-// 2. need to walk through inputs of tests to remove redundancy
-// - Example - TestPodSelectorIPSets and TestNameSpaceSelectorIPSets (while setType is different)
 func TestPortType(t *testing.T) {
 	tcp := v1.ProtocolTCP
 	port8000 := intstr.FromInt(8000)
@@ -83,6 +79,7 @@ func TestPortType(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := portType(tt.portRule)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
@@ -158,6 +155,7 @@ func TestNumericPortRule(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			portRule, protocol := numericPortRule(&tt.portRule)
 			require.Equal(t, tt.want, portRule)
 			require.Equal(t, tt.wantProtocol, protocol)
@@ -182,7 +180,7 @@ func TestNamedPortRuleInfo(t *testing.T) {
 			name:     "empty",
 			portRule: nil,
 			want: &namedPortOutput{
-				translatedIPSet: nil, // (TODO): Need to check it
+				translatedIPSet: nil,
 				protocol:        "",
 			},
 		},
@@ -194,13 +192,8 @@ func TestNamedPortRuleInfo(t *testing.T) {
 			},
 
 			want: &namedPortOutput{
-				translatedIPSet: &ipsets.TranslatedIPSet{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: util.NamedPortIPSetPrefix + "serve-tcp",
-						Type: ipsets.NamedPorts,
-					},
-				},
-				protocol: "TCP",
+				translatedIPSet: ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts),
+				protocol:        "TCP",
 			},
 		},
 		{
@@ -209,13 +202,8 @@ func TestNamedPortRuleInfo(t *testing.T) {
 				Port: &namedPort,
 			},
 			want: &namedPortOutput{
-				translatedIPSet: &ipsets.TranslatedIPSet{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: util.NamedPortIPSetPrefix + "serve-tcp",
-						Type: ipsets.NamedPorts,
-					},
-				},
-				protocol: "TCP",
+				translatedIPSet: ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts),
+				protocol:        "TCP",
 			},
 		},
 	}
@@ -223,6 +211,7 @@ func TestNamedPortRuleInfo(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			translatedIPSet, protocol := namedPortRuleInfo(tt.portRule)
 			got := &namedPortOutput{
 				translatedIPSet: translatedIPSet,
@@ -263,23 +252,10 @@ func TestNamedPortRule(t *testing.T) {
 				Protocol: &tcp,
 				Port:     &namedPort,
 			},
-
 			want: &namedPortRuleOutput{
-				translatedIPSet: &ipsets.TranslatedIPSet{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: util.NamedPortIPSetPrefix + "serve-tcp",
-						Type: ipsets.NamedPorts,
-					},
-				},
-				setInfo: policies.SetInfo{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: util.NamedPortIPSetPrefix + "serve-tcp",
-						Type: ipsets.NamedPorts,
-					},
-					Included:  included,
-					MatchType: policies.DstDstMatch,
-				},
-				protocol: "TCP",
+				translatedIPSet: ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts),
+				setInfo:         policies.NewSetInfo(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts, included, policies.DstDstMatch),
+				protocol:        "TCP",
 			},
 		},
 		{
@@ -288,21 +264,9 @@ func TestNamedPortRule(t *testing.T) {
 				Port: &namedPort,
 			},
 			want: &namedPortRuleOutput{
-				translatedIPSet: &ipsets.TranslatedIPSet{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: util.NamedPortIPSetPrefix + "serve-tcp",
-						Type: ipsets.NamedPorts,
-					},
-				},
-				setInfo: policies.SetInfo{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: util.NamedPortIPSetPrefix + "serve-tcp",
-						Type: ipsets.NamedPorts,
-					},
-					Included:  included,
-					MatchType: policies.DstDstMatch,
-				},
-				protocol: "TCP",
+				translatedIPSet: ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts),
+				setInfo:         policies.NewSetInfo(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts, included, policies.DstDstMatch),
+				protocol:        "TCP",
 			},
 		},
 	}
@@ -310,6 +274,7 @@ func TestNamedPortRule(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			namedPortIPSet, setInfo, protocol := namedPortRule(tt.portRule)
 			got := &namedPortRuleOutput{
 				translatedIPSet: namedPortIPSet,
@@ -321,36 +286,51 @@ func TestNamedPortRule(t *testing.T) {
 	}
 }
 
+type ipBlockInfo struct {
+	policyName      string
+	namemspace      string
+	direction       policies.Direction
+	matchType       policies.MatchType
+	ipBlockSetIndex int
+}
+
+func createIPBlockInfo(policyName, ns string, direction policies.Direction, matchType policies.MatchType, ipBlockSetIndex int) *ipBlockInfo {
+	return &ipBlockInfo{
+		policyName:      policyName,
+		namemspace:      ns,
+		direction:       direction,
+		matchType:       matchType,
+		ipBlockSetIndex: ipBlockSetIndex,
+	}
+}
+
 func TestIPBlockSetName(t *testing.T) {
 	tests := []struct {
-		name            string
-		policyName      string
-		namemspace      string
-		direction       policies.Direction
-		ipBlockSetIndex int
-		want            string
+		name string
+		*ipBlockInfo
+		want string
 	}{
 		{
-			name:            "default/test",
-			policyName:      "test",
-			namemspace:      "default",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
-			want:            "test-in-ns-default-0IN",
+			name:        "default/test (ingress)",
+			ipBlockInfo: createIPBlockInfo("test", "default", policies.Ingress, policies.SrcMatch, 0),
+			want:        "test-in-ns-default-0IN",
 		},
 		{
-			name:            "testns/test",
-			policyName:      "test",
-			namemspace:      "testns",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
-			want:            "test-in-ns-testns-0IN",
+			name:        "default/test (ingress)",
+			ipBlockInfo: createIPBlockInfo("test", "default", policies.Ingress, policies.SrcMatch, 1),
+			want:        "test-in-ns-default-1IN",
+		},
+		{
+			name:        "testns/test (egress)",
+			ipBlockInfo: createIPBlockInfo("test", "testns", policies.Egress, policies.DstMatch, 0),
+			want:        "test-in-ns-testns-0OUT",
 		},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := ipBlockSetName(tt.policyName, tt.namemspace, tt.direction, tt.ipBlockSetIndex)
 			require.Equal(t, tt.want, got)
 		})
@@ -359,29 +339,20 @@ func TestIPBlockSetName(t *testing.T) {
 
 func TestIPBlockIPSet(t *testing.T) {
 	tests := []struct {
-		name            string
-		policyName      string
-		namemspace      string
-		direction       policies.Direction
-		ipBlockSetIndex int
+		name string
+		*ipBlockInfo
 		ipBlockRule     *networkingv1.IPBlock
 		translatedIPSet *ipsets.TranslatedIPSet
 	}{
 		{
 			name:            "empty ipblock rule",
-			policyName:      "test",
-			namemspace:      "default",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
+			ipBlockInfo:     createIPBlockInfo("test", "default", policies.Ingress, policies.SrcMatch, 0),
 			ipBlockRule:     nil,
 			translatedIPSet: nil,
 		},
 		{
-			name:            "incorrect ipblock rule with only except",
-			policyName:      "test",
-			namemspace:      "default",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
+			name:        "incorrect ipblock rule with only except",
+			ipBlockInfo: createIPBlockInfo("test", "default", policies.Ingress, policies.SrcMatch, 0),
 			ipBlockRule: &networkingv1.IPBlock{
 				CIDR:   "",
 				Except: []string{"172.17.1.0/24"},
@@ -389,63 +360,37 @@ func TestIPBlockIPSet(t *testing.T) {
 			translatedIPSet: nil,
 		},
 		{
-			name:            "only cidr",
-			policyName:      "test",
-			namemspace:      "default",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
+			name:        "only cidr",
+			ipBlockInfo: createIPBlockInfo("test", "default", policies.Ingress, policies.SrcMatch, 0),
 			ipBlockRule: &networkingv1.IPBlock{
 				CIDR: "172.17.0.0/16",
 			},
-			translatedIPSet: &ipsets.TranslatedIPSet{
-				Metadata: &ipsets.IPSetMetadata{
-					Name: "test-in-ns-default-0IN",
-					Type: ipsets.CIDRBlocks,
-				},
-				Members: []string{"172.17.0.0/16"},
-			},
+			translatedIPSet: ipsets.NewTranslatedIPSet("test-in-ns-default-0IN", ipsets.CIDRBlocks, []string{"172.17.0.0/16"}...),
 		},
 		{
-			name:            "one cidr and one except",
-			policyName:      "test",
-			namemspace:      "default",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
+			name:        "one cidr and one except",
+			ipBlockInfo: createIPBlockInfo("test", "default", policies.Ingress, policies.SrcMatch, 0),
 			ipBlockRule: &networkingv1.IPBlock{
 				CIDR:   "172.17.0.0/16",
 				Except: []string{"172.17.1.0/24"},
 			},
-			translatedIPSet: &ipsets.TranslatedIPSet{
-				Metadata: &ipsets.IPSetMetadata{
-					Name: "test-in-ns-default-0IN",
-					Type: ipsets.CIDRBlocks,
-				},
-				Members: []string{"172.17.0.0/16", "172.17.1.0/24nomatch"},
-			},
+			translatedIPSet: ipsets.NewTranslatedIPSet("test-in-ns-default-0IN", ipsets.CIDRBlocks, []string{"172.17.0.0/16", "172.17.1.0/24nomatch"}...),
 		},
 		{
-			name:            "one cidr and multiple except",
-			policyName:      "test-network-policy",
-			namemspace:      "default",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
+			name:        "one cidr and multiple except",
+			ipBlockInfo: createIPBlockInfo("test-network-policy", "default", policies.Ingress, policies.SrcMatch, 0),
 			ipBlockRule: &networkingv1.IPBlock{
 				CIDR:   "172.17.0.0/16",
 				Except: []string{"172.17.1.0/24", "172.17.2.0/24"},
 			},
-			translatedIPSet: &ipsets.TranslatedIPSet{
-				Metadata: &ipsets.IPSetMetadata{
-					Name: "test-network-policy-in-ns-default-0IN",
-					Type: ipsets.CIDRBlocks,
-				},
-				Members: []string{"172.17.0.0/16", "172.17.1.0/24nomatch", "172.17.2.0/24nomatch"},
-			},
+			translatedIPSet: ipsets.NewTranslatedIPSet("test-network-policy-in-ns-default-0IN", ipsets.CIDRBlocks, []string{"172.17.0.0/16", "172.17.1.0/24nomatch", "172.17.2.0/24nomatch"}...),
 		},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := ipBlockIPSet(tt.policyName, tt.namemspace, tt.direction, tt.ipBlockSetIndex, tt.ipBlockRule)
 			require.Equal(t, tt.translatedIPSet, got)
 		})
@@ -453,33 +398,23 @@ func TestIPBlockIPSet(t *testing.T) {
 }
 
 func TestIPBlockRule(t *testing.T) {
-	matchType := policies.SrcMatch
 	tests := []struct {
-		name            string
-		policyName      string
-		namemspace      string
-		direction       policies.Direction
-		ipBlockSetIndex int
+		name string
+		*ipBlockInfo
 		ipBlockRule     *networkingv1.IPBlock
 		translatedIPSet *ipsets.TranslatedIPSet
 		setInfo         policies.SetInfo
 	}{
 		{
-			name:            "empty ipblock rule",
-			policyName:      "test",
-			namemspace:      "default",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
+			name:            "empty ipblock rule ",
+			ipBlockInfo:     createIPBlockInfo("test", "default", policies.Ingress, policies.SrcMatch, 0),
 			ipBlockRule:     nil,
 			translatedIPSet: nil,
 			setInfo:         policies.SetInfo{},
 		},
 		{
-			name:            "incorrect ipblock rule with only except",
-			policyName:      "test",
-			namemspace:      "default",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
+			name:        "incorrect ipblock rule with only except",
+			ipBlockInfo: createIPBlockInfo("test", "default", policies.Ingress, policies.SrcMatch, 0),
 			ipBlockRule: &networkingv1.IPBlock{
 				CIDR:   "",
 				Except: []string{"172.17.1.0/24"},
@@ -488,88 +423,41 @@ func TestIPBlockRule(t *testing.T) {
 			setInfo:         policies.SetInfo{},
 		},
 		{
-			name:            "only cidr",
-			policyName:      "test",
-			namemspace:      "default",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
+			name:        "only cidr",
+			ipBlockInfo: createIPBlockInfo("test", "default", policies.Ingress, policies.SrcMatch, 0),
 			ipBlockRule: &networkingv1.IPBlock{
 				CIDR: "172.17.0.0/16",
 			},
-			translatedIPSet: &ipsets.TranslatedIPSet{
-				Metadata: &ipsets.IPSetMetadata{
-					Name: "test-in-ns-default-0IN",
-					Type: ipsets.CIDRBlocks,
-				},
-				Members: []string{"172.17.0.0/16"},
-			},
-			setInfo: policies.SetInfo{
-				IPSet: &ipsets.IPSetMetadata{
-					Name: "test-in-ns-default-0IN",
-					Type: ipsets.CIDRBlocks,
-				},
-				Included:  included,
-				MatchType: matchType,
-			},
+			translatedIPSet: ipsets.NewTranslatedIPSet("test-in-ns-default-0IN", ipsets.CIDRBlocks, []string{"172.17.0.0/16"}...),
+			setInfo:         policies.NewSetInfo("test-in-ns-default-0IN", ipsets.CIDRBlocks, included, policies.SrcMatch),
 		},
 		{
-			name:            "one cidr and one except",
-			policyName:      "test",
-			namemspace:      "default",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
+			name:        "one cidr and one except",
+			ipBlockInfo: createIPBlockInfo("test", "default", policies.Ingress, policies.SrcMatch, 0),
 			ipBlockRule: &networkingv1.IPBlock{
 				CIDR:   "172.17.0.0/16",
 				Except: []string{"172.17.1.0/24"},
 			},
-			translatedIPSet: &ipsets.TranslatedIPSet{
-				Metadata: &ipsets.IPSetMetadata{
-					Name: "test-in-ns-default-0IN",
-					Type: ipsets.CIDRBlocks,
-				},
-				Members: []string{"172.17.0.0/16", "172.17.1.0/24nomatch"},
-			},
-			setInfo: policies.SetInfo{
-				IPSet: &ipsets.IPSetMetadata{
-					Name: "test-in-ns-default-0IN",
-					Type: ipsets.CIDRBlocks,
-				},
-				Included:  included,
-				MatchType: matchType,
-			},
+			translatedIPSet: ipsets.NewTranslatedIPSet("test-in-ns-default-0IN", ipsets.CIDRBlocks, []string{"172.17.0.0/16", "172.17.1.0/24nomatch"}...),
+			setInfo:         policies.NewSetInfo("test-in-ns-default-0IN", ipsets.CIDRBlocks, included, policies.SrcMatch),
 		},
 		{
-			name:            "one cidr and multiple except",
-			policyName:      "test-network-policy",
-			namemspace:      "default",
-			direction:       policies.Ingress,
-			ipBlockSetIndex: 0,
+			name:        "one cidr and multiple except",
+			ipBlockInfo: createIPBlockInfo("test-network-policy", "default", policies.Ingress, policies.SrcMatch, 0),
 			ipBlockRule: &networkingv1.IPBlock{
 				CIDR:   "172.17.0.0/16",
 				Except: []string{"172.17.1.0/24", "172.17.2.0/24"},
 			},
-			translatedIPSet: &ipsets.TranslatedIPSet{
-				Metadata: &ipsets.IPSetMetadata{
-					Name: "test-network-policy-in-ns-default-0IN",
-					Type: ipsets.CIDRBlocks,
-				},
-				Members: []string{"172.17.0.0/16", "172.17.1.0/24nomatch", "172.17.2.0/24nomatch"},
-			},
-			setInfo: policies.SetInfo{
-				IPSet: &ipsets.IPSetMetadata{
-					Name: "test-network-policy-in-ns-default-0IN",
-					Type: ipsets.CIDRBlocks,
-				},
-				Included:  included,
-				MatchType: matchType,
-			},
+			translatedIPSet: ipsets.NewTranslatedIPSet("test-network-policy-in-ns-default-0IN", ipsets.CIDRBlocks, []string{"172.17.0.0/16", "172.17.1.0/24nomatch", "172.17.2.0/24nomatch"}...),
+			setInfo:         policies.NewSetInfo("test-network-policy-in-ns-default-0IN", ipsets.CIDRBlocks, included, policies.SrcMatch),
 		},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			translatedIPSet, setInfo := ipBlockRule(tt.policyName, tt.namemspace, tt.direction, tt.ipBlockSetIndex, tt.ipBlockRule)
+			t.Parallel()
+			translatedIPSet, setInfo := ipBlockRule(tt.policyName, tt.namemspace, tt.direction, tt.matchType, tt.ipBlockSetIndex, tt.ipBlockRule)
 			require.Equal(t, tt.translatedIPSet, translatedIPSet)
 			require.Equal(t, tt.setInfo, setInfo)
 		})
@@ -775,22 +663,10 @@ func TestNameSpaceSelector(t *testing.T) {
 				MatchLabels: map[string]string{},
 			},
 			nsSelectorIPSets: []*ipsets.TranslatedIPSet{
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: util.KubeAllNamespacesFlag,
-						Type: ipsets.KeyLabelOfNamespace,
-					},
-				},
+				ipsets.NewTranslatedIPSet(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNamespace),
 			},
 			nsSelectorList: []policies.SetInfo{
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: util.KubeAllNamespacesFlag,
-						Type: ipsets.KeyLabelOfNamespace,
-					},
-					Included:  included,
-					MatchType: matchType,
-				},
+				policies.NewSetInfo(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNamespace, included, matchType),
 			},
 		},
 		{
@@ -802,22 +678,10 @@ func TestNameSpaceSelector(t *testing.T) {
 				},
 			},
 			nsSelectorIPSets: []*ipsets.TranslatedIPSet{
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: "test:",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-				},
+				ipsets.NewTranslatedIPSet("test:", ipsets.KeyValueLabelOfNamespace),
 			},
 			nsSelectorList: []policies.SetInfo{
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: "test:",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-					Included:  included,
-					MatchType: matchType,
-				},
+				policies.NewSetInfo("test:", ipsets.KeyValueLabelOfNamespace, included, matchType),
 			},
 		},
 		{
@@ -829,22 +693,10 @@ func TestNameSpaceSelector(t *testing.T) {
 				},
 			},
 			nsSelectorIPSets: []*ipsets.TranslatedIPSet{
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: "label:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-				},
+				ipsets.NewTranslatedIPSet("label:src", ipsets.KeyValueLabelOfNamespace),
 			},
 			nsSelectorList: []policies.SetInfo{
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: "label:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-					Included:  included,
-					MatchType: matchType,
-				},
+				policies.NewSetInfo("label:src", ipsets.KeyValueLabelOfNamespace, included, matchType),
 			},
 		},
 		{
@@ -862,36 +714,12 @@ func TestNameSpaceSelector(t *testing.T) {
 				},
 			},
 			nsSelectorIPSets: []*ipsets.TranslatedIPSet{
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: "label:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-				},
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: "label",
-						Type: ipsets.KeyLabelOfNamespace,
-					},
-				},
+				ipsets.NewTranslatedIPSet("label:src", ipsets.KeyValueLabelOfNamespace),
+				ipsets.NewTranslatedIPSet("label", ipsets.KeyLabelOfNamespace),
 			},
 			nsSelectorList: []policies.SetInfo{
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: "label:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-					Included:  included,
-					MatchType: matchType,
-				},
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: "label",
-						Type: ipsets.KeyLabelOfNamespace,
-					},
-					Included:  included,
-					MatchType: matchType,
-				},
+				policies.NewSetInfo("label:src", ipsets.KeyValueLabelOfNamespace, included, matchType),
+				policies.NewSetInfo("label", ipsets.KeyLabelOfNamespace, included, matchType),
 			},
 		},
 		{
@@ -912,36 +740,12 @@ func TestNameSpaceSelector(t *testing.T) {
 				},
 			},
 			nsSelectorIPSets: []*ipsets.TranslatedIPSet{
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: "label:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-				},
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: "labelIn:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-				},
+				ipsets.NewTranslatedIPSet("label:src", ipsets.KeyValueLabelOfNamespace),
+				ipsets.NewTranslatedIPSet("labelIn:src", ipsets.KeyValueLabelOfNamespace),
 			},
 			nsSelectorList: []policies.SetInfo{
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: "label:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-					Included:  included,
-					MatchType: matchType,
-				},
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: "labelIn:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-					Included:  included,
-					MatchType: matchType,
-				},
+				policies.NewSetInfo("label:src", ipsets.KeyValueLabelOfNamespace, included, matchType),
+				policies.NewSetInfo("labelIn:src", ipsets.KeyValueLabelOfNamespace, included, matchType),
 			},
 		},
 		{
@@ -962,36 +766,12 @@ func TestNameSpaceSelector(t *testing.T) {
 				},
 			},
 			nsSelectorIPSets: []*ipsets.TranslatedIPSet{
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: "label:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-				},
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: "labelNotIn:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-				},
+				ipsets.NewTranslatedIPSet("label:src", ipsets.KeyValueLabelOfNamespace),
+				ipsets.NewTranslatedIPSet("labelNotIn:src", ipsets.KeyValueLabelOfNamespace),
 			},
 			nsSelectorList: []policies.SetInfo{
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: "label:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-					Included:  included,
-					MatchType: matchType,
-				},
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: "labelNotIn:src",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-					Included:  nonIncluded,
-					MatchType: matchType,
-				},
+				policies.NewSetInfo("label:src", ipsets.KeyValueLabelOfNamespace, included, matchType),
+				policies.NewSetInfo("labelNotIn:src", ipsets.KeyValueLabelOfNamespace, nonIncluded, matchType),
 			},
 		},
 		{
@@ -1017,50 +797,14 @@ func TestNameSpaceSelector(t *testing.T) {
 				},
 			},
 			nsSelectorIPSets: []*ipsets.TranslatedIPSet{
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: "k0:v0",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-				},
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: "k1:v10",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-				},
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: "k2",
-						Type: ipsets.KeyLabelOfNamespace,
-					},
-				},
+				ipsets.NewTranslatedIPSet("k0:v0", ipsets.KeyValueLabelOfNamespace),
+				ipsets.NewTranslatedIPSet("k1:v10", ipsets.KeyValueLabelOfNamespace),
+				ipsets.NewTranslatedIPSet("k2", ipsets.KeyLabelOfNamespace),
 			},
 			nsSelectorList: []policies.SetInfo{
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: "k0:v0",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-					Included:  included,
-					MatchType: matchType,
-				},
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: "k1:v10",
-						Type: ipsets.KeyValueLabelOfNamespace,
-					},
-					Included:  included,
-					MatchType: matchType,
-				},
-				{
-					IPSet: &ipsets.IPSetMetadata{
-						Name: "k2",
-						Type: ipsets.KeyLabelOfNamespace,
-					},
-					Included:  nonIncluded,
-					MatchType: matchType,
-				},
+				policies.NewSetInfo("k0:v0", ipsets.KeyValueLabelOfNamespace, included, matchType),
+				policies.NewSetInfo("k1:v10", ipsets.KeyValueLabelOfNamespace, included, matchType),
+				policies.NewSetInfo("k2", ipsets.KeyLabelOfNamespace, nonIncluded, matchType),
 			},
 		},
 	}
@@ -1068,6 +812,7 @@ func TestNameSpaceSelector(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			nsSelectorIPSets, nsSelectorList := nameSpaceSelector(tt.matchType, tt.labelSelector)
 			require.Equal(t, tt.nsSelectorIPSets, nsSelectorIPSets)
 			require.Equal(t, tt.nsSelectorList, nsSelectorList)
@@ -1075,7 +820,7 @@ func TestNameSpaceSelector(t *testing.T) {
 	}
 }
 
-func TestAllowAllTraffic(t *testing.T) {
+func TestAllowAllInternal(t *testing.T) {
 	matchType := policies.SrcMatch
 	tests := []struct {
 		name             string
@@ -1084,29 +829,18 @@ func TestAllowAllTraffic(t *testing.T) {
 		nsSelectorList   policies.SetInfo
 	}{
 		{
-			name:      "Allow all traffic from all namespaces in ingress",
-			matchType: matchType,
-			nsSelectorIPSets: &ipsets.TranslatedIPSet{
-				Metadata: &ipsets.IPSetMetadata{
-					Name: util.KubeAllNamespacesFlag,
-					Type: ipsets.KeyLabelOfNamespace,
-				},
-			},
-			nsSelectorList: policies.SetInfo{
-				IPSet: &ipsets.IPSetMetadata{
-					Name: util.KubeAllNamespacesFlag,
-					Type: ipsets.KeyLabelOfNamespace,
-				},
-				Included:  included,
-				MatchType: matchType,
-			},
+			name:             "Allow all traffic from all namespaces in ingress",
+			matchType:        matchType,
+			nsSelectorIPSets: ipsets.NewTranslatedIPSet(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNamespace),
+			nsSelectorList:   policies.NewSetInfo(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNamespace, included, matchType),
 		},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			nsSelectorIPSets, nsSelectorList := allowAllTraffic(tt.matchType)
+			t.Parallel()
+			nsSelectorIPSets, nsSelectorList := allowAllInternal(tt.matchType)
 			require.Equal(t, tt.nsSelectorIPSets, nsSelectorIPSets)
 			require.Equal(t, tt.nsSelectorList, nsSelectorList)
 		})
@@ -1149,6 +883,7 @@ func TestDefaultDropACL(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			dropACL := defaultDropACL(tt.policyNS, tt.policyName, tt.direction)
 			require.Equal(t, tt.dropACL, dropACL)
 		})
@@ -1172,23 +907,11 @@ func TestPortRuleWithNamedPort(t *testing.T) {
 				Port:     &namedPort,
 			},
 			ruleIPSets: []*ipsets.TranslatedIPSet{
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: util.NamedPortIPSetPrefix + "serve-tcp",
-						Type: ipsets.NamedPorts,
-					},
-				},
+				ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts),
 			},
 			acl: &policies.ACLPolicy{
 				DstList: []policies.SetInfo{
-					{
-						IPSet: &ipsets.IPSetMetadata{
-							Name: util.NamedPortIPSetPrefix + "serve-tcp",
-							Type: ipsets.NamedPorts,
-						},
-						Included:  included,
-						MatchType: matchType,
-					},
+					policies.NewSetInfo(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts, included, matchType),
 				},
 				Protocol: "TCP",
 			},
@@ -1199,23 +922,11 @@ func TestPortRuleWithNamedPort(t *testing.T) {
 				Port: &namedPort,
 			},
 			ruleIPSets: []*ipsets.TranslatedIPSet{
-				{
-					Metadata: &ipsets.IPSetMetadata{
-						Name: util.NamedPortIPSetPrefix + "serve-tcp",
-						Type: ipsets.NamedPorts,
-					},
-				},
+				ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts),
 			},
 			acl: &policies.ACLPolicy{
 				DstList: []policies.SetInfo{
-					{
-						IPSet: &ipsets.IPSetMetadata{
-							Name: util.NamedPortIPSetPrefix + "serve-tcp",
-							Type: ipsets.NamedPorts,
-						},
-						Included:  included,
-						MatchType: matchType,
-					},
+					policies.NewSetInfo(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts, included, matchType),
 				},
 				Protocol: "TCP",
 			},
@@ -1225,6 +936,7 @@ func TestPortRuleWithNamedPort(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			ruleIPSets := []*ipsets.TranslatedIPSet{}
 			acl := &policies.ACLPolicy{}
 			ruleIPSets = portRule(ruleIPSets, acl, tt.portRule, namedPortType)
@@ -1303,6 +1015,7 @@ func TestPortRuleWithNumericPort(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			acl := &policies.ACLPolicy{}
 			_ = portRule([]*ipsets.TranslatedIPSet{}, acl, tt.portRule, numericPortType)
 			require.Equal(t, tt.acl, acl)
@@ -1325,58 +1038,16 @@ func TestPeerAndPortRule(t *testing.T) {
 			{},
 		},
 		{
-			{
-				IPSet: &ipsets.IPSetMetadata{
-					Name: "test-in-ns-default-0IN",
-					Type: ipsets.CIDRBlocks,
-				},
-				Included:  included,
-				MatchType: matchType,
-			},
+			policies.NewSetInfo("test-in-ns-default-0IN", ipsets.CIDRBlocks, included, matchType),
 		},
 		{
-			{
-				IPSet: &ipsets.IPSetMetadata{
-					Name: "label:src",
-					Type: ipsets.KeyValueLabelOfNamespace,
-				},
-				Included:  included,
-				MatchType: matchType,
-			},
-			{
-				IPSet: &ipsets.IPSetMetadata{
-					Name: "label",
-					Type: ipsets.KeyLabelOfNamespace,
-				},
-				Included:  included,
-				MatchType: matchType,
-			},
+			policies.NewSetInfo("label:src", ipsets.KeyValueLabelOfNamespace, included, matchType),
+			policies.NewSetInfo("label", ipsets.KeyLabelOfNamespace, included, matchType),
 		},
 		{
-			{
-				IPSet: &ipsets.IPSetMetadata{
-					Name: "k0:v0",
-					Type: ipsets.KeyValueLabelOfPod,
-				},
-				Included:  included,
-				MatchType: matchType,
-			},
-			{
-				IPSet: &ipsets.IPSetMetadata{
-					Name: "k2",
-					Type: ipsets.KeyLabelOfPod,
-				},
-				Included:  nonIncluded,
-				MatchType: matchType,
-			},
-			{
-				IPSet: &ipsets.IPSetMetadata{
-					Name: "k1:v10:v11",
-					Type: ipsets.NestedLabelOfPod,
-				},
-				Included:  included,
-				MatchType: matchType,
-			},
+			policies.NewSetInfo("k0:v0", ipsets.KeyValueLabelOfPod, included, matchType),
+			policies.NewSetInfo("k2", ipsets.KeyLabelOfPod, nonIncluded, matchType),
+			policies.NewSetInfo("k1:v10:v11", ipsets.NestedLabelOfPod, included, matchType),
 		},
 	}
 
@@ -1425,12 +1096,7 @@ func TestPeerAndPortRule(t *testing.T) {
 				Name:      namedPortStr,
 				NameSpace: "default",
 				RuleIPSets: []*ipsets.TranslatedIPSet{
-					{
-						Metadata: &ipsets.IPSetMetadata{
-							Name: util.NamedPortIPSetPrefix + "serve-tcp",
-							Type: ipsets.NamedPorts,
-						},
-					},
+					ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts),
 				},
 				ACLs: []*policies.ACLPolicy{
 					{
@@ -1439,14 +1105,7 @@ func TestPeerAndPortRule(t *testing.T) {
 						Direction: policies.Ingress,
 						SrcList:   []policies.SetInfo{},
 						DstList: []policies.SetInfo{
-							{
-								IPSet: &ipsets.IPSetMetadata{
-									Name: util.NamedPortIPSetPrefix + "serve-tcp",
-									Type: ipsets.NamedPorts,
-								},
-								Included:  included,
-								MatchType: policies.DstDstMatch,
-							},
+							policies.NewSetInfo(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts, included, policies.DstDstMatch),
 						},
 						Protocol: "TCP",
 					},
@@ -1465,12 +1124,7 @@ func TestPeerAndPortRule(t *testing.T) {
 				Name:      namedPortStr,
 				NameSpace: "default",
 				RuleIPSets: []*ipsets.TranslatedIPSet{
-					{
-						Metadata: &ipsets.IPSetMetadata{
-							Name: util.NamedPortIPSetPrefix + "serve-tcp",
-							Type: ipsets.NamedPorts,
-						},
-					},
+					ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts),
 				},
 				ACLs: []*policies.ACLPolicy{
 					{
@@ -1478,24 +1132,10 @@ func TestPeerAndPortRule(t *testing.T) {
 						Target:    policies.Allowed,
 						Direction: policies.Ingress,
 						SrcList: []policies.SetInfo{
-							{
-								IPSet: &ipsets.IPSetMetadata{
-									Name: "test-in-ns-default-0IN",
-									Type: ipsets.CIDRBlocks,
-								},
-								Included:  included,
-								MatchType: matchType,
-							},
+							policies.NewSetInfo("test-in-ns-default-0IN", ipsets.CIDRBlocks, included, matchType),
 						},
 						DstList: []policies.SetInfo{
-							{
-								IPSet: &ipsets.IPSetMetadata{
-									Name: util.NamedPortIPSetPrefix + "serve-tcp",
-									Type: ipsets.NamedPorts,
-								},
-								Included:  included,
-								MatchType: policies.DstDstMatch,
-							},
+							policies.NewSetInfo(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts, included, policies.DstDstMatch),
 						},
 						Protocol: "TCP",
 					},
@@ -1514,12 +1154,7 @@ func TestPeerAndPortRule(t *testing.T) {
 				Name:      namedPortStr,
 				NameSpace: "default",
 				RuleIPSets: []*ipsets.TranslatedIPSet{
-					{
-						Metadata: &ipsets.IPSetMetadata{
-							Name: util.NamedPortIPSetPrefix + "serve-tcp",
-							Type: ipsets.NamedPorts,
-						},
-					},
+					ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts),
 				},
 				ACLs: []*policies.ACLPolicy{
 					{
@@ -1528,14 +1163,7 @@ func TestPeerAndPortRule(t *testing.T) {
 						Direction: policies.Ingress,
 						SrcList:   []policies.SetInfo{},
 						DstList: []policies.SetInfo{
-							{
-								IPSet: &ipsets.IPSetMetadata{
-									Name: util.NamedPortIPSetPrefix + "serve-tcp",
-									Type: ipsets.NamedPorts,
-								},
-								Included:  included,
-								MatchType: policies.DstDstMatch,
-							},
+							policies.NewSetInfo(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts, included, policies.DstDstMatch),
 						},
 						Protocol: "TCP",
 					},
@@ -1554,12 +1182,7 @@ func TestPeerAndPortRule(t *testing.T) {
 				Name:      namedPortStr,
 				NameSpace: "default",
 				RuleIPSets: []*ipsets.TranslatedIPSet{
-					{
-						Metadata: &ipsets.IPSetMetadata{
-							Name: util.NamedPortIPSetPrefix + "serve-tcp",
-							Type: ipsets.NamedPorts,
-						},
-					},
+					ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts),
 				},
 				ACLs: []*policies.ACLPolicy{
 					{
@@ -1568,14 +1191,7 @@ func TestPeerAndPortRule(t *testing.T) {
 						Direction: policies.Ingress,
 						SrcList:   []policies.SetInfo{},
 						DstList: []policies.SetInfo{
-							{
-								IPSet: &ipsets.IPSetMetadata{
-									Name: util.NamedPortIPSetPrefix + "serve-tcp",
-									Type: ipsets.NamedPorts,
-								},
-								Included:  included,
-								MatchType: policies.DstDstMatch,
-							},
+							policies.NewSetInfo(util.NamedPortIPSetPrefix+"serve-tcp", ipsets.NamedPorts, included, policies.DstDstMatch),
 						},
 						Protocol: "TCP",
 					},
@@ -1588,6 +1204,7 @@ func TestPeerAndPortRule(t *testing.T) {
 		tt := tt
 		setInfo := setInfos[i]
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			for _, acl := range tt.npmNetPol.ACLs {
 				acl.SrcList = setInfo
 			}
@@ -1595,15 +1212,15 @@ func TestPeerAndPortRule(t *testing.T) {
 				Name:      tt.npmNetPol.Name,
 				NameSpace: tt.npmNetPol.NameSpace,
 			}
-			peerAndPortRule(npmNetPol, tt.ports, setInfo)
+			peerAndPortRule(npmNetPol, policies.Ingress, tt.ports, setInfo)
 			require.Equal(t, tt.npmNetPol, npmNetPol)
 		})
 	}
 }
 
-func TestTranslateIngress(t *testing.T) {
+func TestIngressPolicy(t *testing.T) {
 	tcp := v1.ProtocolTCP
-	targetPodMatchType := policies.DstMatch
+	targetPodMatchType := policies.EitherMatch
 	peerMatchType := policies.SrcMatch
 	// TODO(jungukcho): add test cases with more complex rules
 	tests := []struct {
@@ -1650,6 +1267,7 @@ func TestTranslateIngress(t *testing.T) {
 						},
 						Protocol: "TCP",
 					},
+					defaultDropACL("default", "serve-tcp", policies.Ingress),
 				},
 			},
 		},
@@ -1695,6 +1313,7 @@ func TestTranslateIngress(t *testing.T) {
 							policies.NewSetInfo("only-ipblock-in-ns-default-0IN", ipsets.CIDRBlocks, included, peerMatchType),
 						},
 					},
+					defaultDropACL("default", "only-ipblock", policies.Ingress),
 				},
 			},
 		},
@@ -1743,6 +1362,7 @@ func TestTranslateIngress(t *testing.T) {
 							policies.NewSetInfo("default", ipsets.Namespace, included, peerMatchType),
 						},
 					},
+					defaultDropACL("default", "only-peer-podSelector", policies.Ingress),
 				},
 			},
 		},
@@ -1789,6 +1409,7 @@ func TestTranslateIngress(t *testing.T) {
 							policies.NewSetInfo("peer-nsselector-kay:peer-nsselector-value", ipsets.KeyValueLabelOfNamespace, included, peerMatchType),
 						},
 					},
+					defaultDropACL("default", "only-peer-nsSelector", policies.Ingress),
 				},
 			},
 		},
@@ -1797,11 +1418,13 @@ func TestTranslateIngress(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			npmNetPol := &policies.NPMNetworkPolicy{
 				Name:      tt.npmNetPol.Name,
 				NameSpace: tt.npmNetPol.NameSpace,
 			}
-			translateIngress(npmNetPol, tt.targetSelector, tt.rules)
+			npmNetPol.PodSelectorIPSets, npmNetPol.PodSelectorList = podSelectorWithNS(npmNetPol.NameSpace, policies.EitherMatch, tt.targetSelector)
+			ingressPolicy(npmNetPol, tt.rules)
 			require.Equal(t, tt.npmNetPol, npmNetPol)
 		})
 	}
