@@ -15,9 +15,20 @@ var (
 	ErrFailedUnMarshalACLSettings = errors.New("Failed to unmarshal ACL settings")
 )
 
+type staleChains struct{} // unused in Windows
+
 type endpointPolicyBuilder struct {
 	aclPolicies   []*NPMACLPolSettings
 	otherPolicies []hcn.EndpointPolicy
+}
+
+func newStaleChains() *staleChains {
+	return &staleChains{}
+}
+
+func (pMgr *PolicyManager) reboot() error {
+	// TODO should we something here?
+	return nil
 }
 
 func (pMgr *PolicyManager) initialize() error {
@@ -28,6 +39,10 @@ func (pMgr *PolicyManager) initialize() error {
 func (pMgr *PolicyManager) reset() error {
 	// TODO
 	return nil
+}
+
+func (pMgr *PolicyManager) reconcile() {
+	// TODO
 }
 
 func (pMgr *PolicyManager) addPolicy(policy *NPMNetworkPolicy, endpointList map[string]string) error {
