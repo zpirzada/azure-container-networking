@@ -69,6 +69,7 @@ func (iMgr *IPSetManager) CreateIPSets(setMetadatas []*IPSetMetadata) {
 }
 
 func (iMgr *IPSetManager) createIPSet(setMetadata *IPSetMetadata) {
+	// TODO (vamsi) check for os specific restrictions on ipsets
 	prefixedName := setMetadata.GetPrefixName()
 	if iMgr.exists(prefixedName) {
 		return
