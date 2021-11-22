@@ -105,21 +105,19 @@ const (
 	HoneyCombGoalStateFile = "D:\\Data\\AP_Containers\\NetworkGoalState\\NetworkGoalState.json"
 )
 
-
 // Honeycomb goal state.
 type HoneyCombGoalState struct {
 	ContainerGroupNetworkGoalStates []struct {
 		ContainerGroupName string `json:"ContainerGroupName"`
-		IPV6Prefix string `json:"IPV6Prefix"`
-		IPV6Gateway string `json:"IPV6Gateway"`
-		IPV4HLIPPrefix string `json:"IPV4HLIPPrefix"`
-		IPV6Address string `json:"IPV6Address"`
-		MAC string `json:"MAC"`
-		IPV4HLIPAddress string `json:"IPV4HLIPAddress"`
+		ContainerName      string `json:"ContainerName"`
+		IPv6Prefix         string `json:"IPv6Prefix"`
+		IPv6Gateway        string `json:"IPv6Gateway"`
+		HLIPv4Prefix       string `json:"HLIPv4Prefix"`
+		IPv6Address        string `json:"IPv6Address"`
+		MAC                string `json:"MAC"`
+		HLIPv4Address      string `json:"HLIPv4Address"`
 	} `json:"ContainerGroupNetworkGoalStates"`
 }
-
-
 
 // NewPlugin creates a new NetPlugin object.
 func NewPlugin(name string,
@@ -602,24 +600,24 @@ func HoneyCombIpamAdd(nwCfg *cni.NetworkConfig, _ *cniSkel.CmdArgs, subnetPrefix
 		if goalState.ContainerGroupName == podName {
 			//v6 result object creation.
 			resultv6 := cniTypesCurr.Result{CNIVersion: "0.2.0"}
-			_, netv6, _ := net.ParseCIDR(goalState.IPV6Prefix)
-			netv6.IP = net.ParseIP(goalState.IPV6Address)
-			ipConfigv6 := cniTypesCurr.IPConfig{Version: "6", Address: *netv6, Gateway: net.ParseIP(goalState.IPV6Gateway)}
+			_, netv6, _ := net.ParseCIDR(goalState.IPv6Prefix)
+			netv6.IP = net.ParseIP(goalState.IPv6Prefix)
+			ipConfigv6 := cniTypesCurr.IPConfig{Version: "6", Address: *netv6, Gateway: net.ParseIP(goalState.IPv6Gateway)}
 			log.Printf("[cni-net] ipConfigv6: %+v", ipConfigv6)
 			resultv6.IPs = append(resultv6.IPs, &ipConfigv6)
 			log.Printf("[cni-net] resultv6: %+v", resultv6)
 
 			//v4 result object creation
 			result := cniTypesCurr.Result{CNIVersion: "0.2.0"}
-			gatewayIP, netv4, _ := net.ParseCIDR(goalState.IPV4HLIPPrefix)
-			netv4.IP = net.ParseIP(goalState.IPV4HLIPAddress)
+			gatewayIP, netv4, _ := net.ParseCIDR(goalState.HLIPv4Prefix)
+			netv4.IP = net.ParseIP(goalState.HLIPv4Address)
 			nextIP(gatewayIP)
 			log.Printf("[cni-net] Gateway IPv4: %v", gatewayIP)
 			ipConfigv4 := cniTypesCurr.IPConfig{Version: "4", Address: *netv4, Gateway: gatewayIP}
 			log.Printf("[cni-net] ipConfigv4: %+v", ipConfigv4)
 			result.IPs = append(result.IPs, &ipConfigv4)
 			_, routeNet, _ := net.ParseCIDR("0.0.0.0/32")
-			result.Routes = append(result.Routes, &cniTypes.Route{Dst: *routeNet, GW: net.ParseIP(goalState.IPV6Gateway)})			
+			result.Routes = append(result.Routes, &cniTypes.Route{Dst: *routeNet, GW: net.ParseIP(goalState.IPv6Gateway)})
 			log.Printf("[cni-net] result: %+v", result)
 
 			//setting subnetPrefix
