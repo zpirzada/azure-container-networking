@@ -1,13 +1,13 @@
 pr:
   branches:
     include:
-      - master
+      - main
       - honeycomb-dev
 
 trigger:
   branches:
     include:
-      - master
+      - main
       - honeycomb-dev
 
 stages:
