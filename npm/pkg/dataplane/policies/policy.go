@@ -3,14 +3,19 @@ package policies
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/util"
+	"k8s.io/klog"
 )
 
 type NPMNetworkPolicy struct {
 	Name      string
 	NameSpace string
+	// TODO remove Name and Namespace field
+	// PolicyKey is a unique combination of "namespace/name" of network policy
+	PolicyKey string
 	// PodSelectorIPSets holds all the IPSets generated from Pod Selector
 	PodSelectorIPSets []*ipsets.TranslatedIPSet
 	// PodSelectorList holds target pod information to avoid duplicatoin in SrcList and DstList fields in ACLs
@@ -22,6 +27,14 @@ type NPMNetworkPolicy struct {
 	// podIP is key and endpoint ID as value
 	// Will be populated by dataplane and policy manager
 	PodEndpoints map[string]string
+}
+
+func NewNPMNetworkPolicy(netPolName, netPolNamespace string) *NPMNetworkPolicy {
+	return &NPMNetworkPolicy{
+		Name:      netPolName,
+		NameSpace: netPolNamespace,
+		PolicyKey: fmt.Sprintf("%s/%s", netPolNamespace, netPolName),
+	}
 }
 
 // ACLPolicy equivalent to a single iptable rule in linux
@@ -108,10 +121,10 @@ func (aclPolicy *ACLPolicy) hasEgress() bool {
 }
 
 func (aclPolicy *ACLPolicy) hasKnownProtocol() bool {
-	return aclPolicy.Protocol != "" && (aclPolicy.Protocol == TCP ||
+	return aclPolicy.Protocol == TCP ||
 		aclPolicy.Protocol == UDP ||
 		aclPolicy.Protocol == SCTP ||
-		aclPolicy.Protocol == AnyProtocol)
+		aclPolicy.Protocol == UnspecifiedProtocol
 }
 
 func (aclPolicy *ACLPolicy) hasKnownTarget() bool {
@@ -119,7 +132,52 @@ func (aclPolicy *ACLPolicy) hasKnownTarget() bool {
 }
 
 func (aclPolicy *ACLPolicy) satisifiesPortAndProtocolConstraints() bool {
-	return (aclPolicy.Protocol != AnyProtocol) || (aclPolicy.DstPorts.Port == 0 && aclPolicy.DstPorts.EndPort == 0)
+	return (aclPolicy.Protocol != UnspecifiedProtocol) || (aclPolicy.DstPorts.Port == 0 && aclPolicy.DstPorts.EndPort == 0)
+}
+
+func (netPol *NPMNetworkPolicy) String() string {
+	if netPol == nil {
+		klog.Infof("NPMNetworkPolicy is nil when trying to print string")
+		return "nil NPMNetworkPolicy"
+	}
+	itemStrings := make([]string, 0, len(netPol.ACLs))
+	for _, item := range netPol.ACLs {
+		itemStrings = append(itemStrings, item.String())
+	}
+	aclArrayString := strings.Join(itemStrings, "\n--\n")
+
+	podSelectorIPSetString := translatedIPSetsToString(netPol.PodSelectorIPSets)
+	podSelectorListString := infoArrayToString(netPol.PodSelectorList)
+	format := `Name:%s  Namespace:%s
+PodSelectorIPSets: %s
+PodSelectorList: %s
+ACLs:
+%s`
+	return fmt.Sprintf(format, netPol.Name, netPol.NameSpace, podSelectorIPSetString, podSelectorListString, aclArrayString)
+}
+
+func (aclPolicy *ACLPolicy) String() string {
+	format := `Target:%s  Direction:%s  Protocol:%s  Ports:%+v
+SrcList: %s
+DstList: %s`
+	return fmt.Sprintf(format, aclPolicy.Target, aclPolicy.Direction, aclPolicy.Protocol, aclPolicy.DstPorts, infoArrayToString(aclPolicy.SrcList), infoArrayToString(aclPolicy.DstList))
+}
+
+func infoArrayToString(items []SetInfo) string {
+	itemStrings := make([]string, 0, len(items))
+	for _, item := range items {
+		itemStrings = append(itemStrings, fmt.Sprintf("{%s}", item.String()))
+	}
+	return fmt.Sprintf("[%s]", strings.Join(itemStrings, ","))
+}
+
+func translatedIPSetsToString(items []*ipsets.TranslatedIPSet) string {
+	itemStrings := make([]string, 0, len(items))
+	for _, item := range items {
+		ipset := ipsets.NewIPSet(item.Metadata)
+		itemStrings = append(itemStrings, fmt.Sprintf("{%s}", ipset.String()))
+	}
+	return fmt.Sprintf("[%s]", strings.Join(itemStrings, ","))
 }
 
 // SetInfo helps capture additional details in a matchSet.
@@ -148,6 +206,10 @@ func NewSetInfo(name string, setType ipsets.SetType, included bool, matchType Ma
 		Included:  included,
 		MatchType: matchType,
 	}
+}
+
+func (info SetInfo) String() string {
+	return fmt.Sprintf("Name:%s  HashedName:%s  MatchType:%v  Included:%v", info.IPSet.GetPrefixName(), info.IPSet.GetHashedName(), info.MatchType, info.Included)
 }
 
 type Ports struct {
@@ -188,19 +250,22 @@ const (
 	Dropped Verdict = "DROP"
 )
 
-// Protocol can be TCP, UDP, SCTP, or ANY since they are currently supported in networkpolicy.
+// Protocol can be TCP, UDP, SCTP, or unspecified since they are currently supported in networkpolicy.
+// Protocol value is case-sensitive (Capital now).
+// TODO: Need to remove this dependency on case-sensitivity.
 // NPM is not fully tested with SCTP.
 type Protocol string
 
 const (
+
 	// TCP Protocol
-	TCP Protocol = "tcp"
+	TCP Protocol = "TCP"
 	// UDP Protocol
-	UDP Protocol = "udp"
+	UDP Protocol = "UDP"
 	// SCTP Protocol
-	SCTP Protocol = "sctp"
-	// AnyProtocol can be used for all other protocols
-	AnyProtocol Protocol = "all"
+	SCTP Protocol = "SCTP"
+	// UnspecifiedProtocol leaves protocol unspecified. For a named port, this represents its protocol. Otherwise, this represents any protocol.
+	UnspecifiedProtocol Protocol = "unspecified"
 )
 
 type MatchType int8

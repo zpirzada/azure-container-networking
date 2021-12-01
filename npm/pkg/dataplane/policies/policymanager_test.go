@@ -14,7 +14,9 @@ var (
 	testNSSet     = ipsets.NewIPSetMetadata("test-ns-set", ipsets.Namespace)
 	testKeyPodSet = ipsets.NewIPSetMetadata("test-keyPod-set", ipsets.KeyLabelOfPod)
 	testNetPol    = &NPMNetworkPolicy{
-		Name: "test/test-netpol",
+		Name:      "test-netpol",
+		NameSpace: "x",
+		PolicyKey: "x/test-netpol",
 		PodSelectorIPSets: []*ipsets.TranslatedIPSet{
 			{
 				Metadata: testNSSet,
@@ -74,7 +76,9 @@ func TestAddPolicy(t *testing.T) {
 
 func TestGetPolicy(t *testing.T) {
 	netpol := &NPMNetworkPolicy{
-		Name: "test",
+		Name:      "test-netpol",
+		NameSpace: "x",
+		PolicyKey: "x/test-netpol",
 		ACLs: []*ACLPolicy{
 			{
 				PolicyID:  "azure-acl-123",
@@ -89,11 +93,11 @@ func TestGetPolicy(t *testing.T) {
 
 	require.NoError(t, pMgr.AddPolicy(netpol, epList))
 
-	require.True(t, pMgr.PolicyExists("test"))
+	require.True(t, pMgr.PolicyExists("x/test-netpol"))
 
-	policy, ok := pMgr.GetPolicy("test")
+	policy, ok := pMgr.GetPolicy("x/test-netpol")
 	require.True(t, ok)
-	require.Equal(t, "test", policy.Name)
+	require.Equal(t, "x/test-netpol", policy.PolicyKey)
 }
 
 func TestRemovePolicy(t *testing.T) {
@@ -105,4 +109,51 @@ func TestRemovePolicy(t *testing.T) {
 	require.NoError(t, pMgr.RemovePolicy("test", epList))
 
 	require.NoError(t, pMgr.RemovePolicy("test/test-netpol", nil))
+}
+
+func TestNormalizeAndValidatePolicy(t *testing.T) {
+	tests := []struct {
+		name    string
+		acl     *ACLPolicy
+		wantErr bool
+	}{
+		{
+			name: "valid policy",
+			acl: &ACLPolicy{
+				PolicyID:  "valid-acl",
+				Target:    Dropped,
+				Direction: Ingress,
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid protocol",
+			acl: &ACLPolicy{
+				PolicyID:  "bad-protocol-acl",
+				Target:    Dropped,
+				Direction: Ingress,
+				Protocol:  "invalid",
+			},
+			wantErr: true,
+		},
+		// TODO add other invalid cases
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			netPol := &NPMNetworkPolicy{
+				Name:      "test-netpol",
+				NameSpace: "x",
+				PolicyKey: "x/test-netpol",
+				ACLs:      []*ACLPolicy{tt.acl},
+			}
+			normalizePolicy(netPol)
+			err := validatePolicy(netPol)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

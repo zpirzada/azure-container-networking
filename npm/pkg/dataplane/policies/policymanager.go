@@ -83,25 +83,26 @@ func (pMgr *PolicyManager) Reconcile(stopChannel <-chan struct{}) {
 	}()
 }
 
-func (pMgr *PolicyManager) PolicyExists(name string) bool {
-	_, ok := pMgr.policyMap.cache[name]
+func (pMgr *PolicyManager) PolicyExists(policyKey string) bool {
+	_, ok := pMgr.policyMap.cache[policyKey]
 	return ok
 }
 
-func (pMgr *PolicyManager) GetPolicy(name string) (*NPMNetworkPolicy, bool) {
-	policy, ok := pMgr.policyMap.cache[name]
+func (pMgr *PolicyManager) GetPolicy(policyKey string) (*NPMNetworkPolicy, bool) {
+	policy, ok := pMgr.policyMap.cache[policyKey]
 	return policy, ok
 }
 
 func (pMgr *PolicyManager) AddPolicy(policy *NPMNetworkPolicy, endpointList map[string]string) error {
 	if len(policy.ACLs) == 0 {
-		klog.Infof("[DataPlane] No ACLs in policy %s to apply", policy.Name)
+		klog.Infof("[DataPlane] No ACLs in policy %s to apply", policy.PolicyKey)
 		return nil
 	}
 	normalizePolicy(policy)
-	if err := checkForErrors(policy); err != nil {
+	if err := validatePolicy(policy); err != nil {
 		return npmerrors.Errorf(npmerrors.AddPolicy, false, fmt.Sprintf("couldn't add malformed policy: %s", err.Error()))
 	}
+	klog.Infof("PRINTING-CONTENTS-FOR-ADDING-POLICY:\n%s", policy.String())
 
 	// Call actual dataplane function to apply changes
 	err := pMgr.addPolicy(policy, endpointList)
@@ -109,18 +110,22 @@ func (pMgr *PolicyManager) AddPolicy(policy *NPMNetworkPolicy, endpointList map[
 		return npmerrors.Errorf(npmerrors.AddPolicy, false, fmt.Sprintf("failed to add policy: %v", err))
 	}
 
-	pMgr.policyMap.cache[policy.Name] = policy
+	pMgr.policyMap.cache[policy.PolicyKey] = policy
 	return nil
 }
 
-func (pMgr *PolicyManager) RemovePolicy(name string, endpointList map[string]string) error {
-	policy, ok := pMgr.GetPolicy(name)
+func (pMgr *PolicyManager) RemovePolicy(policyKey string, endpointList map[string]string) error {
+	policy, ok := pMgr.GetPolicy(policyKey)
+	klog.Infof("PRINTING-CONTENTS-FOR-REMOVING-POLICY:\n%s", policy.String())
+
 	if !ok {
+		klog.Infof("DEBUGME-POLICY-DOESN'T-EXIST-WHEN-DELETING")
+		klog.Infof("POLICY-CACHE: %+v", pMgr.policyMap.cache)
 		return nil
 	}
 
 	if len(policy.ACLs) == 0 {
-		klog.Infof("[DataPlane] No ACLs in policy %s to remove", policy.Name)
+		klog.Infof("[DataPlane] No ACLs in policy %s to remove", policyKey)
 		return nil
 	}
 	// Call actual dataplane function to apply changes
@@ -129,7 +134,7 @@ func (pMgr *PolicyManager) RemovePolicy(name string, endpointList map[string]str
 		return npmerrors.Errorf(npmerrors.RemovePolicy, false, fmt.Sprintf("failed to remove policy: %v", err))
 	}
 
-	delete(pMgr.policyMap.cache, name)
+	delete(pMgr.policyMap.cache, policyKey)
 	if len(pMgr.policyMap.cache) == 0 {
 		klog.Infof("rebooting policy manager since there are no policies remaining in the cache")
 		if err := pMgr.reboot(); err != nil {
@@ -143,7 +148,7 @@ func (pMgr *PolicyManager) RemovePolicy(name string, endpointList map[string]str
 func normalizePolicy(networkPolicy *NPMNetworkPolicy) {
 	for _, aclPolicy := range networkPolicy.ACLs {
 		if aclPolicy.Protocol == "" {
-			aclPolicy.Protocol = AnyProtocol
+			aclPolicy.Protocol = UnspecifiedProtocol
 		}
 
 		if aclPolicy.DstPorts.EndPort == 0 {
@@ -153,16 +158,16 @@ func normalizePolicy(networkPolicy *NPMNetworkPolicy) {
 }
 
 // TODO do verification in controller?
-func checkForErrors(networkPolicy *NPMNetworkPolicy) error {
+func validatePolicy(networkPolicy *NPMNetworkPolicy) error {
 	for _, aclPolicy := range networkPolicy.ACLs {
 		if !aclPolicy.hasKnownTarget() {
-			return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has unknown target", aclPolicy.PolicyID))
+			return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has unknown target [%s]", aclPolicy.PolicyID, aclPolicy.Target))
 		}
 		if !aclPolicy.hasKnownDirection() {
-			return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has unknown direction", aclPolicy.PolicyID))
+			return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has unknown direction [%s]", aclPolicy.PolicyID, aclPolicy.Direction))
 		}
 		if !aclPolicy.hasKnownProtocol() {
-			return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has unknown protocol (set to All if desired)", aclPolicy.PolicyID))
+			return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has unknown protocol [%s]", aclPolicy.PolicyID, aclPolicy.Protocol))
 		}
 		if !aclPolicy.satisifiesPortAndProtocolConstraints() {
 			return npmerrors.SimpleError(fmt.Sprintf(

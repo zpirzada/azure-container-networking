@@ -51,7 +51,7 @@ func (pMgr *PolicyManager) removePolicy(networkPolicy *NPMNetworkPolicy, _ map[s
 }
 
 func restore(creator *ioutil.FileCreator) error {
-	err := creator.RunCommandWithFile(util.IptablesRestore, util.IptablesRestoreTableFlag, util.IptablesFilterTable, util.IptablesRestoreNoFlushFlag)
+	err := creator.RunCommandWithFile(util.IptablesRestore, util.IptablesWaitFlag, defaultlockWaitTimeInSeconds, util.IptablesRestoreTableFlag, util.IptablesFilterTable, util.IptablesRestoreNoFlushFlag)
 	if err != nil {
 		return npmerrors.SimpleErrorWrapper("failed to restore iptables file", err)
 	}
@@ -129,7 +129,7 @@ func (pMgr *PolicyManager) deleteJumpRule(policy *NPMNetworkPolicy, isIngress bo
 	errCode, err := pMgr.runIPTablesCommand(util.IptablesDeletionFlag, specs...)
 	if err != nil && errCode != couldntLoadTargetErrorCode {
 		// TODO check rule doesn't exist error code instead because the chain should exist
-		errorString := fmt.Sprintf("failed to delete jump from %s chain to %s chain for policy %s with exit code %d", baseChainName, chainName, policy.Name, errCode)
+		errorString := fmt.Sprintf("failed to delete jump from %s chain to %s chain for policy %s with exit code %d", baseChainName, chainName, policy.PolicyKey, errCode)
 		log.Errorf(errorString+": %w", err)
 		return npmerrors.SimpleErrorWrapper(errorString, err)
 	}
@@ -183,7 +183,7 @@ func writeNetworkPolicyRules(creator *ioutil.FileCreator, networkPolicy *NPMNetw
 		if aclPolicy.hasIngress() {
 			chainName = networkPolicy.ingressChainName()
 			if aclPolicy.Target == Allowed {
-				actionSpecs = []string{util.IptablesJumpFlag, util.IptablesAzureEgressChain}
+				actionSpecs = []string{util.IptablesJumpFlag, util.IptablesAzureIngressAllowMarkChain}
 			} else {
 				actionSpecs = setMarkSpecs(util.IptablesAzureIngressDropMarkHex)
 			}
@@ -204,7 +204,9 @@ func writeNetworkPolicyRules(creator *ioutil.FileCreator, networkPolicy *NPMNetw
 
 func iptablesRuleSpecs(aclPolicy *ACLPolicy) []string {
 	specs := make([]string, 0)
-	specs = append(specs, util.IptablesProtFlag, string(aclPolicy.Protocol)) // NOTE: protocol must be ALL instead of nil
+	if aclPolicy.Protocol != UnspecifiedProtocol {
+		specs = append(specs, util.IptablesProtFlag, string(aclPolicy.Protocol))
+	}
 	specs = append(specs, dstPortSpecs(aclPolicy.DstPorts)...)
 	specs = append(specs, matchSetSpecsFromSetInfo(aclPolicy.SrcList)...)
 	specs = append(specs, matchSetSpecsFromSetInfo(aclPolicy.DstList)...)
@@ -223,11 +225,16 @@ func dstPortSpecs(portRange Ports) []string {
 
 func matchSetSpecsForNetworkPolicy(networkPolicy *NPMNetworkPolicy, matchType MatchType) []string {
 	// TODO update to use included boolean/new data structure from Junguk's PR
-	specs := make([]string, 0, maxLengthForMatchSetSpecs*len(networkPolicy.PodSelectorIPSets))
-	for _, translatedIPSet := range networkPolicy.PodSelectorIPSets {
-		matchString := matchType.toIPTablesString()
-		hashedSetName := translatedIPSet.Metadata.GetHashedName()
-		specs = append(specs, util.IptablesModuleFlag, util.IptablesSetModuleFlag, util.IptablesMatchSetFlag, hashedSetName, matchString)
+	specs := make([]string, 0, maxLengthForMatchSetSpecs*len(networkPolicy.PodSelectorList))
+	matchString := matchType.toIPTablesString()
+	for _, setInfo := range networkPolicy.PodSelectorList {
+		// TODO consolidate this code with that in matchSetSpecsFromSetInfo
+		specs = append(specs, util.IptablesModuleFlag, util.IptablesSetModuleFlag)
+		if !setInfo.Included {
+			specs = append(specs, util.IptablesNotFlag)
+		}
+		hashedSetName := setInfo.IPSet.GetHashedName()
+		specs = append(specs, util.IptablesMatchSetFlag, hashedSetName, matchString)
 	}
 	return specs
 }

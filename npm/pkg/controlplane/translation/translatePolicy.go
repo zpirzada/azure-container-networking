@@ -80,7 +80,7 @@ func namedPortRuleInfo(portRule *networkingv1.NetworkPolicyPort) (namedPortIPSet
 		return nil, protocol
 	}
 
-	namedPortIPSet = ipsets.NewTranslatedIPSet(util.NamedPortIPSetPrefix+portRule.Port.String(), ipsets.NamedPorts)
+	namedPortIPSet = ipsets.NewTranslatedIPSet(portRule.Port.String(), ipsets.NamedPorts)
 	return namedPortIPSet, protocol
 }
 
@@ -90,7 +90,7 @@ func namedPortRule(portRule *networkingv1.NetworkPolicyPort) (*ipsets.Translated
 	}
 
 	namedPortIPSet, protocol := namedPortRuleInfo(portRule)
-	setInfo := policies.NewSetInfo(util.NamedPortIPSetPrefix+portRule.Port.String(), ipsets.NamedPorts, included, policies.DstDstMatch)
+	setInfo := policies.NewSetInfo(portRule.Port.String(), ipsets.NamedPorts, included, policies.DstDstMatch)
 	return namedPortIPSet, setInfo, protocol
 }
 
@@ -481,7 +481,7 @@ func egressPolicy(npmNetPol *policies.NPMNetworkPolicy, egress []networkingv1.Ne
 	}
 
 	// #2. If egress is nil (in yaml file, it is specified with '[]'), it means "Deny all" - it does not allow sending traffic to others.
-	if egress != nil {
+	if egress == nil {
 		// Except for allow all traffic case in #1, the rest of them should have default drop rules.
 		dropACL := defaultDropACL(npmNetPol.NameSpace, npmNetPol.Name, policies.Egress)
 		npmNetPol.ACLs = append(npmNetPol.ACLs, dropACL)
@@ -503,10 +503,7 @@ func egressPolicy(npmNetPol *policies.NPMNetworkPolicy, egress []networkingv1.Ne
 // TranslatePolicy traslates networkpolicy object to NPMNetworkPolicy object
 // and return the NPMNetworkPolicy object.
 func TranslatePolicy(npObj *networkingv1.NetworkPolicy) *policies.NPMNetworkPolicy {
-	npmNetPol := &policies.NPMNetworkPolicy{
-		Name:      npObj.ObjectMeta.Name,
-		NameSpace: npObj.ObjectMeta.Namespace,
-	}
+	npmNetPol := policies.NewNPMNetworkPolicy(npObj.Name, npObj.Namespace)
 
 	// podSelector in spec.PodSelector is common for ingress and egress.
 	// Process this podSelector first.
@@ -522,6 +519,7 @@ func TranslatePolicy(npObj *networkingv1.NetworkPolicy) *policies.NPMNetworkPoli
 			egressPolicy(npmNetPol, npObj.Spec.Egress)
 		}
 	}
-
+	klog.Infof("JUST-TRANSLATED-THIS-POLICY:\n%s", npmNetPol.String())
+	klog.Infof("THIS-NPOBJ:\n%+v", npObj)
 	return npmNetPol
 }

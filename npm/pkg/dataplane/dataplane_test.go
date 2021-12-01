@@ -25,7 +25,9 @@ var (
 		Metadata: ipsets.NewIPSetMetadata("setpodkey1", ipsets.KeyLabelOfPod),
 	}
 	testPolicyobj = policies.NPMNetworkPolicy{
-		Name: "ns1/testpolicy",
+		Name:      "testpolicy",
+		NameSpace: "ns1",
+		PolicyKey: "ns1/testpolicy",
 		PodSelectorIPSets: []*ipsets.TranslatedIPSet{
 			{
 				Metadata: ipsets.NewIPSetMetadata("setns1", ipsets.Namespace),
@@ -245,7 +247,7 @@ func TestRemovePolicy(t *testing.T) {
 	err = dp.AddPolicy(&testPolicyobj)
 	require.NoError(t, err)
 
-	err = dp.RemovePolicy(testPolicyobj.Name)
+	err = dp.RemovePolicy(testPolicyobj.PolicyKey)
 	require.NoError(t, err)
 }
 
@@ -315,4 +317,50 @@ func getAffectedIPSets(networkPolicy *policies.NPMNetworkPolicy) []*ipsets.IPSet
 		sets = append(sets, translatedIPSet.Metadata)
 	}
 	return sets
+}
+
+func TestValidateIPBlock(t *testing.T) {
+	tests := []struct {
+		name    string
+		ipblock string
+		wantErr bool
+	}{
+		{
+			name:    "cidr",
+			ipblock: "172.17.0.0/16",
+			wantErr: false,
+		},
+		{
+			name:    "except ipblock",
+			ipblock: "172.17.1.0/24 nomatch",
+			wantErr: false,
+		},
+		{
+			name:    "incorrect ip format",
+			ipblock: "1234",
+			wantErr: true,
+		},
+		{
+			name:    "incorrect ip range",
+			ipblock: "256.1.2.3",
+			wantErr: true,
+		},
+		{
+			name:    "empty cidr",
+			ipblock: "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateIPBlock(tt.ipblock)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

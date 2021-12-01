@@ -48,6 +48,7 @@ type NPMEndpoint struct {
 	Name string
 	ID   string
 	IP   string
+	// TODO: check it may use PolicyKey instead of Policy name
 	// Map with Key as Network Policy name to to emulate set
 	// and value as struct{} for minimal memory consumption
 	NetPolReference map[string]struct{}
@@ -207,16 +208,16 @@ func (dp *DataPlane) ApplyDataPlane() error {
 
 // AddPolicy takes in a translated NPMNetworkPolicy object and applies on dataplane
 func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
-	klog.Infof("[DataPlane] Add Policy called for %s", policy.Name)
+	klog.Infof("[DataPlane] Add Policy called for %s", policy.PolicyKey)
 	// Create and add references for Selector IPSets first
-	err := dp.createIPSetsAndReferences(policy.PodSelectorIPSets, policy.Name, ipsets.SelectorType)
+	err := dp.createIPSetsAndReferences(policy.PodSelectorIPSets, policy.PolicyKey, ipsets.SelectorType)
 	if err != nil {
 		klog.Infof("[DataPlane] error while adding Selector IPSet references: %s", err.Error())
 		return fmt.Errorf("[DataPlane] error while adding Selector IPSet references: %w", err)
 	}
 
 	// Create and add references for Rule IPSets
-	err = dp.createIPSetsAndReferences(policy.RuleIPSets, policy.Name, ipsets.NetPolType)
+	err = dp.createIPSetsAndReferences(policy.RuleIPSets, policy.PolicyKey, ipsets.NetPolType)
 	if err != nil {
 		klog.Infof("[DataPlane] error while adding Rule IPSet references: %s", err.Error())
 		return fmt.Errorf("[DataPlane] error while adding Rule IPSet references: %w", err)
@@ -239,29 +240,29 @@ func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 	return nil
 }
 
-// RemovePolicy takes in network policy name and removes it from dataplane and cache
-func (dp *DataPlane) RemovePolicy(policyName string) error {
-	klog.Infof("[DataPlane] Remove Policy called for %s", policyName)
+// RemovePolicy takes in network policyKey (namespace/name of network policy) and removes it from dataplane and cache
+func (dp *DataPlane) RemovePolicy(policyKey string) error {
+	klog.Infof("[DataPlane] Remove Policy called for %s", policyKey)
 	// because policy Manager will remove from policy from cache
 	// keep a local copy to remove references for ipsets
-	policy, ok := dp.policyMgr.GetPolicy(policyName)
+	policy, ok := dp.policyMgr.GetPolicy(policyKey)
 	if !ok {
-		klog.Infof("[DataPlane] Policy %s is not found. Might been deleted already", policyName)
+		klog.Infof("[DataPlane] Policy %s is not found. Might been deleted already", policyKey)
 		return nil
 	}
 	// Use the endpoint list saved in cache for this network policy to remove
-	err := dp.policyMgr.RemovePolicy(policy.Name, nil)
+	err := dp.policyMgr.RemovePolicy(policy.PolicyKey, nil)
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while removing policy: %w", err)
 	}
 	// Remove references for Rule IPSets first
-	err = dp.deleteIPSetsAndReferences(policy.RuleIPSets, policy.Name, ipsets.NetPolType)
+	err = dp.deleteIPSetsAndReferences(policy.RuleIPSets, policy.PolicyKey, ipsets.NetPolType)
 	if err != nil {
 		return err
 	}
 
 	// Remove references for Selector IPSets
-	err = dp.deleteIPSetsAndReferences(policy.PodSelectorIPSets, policy.Name, ipsets.SelectorType)
+	err = dp.deleteIPSetsAndReferences(policy.PodSelectorIPSets, policy.PolicyKey, ipsets.SelectorType)
 	if err != nil {
 		return err
 	}
@@ -277,10 +278,10 @@ func (dp *DataPlane) RemovePolicy(policyName string) error {
 // UpdatePolicy takes in updated policy object, calculates the delta and applies changes
 // onto dataplane accordingly
 func (dp *DataPlane) UpdatePolicy(policy *policies.NPMNetworkPolicy) error {
-	klog.Infof("[DataPlane] Update Policy called for %s", policy.Name)
-	ok := dp.policyMgr.PolicyExists(policy.Name)
+	klog.Infof("[DataPlane] Update Policy called for %s", policy.PolicyKey)
+	ok := dp.policyMgr.PolicyExists(policy.PolicyKey)
 	if !ok {
-		klog.Infof("[DataPlane] Policy %s is not found. Might been deleted already", policy.Name)
+		klog.Infof("[DataPlane] Policy %s is not found. Might been deleted already", policy.PolicyKey)
 		return dp.AddPolicy(policy)
 	}
 
@@ -288,7 +289,7 @@ func (dp *DataPlane) UpdatePolicy(policy *policies.NPMNetworkPolicy) error {
 	// and remove/apply only the delta of IPSets and policies
 
 	// Taking the easy route here, delete existing policy
-	err := dp.RemovePolicy(policy.Name)
+	err := dp.RemovePolicy(policy.PolicyKey)
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while updating policy: %w", err)
 	}
@@ -321,22 +322,14 @@ func (dp *DataPlane) createIPSetsAndReferences(sets []*ipsets.TranslatedIPSet, n
 		// Check if any CIDR block IPSets needs to be applied
 		setType := set.Metadata.Type
 		if setType == ipsets.CIDRBlocks {
-			// cidrInfo can have either cidr (CIDR in IPBlock) or "cidr + " " (space) + nomatch" (Except in IPBlock)
-			for _, cidrInfo := range set.Members {
-				// TODO(jungukcho): This is an adhoc approach for linux, but need to refactor data structure for better management.
-				// onlyCidr has only cidr without "nomatch" to validate cidr format.
-				var onlyCidr string
-				if strings.Contains(cidrInfo, util.IpsetNomatch) {
-					onlyCidr = strings.Trim(onlyCidr, util.IpsetNomatch)
-				} else {
-					onlyCidr = cidrInfo
-				}
-
-				_, _, err := net.ParseCIDR(onlyCidr)
+			// ipblock can have either cidr (CIDR in IPBlock) or "cidr + " " (space) + nomatch" (Except in IPBlock)
+			// (TODO) need to revise it for windows
+			for _, ipblock := range set.Members {
+				err := validateIPBlock(ipblock)
 				if err != nil {
 					return npmerrors.Errorf(npmErrorString, false, fmt.Sprintf("[dataplane] failed to parseCIDR in addIPSetReferences with err: %s", err.Error()))
 				}
-				err = dp.ipsetMgr.AddToSets([]*ipsets.IPSetMetadata{set.Metadata}, cidrInfo, "")
+				err = dp.ipsetMgr.AddToSets([]*ipsets.IPSetMetadata{set.Metadata}, ipblock, "")
 				if err != nil {
 					return npmerrors.Errorf(npmErrorString, false, fmt.Sprintf("[dataplane] failed to AddToSet in addIPSetReferences with err: %s", err.Error()))
 				}
@@ -377,12 +370,14 @@ func (dp *DataPlane) deleteIPSetsAndReferences(sets []*ipsets.TranslatedIPSet, n
 		// Check if any CIDR block IPSets needs to be applied
 		setType := set.Metadata.Type
 		if setType == ipsets.CIDRBlocks {
-			for _, ip := range set.Members {
-				_, _, err := net.ParseCIDR(ip)
+			// ipblock can have either cidr (CIDR in IPBlock) or "cidr + " " (space) + nomatch" (Except in IPBlock)
+			// (TODO) need to revise it for windows
+			for _, ipblock := range set.Members {
+				err := validateIPBlock(ipblock)
 				if err != nil {
 					return npmerrors.Errorf(npmErrorString, false, fmt.Sprintf("[dataplane] failed to parseCIDR in deleteIPSetReferences with err: %s", err.Error()))
 				}
-				err = dp.ipsetMgr.RemoveFromSets([]*ipsets.IPSetMetadata{set.Metadata}, ip, "")
+				err = dp.ipsetMgr.RemoveFromSets([]*ipsets.IPSetMetadata{set.Metadata}, ipblock, "")
 				if err != nil {
 					return npmerrors.Errorf(npmErrorString, false, fmt.Sprintf("[dataplane] failed to RemoveFromSet in deleteIPSetReferences with err: %s", err.Error()))
 				}
@@ -398,6 +393,18 @@ func (dp *DataPlane) deleteIPSetsAndReferences(sets []*ipsets.TranslatedIPSet, n
 
 		// Try to delete these IPSets
 		dp.ipsetMgr.DeleteIPSet(set.Metadata.GetPrefixName())
+	}
+	return nil
+}
+
+// TODO: This is an adhoc approach for linux, but need to refactor data structure for better management.
+func validateIPBlock(ipblock string) error {
+	// TODO: This is fragile code with strong dependency with " "(space).
+	// onlyCidr has only cidr without "space" and "nomatch" in case except ipblock to validate cidr format.
+	onlyCidr := strings.Split(ipblock, " ")[0]
+	_, _, err := net.ParseCIDR(onlyCidr)
+	if err != nil {
+		return npmerrors.SimpleErrorWrapper("failed to parse CIDR", err)
 	}
 	return nil
 }
