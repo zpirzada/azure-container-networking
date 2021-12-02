@@ -42,7 +42,7 @@ type HTTPService interface {
 	SyncNodeStatus(string, string, string, json.RawMessage) (types.ResponseCode, string)
 	GetPendingProgramIPConfigs() []IPConfigurationStatus
 	GetAvailableIPConfigs() []IPConfigurationStatus
-	GetAllocatedIPConfigs() []IPConfigurationStatus
+	GetAssignedIPConfigs() []IPConfigurationStatus
 	GetPendingReleaseIPConfigs() []IPConfigurationStatus
 	GetPodIPConfigState() map[string]IPConfigurationStatus
 	MarkIPAsPendingRelease(numberToMark int) (map[string]IPConfigurationStatus, error)
@@ -54,7 +54,7 @@ type IPConfigurationStatus struct {
 	NCID      string
 	ID        string // uuid
 	IPAddress string
-	State     IPConfigState
+	State     types.IPState
 	PodInfo   PodInfo
 }
 
@@ -221,9 +221,9 @@ type IPAMPoolMonitor interface {
 
 // IpamPoolMonitorStateSnapshot struct to expose state values for IPAMPoolMonitor struct
 type IpamPoolMonitorStateSnapshot struct {
-	MinimumFreeIps           int
-	MaximumFreeIps           int
-	UpdatingIpsNotInUseCount int
+	MinimumFreeIps           int64
+	MaximumFreeIps           int64
+	UpdatingIpsNotInUseCount int64
 	CachedNNC                v1alpha.NodeNetworkConfig
 }
 

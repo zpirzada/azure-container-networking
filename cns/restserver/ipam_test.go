@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/common"
 	"github.com/Azure/azure-container-networking/cns/fakes"
+	"github.com/Azure/azure-container-networking/cns/types"
 	"github.com/Azure/azure-container-networking/crd/nodenetworkconfig/api/v1alpha"
 )
 
@@ -50,7 +51,7 @@ func newSecondaryIPConfig(ipAddress string, ncVersion int) cns.SecondaryIPConfig
 	}
 }
 
-func NewPodState(ipaddress string, prefixLength uint8, id, ncid string, state cns.IPConfigState, ncVersion int) cns.IPConfigurationStatus {
+func NewPodState(ipaddress string, prefixLength uint8, id, ncid string, state types.IPState, ncVersion int) cns.IPConfigurationStatus {
 	ipconfig := newSecondaryIPConfig(ipaddress, ncVersion)
 
 	return cns.IPConfigurationStatus{
@@ -114,7 +115,7 @@ func requestIpAddressAndGetState(t *testing.T, req cns.IPConfigRequest) (cns.IPC
 	return ipState, err
 }
 
-func NewPodStateWithOrchestratorContext(ipaddress, id, ncid string, state cns.IPConfigState, prefixLength uint8, ncVersion int, podInfo cns.PodInfo) (cns.IPConfigurationStatus, error) {
+func NewPodStateWithOrchestratorContext(ipaddress, id, ncid string, state types.IPState, prefixLength uint8, ncVersion int, podInfo cns.PodInfo) (cns.IPConfigurationStatus, error) {
 	ipconfig := newSecondaryIPConfig(ipaddress, ncVersion)
 	return cns.IPConfigurationStatus{
 		IPAddress: ipconfig.IPAddress,
@@ -143,7 +144,7 @@ func UpdatePodIpConfigState(t *testing.T, svc *HTTPRestService, ipconfigs map[st
 
 	// update ipconfigs to expected state
 	for ipId, ipconfig := range ipconfigs {
-		if ipconfig.State == cns.Allocated {
+		if ipconfig.State == types.Assigned {
 			svc.PodIPIDByPodInterfaceKey[ipconfig.PodInfo.Key()] = ipId
 			svc.PodIPConfigState[ipId] = ipconfig
 		}
@@ -155,7 +156,7 @@ func UpdatePodIpConfigState(t *testing.T, svc *HTTPRestService, ipconfigs map[st
 func TestIPAMGetAvailableIPConfig(t *testing.T) {
 	svc := getTestService()
 
-	testState := NewPodState(testIP1, 24, testPod1GUID, testNCID, cns.Available, 0)
+	testState := NewPodState(testIP1, 24, testPod1GUID, testNCID, types.Available, 0)
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		testState.ID: testState,
 	}
@@ -173,7 +174,7 @@ func TestIPAMGetAvailableIPConfig(t *testing.T) {
 		t.Fatal("Expected IP retrieval to be nil")
 	}
 
-	desiredState := NewPodState(testIP1, 24, testPod1GUID, testNCID, cns.Allocated, 0)
+	desiredState := NewPodState(testIP1, 24, testPod1GUID, testNCID, types.Assigned, 0)
 	desiredState.PodInfo = testPod1Info
 
 	if reflect.DeepEqual(desiredState, actualstate) != true {
@@ -185,10 +186,10 @@ func TestIPAMGetAvailableIPConfig(t *testing.T) {
 func TestIPAMGetNextAvailableIPConfig(t *testing.T) {
 	svc := getTestService()
 
-	// Add already allocated pod ip to state
+	// Add already assigned pod ip to state
 	svc.PodIPIDByPodInterfaceKey[testPod1Info.Key()] = testPod1GUID
-	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, cns.Allocated, 24, 0, testPod1Info)
-	state2 := NewPodState(testIP2, 24, testPod2GUID, testNCID, cns.Available, 0)
+	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, types.Assigned, 24, 0, testPod1Info)
+	state2 := NewPodState(testIP2, 24, testPod2GUID, testNCID, types.Available, 0)
 
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		state1.ID: state1,
@@ -210,19 +211,19 @@ func TestIPAMGetNextAvailableIPConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected IP retrieval to be nil: %+v", err)
 	}
-	// want second available Pod IP State as first has been allocated
-	desiredState, _ := NewPodStateWithOrchestratorContext(testIP2, testPod2GUID, testNCID, cns.Allocated, 24, 0, testPod2Info)
+	// want second available Pod IP State as first has been assigned
+	desiredState, _ := NewPodStateWithOrchestratorContext(testIP2, testPod2GUID, testNCID, types.Assigned, 24, 0, testPod2Info)
 
 	if reflect.DeepEqual(desiredState, actualstate) != true {
 		t.Fatalf("Desired state not matching actual state, expected: %+v, actual: %+v", desiredState, actualstate)
 	}
 }
 
-func TestIPAMGetAlreadyAllocatedIPConfigForSamePod(t *testing.T) {
+func TestIPAMGetAlreadyAssignedIPConfigForSamePod(t *testing.T) {
 	svc := getTestService()
 
-	// Add Allocated Pod IP to state
-	testState, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, cns.Allocated, 24, 0, testPod1Info)
+	// Add Assigned Pod IP to state
+	testState, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, types.Assigned, 24, 0, testPod1Info)
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		testState.ID: testState,
 	}
@@ -243,7 +244,7 @@ func TestIPAMGetAlreadyAllocatedIPConfigForSamePod(t *testing.T) {
 		t.Fatalf("Expected not error: %+v", err)
 	}
 
-	desiredState, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, cns.Allocated, 24, 0, testPod1Info)
+	desiredState, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, types.Assigned, 24, 0, testPod1Info)
 
 	if reflect.DeepEqual(desiredState, actualstate) != true {
 		t.Fatalf("Desired state not matching actual state, expected: %+v, actual: %+v", desiredState, actualstate)
@@ -254,7 +255,7 @@ func TestIPAMAttemptToRequestIPNotFoundInPool(t *testing.T) {
 	svc := getTestService()
 
 	// Add Available Pod IP to state
-	testState := NewPodState(testIP1, 24, testPod1GUID, testNCID, cns.Available, 0)
+	testState := NewPodState(testIP1, 24, testPod1GUID, testNCID, types.Available, 0)
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		testState.ID: testState,
 	}
@@ -282,7 +283,7 @@ func TestIPAMGetDesiredIPConfigWithSpecfiedIP(t *testing.T) {
 	svc := getTestService()
 
 	// Add Available Pod IP to state
-	testState := NewPodState(testIP1, 24, testPod1GUID, testNCID, cns.Available, 0)
+	testState := NewPodState(testIP1, 24, testPod1GUID, testNCID, types.Available, 0)
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		testState.ID: testState,
 	}
@@ -305,7 +306,7 @@ func TestIPAMGetDesiredIPConfigWithSpecfiedIP(t *testing.T) {
 		t.Fatalf("Expected IP retrieval to be nil: %+v", err)
 	}
 
-	desiredState := NewPodState(testIP1, 24, testPod1GUID, testNCID, cns.Allocated, 0)
+	desiredState := NewPodState(testIP1, 24, testPod1GUID, testNCID, types.Assigned, 0)
 	desiredState.PodInfo = testPod1Info
 
 	if reflect.DeepEqual(desiredState, actualstate) != true {
@@ -313,11 +314,11 @@ func TestIPAMGetDesiredIPConfigWithSpecfiedIP(t *testing.T) {
 	}
 }
 
-func TestIPAMFailToGetDesiredIPConfigWithAlreadyAllocatedSpecfiedIP(t *testing.T) {
+func TestIPAMFailToGetDesiredIPConfigWithAlreadyAssignedSpecfiedIP(t *testing.T) {
 	svc := getTestService()
 
-	// set state as already allocated
-	testState, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, cns.Allocated, 24, 0, testPod1Info)
+	// set state as already assigned
+	testState, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, types.Assigned, 24, 0, testPod1Info)
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		testState.ID: testState,
 	}
@@ -326,7 +327,7 @@ func TestIPAMFailToGetDesiredIPConfigWithAlreadyAllocatedSpecfiedIP(t *testing.T
 		t.Fatalf("Expected to not fail adding IPs to state: %+v", err)
 	}
 
-	// request the already allocated ip with a new context
+	// request the already assigned ip with a new context
 	req := cns.IPConfigRequest{
 		PodInterfaceID:   testPod2Info.InterfaceID(),
 		InfraContainerID: testPod2Info.InfraContainerID(),
@@ -337,16 +338,16 @@ func TestIPAMFailToGetDesiredIPConfigWithAlreadyAllocatedSpecfiedIP(t *testing.T
 
 	_, err = requestIpAddressAndGetState(t, req)
 	if err == nil {
-		t.Fatalf("Expected failure requesting already allocated IP: %+v", err)
+		t.Fatalf("Expected failure requesting already assigned IP: %+v", err)
 	}
 }
 
-func TestIPAMFailToGetIPWhenAllIPsAreAllocated(t *testing.T) {
+func TestIPAMFailToGetIPWhenAllIPsAreAssigned(t *testing.T) {
 	svc := getTestService()
 
-	// set state as already allocated
-	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, cns.Allocated, 24, 0, testPod1Info)
-	state2, _ := NewPodStateWithOrchestratorContext(testIP2, testPod2GUID, testNCID, cns.Allocated, 24, 0, testPod2Info)
+	// set state as already assigned
+	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, types.Assigned, 24, 0, testPod1Info)
+	state2, _ := NewPodStateWithOrchestratorContext(testIP2, testPod2GUID, testNCID, types.Assigned, 24, 0, testPod2Info)
 
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		state1.ID: state1,
@@ -357,7 +358,7 @@ func TestIPAMFailToGetIPWhenAllIPsAreAllocated(t *testing.T) {
 		t.Fatalf("Expected to not fail adding IPs to state: %+v", err)
 	}
 
-	// request the already allocated ip with a new context
+	// request the already assigned ip with a new context
 	req := cns.IPConfigRequest{}
 	b, _ := testPod3Info.OrchestratorContext()
 	req.OrchestratorContext = b
@@ -375,8 +376,8 @@ func TestIPAMFailToGetIPWhenAllIPsAreAllocated(t *testing.T) {
 func TestIPAMRequestThenReleaseThenRequestAgain(t *testing.T) {
 	svc := getTestService()
 
-	// set state as already allocated
-	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, cns.Allocated, 24, 0, testPod1Info)
+	// set state as already assigned
+	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, types.Assigned, 24, 0, testPod1Info)
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		state1.ID: state1,
 	}
@@ -388,7 +389,7 @@ func TestIPAMRequestThenReleaseThenRequestAgain(t *testing.T) {
 
 	desiredIpAddress := testIP1
 
-	// Use TestPodInfo2 to request TestIP1, which has already been allocated
+	// Use TestPodInfo2 to request TestIP1, which has already been assigned
 	req := cns.IPConfigRequest{
 		PodInterfaceID:   testPod2Info.InterfaceID(),
 		InfraContainerID: testPod2Info.InfraContainerID(),
@@ -422,7 +423,7 @@ func TestIPAMRequestThenReleaseThenRequestAgain(t *testing.T) {
 		t.Fatalf("Expected IP retrieval to be nil: %+v", err)
 	}
 
-	desiredState, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, cns.Allocated, 24, 0, testPod1Info)
+	desiredState, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, types.Assigned, 24, 0, testPod1Info)
 	// want first available Pod IP State
 	desiredState.IPAddress = desiredIpAddress
 	desiredState.PodInfo = testPod2Info
@@ -434,8 +435,8 @@ func TestIPAMRequestThenReleaseThenRequestAgain(t *testing.T) {
 
 func TestIPAMReleaseIPIdempotency(t *testing.T) {
 	svc := getTestService()
-	// set state as already allocated
-	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, cns.Allocated, 24, 0, testPod1Info)
+	// set state as already assigned
+	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, types.Assigned, 24, 0, testPod1Info)
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		state1.ID: state1,
 	}
@@ -460,8 +461,8 @@ func TestIPAMReleaseIPIdempotency(t *testing.T) {
 
 func TestIPAMAllocateIPIdempotency(t *testing.T) {
 	svc := getTestService()
-	// set state as already allocated
-	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, cns.Allocated, 24, 0, testPod1Info)
+	// set state as already assigned
+	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, types.Assigned, 24, 0, testPod1Info)
 
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		state1.ID: state1,
@@ -481,9 +482,9 @@ func TestIPAMAllocateIPIdempotency(t *testing.T) {
 func TestAvailableIPConfigs(t *testing.T) {
 	svc := getTestService()
 
-	state1 := NewPodState(testIP1, 24, testPod1GUID, testNCID, cns.Available, 0)
-	state2 := NewPodState(testIP2, 24, testPod2GUID, testNCID, cns.Available, 0)
-	state3 := NewPodState(testIP3, 24, testPod3GUID, testNCID, cns.Available, 0)
+	state1 := NewPodState(testIP1, 24, testPod1GUID, testNCID, types.Available, 0)
+	state2 := NewPodState(testIP2, 24, testPod2GUID, testNCID, types.Available, 0)
+	state3 := NewPodState(testIP3, 24, testPod3GUID, testNCID, types.Available, 0)
 
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		state1.ID: state1,
@@ -500,9 +501,9 @@ func TestAvailableIPConfigs(t *testing.T) {
 	availableIps := svc.GetAvailableIPConfigs()
 	validateIpState(t, availableIps, desiredAvailableIps)
 
-	desiredAllocatedIpConfigs := make(map[string]cns.IPConfigurationStatus)
-	allocatedIps := svc.GetAllocatedIPConfigs()
-	validateIpState(t, allocatedIps, desiredAllocatedIpConfigs)
+	desiredAssignedIPConfigs := make(map[string]cns.IPConfigurationStatus)
+	assignedIPs := svc.GetAssignedIPConfigs()
+	validateIpState(t, assignedIPs, desiredAssignedIPConfigs)
 
 	req := cns.IPConfigRequest{
 		PodInterfaceID:   testPod1Info.InterfaceID(),
@@ -521,11 +522,11 @@ func TestAvailableIPConfigs(t *testing.T) {
 	availableIps = svc.GetAvailableIPConfigs()
 	validateIpState(t, availableIps, desiredAvailableIps)
 
-	desiredState := NewPodState(testIP1, 24, testPod1GUID, testNCID, cns.Allocated, 0)
+	desiredState := NewPodState(testIP1, 24, testPod1GUID, testNCID, types.Assigned, 0)
 	desiredState.PodInfo = testPod1Info
-	desiredAllocatedIpConfigs[desiredState.ID] = desiredState
-	allocatedIps = svc.GetAllocatedIPConfigs()
-	validateIpState(t, allocatedIps, desiredAllocatedIpConfigs)
+	desiredAssignedIPConfigs[desiredState.ID] = desiredState
+	assignedIPs = svc.GetAssignedIPConfigs()
+	validateIpState(t, assignedIPs, desiredAssignedIPConfigs)
 }
 
 func validateIpState(t *testing.T, actualIps []cns.IPConfigurationStatus, expectedList map[string]cns.IPConfigurationStatus) {
@@ -551,8 +552,8 @@ func validateIpState(t *testing.T, actualIps []cns.IPConfigurationStatus, expect
 
 func TestIPAMMarkIPCountAsPending(t *testing.T) {
 	svc := getTestService()
-	// set state as already allocated
-	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, cns.Available, 24, 0, testPod1Info)
+	// set state as already assigned
+	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, types.Available, 24, 0, testPod1Info)
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		state1.ID: state1,
 	}
@@ -693,10 +694,10 @@ func constructSecondaryIPConfigs(ipAddress, uuid string, ncVersion int, secondar
 func TestIPAMMarkExistingIPConfigAsPending(t *testing.T) {
 	svc := getTestService()
 
-	// Add already allocated pod ip to state
+	// Add already assigned pod ip to state
 	svc.PodIPIDByPodInterfaceKey[testPod1Info.Key()] = testPod1GUID
-	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, cns.Allocated, 24, 0, testPod1Info)
-	state2 := NewPodState(testIP2, 24, testPod2GUID, testNCID, cns.Available, 0)
+	state1, _ := NewPodStateWithOrchestratorContext(testIP1, testPod1GUID, testNCID, types.Assigned, 24, 0, testPod1Info)
+	state2 := NewPodState(testIP2, 24, testPod2GUID, testNCID, types.Available, 0)
 
 	ipconfigs := map[string]cns.IPConfigurationStatus{
 		state1.ID: state1,
@@ -719,15 +720,15 @@ func TestIPAMMarkExistingIPConfigAsPending(t *testing.T) {
 		t.Fatalf("Expected to see ID %v in pending release ipconfigs, actual %+v", testPod2GUID, pendingIPConfigs)
 	}
 
-	// attempt to mark allocated ipconfig as pending, expect fail
+	// attempt to mark assigned ipconfig as pending, expect fail
 	pendingIPIDs = []string{testPod1GUID}
 	err = svc.MarkExistingIPsAsPending(pendingIPIDs)
 	if err == nil {
-		t.Fatalf("Expected to fail when marking allocated ip as pending")
+		t.Fatalf("Expected to fail when marking assigned ip as pending")
 	}
 
-	allocatedIPConfigs := svc.GetAllocatedIPConfigs()
-	if allocatedIPConfigs[0].ID != testPod1GUID {
-		t.Fatalf("Expected to see ID %v in pending release ipconfigs, actual %+v", testPod1GUID, allocatedIPConfigs)
+	assignedIPConfigs := svc.GetAssignedIPConfigs()
+	if assignedIPConfigs[0].ID != testPod1GUID {
+		t.Fatalf("Expected to see ID %v in pending release ipconfigs, actual %+v", testPod1GUID, assignedIPConfigs)
 	}
 }
