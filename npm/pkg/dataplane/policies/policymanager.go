@@ -23,6 +23,10 @@ const (
 	reconcileTimeInMinutes = 5
 )
 
+type PolicyManagerCfg struct {
+	Mode PolicyManagerMode
+}
+
 type PolicyMap struct {
 	cache map[string]*NPMNetworkPolicy
 }
@@ -35,30 +39,20 @@ type PolicyManager struct {
 	sync.Mutex
 }
 
-func NewPolicyManager(ioShim *common.IOShim) *PolicyManager {
+func NewPolicyManager(ioShim *common.IOShim, cfg *PolicyManagerCfg) *PolicyManager {
 	return &PolicyManager{
 		policyMap: &PolicyMap{
 			cache: make(map[string]*NPMNetworkPolicy),
 		},
-		ioShim:      ioShim,
-		staleChains: newStaleChains(),
+		ioShim:           ioShim,
+		staleChains:      newStaleChains(),
+		PolicyManagerCfg: cfg,
 	}
 }
 
-func (pMgr *PolicyManager) Initialize() error {
-	if err := pMgr.initialize(); err != nil {
-		return npmerrors.ErrorWrapper(npmerrors.InitializePolicyMgr, false, "failed to initialize policy manager", err)
-	}
-	return nil
-}
-
-type PolicyManagerCfg struct {
-	Mode PolicyManagerMode
-}
-
-func (pMgr *PolicyManager) Reset(epIDs []string) error {
-	if err := pMgr.reset(epIDs); err != nil {
-		return npmerrors.ErrorWrapper(npmerrors.ResetPolicyMgr, false, "failed to reset policy manager", err)
+func (pMgr *PolicyManager) Bootup(epIDs []string) error {
+	if err := pMgr.bootup(epIDs); err != nil {
+		return npmerrors.ErrorWrapper(npmerrors.BootupPolicyMgr, false, "failed to bootup policy manager", err)
 	}
 	return nil
 }
@@ -114,6 +108,10 @@ func (pMgr *PolicyManager) AddPolicy(policy *NPMNetworkPolicy, endpointList map[
 	return nil
 }
 
+func (pMgr *PolicyManager) isFirstPolicy() bool {
+	return len(pMgr.policyMap.cache) == 0
+}
+
 func (pMgr *PolicyManager) RemovePolicy(policyKey string, endpointList map[string]string) error {
 	policy, ok := pMgr.GetPolicy(policyKey)
 	klog.Infof("PRINTING-CONTENTS-FOR-REMOVING-POLICY:\n%s", policy.String())
@@ -135,14 +133,13 @@ func (pMgr *PolicyManager) RemovePolicy(policyKey string, endpointList map[strin
 	}
 
 	delete(pMgr.policyMap.cache, policyKey)
-	if len(pMgr.policyMap.cache) == 0 {
-		klog.Infof("rebooting policy manager since there are no policies remaining in the cache")
-		if err := pMgr.reboot(); err != nil {
-			klog.Errorf("failed to reboot when there were no policies remaining")
-		}
-	}
-
 	return nil
+}
+
+func (pMgr *PolicyManager) isLastPolicy() bool {
+	// if change our code to delete more than one policy at once, we can specify numPoliciesToDelete as an argument
+	numPoliciesToDelete := 1
+	return len(pMgr.policyMap.cache) == numPoliciesToDelete
 }
 
 func normalizePolicy(networkPolicy *NPMNetworkPolicy) {

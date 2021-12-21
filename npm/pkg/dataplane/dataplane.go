@@ -9,7 +9,6 @@ import (
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
-	"github.com/Azure/azure-container-networking/npm/util"
 	npmerrors "github.com/Azure/azure-container-networking/npm/util/errors"
 	"k8s.io/klog"
 )
@@ -19,18 +18,13 @@ const (
 	AzureNetworkName = "azure"
 )
 
-type policyMode string
+type PolicyMode string
 
-type dataplaneCfg struct {
-	policyMode policyMode
+// TODO put NodeName in Config?
+type Config struct {
+	*ipsets.IPSetManagerCfg
+	*policies.PolicyManagerCfg
 }
-
-var (
-	iMgrDefaultCfg = &ipsets.IPSetManagerCfg{
-		IPSetMode:   ipsets.ApplyAllIPSets,
-		NetworkName: AzureNetworkName,
-	}
-)
 
 type DataPlane struct {
 	policyMgr *policies.PolicyManager
@@ -41,7 +35,7 @@ type DataPlane struct {
 	endpointCache  map[string]*NPMEndpoint
 	ioShim         *common.IOShim
 	updatePodCache map[string]*updateNPMPod
-	dataplaneCfg
+	*Config
 }
 
 type NPMEndpoint struct {
@@ -54,19 +48,16 @@ type NPMEndpoint struct {
 	NetPolReference map[string]struct{}
 }
 
-func NewDataPlane(nodeName string, ioShim *common.IOShim) (*DataPlane, error) {
+func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config) (*DataPlane, error) {
 	metrics.InitializeAll()
 	dp := &DataPlane{
-		policyMgr:      policies.NewPolicyManager(ioShim),
-		ipsetMgr:       ipsets.NewIPSetManager(iMgrDefaultCfg, ioShim),
+		policyMgr:      policies.NewPolicyManager(ioShim, cfg.PolicyManagerCfg),
+		ipsetMgr:       ipsets.NewIPSetManager(cfg.IPSetManagerCfg, ioShim),
 		endpointCache:  make(map[string]*NPMEndpoint),
 		nodeName:       nodeName,
 		ioShim:         ioShim,
 		updatePodCache: make(map[string]*updateNPMPod),
-		dataplaneCfg: dataplaneCfg{
-			// For linux this policyMode is not used
-			policyMode: "",
-		},
+		Config:         cfg,
 	}
 
 	err := dp.ResetDataPlane()
@@ -74,34 +65,21 @@ func NewDataPlane(nodeName string, ioShim *common.IOShim) (*DataPlane, error) {
 		klog.Errorf("Failed to reset dataplane: %v", err)
 		return nil, err
 	}
-
-	err = dp.InitializeDataPlane()
-	if err != nil {
-		klog.Errorf("Failed to initialize dataplane: %v", err)
-		return nil, err
-	}
-
 	return dp, nil
 }
 
 // InitializeDataPlane helps in setting up dataplane for NPM
 func (dp *DataPlane) InitializeDataPlane() error {
-	// Create Kube-All-NS IPSet
-	kubeAllSet := ipsets.NewIPSetMetadata(util.KubeAllNamespacesFlag, ipsets.KeyLabelOfNamespace)
-	dp.CreateIPSets([]*ipsets.IPSetMetadata{kubeAllSet})
-	if err := dp.initializeDataPlane(); err != nil {
-		return npmerrors.ErrorWrapper(npmerrors.InitializeDataPlane, false, "failed to initialize overall dataplane", err)
-	}
-	if err := dp.policyMgr.Initialize(); err != nil {
-		return npmerrors.ErrorWrapper(npmerrors.InitializeDataPlane, false, "failed to initialize policy dataplane", err)
-	}
+	// TODO deprecate this function
 	return nil
 }
 
 // ResetDataPlane helps in cleaning up dataplane sets and policies programmed
 // by NPM, returning a clean slate
 func (dp *DataPlane) ResetDataPlane() error {
-	return dp.resetDataPlane()
+	// TODO rename this function to BootupDataplane
+	// NOTE: used to create an all-namespaces set, but there's no need since it will be created by the control plane
+	return dp.bootupDataPlane()
 }
 
 // CreateIPSets takes in a set object and updates local cache with this set

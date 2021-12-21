@@ -16,6 +16,8 @@ import (
 	restserver "github.com/Azure/azure-container-networking/npm/http/server"
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane"
+	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
+	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
 	"github.com/Azure/azure-container-networking/npm/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -28,6 +30,16 @@ import (
 	"k8s.io/klog"
 	"k8s.io/utils/exec"
 )
+
+var npmV2DataplaneCfg = &dataplane.Config{
+	IPSetManagerCfg: &ipsets.IPSetManagerCfg{
+		IPSetMode:   ipsets.ApplyAllIPSets,
+		NetworkName: "azure", // FIXME  should be specified in DP config instead
+	},
+	PolicyManagerCfg: &policies.PolicyManagerCfg{
+		Mode: policies.IPSetPolicyMode,
+	},
+}
 
 func newStartNPMCmd() *cobra.Command {
 	// getTuplesCmd represents the getTuples command
@@ -126,7 +138,7 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 
 	var dp dataplane.GenericDataplane
 	if config.Toggles.EnableV2NPM {
-		dp, err = dataplane.NewDataPlane(npm.GetNodeName(), common.NewIOShim())
+		dp, err = dataplane.NewDataPlane(npm.GetNodeName(), common.NewIOShim(), npmV2DataplaneCfg)
 		if err != nil {
 			return fmt.Errorf("failed to create dataplane with error %w", err)
 		}
