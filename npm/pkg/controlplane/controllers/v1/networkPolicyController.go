@@ -5,6 +5,7 @@ package controllers
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-container-networking/npm/ipsm"
@@ -82,12 +83,37 @@ func (c *NetworkPolicyController) ResetDataPlane() error {
 		utilruntime.HandleError(fmt.Errorf("Failed to DestroyNpmIpsets with err: %w", err))
 	}
 
+	klog.Infof("[DEBUGME-BEGIN-RESET-DATAPLANE]\nCURRENT IPTABLES\n%s\n\nCURRENT IPSETS\n%s\n[DEBUGME-END-RESET-DATAPLANE]", c.iptMgr.List(), c.ipsMgr.List())
 	return nil
 }
 
 func (c *NetworkPolicyController) RunPeriodicTasks(stopCh <-chan struct{}) {
 	// (TODO): Check any side effects
 	c.iptMgr.ReconcileIPTables(stopCh)
+
+	go func() {
+		ticker := time.NewTicker(time.Second * 5)
+		defer ticker.Stop()
+
+		prevIPSetsLength := 0
+		prevIPTablesLength := 0
+		for {
+			select {
+			case <-stopCh:
+				return
+			case <-ticker.C:
+				iptables := c.iptMgr.List()
+				ipsets := c.ipsMgr.List()
+				if prevIPTablesLength != len(iptables) || prevIPSetsLength != len(ipsets) {
+					prevIPSetsLength = len(ipsets)
+					prevIPTablesLength = len(iptables)
+					klog.Infof("[DEBUGME-BEGIN-CHECKING-LIST]\nCURRENT IPTABLES\n%s\n\nCURRENT IPSETS\n%s\n[DEBUGME-END-CHECKING-LIST]", c.iptMgr.List(), c.ipsMgr.List())
+				} else {
+					klog.Infof("[DEBUGME-NO-CHANGE-WHEN-CHECKING-LIST]")
+				}
+			}
+		}
+	}()
 }
 
 func (c *NetworkPolicyController) LengthOfRawNpMap() int {
@@ -391,6 +417,12 @@ func (c *NetworkPolicyController) syncAddAndUpdateNetPol(netPolObj *networkingv1
 		}
 	}
 
+	commands := []string{}
+	for _, iptEntry := range iptEntries {
+		commands = append(commands, iptEntry.String())
+	}
+
+	klog.Infof("[DEBUGME-BEGIN-ADD-POLICY]\nran commands:\n%s\n\nCURRENT IPTABLES\n%s\n\nCURRENT IPSETS\n%s\n[DEBUGME-END-ADD-POLICY]", strings.Join(commands, "\n"), c.iptMgr.List(), c.ipsMgr.List())
 	return nil
 }
 
@@ -450,6 +482,8 @@ func (c *NetworkPolicyController) cleanUpNetworkPolicy(netPolKey string, isSafeC
 			return nil
 		}
 	}
+
+	klog.Infof("[DEBUGME-BEGIN-REMOVE-POLICY]\nCURRENT IPTABLES\n%s\n\nCURRENT IPSETS\n%s\n[DEBUGME-END-REMOVE-POLICY]", c.iptMgr.List(), c.ipsMgr.List())
 
 	return nil
 }

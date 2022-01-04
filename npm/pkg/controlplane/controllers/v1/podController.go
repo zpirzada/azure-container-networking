@@ -362,7 +362,7 @@ func (c *PodController) syncPod(key string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to sync pod due to %v\n", err)
 	}
-
+	klog.Infof("[DEBUGME-BEGIN-ADD/UPDATE-POD]\nCURRENT IPSETS\n%s\nDEBUGME-END-ADD/UPDATE-POD", c.ipsMgr.List())
 	return nil
 }
 
@@ -570,6 +570,7 @@ func (c *PodController) cleanUpDeletedPod(cachedNpmPodKey string) error {
 	}
 
 	delete(c.podMap, cachedNpmPodKey)
+	klog.Infof("[DEBUGME-BEGIN-REMOVE-POD]\nCURRENT IPSETS\n%s\n[DEBUGME-END-REMOVE-POD]", c.ipsMgr.List())
 	return nil
 }
 

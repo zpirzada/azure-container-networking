@@ -488,7 +488,6 @@ func (iptMgr *IptablesManager) run(entry *IptEntry) (int, error) {
 
 		return errCode, err
 	}
-	fmt.Println(output)
 
 	return 0, nil
 }
@@ -518,3 +517,17 @@ func (iptMgr *IptablesManager) run(entry *IptEntry) (int, error) {
 // 	writeLine(filterChains, "*filter")
 
 // }
+
+func (e *IptEntry) String() string {
+	return fmt.Sprintf("%s %s %s %s %s", e.Command, e.Name, e.Chain, e.Flag, strings.Join(e.Specs, " "))
+}
+
+func (iptMgr *IptablesManager) List() string {
+	iptMgr.OperationFlag = util.IptablesListFlag
+	cmdArgs := []string{util.IptablesWaitFlag, "2", util.IptablesListFlag, "-n"}
+	output, err := iptMgr.exec.Command(util.Iptables, cmdArgs...).CombinedOutput()
+	if err != nil {
+		return fmt.Sprintf("Error: failed to list iptables [%s] with output [%s]", err.Error(), string(output))
+	}
+	return string(output)
+}

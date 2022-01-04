@@ -299,7 +299,7 @@ func (nsc *NamespaceController) syncNameSpace(key string) error {
 		metrics.SendErrorLogAndMetric(util.NSID, "[syncNameSpace] failed to sync namespace due to  %s", err.Error())
 		return err
 	}
-
+	klog.Infof("[DEBUGME-BEGIN-ADD/UPDATE-NAMESPACE]\nCURRENT IPSETS\n%s\n[DEBUGME-END-ADD/UPDATE-NAMESPACE]", nsc.ipsMgr.List())
 	return nil
 }
 
@@ -455,5 +455,6 @@ func (nsc *NamespaceController) cleanDeletedNamespace(cachedNsKey string) error 
 
 	delete(nsc.npmNamespaceCache.NsMap, cachedNsKey)
 
+	klog.Infof("[DEBUGME-BEGIN-REMOVE-NAMESPACE]\nCURRENT IPSETS\n%s\n[DEBUGME-END-REMOVE-NAMESPACE]", nsc.ipsMgr.List())
 	return nil
 }
