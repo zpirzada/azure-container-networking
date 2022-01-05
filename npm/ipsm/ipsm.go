@@ -654,7 +654,7 @@ func (ipsMgr *IpsetManager) DestroyNpmIpsets() error {
 func (ipsMgr *IpsetManager) List() string {
 	ipsMgr.Lock()
 	defer ipsMgr.Unlock()
-	output, err := ipsMgr.exec.Command(util.Ipset, util.IpsetSetListFlag).CombinedOutput()
+	output, err := ipsMgr.exec.Command(util.Ipset, "list").CombinedOutput()
 	if err != nil {
 		return fmt.Sprintf("Error: there was an error running ipset list command [%s] with output [%s]", err.Error(), string(output))
 	}
