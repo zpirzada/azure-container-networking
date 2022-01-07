@@ -227,6 +227,15 @@ func (iptMgr *IptablesManager) checkAndAddForwardChain() error {
 			util.IptablesNewState,
 		},
 	}
+	if iptMgr.placeAzureChainFirst {
+		entry = &IptEntry{
+			Chain: util.IptablesForwardChain,
+			Specs: []string{
+				util.IptablesJumpFlag,
+				util.IptablesAzureChain,
+			},
+		}
+	}
 
 	var index int
 	var kubeServicesLine int
