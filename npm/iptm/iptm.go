@@ -227,7 +227,7 @@ func (iptMgr *IptablesManager) checkAndAddForwardChain() error {
 			util.IptablesNewState,
 		},
 	}
-	if iptMgr.placeAzureChainFirst {
+	if !iptMgr.placeAzureChainFirst {
 		entry = &IptEntry{
 			Chain: util.IptablesForwardChain,
 			Specs: []string{
