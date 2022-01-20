@@ -6,6 +6,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/npm/metrics"
+	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/snapshot"
 	npmerrors "github.com/Azure/azure-container-networking/npm/util/errors"
 	"k8s.io/klog"
 )
@@ -29,6 +30,7 @@ type IPSetManager struct {
 	// IPSets referred to in this cache may be in the setMap, but must be deleted from the kernel
 	toDeleteCache map[string]struct{}
 	ioShim        *common.IOShim
+	snapshotter   snapshot.Snapshotter
 	sync.Mutex
 }
 
@@ -39,13 +41,14 @@ type IPSetManagerCfg struct {
 
 // TODO delegate prometheus metrics logic to OS-specific ones?
 
-func NewIPSetManager(iMgrCfg *IPSetManagerCfg, ioShim *common.IOShim) *IPSetManager {
+func NewIPSetManager(iMgrCfg *IPSetManagerCfg, ioShim *common.IOShim, s snapshot.Snapshotter) *IPSetManager {
 	return &IPSetManager{
 		iMgrCfg:            iMgrCfg,
 		setMap:             make(map[string]*IPSet),
 		toAddOrUpdateCache: make(map[string]struct{}),
 		toDeleteCache:      make(map[string]struct{}),
 		ioShim:             ioShim,
+		snapshotter:        s,
 	}
 }
 
@@ -280,6 +283,7 @@ func (iMgr *IPSetManager) ApplyIPSets() error {
 	// Call the appropriate apply ipsets
 	err := iMgr.applyIPSets()
 	if err != nil {
+		iMgr.snapshotter.Record(err.Error())
 		return err
 	}
 

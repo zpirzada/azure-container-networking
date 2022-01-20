@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/snapshot"
 	npmerrors "github.com/Azure/azure-container-networking/npm/util/errors"
 	"k8s.io/klog"
 )
@@ -38,15 +39,17 @@ type reconcileManager struct {
 }
 
 type PolicyManager struct {
+	*PolicyManagerCfg
 	policyMap        *PolicyMap
 	ioShim           *common.IOShim
 	staleChains      *staleChains
 	reconcileManager *reconcileManager
-	*PolicyManagerCfg
+	snapshotter      snapshot.Snapshotter
 }
 
-func NewPolicyManager(ioShim *common.IOShim, cfg *PolicyManagerCfg) *PolicyManager {
+func NewPolicyManager(cfg *PolicyManagerCfg, ioShim *common.IOShim, s snapshot.Snapshotter) *PolicyManager {
 	return &PolicyManager{
+		PolicyManagerCfg: cfg,
 		policyMap: &PolicyMap{
 			cache: make(map[string]*NPMNetworkPolicy),
 		},
@@ -55,13 +58,15 @@ func NewPolicyManager(ioShim *common.IOShim, cfg *PolicyManagerCfg) *PolicyManag
 		reconcileManager: &reconcileManager{
 			releaseLockSignal: make(chan struct{}, 1),
 		},
-		PolicyManagerCfg: cfg,
+		snapshotter: s,
 	}
 }
 
 func (pMgr *PolicyManager) Bootup(epIDs []string) error {
 	if err := pMgr.bootup(epIDs); err != nil {
-		return npmerrors.ErrorWrapper(npmerrors.BootupPolicyMgr, false, "failed to bootup policy manager", err)
+		errMsg := "failed to bootup policy manager"
+		pMgr.snapshotter.Record(errMsg)
+		return npmerrors.ErrorWrapper(npmerrors.BootupPolicyMgr, false, errMsg, err)
 	}
 	return nil
 }
@@ -106,7 +111,9 @@ func (pMgr *PolicyManager) AddPolicy(policy *NPMNetworkPolicy, endpointList map[
 	// Call actual dataplane function to apply changes
 	err := pMgr.addPolicy(policy, endpointList)
 	if err != nil {
-		return npmerrors.Errorf(npmerrors.AddPolicy, false, fmt.Sprintf("failed to add policy: %v", err))
+		errMsg := "failed to add policy"
+		pMgr.snapshotter.Record(errMsg)
+		return npmerrors.Errorf(npmerrors.AddPolicy, false, fmt.Sprintf("%s: %v", errMsg, err))
 	}
 
 	pMgr.policyMap.cache[policy.PolicyKey] = policy
@@ -134,7 +141,9 @@ func (pMgr *PolicyManager) RemovePolicy(policyKey string, endpointList map[strin
 	// Call actual dataplane function to apply changes
 	err := pMgr.removePolicy(policy, endpointList)
 	if err != nil {
-		return npmerrors.Errorf(npmerrors.RemovePolicy, false, fmt.Sprintf("failed to remove policy: %v", err))
+		errMsg := "failed to remove policy"
+		pMgr.snapshotter.Record(errMsg)
+		return npmerrors.Errorf(npmerrors.RemovePolicy, false, fmt.Sprintf("%s: %v", errMsg, err))
 	}
 
 	delete(pMgr.policyMap.cache, policyKey)

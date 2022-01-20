@@ -4,18 +4,22 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
 	npmerrors "github.com/Azure/azure-container-networking/npm/util/errors"
+	"github.com/Azure/azure-container-networking/npm/util/snapshot"
 	"k8s.io/klog"
 )
 
 const (
 	// AzureNetworkName is default network Azure CNI creates
 	AzureNetworkName = "azure"
+
+	snapshotIntervalInMinutes = 15
 )
 
 type PolicyMode string
@@ -36,6 +40,7 @@ type DataPlane struct {
 	endpointCache  map[string]*NPMEndpoint
 	ioShim         *common.IOShim
 	updatePodCache map[string]*updateNPMPod
+	snapshotter    *snapshot.PeriodicSnapshotter
 	stopChannel    <-chan struct{}
 }
 
@@ -51,14 +56,16 @@ type NPMEndpoint struct {
 
 func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChannel <-chan struct{}) (*DataPlane, error) {
 	metrics.InitializeAll()
+	snapshotter := snapshot.NewPeriodicSnapshotter(ioShim)
 	dp := &DataPlane{
 		Config:         cfg,
-		policyMgr:      policies.NewPolicyManager(ioShim, cfg.PolicyManagerCfg),
-		ipsetMgr:       ipsets.NewIPSetManager(cfg.IPSetManagerCfg, ioShim),
+		policyMgr:      policies.NewPolicyManager(cfg.PolicyManagerCfg, ioShim, snapshotter),
+		ipsetMgr:       ipsets.NewIPSetManager(cfg.IPSetManagerCfg, ioShim, snapshotter),
 		endpointCache:  make(map[string]*NPMEndpoint),
 		nodeName:       nodeName,
 		ioShim:         ioShim,
 		updatePodCache: make(map[string]*updateNPMPod),
+		snapshotter:    snapshotter,
 		stopChannel:    stopChannel,
 	}
 
@@ -83,9 +90,24 @@ func (dp *DataPlane) ResetDataPlane() error {
 	return dp.bootupDataPlane() //nolint:wrapcheck // unnecessary to wrap error
 }
 
-// RunPeriodicTasks runs periodic tasks. Should only be called once.
+// RunPeriodicTasks runs two go routines: one to reconcile policies, the other to snapshot the dataplane on errors.
+// This function should only be called once.
 func (dp *DataPlane) RunPeriodicTasks() {
 	dp.policyMgr.Reconcile(dp.stopChannel)
+
+	go func() {
+		ticker := time.NewTicker(time.Minute * time.Duration(snapshotIntervalInMinutes))
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-dp.stopChannel:
+				return
+			case <-ticker.C:
+				dp.snapshotter.CaptureIfNeeded()
+			}
+		}
+	}()
 }
 
 func (dp *DataPlane) GetIPSet(setName string) *ipsets.IPSet {
