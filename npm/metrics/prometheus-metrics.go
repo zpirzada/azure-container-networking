@@ -77,6 +77,14 @@ func InitializeAll() {
 	}
 }
 
+// ReinitializeAll creates/replaces Prometheus metrics. This function is intended for UTs.
+// Be sure to reset helper variables e.g. ipsetInventoryMap.
+func ReinitializeAll() {
+	haveInitialized = false
+	InitializeAll()
+	ipsetInventoryMap = make(map[string]int)
+}
+
 // GetHandler returns the HTTP handler for the metrics endpoint
 func GetHandler(isNodeLevel bool) http.Handler {
 	return promhttp.HandlerFor(getRegistry(isNodeLevel), promhttp.HandlerOpts{})
