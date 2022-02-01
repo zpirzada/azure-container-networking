@@ -130,14 +130,13 @@ func (service *HTTPRestService) saveNetworkContainerGoalState(
 	createNetworkContainerRequest := req
 	createNetworkContainerRequest.AuthorizationToken = ""
 
-	service.state.ContainerStatus[req.NetworkContainerid] =
-		containerstatus{
-			ID:                            req.NetworkContainerid,
-			VMVersion:                     req.Version,
-			CreateNetworkContainerRequest: createNetworkContainerRequest,
-			HostVersion:                   hostVersion,
-			VfpUpdateComplete:             vfpUpdateComplete,
-		}
+	service.state.ContainerStatus[req.NetworkContainerid] = containerstatus{
+		ID:                            req.NetworkContainerid,
+		VMVersion:                     req.Version,
+		CreateNetworkContainerRequest: createNetworkContainerRequest,
+		HostVersion:                   hostVersion,
+		VfpUpdateComplete:             vfpUpdateComplete,
+	}
 
 	switch req.NetworkContainerType {
 	case cns.AzureContainerInstance:
@@ -316,7 +315,6 @@ func validateIPSubnet(ipSubnet cns.IPSubnet) error {
 func (service *HTTPRestService) removeToBeDeletedIPStateUntransacted(
 	ipID string, skipValidation bool,
 ) (types.ResponseCode, string) {
-
 	// this is set if caller has already done the validation
 	if !skipValidation {
 		ipConfigStatus, exists := service.PodIPConfigState[ipID]
@@ -373,8 +371,7 @@ func (service *HTTPRestService) getNetworkContainerResponse(
 
 		if exists {
 			// If the goal state is available with CNS, check if the NC is pending VFP programming
-			waitingForUpdate, getNetworkContainerResponse.Response.ReturnCode, getNetworkContainerResponse.Response.Message =
-				service.isNCWaitingForUpdate(service.state.ContainerStatus[containerID].CreateNetworkContainerRequest.Version, containerID)
+			waitingForUpdate, getNetworkContainerResponse.Response.ReturnCode, getNetworkContainerResponse.Response.Message = service.isNCWaitingForUpdate(service.state.ContainerStatus[containerID].CreateNetworkContainerRequest.Version, containerID) //nolint:lll // bad code
 			// If the return code is not success, return the error to the caller
 			if getNetworkContainerResponse.Response.ReturnCode == types.NetworkContainerVfpProgramPending {
 				logger.Errorf("[Azure-CNS] isNCWaitingForUpdate failed for NC: %s with error: %s",
@@ -623,12 +620,9 @@ func (service *HTTPRestService) setNetworkStateJoined(networkID string) {
 
 // Join Network by calling nmagent
 func (service *HTTPRestService) joinNetwork(
-	networkID string,
-	joinNetworkURL string) (*http.Response, error, error) {
+	networkID string) (*http.Response, error, error) {
 	var err error
-	joinResponse, joinErr := nmagent.JoinNetwork(
-		networkID,
-		joinNetworkURL)
+	joinResponse, joinErr := nmagent.JoinNetwork(networkID)
 
 	if joinErr == nil && joinResponse.StatusCode == http.StatusOK {
 		// Network joined successfully

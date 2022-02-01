@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/Azure/azure-container-networking/cns/logger"
@@ -20,11 +21,16 @@ const (
 	GetNmAgentSupportedApiURLFmt       = "http://%s/machine/plugins/?comp=nmagent&type=GetSupportedApis"
 	GetNetworkContainerVersionURLFmt   = "http://%s/machine/plugins/?comp=nmagent&type=NetworkManagement/interfaces/%s/networkContainers/%s/version/authenticationToken/%s/api-version/1"
 	GetNcVersionListWithOutTokenURLFmt = "http://%s/machine/plugins/?comp=nmagent&type=NetworkManagement/interfaces/api-version/%s"
+	JoinNetworkURLFmt                  = "NetworkManagement/joinedVirtualNetworks/%s/api-version/1"
+	PutNetworkValueFmt                 = "NetworkManagement/interfaces/%s/networkContainers/%s/authenticationToken/%s/api-version/1"
+	DeleteNetworkContainerURLFmt       = "NetworkManagement/interfaces/%s/networkContainers/%s/authenticationToken/%s/api-version/1/method/DELETE"
 )
 
 // WireServerIP - wire server ip
 var (
 	WireserverIP                           = "168.63.129.16"
+	WireServerPath                         = "machine/plugins"
+	WireServerScheme                       = "http"
 	getNcVersionListWithOutTokenURLVersion = "2"
 )
 
@@ -65,13 +71,30 @@ func NewClient(url string) (*Client, error) {
 }
 
 // JoinNetwork joins the given network
-func JoinNetwork(networkID, joinNetworkURL string) (*http.Response, error) {
+func JoinNetwork(networkID string) (*http.Response, error) {
 	logger.Printf("[NMAgentClient] JoinNetwork: %s", networkID)
 
 	// Empty body is required as wireserver cannot handle a post without the body.
 	var body bytes.Buffer
 	json.NewEncoder(&body).Encode("")
-	response, err := common.GetHttpClient().Post(joinNetworkURL, "application/json", &body)
+
+	joinNetworkTypeValue := fmt.Sprintf(
+		JoinNetworkURLFmt,
+		networkID)
+
+	joinNetworkURL := url.URL{
+		Host:   WireserverIP,
+		Path:   WireServerPath,
+		Scheme: WireServerScheme,
+	}
+
+	queryString := joinNetworkURL.Query()
+	queryString.Set("type", joinNetworkTypeValue)
+	queryString.Set("comp", "nmagent")
+
+	joinNetworkURL.RawQuery = queryString.Encode()
+
+	response, err := common.PostCtx(context.TODO(), common.GetHttpClient(), joinNetworkURL.String(), "application/json", &body)
 
 	if err == nil && response.StatusCode == http.StatusOK {
 		defer response.Body.Close()
@@ -84,11 +107,29 @@ func JoinNetwork(networkID, joinNetworkURL string) (*http.Response, error) {
 }
 
 // PublishNetworkContainer publishes given network container
-func PublishNetworkContainer(networkContainerID, createNetworkContainerURL string, requestBodyData []byte) (*http.Response, error) {
+func PublishNetworkContainer(networkContainerID, associatedInterfaceID, accessToken string, requestBodyData []byte) (*http.Response, error) {
 	logger.Printf("[NMAgentClient] PublishNetworkContainer NC: %s", networkContainerID)
 
+	createNcTypeValue := fmt.Sprintf(
+		PutNetworkValueFmt,
+		associatedInterfaceID,
+		networkContainerID,
+		accessToken)
+
+	createURL := url.URL{
+		Host:   WireserverIP,
+		Path:   WireServerPath,
+		Scheme: WireServerScheme,
+	}
+
+	queryString := createURL.Query()
+	queryString.Set("type", createNcTypeValue)
+	queryString.Set("comp", "nmagent")
+
+	createURL.RawQuery = queryString.Encode()
+
 	requestBody := bytes.NewBuffer(requestBodyData)
-	response, err := common.GetHttpClient().Post(createNetworkContainerURL, "application/json", requestBody)
+	response, err := common.PostCtx(context.TODO(), common.GetHttpClient(), createURL.String(), "application/json", requestBody)
 
 	logger.Printf("[NMAgentClient][Response] Publish NC: %s. Response: %+v. Error: %v",
 		networkContainerID, response, err)
@@ -97,13 +138,31 @@ func PublishNetworkContainer(networkContainerID, createNetworkContainerURL strin
 }
 
 // UnpublishNetworkContainer unpublishes given network container
-func UnpublishNetworkContainer(networkContainerID, deleteNetworkContainerURL string) (*http.Response, error) {
+func UnpublishNetworkContainer(networkContainerID, associatedInterfaceID, accessToken string) (*http.Response, error) {
 	logger.Printf("[NMAgentClient] UnpublishNetworkContainer NC: %s", networkContainerID)
+
+	deleteNCTypeValue := fmt.Sprintf(
+		DeleteNetworkContainerURLFmt,
+		associatedInterfaceID,
+		networkContainerID,
+		accessToken)
+
+	deleteURL := url.URL{
+		Host:   WireserverIP,
+		Path:   WireServerPath,
+		Scheme: WireServerScheme,
+	}
+
+	queryString := deleteURL.Query()
+	queryString.Set("type", deleteNCTypeValue)
+	queryString.Set("comp", "nmagent")
+
+	deleteURL.RawQuery = queryString.Encode()
 
 	// Empty body is required as wireserver cannot handle a post without the body.
 	var body bytes.Buffer
 	json.NewEncoder(&body).Encode("")
-	response, err := common.GetHttpClient().Post(deleteNetworkContainerURL, "application/json", &body)
+	response, err := common.PostCtx(context.TODO(), common.GetHttpClient(), deleteURL.String(), "application/json", &body)
 
 	logger.Printf("[NMAgentClient][Response] Unpublish NC: %s. Response: %+v. Error: %v",
 		networkContainerID, response, err)
