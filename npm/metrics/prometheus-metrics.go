@@ -6,15 +6,21 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"k8s.io/klog"
 )
 
-const namespace = "npm"
+const (
+	namespace                = "npm"
+	dataplaneHealthSubsystem = "dataplane_health"
+)
 
 // Prometheus Metrics
 // Gauge metrics have the methods Inc(), Dec(), and Set(float64)
 // Summary metrics have the method Observe(float64)
 // For any Vector metric, you can call With(prometheus.Labels) before the above methods
 //   e.g. SomeGaugeVec.With(prometheus.Labels{label1: val1, label2: val2, ...).Dec()
+
+// Customer cluster and node metrics
 var (
 	numPolicies        prometheus.Gauge
 	addPolicyExecTime  prometheus.Summary
@@ -26,7 +32,7 @@ var (
 	ipsetInventory     *prometheus.GaugeVec
 )
 
-// Constants for metric names and descriptions as well as exported labels for Vector metrics
+// Constants for customer cluster and node metric names and descriptions as well as exported labels for Vector metrics
 const (
 	numPoliciesName = "num_policies"
 	numPoliciesHelp = "The number of current network policies for this node"
@@ -55,49 +61,106 @@ const (
 	setHashLabel       = "set_hash"
 )
 
+// Dataplane health metrics
 var (
-	nodeLevelRegistry    = prometheus.NewRegistry()
-	clusterLevelRegistry = prometheus.NewRegistry()
-	haveInitialized      = false
+	numApplyIPSetFailures         prometheus.Counter
+	numAddPolicyFailures          prometheus.Counter
+	numDeletePolicyFailures       prometheus.Counter
+	numPeriodicPolicyTaskFailures prometheus.Counter
+	numValidatePolicyFailures     prometheus.Counter
+	numValidateIPSetFailures      prometheus.Counter
+)
+
+// Constants for DataplaneHealthMetrics names and descriptions
+const (
+	numApplyIPSetFailuresName = "num_apply_ipset_failures"
+	numApplyIPSetFailuresHelp = "The number of times the dataplane failed to apply ipsets"
+
+	numAddPolicyFailuresName = "num_add_policy_failures"
+	numAddPolicyFailuresHelp = "The number of times the dataplane failed to add a network policy"
+
+	numDeletePolicyFailuresName = "num_delete_policy_failures"
+	numDeletePolicyFailuresHelp = "The number of times the dataplane failed to delete a network policy"
+
+	numPeriodicPolicyTaskFailuresName = "num_periodic_policy_task_failures"
+	numPeriodicPolicyTaskFailuresHelp = "The number of times the dataplane failed to run a periodic policy task"
+
+	numValidatePolicyFailuresName = "num_validate_policy_failures"
+	numValidatePolicyFailuresHelp = "The number of times the dataplane failed to validate a network policy"
+
+	numValidateIPSetFailuresName = "num_validate_ipset_failures"
+	numValidateIPSetFailuresHelp = "The number of times the dataplane failed to validate an ipset"
+)
+
+type RegistryType string
+
+const (
+	CustomerNodeMetrics    RegistryType = "customer-node"
+	CustomerClusterMetrics RegistryType = "customer-cluster"
+	DataplaneHealthMetrics RegistryType = "dataplane-health"
+)
+
+var (
+	allRegistries   = []RegistryType{CustomerNodeMetrics, CustomerClusterMetrics, DataplaneHealthMetrics}
+	registries      = make(map[RegistryType]*prometheus.Registry)
+	haveInitialized = false
 )
 
 // InitializeAll creates all the Prometheus Metrics. The metrics will be nil before this method is called.
 func InitializeAll() {
 	if !haveInitialized {
-		numPolicies = createGauge(numPoliciesName, numPoliciesHelp, false)
-		addPolicyExecTime = createSummary(addPolicyExecTimeName, addPolicyExecTimeHelp, true)
-		numACLRules = createGauge(numACLRulesName, numACLRulesHelp, false)
-		addACLRuleExecTime = createSummary(addACLRuleExecTimeName, addACLRuleExecTimeHelp, true)
-		numIPSets = createGauge(numIPSetsName, numIPSetsHelp, false)
-		addIPSetExecTime = createSummary(addIPSetExecTimeName, addIPSetExecTimeHelp, true)
-		numIPSetEntries = createGauge(numIPSetEntriesName, numIPSetEntriesHelp, false)
-		ipsetInventory = createGaugeVec(ipsetInventoryName, ipsetInventoryHelp, false, setNameLabel, setHashLabel)
+		// TODO optimize to only create the registries/metrics that are needed?
+		createRegistries()
+
+		// customer node and cluster metrics
+		numPolicies = createGauge(numPoliciesName, numPoliciesHelp, CustomerClusterMetrics)
+		addPolicyExecTime = createSummary(addPolicyExecTimeName, addPolicyExecTimeHelp, CustomerNodeMetrics)
+		numACLRules = createGauge(numACLRulesName, numACLRulesHelp, CustomerClusterMetrics)
+		addACLRuleExecTime = createSummary(addACLRuleExecTimeName, addACLRuleExecTimeHelp, CustomerNodeMetrics)
+		numIPSets = createGauge(numIPSetsName, numIPSetsHelp, CustomerClusterMetrics)
+		addIPSetExecTime = createSummary(addIPSetExecTimeName, addIPSetExecTimeHelp, CustomerNodeMetrics)
+		numIPSetEntries = createGauge(numIPSetEntriesName, numIPSetEntriesHelp, CustomerClusterMetrics)
+		ipsetInventory = createGaugeVec(ipsetInventoryName, ipsetInventoryHelp, CustomerClusterMetrics, setNameLabel, setHashLabel)
+
+		// vanilla dataplane health metrics
+		numApplyIPSetFailures = createDataplaneHealthCounter(numApplyIPSetFailuresName, numApplyIPSetFailuresHelp)
+		numAddPolicyFailures = createDataplaneHealthCounter(numAddPolicyFailuresName, numAddPolicyFailuresHelp)
+		numDeletePolicyFailures = createDataplaneHealthCounter(numDeletePolicyFailuresName, numDeletePolicyFailuresHelp)
+		numPeriodicPolicyTaskFailures = createDataplaneHealthCounter(numPeriodicPolicyTaskFailuresName, numPeriodicPolicyTaskFailuresHelp)
+		numValidatePolicyFailures = createDataplaneHealthCounter(numValidatePolicyFailuresName, numValidatePolicyFailuresHelp)
+		numValidateIPSetFailures = createDataplaneHealthCounter(numValidateIPSetFailuresName, numValidateIPSetFailuresHelp)
+
 		log.Logf("Finished initializing all Prometheus metrics")
 		haveInitialized = true
 	}
 }
 
 // GetHandler returns the HTTP handler for the metrics endpoint
-func GetHandler(isNodeLevel bool) http.Handler {
-	return promhttp.HandlerFor(getRegistry(isNodeLevel), promhttp.HandlerOpts{})
+func GetHandler(registryType RegistryType) http.Handler {
+	if !haveInitialized {
+		// not sure if this will ever happen, but just in case
+		klog.Infof("in GetHandler, metrics weren't initialized. Initializing now")
+		InitializeAll()
+	}
+	registry := registries[registryType]
+	return promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 }
 
-func register(collector prometheus.Collector, name string, isNodeLevel bool) {
-	err := getRegistry(isNodeLevel).Register(collector)
+func createRegistries() {
+	for _, registryType := range allRegistries {
+		registries[registryType] = prometheus.NewRegistry()
+	}
+}
+
+func register(collector prometheus.Collector, name string, registryType RegistryType) {
+	registry := registries[registryType]
+	err := registry.Register(collector)
 	if err != nil {
 		log.Errorf("Error creating metric %s", name)
 	}
 }
 
-func getRegistry(isNodeLevel bool) *prometheus.Registry {
-	registry := clusterLevelRegistry
-	if isNodeLevel {
-		registry = nodeLevelRegistry
-	}
-	return registry
-}
-
-func createGauge(name string, helpMessage string, isNodeLevel bool) prometheus.Gauge {
+func createGauge(name string, helpMessage string, registryType RegistryType) prometheus.Gauge {
 	gauge := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -105,11 +168,11 @@ func createGauge(name string, helpMessage string, isNodeLevel bool) prometheus.G
 			Help:      helpMessage,
 		},
 	)
-	register(gauge, name, isNodeLevel)
+	register(gauge, name, registryType)
 	return gauge
 }
 
-func createGaugeVec(name string, helpMessage string, isNodeLevel bool, labels ...string) *prometheus.GaugeVec {
+func createGaugeVec(name string, helpMessage string, registryType RegistryType, labels ...string) *prometheus.GaugeVec {
 	gaugeVec := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -118,11 +181,11 @@ func createGaugeVec(name string, helpMessage string, isNodeLevel bool, labels ..
 		},
 		labels,
 	)
-	register(gaugeVec, name, isNodeLevel)
+	register(gaugeVec, name, registryType)
 	return gaugeVec
 }
 
-func createSummary(name string, helpMessage string, isNodeLevel bool) prometheus.Summary {
+func createSummary(name string, helpMessage string, registryType RegistryType) prometheus.Summary {
 	summary := prometheus.NewSummary(
 		prometheus.SummaryOpts{
 			Namespace:  namespace,
@@ -132,6 +195,20 @@ func createSummary(name string, helpMessage string, isNodeLevel bool) prometheus
 			// quantiles e.g. the "0.5 quantile" will actually be the phi quantile for some phi in [0.5 - 0.05, 0.5 + 0.05]
 		},
 	)
-	register(summary, name, isNodeLevel)
+	register(summary, name, registryType)
 	return summary
+}
+
+func createDataplaneHealthCounter(name string, helpMessage string) prometheus.Counter {
+	counter := prometheus.NewCounter(
+		// fully-qualified name will be namespace_subsystem_name
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: dataplaneHealthSubsystem,
+			Name:      name,
+			Help:      helpMessage,
+		},
+	)
+	register(counter, name, DataplaneHealthMetrics)
+	return counter
 }
