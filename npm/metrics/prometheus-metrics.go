@@ -63,15 +63,15 @@ const (
 
 // Dataplane health metrics
 var (
-	numApplyIPSetFailures         prometheus.Counter
-	numAddPolicyFailures          prometheus.Counter
-	numDeletePolicyFailures       prometheus.Counter
-	numPeriodicPolicyTaskFailures prometheus.Counter
-	numValidatePolicyFailures     prometheus.Counter
-	numValidateIPSetFailures      prometheus.Counter
+	numApplyIPSetFailures         *prometheus.CounterVec
+	numAddPolicyFailures          *prometheus.CounterVec
+	numDeletePolicyFailures       *prometheus.CounterVec
+	numPeriodicPolicyTaskFailures *prometheus.CounterVec
+	numValidatePolicyFailures     *prometheus.CounterVec
+	numValidateIPSetFailures      *prometheus.CounterVec
 )
 
-// Constants for DataplaneHealthMetrics names and descriptions
+// Constants for DataplaneHealthMetrics names and descriptions as well as exported labels for Vector metrics
 const (
 	numApplyIPSetFailuresName = "num_apply_ipset_failures"
 	numApplyIPSetFailuresHelp = "The number of times the dataplane failed to apply ipsets"
@@ -90,6 +90,8 @@ const (
 
 	numValidateIPSetFailuresName = "num_validate_ipset_failures"
 	numValidateIPSetFailuresHelp = "The number of times the dataplane failed to validate an ipset"
+
+	errorTypeLabel = "error_type"
 )
 
 type RegistryType string
@@ -123,12 +125,12 @@ func InitializeAll() {
 		ipsetInventory = createGaugeVec(ipsetInventoryName, ipsetInventoryHelp, CustomerClusterMetrics, setNameLabel, setHashLabel)
 
 		// vanilla dataplane health metrics
-		numApplyIPSetFailures = createDataplaneHealthCounter(numApplyIPSetFailuresName, numApplyIPSetFailuresHelp)
-		numAddPolicyFailures = createDataplaneHealthCounter(numAddPolicyFailuresName, numAddPolicyFailuresHelp)
-		numDeletePolicyFailures = createDataplaneHealthCounter(numDeletePolicyFailuresName, numDeletePolicyFailuresHelp)
-		numPeriodicPolicyTaskFailures = createDataplaneHealthCounter(numPeriodicPolicyTaskFailuresName, numPeriodicPolicyTaskFailuresHelp)
-		numValidatePolicyFailures = createDataplaneHealthCounter(numValidatePolicyFailuresName, numValidatePolicyFailuresHelp)
-		numValidateIPSetFailures = createDataplaneHealthCounter(numValidateIPSetFailuresName, numValidateIPSetFailuresHelp)
+		numApplyIPSetFailures = createDataplaneHealthCounterVec(numApplyIPSetFailuresName, numApplyIPSetFailuresHelp)
+		numAddPolicyFailures = createDataplaneHealthCounterVec(numAddPolicyFailuresName, numAddPolicyFailuresHelp)
+		numDeletePolicyFailures = createDataplaneHealthCounterVec(numDeletePolicyFailuresName, numDeletePolicyFailuresHelp)
+		numPeriodicPolicyTaskFailures = createDataplaneHealthCounterVec(numPeriodicPolicyTaskFailuresName, numPeriodicPolicyTaskFailuresHelp)
+		numValidatePolicyFailures = createDataplaneHealthCounterVec(numValidatePolicyFailuresName, numValidatePolicyFailuresHelp)
+		numValidateIPSetFailures = createDataplaneHealthCounterVec(numValidateIPSetFailuresName, numValidateIPSetFailuresHelp)
 
 		log.Logf("Finished initializing all Prometheus metrics")
 		haveInitialized = true
@@ -199,8 +201,8 @@ func createSummary(name string, helpMessage string, registryType RegistryType) p
 	return summary
 }
 
-func createDataplaneHealthCounter(name string, helpMessage string) prometheus.Counter {
-	counter := prometheus.NewCounter(
+func createDataplaneHealthCounterVec(name string, helpMessage string) *prometheus.CounterVec {
+	counter := prometheus.NewCounterVec(
 		// fully-qualified name will be namespace_subsystem_name
 		prometheus.CounterOpts{
 			Namespace: namespace,
@@ -208,6 +210,7 @@ func createDataplaneHealthCounter(name string, helpMessage string) prometheus.Co
 			Name:      name,
 			Help:      helpMessage,
 		},
+		[]string{errorTypeLabel},
 	)
 	register(counter, name, DataplaneHealthMetrics)
 	return counter
