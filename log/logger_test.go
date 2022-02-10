@@ -6,6 +6,7 @@ package log
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"testing"
 )
@@ -13,6 +14,33 @@ import (
 const (
 	logName = "test"
 )
+
+func TestNewLoggerError(t *testing.T) {
+	// we expect an error from NewLoggerE in the event that we provide an
+	// unwriteable directory
+
+	// this test needs a guaranteed empty directory, so we create a temporary one
+	// and ensure that it gets destroyed afterward.
+	targetDir, err := os.MkdirTemp("", "acn")
+	if err != nil {
+		t.Fatal("unable to create temporary directory: err:", err)
+	}
+
+	t.Cleanup(func() {
+		// This removal could produce an error, but since it's a temporary
+		// directory anyway, this is a best-effort cleanup
+		os.Remove(targetDir)
+	})
+
+	// if we just use the targetDir, NewLoggerE will create the file and it will
+	// work. We need a non-existent directory *within* the tempdir
+	fullPath := path.Join(targetDir, "definitelyDoesNotExist")
+
+	_, err = NewLoggerE(logName, LevelInfo, TargetLogfile, fullPath)
+	if err == nil {
+		t.Error("expected an error but did not receive one")
+	}
+}
 
 // Tests that the log file rotates when size limit is reached.
 func TestLogFileRotatesWhenSizeLimitIsReached(t *testing.T) {
