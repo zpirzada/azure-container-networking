@@ -68,6 +68,32 @@ var (
 	list             = NewIPSetMetadata("test-list1", KeyLabelOfNamespace)
 )
 
+// see ipsetmanager_linux_test.go for testing when an error occurs
+func TestResetIPSets(t *testing.T) {
+	metrics.ReinitializeAll()
+	calls := GetResetTestCalls()
+	ioShim := common.NewMockIOShim(calls)
+	defer ioShim.VerifyCalls(t, calls)
+	iMgr := NewIPSetManager(applyAlwaysCfg, ioShim)
+
+	iMgr.CreateIPSets([]*IPSetMetadata{namespaceSet, keyLabelOfPodSet})
+
+	metrics.IncNumIPSets()
+	metrics.IncNumIPSets()
+	metrics.AddEntryToIPSet("test1")
+	metrics.AddEntryToIPSet("test1")
+	metrics.AddEntryToIPSet("test2")
+
+	require.NoError(t, iMgr.ResetIPSets())
+
+	assertExpectedInfo(t, iMgr, &expectedInfo{
+		mainCache:        nil,
+		toAddUpdateCache: nil,
+		toDeleteCache:    nil,
+		setsForKernel:    nil,
+	})
+}
+
 func TestApplyIPSets(t *testing.T) {
 	type args struct {
 		toAddUpdateSets []*IPSetMetadata
