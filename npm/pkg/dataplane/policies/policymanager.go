@@ -115,8 +115,8 @@ func (pMgr *PolicyManager) AddPolicy(policy *NPMNetworkPolicy, endpointList map[
 	}
 
 	// TODO move this validation and normalization to controller
-	normalizePolicy(policy)
-	if err := validatePolicy(policy); err != nil {
+	NormalizePolicy(policy)
+	if err := ValidatePolicy(policy); err != nil {
 		msg := fmt.Sprintf("failed to validate policy: %s", err.Error())
 		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s", msg)
 		return npmerrors.Errorf(npmerrors.AddPolicy, false, msg)
@@ -176,54 +176,4 @@ func (pMgr *PolicyManager) isLastPolicy() bool {
 	// if we change our code to delete more than one policy at once, we can specify numPoliciesToDelete as an argument
 	numPoliciesToDelete := 1
 	return len(pMgr.policyMap.cache) == numPoliciesToDelete
-}
-
-func normalizePolicy(networkPolicy *NPMNetworkPolicy) {
-	for _, aclPolicy := range networkPolicy.ACLs {
-		if aclPolicy.Protocol == "" {
-			aclPolicy.Protocol = UnspecifiedProtocol
-		}
-
-		if aclPolicy.DstPorts.EndPort == 0 {
-			aclPolicy.DstPorts.EndPort = aclPolicy.DstPorts.Port
-		}
-	}
-}
-
-// TODO do verification in controller?
-func validatePolicy(networkPolicy *NPMNetworkPolicy) error {
-	for _, aclPolicy := range networkPolicy.ACLs {
-		if !aclPolicy.hasKnownTarget() {
-			return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has unknown target [%s]", aclPolicy.PolicyID, aclPolicy.Target))
-		}
-		if !aclPolicy.hasKnownDirection() {
-			return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has unknown direction [%s]", aclPolicy.PolicyID, aclPolicy.Direction))
-		}
-		if !aclPolicy.hasKnownProtocol() {
-			return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has unknown protocol [%s]", aclPolicy.PolicyID, aclPolicy.Protocol))
-		}
-		if !aclPolicy.satisifiesPortAndProtocolConstraints() {
-			return npmerrors.SimpleError(fmt.Sprintf(
-				"ACL policy %s has dst port(s) (Port or Port and EndPort), so must have protocol tcp, udp, udplite, sctp, or dccp but has protocol %s",
-				aclPolicy.PolicyID,
-				string(aclPolicy.Protocol),
-			))
-		}
-
-		if !aclPolicy.DstPorts.isValidRange() {
-			return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has invalid port range in DstPorts (start: %d, end: %d)", aclPolicy.PolicyID, aclPolicy.DstPorts.Port, aclPolicy.DstPorts.EndPort))
-		}
-
-		for _, setInfo := range aclPolicy.SrcList {
-			if !setInfo.hasKnownMatchType() {
-				return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has set %s in SrcList with unknown Match Type", aclPolicy.PolicyID, setInfo.IPSet.Name))
-			}
-		}
-		for _, setInfo := range aclPolicy.DstList {
-			if !setInfo.hasKnownMatchType() {
-				return npmerrors.SimpleError(fmt.Sprintf("ACL policy %s has set %s in DstList with unknown Match Type", aclPolicy.PolicyID, setInfo.IPSet.Name))
-			}
-		}
-	}
-	return nil
 }

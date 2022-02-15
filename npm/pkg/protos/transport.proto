@@ -30,5 +30,5 @@ message Events {
 message GoalState {
   // Data can contain one or more instances of IPSet or NetworkPolicy
   // objects.
-	repeated bytes data = 1;
+	bytes data = 1;
 }

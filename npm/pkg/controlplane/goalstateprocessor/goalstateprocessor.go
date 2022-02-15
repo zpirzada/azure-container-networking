@@ -63,37 +63,38 @@ func (gsp *GoalStateProcessor) Stop() {
 func (gsp *GoalStateProcessor) run(stopCh <-chan struct{}) {
 	klog.Infof("Starting dataplane for node %s", gsp.nodeID)
 
-	for {
-		select {
-		case <-gsp.ctx.Done():
-			klog.Infof("GoalStateProcessor for node %s received context Done", gsp.nodeID)
-			return
-		case <-stopCh:
-			klog.Infof("GoalStateProcessor for node %s stopped", gsp.nodeID)
-			return
-		default:
-			gsp.processNext()
-		}
+	for gsp.processNext(stopCh) {
 	}
 }
 
-func (gsp *GoalStateProcessor) processNext() {
+func (gsp *GoalStateProcessor) processNext(stopCh <-chan struct{}) bool {
 	select {
 	case inputEvents := <-gsp.inputChannel:
 		// TODO remove this large print later
 		klog.Infof("Received event %s", inputEvents)
 		gsp.process(inputEvents)
+		return true
 	case backoffEvents := <-gsp.backoffChannel:
 		// For now keep it simple. Do not worry about backoff events
 		// but if we need to handle them, we can do it here.
 		// TODO remove this large print later
 		klog.Infof("Received backoff event %s", backoffEvents)
 		gsp.process(backoffEvents)
-	default:
+		return true
+
+	case <-gsp.ctx.Done():
+		klog.Infof("GoalStateProcessor for node %s received context Done", gsp.nodeID)
+		return false
+	case <-stopCh:
+		klog.Infof("GoalStateProcessor for node %s stopped", gsp.nodeID)
+		return false
 	}
 }
 
 func (gsp *GoalStateProcessor) process(inputEvent *protos.Events) {
+	// TODO (Vamsi) differentiate between hydration event and a normal event
+	// in hydration event, any thing in local cache and not in event should be deleted.
+
 	klog.Infof("Processing event")
 	// apply dataplane after syncing
 	defer func() {
@@ -147,17 +148,21 @@ func (gsp *GoalStateProcessor) process(inputEvent *protos.Events) {
 }
 
 func (gsp *GoalStateProcessor) processIPSetsApplyEvent(goalState *protos.GoalState) error {
-	for _, gs := range goalState.GetData() {
-		payload := bytes.NewBuffer(gs)
-		ipset, err := cp.DecodeControllerIPSet(payload)
-		if err != nil {
-			return npmerrors.SimpleErrorWrapper("failed to decode IPSet apply event", err)
-		}
+	payload := bytes.NewBuffer(goalState.GetData())
+	payloadIPSets, err := cp.DecodeControllerIPSets(payload)
+	if err != nil {
+		return npmerrors.SimpleErrorWrapper("failed to decode IPSet apply event", err)
+	}
 
+	klog.Infof("Processing IPSet apply event %v", payloadIPSets)
+
+	for _, ipset := range payloadIPSets {
 		if ipset == nil {
 			klog.Warningf("Empty IPSet apply event")
 			continue
 		}
+
+		klog.Infof("ipset: %v", ipset)
 
 		ipsetName := ipset.GetPrefixName()
 		klog.Infof("Processing %s IPSET apply event", ipsetName)
@@ -202,9 +207,9 @@ func (gsp *GoalStateProcessor) applySets(ipSet *cp.ControllerIPSets, cachedIPSet
 	}
 
 	if cachedIPSet != nil {
-		for podIP, podKey := range cachedIPSet.IPPodKey {
+		for podIP, cachedPodKey := range cachedIPSet.IPPodKey {
 			if _, ok := ipSet.IPPodMetadata[podIP]; !ok {
-				err := gsp.dp.RemoveFromSets([]*ipsets.IPSetMetadata{setMetadata}, dataplane.NewPodMetadata(podIP, podKey, ""))
+				err := gsp.dp.RemoveFromSets([]*ipsets.IPSetMetadata{setMetadata}, dataplane.NewPodMetadata(podIP, cachedPodKey, ""))
 				if err != nil {
 					return npmerrors.SimpleErrorWrapper("IPSet apply event, failed at RemoveFromSets.", err)
 				}
@@ -251,12 +256,13 @@ func (gsp *GoalStateProcessor) applyLists(ipSet *cp.ControllerIPSets, cachedIPSe
 }
 
 func (gsp *GoalStateProcessor) processIPSetsRemoveEvent(goalState *protos.GoalState) error {
-	for _, gs := range goalState.GetData() {
-		payload := bytes.NewBuffer(gs)
-		ipsetName, err := cp.DecodeString(payload)
-		if err != nil {
-			return npmerrors.SimpleErrorWrapper("failed to decode IPSet remove event", err)
-		}
+	payload := bytes.NewBuffer(goalState.GetData())
+	ipsetNames, err := cp.DecodeStrings(payload)
+	if err != nil {
+		return npmerrors.SimpleErrorWrapper("failed to decode IPSet remove event", err)
+	}
+
+	for _, ipsetName := range ipsetNames {
 		if ipsetName == "" {
 			klog.Warningf("Empty IPSet remove event")
 			continue
@@ -275,18 +281,19 @@ func (gsp *GoalStateProcessor) processIPSetsRemoveEvent(goalState *protos.GoalSt
 }
 
 func (gsp *GoalStateProcessor) processPolicyApplyEvent(goalState *protos.GoalState) error {
-	for _, gs := range goalState.GetData() {
-		payload := bytes.NewBuffer(gs)
-		netpol, err := cp.DecodeNPMNetworkPolicy(payload)
-		if err != nil {
-			return npmerrors.SimpleErrorWrapper("failed to decode Policy apply event", err)
-		}
+	payload := bytes.NewBuffer(goalState.GetData())
+	netpols, err := cp.DecodeNPMNetworkPolicies(payload)
+	if err != nil {
+		return npmerrors.SimpleErrorWrapper("failed to decode Policy apply event", err)
+	}
 
+	for _, netpol := range netpols {
 		if netpol == nil {
 			klog.Warningf("Empty Policy apply event")
 			continue
 		}
 		klog.Infof("Processing %s Policy ADD event", netpol.Name)
+		klog.Infof("Netpol: %v", netpol)
 
 		err = gsp.dp.UpdatePolicy(netpol)
 		if err != nil {
@@ -298,12 +305,12 @@ func (gsp *GoalStateProcessor) processPolicyApplyEvent(goalState *protos.GoalSta
 }
 
 func (gsp *GoalStateProcessor) processPolicyRemoveEvent(goalState *protos.GoalState) error {
-	for _, gs := range goalState.GetData() {
-		payload := bytes.NewBuffer(gs)
-		netpolName, err := cp.DecodeString(payload)
-		if err != nil {
-			return npmerrors.SimpleErrorWrapper("failed to decode Policy remove event", err)
-		}
+	payload := bytes.NewBuffer(goalState.GetData())
+	netpolNames, err := cp.DecodeStrings(payload)
+	if err != nil {
+		return npmerrors.SimpleErrorWrapper("failed to decode Policy remove event", err)
+	}
+	for _, netpolName := range netpolNames {
 		klog.Infof("Processing %s Policy remove event", netpolName)
 
 		if netpolName == "" {
