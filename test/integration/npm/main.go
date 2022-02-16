@@ -24,7 +24,8 @@ var (
 			NetworkName: "azure",
 		},
 		PolicyManagerCfg: &policies.PolicyManagerCfg{
-			PolicyMode: policies.IPSetPolicyMode,
+			PolicyMode:           policies.IPSetPolicyMode,
+			PlaceAzureChainFirst: util.PlaceAzureChainFirst,
 		},
 	}
 
