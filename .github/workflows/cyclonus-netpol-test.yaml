@@ -23,7 +23,7 @@ jobs:
     strategy:
       matrix:
         # run cyclonus tests in parallel for NPM with the given ConfigMaps
-        profile: [v1-default.yaml, v1-place-azure-chain-first.yaml, v2-default.yaml, v2-apply-on-need.yaml, v2-place-azure-after-kube-services.yaml]
+        profile: [v1-default.yaml]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -76,13 +76,8 @@ jobs:
           make test-cyclonus
           # kill the background processes (the logs) that have this process' pid (i.e. $$) as a parent
           pkill -P $$
-          mv ./test/cyclonus/cyclonus-test.txt ./cyclonus-test_$PROFILE.txt
-
-      - name: Fetch logs
-        if: always()
-        run: |
-          kubectl logs -n kube-system -l k8s-app=azure-npm --tail -1 --prefix > npm-logs_$PROFILE.txt
-          mv ./test/cyclonus/cyclonus-test.txt ./cyclonus-test_$PROFILE.txt
+          # FIXME uncomment
+          # mv ./test/cyclonus/cyclonus-test.txt ./cyclonus-test_$PROFILE.txt
 
       - name: 'Upload Logs'
         uses: actions/upload-artifact@v2
