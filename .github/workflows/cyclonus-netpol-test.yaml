@@ -74,10 +74,12 @@ jobs:
           done
 
           make test-cyclonus
+          exitCode=$?
           # kill the background processes (the logs) that have this process' pid (i.e. $$) as a parent
           pkill -P $$
           # FIXME uncomment
           # mv ./test/cyclonus/cyclonus-test.txt ./cyclonus-test_$PROFILE.txt
+          exit $exitCode
 
       - name: 'Upload Logs'
         uses: actions/upload-artifact@v2
