@@ -21,7 +21,7 @@ time kubectl wait --for=condition=ready --timeout=5m pod -n kube-system -l job-n
 
 #!/bin/bash
 { kubectl logs -f -n kube-system job.batch/cyclonus;  } &
-{ time kubectl wait --for=condition=completed --timeout=20s pod -n kube-system -l job-name=cyclonus;  } &
+{ time kubectl wait --for=condition=completed --timeout=20s pod -n kube-system -l job-name=cyclonus;  } || echo "FIXME remove and revert timeout time" &
 wait -n
 pkill -P $$
 echo done
