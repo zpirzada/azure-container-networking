@@ -1,4 +1,8 @@
-name: Cyclonus Network Policy Test
+name: Cyclonus Network Policy Test - v1 Default
+
+env:
+  PROFILE: v1-default
+  LOGS_FOLDER_NAME: cyclonus-logs
 
 on:
   workflow_dispatch:
@@ -14,16 +18,10 @@ on:
     # run once a day at midnight
     - cron: '0 0 * * *'
 
-env:
-  PROFILE: v1-default
-
+## NOTE: any changes below here need to be propagated to all other Cyclonus workflows (they are identical)
 jobs:
   cyclonus-test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        # run cyclonus tests in parallel for NPM with the given ConfigMaps
-        profile: [v1-default.yaml]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -48,8 +46,8 @@ jobs:
           make npm-image VERSION=cyclonus PLATFORM=linux/amd64 CONTAINER_BUILDER=docker
       
       - name: Install Azure NPM
-        # set the ConfigMap based on the build matrix
-        # currently have to restart the daemonset because changing the ConfigMap doesn't restart NPM
+        # set the ConfigMap based on the profile
+        # have to restart the daemonset because changing the ConfigMap doesn't restart NPM
         run: |
           sed -i 's/mcr.microsoft.com\/containernetworking\/azure-npm:.*/acnpublic.azurecr.io\/azure-npm:cyclonus/' ./npm/azure-npm.yaml
           kind load docker-image acnpublic.azurecr.io/azure-npm:cyclonus --name npm-kind
@@ -60,17 +58,18 @@ jobs:
     
       - name: Check Cluster Components
         run: |
-          sleep 120
+          sleep 180
           kubectl get po -owide -A
           kubectl describe ds azure-npm -n kube-system
 
       - name: Run Cyclonus network policy test and Fetch Logs
-        run: | 
+        run: |
+          mkdir -p $LOGS_FOLDER_NAME
           ## write to all NPM pod logs in the background (do this in the background instead of after to make sure the logs aren't truncated)
           npmPodList=`kubectl get pods -n kube-system | grep npm | awk '{print $1}'`
           echo "Found NPM pods: $npmPodList"
           for npmPod in $npmPodList; do
-            kubectl  logs -n kube-system $npmPod -f > $npmPod-logs_$PROFILE.txt &
+              kubectl  logs -n kube-system $npmPod -f > ./$LOGS_FOLDER_NAME/$npmPod-logs_$PROFILE.txt &
           done
 
           make test-cyclonus
@@ -78,7 +77,7 @@ jobs:
           # kill the background processes (the logs) that have this process' pid (i.e. $$) as a parent
           pkill -P $$
           # FIXME uncomment
-          # mv ./test/cyclonus/cyclonus-test.txt ./cyclonus-test_$PROFILE.txt
+          # mv ./test/cyclonus/cyclonus-test.txt ./$LOGS_FOLDER_NAME/cyclonus-test_$PROFILE.txt
           exit $exitCode
 
       - name: 'Upload Logs'
@@ -87,5 +86,4 @@ jobs:
         with:
           name: logs
           path: |
-            ./npm-logs_$PROFILE.txt
-            ./cyclonus-test_$PROFILE.txt
+            ./$LOGS_FOLDER_NAME/
