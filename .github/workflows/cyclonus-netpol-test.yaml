@@ -2,7 +2,7 @@ name: Cyclonus Network Policy Test - v1 Default
 
 env:
   PROFILE: v1-default
-  LOGS_FOLDER_NAME: cyclonus-logs
+  LOGS_FOLDER_NAME: cyclonus-logs-v1-default
 
 on:
   workflow_dispatch:
@@ -61,24 +61,19 @@ jobs:
           sleep 180
           kubectl get po -owide -A
           kubectl describe ds azure-npm -n kube-system
+      
+      - name: Run Cyclonus network policy test
+        run: make test-cyclonus
 
-      - name: Run Cyclonus network policy test and Fetch Logs
+      - name: Fetch logs
+        if: always()
         run: |
-          mkdir -p $LOGS_FOLDER_NAME
-          ## write to all NPM pod logs in the background (do this in the background instead of after to make sure the logs aren't truncated)
+          mkdir -p $LOGS_OLDER_NAME
+          ## write all NPM pod logs to file
           npmPodList=`kubectl get pods -n kube-system | grep npm | awk '{print $1}'`
           echo "Found NPM pods: $npmPodList"
-          for npmPod in $npmPodList; do
-              kubectl  logs -n kube-system $npmPod -f > ./$LOGS_FOLDER_NAME/$npmPod-logs_$PROFILE.txt &
-          done
-
-          make test-cyclonus
-          exitCode=$?
-          # kill the background processes (the logs) that have this process' pid (i.e. $$) as a parent
-          pkill -P $$
-          # FIXME uncomment
-          # mv ./test/cyclonus/cyclonus-test.txt ./$LOGS_FOLDER_NAME/cyclonus-test_$PROFILE.txt
-          exit $exitCode
+          kubectl logs -n kube-system -l k8s-app=azure-npm --tail -1 --prefix > ./$LOGS_FOLDER_NAME/npm-logs.txt
+          mv ./test/cyclonus/cyclonus-test.txt ./$LOGS_FOLDER_NAME/cyclonus-logs.txt
 
       - name: 'Upload Logs'
         uses: actions/upload-artifact@v2
@@ -86,4 +81,5 @@ jobs:
         with:
           name: logs
           path: |
-            ./$LOGS_FOLDER_NAME/
+            ./$LOGS_FOLDER_NAME/npm-logs.txt
+            ./$LOGS_FOLDER_NAME/cyclonus-logs.txt
