@@ -68,7 +68,7 @@ jobs:
       - name: Fetch logs
         if: always()
         run: |
-          mkdir -p $LOGS_OLDER_NAME
+          mkdir -p $LOGS_FOLDER_NAME
           ## write all NPM pod logs to file
           npmPodList=`kubectl get pods -n kube-system | grep npm | awk '{print $1}'`
           echo "Found NPM pods: $npmPodList"
