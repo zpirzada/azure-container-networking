@@ -20,7 +20,7 @@ spec:
             - --pod-creation-timeout-seconds=30
             - --job-timeout-seconds=2
             - --server-protocol=TCP,UDP
-            - --exclude=sctp
+            - --exclude=sctp,end-port # TODO update kind cluster to use latest k8s version and remove endport exclusion
           name: cyclonus
           imagePullPolicy: IfNotPresent
           image: mfenwick100/cyclonus:v0.4.7
