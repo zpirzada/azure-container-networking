@@ -2,7 +2,6 @@ name: Cyclonus Network Policy Test - v1 Default
 
 env:
   PROFILE: v1-default
-  LOGS_FOLDER_NAME: cyclonus-logs-v1-default
 
 on:
   workflow_dispatch:
@@ -68,12 +67,9 @@ jobs:
       - name: Fetch logs
         if: always()
         run: |
-          mkdir -p $LOGS_FOLDER_NAME
           ## write all NPM pod logs to file
-          npmPodList=`kubectl get pods -n kube-system | grep npm | awk '{print $1}'`
-          echo "Found NPM pods: $npmPodList"
-          kubectl logs -n kube-system -l k8s-app=azure-npm --tail -1 --prefix > ./$LOGS_FOLDER_NAME/npm-logs.txt
-          mv ./test/cyclonus/cyclonus-test.txt ./$LOGS_FOLDER_NAME/cyclonus-logs.txt
+          kubectl logs -n kube-system -l k8s-app=azure-npm --tail -1 --prefix > ./npm-logs.txt
+          mv ./test/cyclonus/cyclonus-test.txt ./cyclonus-logs.txt
 
       - name: 'Upload Logs'
         uses: actions/upload-artifact@v2
@@ -81,5 +77,5 @@ jobs:
         with:
           name: logs
           path: |
-            ./$LOGS_FOLDER_NAME/npm-logs.txt
-            ./$LOGS_FOLDER_NAME/cyclonus-logs.txt
+            ./npm-logs.txt
+            ./cyclonus-logs.txt
