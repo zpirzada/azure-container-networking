@@ -1,7 +1,7 @@
-name: Cyclonus Network Policy Test - v1 Default
+name: Cyclonus Network Policy Test - v2 Place Azure Chain After Kube Services
 
 env:
-  PROFILE: v1-default
+  PROFILE: v2-place-azure-after-kube-services
 
 on:
   workflow_dispatch:
@@ -10,9 +10,13 @@ on:
       - main
   pull_request:
     paths:
-      - 'npm/**'
       - '.github/**'
       - 'test/**'
+      # trigger for a change in any npm file except for v1 controlplane and ipsm/ and iptm/
+      - 'npm/**'
+      - '!npm/pkg/controlplane/v1/**'
+      - '!npm/ipsm/**'
+      - '!npm/iptm/**'
   schedule:
     # run once a day at midnight
     - cron: '0 0 * * *'

@@ -1,0 +1,85 @@
+name: Cyclonus Network Policy Test - v2 Place Azure Chain After Kube Services
+
+env:
+  PROFILE: v2-apply-on-need
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - '.github/**'
+      - 'test/**'
+      # trigger for a change in any npm file except for v1 controlplane and ipsm/ and iptm/
+      - 'npm/**'
+      - '!npm/pkg/controlplane/v1/**'
+      - '!npm/ipsm/**'
+      - '!npm/iptm/**'
+  schedule:
+    # run once a day at midnight
+    - cron: '0 0 * * *'
+
+## NOTE: any changes below here need to be propagated to all other Cyclonus workflows (they are identical)
+jobs:
+  cyclonus-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '^1.17'
+
+      - name: Setup Kind
+        uses: engineerd/setup-kind@v0.5.0
+        with:
+          version: "v0.11.1"
+          config: ./test/kind/kind.yaml
+          name: npm-kind
+
+      - name: Check Kind
+        run: |
+          kubectl get po -owide -A
+
+      - name: Make NPM image
+        run: |
+          make npm-image VERSION=cyclonus PLATFORM=linux/amd64 CONTAINER_BUILDER=docker
+      
+      - name: Install Azure NPM
+        # set the ConfigMap based on the profile
+        # have to restart the daemonset because changing the ConfigMap doesn't restart NPM
+        run: |
+          sed -i 's/mcr.microsoft.com\/containernetworking\/azure-npm:.*/acnpublic.azurecr.io\/azure-npm:cyclonus/' ./npm/azure-npm.yaml
+          kind load docker-image acnpublic.azurecr.io/azure-npm:cyclonus --name npm-kind
+          kubectl apply -f ./npm/azure-npm.yaml
+          echo "Applying profile: $PROFILE"
+          kubectl apply -f ./npm/profiles/$PROFILE.yaml
+          kubectl rollout restart ds azure-npm -n kube-system
+    
+      - name: Check Cluster Components
+        run: |
+          sleep 180
+          kubectl get po -owide -A
+          kubectl describe ds azure-npm -n kube-system
+
+      - name: Run Cyclonus network policy test
+        run: make test-cyclonus
+
+      - name: Fetch logs
+        if: always()
+        run: |
+          ## write all NPM pod logs to file
+          kubectl logs -n kube-system -l k8s-app=azure-npm --tail -1 --prefix > ./npm-logs_${{ env.PROFILE }}.txt
+          mv ./test/cyclonus/cyclonus-test.txt ./cyclonus-logs_${{ env.PROFILE }}.txt
+
+      - name: 'Upload Logs'
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: logs
+          path: |
+            ./npm-logs_${{ env.PROFILE }}.txt
+            ./cyclonus-logs_${{ env.PROFILE }}.txt
