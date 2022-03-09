@@ -70,6 +70,8 @@ jobs:
           ## write all NPM pod logs to file
           kubectl logs -n kube-system -l k8s-app=azure-npm --tail -1 --prefix > ./npm-logs_$PROFILE.txt
           mv ./test/cyclonus/cyclonus-test.txt ./cyclonus-logs_$PROFILE.txt
+          echo "wrote files" # FIXME remove
+          ls # FIXME remove
 
       - name: 'Upload Logs'
         uses: actions/upload-artifact@v2
@@ -77,5 +79,5 @@ jobs:
         with:
           name: logs
           path: |
-            ./npm-logs_$PROFILE.txt
-            ./cyclonus-logs_$PROFILE.txt
+            ./npm-logs_${{ PROFILE }}.txt
+            ./cyclonus-logs_${{ PROFILE }}.txt
