@@ -43,7 +43,7 @@ const (
 	apipaHostLevelEndpoint = "apipa_hostlevel_endpoint"
 
 	// apipa host level ip
-	apipaHostLevelIP = "169.254.169.2"
+	apipaHostLevelIP = "169.254.255.194"
 )
 
 type AzureHNSEndpointClient interface {
