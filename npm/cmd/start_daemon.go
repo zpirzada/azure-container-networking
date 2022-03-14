@@ -98,7 +98,6 @@ func startDaemon(config npmconfig.Config) error {
 		err = metrics.CreateTelemetryHandle(config.NPMVersion(), version, npm.GetAIMetadata())
 		if err != nil {
 			klog.Infof("CreateTelemetryHandle failed with error %v.", err)
-			return fmt.Errorf("CreateTelemetryHandle failed with error %w", err)
 		}
 	}
 
