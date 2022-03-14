@@ -113,10 +113,12 @@ func startControlplane(config npmconfig.Config, flags npmconfig.Flags) error {
 		return fmt.Errorf("failed to create NPM controlplane manager: %w", err)
 	}
 
-	err = metrics.CreateTelemetryHandle(config.NPMVersion(), version, npm.GetAIMetadata())
-	if err != nil {
-		klog.Infof("CreateTelemetryHandle failed with error %v.", err)
-		return fmt.Errorf("CreateTelemetryHandle failed with error %w", err)
+	if config.Toggles.EnableAITelemetry {
+		err = metrics.CreateTelemetryHandle(config.NPMVersion(), version, npm.GetAIMetadata())
+		if err != nil {
+			klog.Infof("CreateTelemetryHandle failed with error %v.", err)
+			return fmt.Errorf("CreateTelemetryHandle failed with error %w", err)
+		}
 	}
 
 	go restserver.NPMRestServerListenAndServe(config, npMgr)

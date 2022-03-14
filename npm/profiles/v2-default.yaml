@@ -15,6 +15,7 @@ data:
         "EnableHTTPDebugAPI": true,
         "EnableV2NPM": true,
         "PlaceAzureChainFirst": true,
-        "ApplyIPSetsOnNeed": true
+        "ApplyIPSetsOnNeed": true,
+        "EnableAITelemetry": true
       }
     }

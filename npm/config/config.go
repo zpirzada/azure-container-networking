@@ -34,6 +34,7 @@ var DefaultConfig = Config{
 		EnableV2NPM:             true,
 		PlaceAzureChainFirst:    util.PlaceAzureChainFirst,
 		ApplyIPSetsOnNeed:       false,
+		EnableAITelemetry:       true,
 	},
 }
 
@@ -64,6 +65,7 @@ type Toggles struct {
 	EnableV2NPM             bool
 	PlaceAzureChainFirst    bool
 	ApplyIPSetsOnNeed       bool
+	EnableAITelemetry       bool
 }
 
 type Flags struct {

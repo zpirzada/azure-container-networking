@@ -132,10 +132,13 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 		dp.RunPeriodicTasks()
 	}
 	npMgr := npm.NewNetworkPolicyManager(config, factory, dp, exec.New(), version, k8sServerVersion)
-	err = metrics.CreateTelemetryHandle(config.NPMVersion(), version, npm.GetAIMetadata())
-	if err != nil {
-		klog.Infof("CreateTelemetryHandle failed with error %v.", err)
-		return fmt.Errorf("CreateTelemetryHandle failed with error %w", err)
+
+	if config.Toggles.EnableAITelemetry {
+		err = metrics.CreateTelemetryHandle(config.NPMVersion(), version, npm.GetAIMetadata())
+		if err != nil {
+			klog.Infof("CreateTelemetryHandle failed with error %v.", err)
+			return fmt.Errorf("CreateTelemetryHandle failed with error %w", err)
+		}
 	}
 
 	go restserver.NPMRestServerListenAndServe(config, npMgr)
