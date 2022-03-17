@@ -118,6 +118,8 @@ func startControlplane(config npmconfig.Config, flags npmconfig.Flags) error {
 		if err != nil {
 			klog.Infof("CreateTelemetryHandle failed with error %v.", err)
 		}
+	} else {
+		klog.Info("AI Telemetry is disabled")
 	}
 
 	go restserver.NPMRestServerListenAndServe(config, npMgr)

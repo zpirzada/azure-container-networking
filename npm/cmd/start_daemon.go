@@ -99,6 +99,8 @@ func startDaemon(config npmconfig.Config) error {
 		if err != nil {
 			klog.Infof("CreateTelemetryHandle failed with error %v.", err)
 		}
+	} else {
+		klog.Info("AI Telemetry is disabled")
 	}
 
 	err = n.Start(config, wait.NeverStop)
