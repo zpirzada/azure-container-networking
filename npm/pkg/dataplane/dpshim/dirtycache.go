@@ -58,3 +58,36 @@ func (dc *dirtyCache) printContents() {
 	klog.Infof("toAddorUpdatePolicies: %v", dc.toAddorUpdatePolicies)
 	klog.Infof("toDeletePolicies: %v", dc.toDeletePolicies)
 }
+
+type deletedObjs struct {
+	// deletedSets is a map of deleted set names to previous generation numbers.
+	deletedSets map[string]int
+	// deletedPolicies is a map of deleted policy names to previous generation numbers.
+	deletedPolicies map[string]int
+}
+
+func (d *deletedObjs) getIPSetGenerationNumber(setName string) int {
+	gen, ok := d.deletedSets[setName]
+	if !ok {
+		// if the set if not deleted previously, then this is its first incarnation
+		return 0
+	}
+	return gen
+}
+
+func (d *deletedObjs) getPolicyGenerationNumber(policyName string) int {
+	gen, ok := d.deletedPolicies[policyName]
+	if !ok {
+		// if the policy if not deleted previously, then this is its first incarnation
+		return 0
+	}
+	return gen
+}
+
+func (d *deletedObjs) setIPSetGenerationNumber(setName string, gen int) {
+	d.deletedSets[setName] = gen
+}
+
+func (d *deletedObjs) setPolicyGenerationNumber(policyName string, gen int) {
+	d.deletedPolicies[policyName] = gen
+}

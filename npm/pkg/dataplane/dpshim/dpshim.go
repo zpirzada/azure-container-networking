@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/pkg/controlplane"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
@@ -29,8 +30,13 @@ type DPShim struct {
 	stopChannel <-chan struct{}
 	setCache    map[string]*controlplane.ControllerIPSets
 	policyCache map[string]*policies.NPMNetworkPolicy
-	dirtyCache  *dirtyCache
-	mu          *sync.Mutex
+	// deletedObjsCache is used to saved named of sets and policies
+	// which are deleted along with their old generation numbers.
+	// If a object of same name and type is created, new object will have
+	// oldGenerationNum+1 as its generation number.
+	deletedObjsCache *deletedObjs
+	dirtyCache       *dirtyCache
+	mu               *sync.Mutex
 }
 
 func NewDPSim(stopChannel <-chan struct{}) (*DPShim, error) {
@@ -38,6 +44,10 @@ func NewDPSim(stopChannel <-chan struct{}) (*DPShim, error) {
 		OutChannel:  make(chan *protos.Events),
 		setCache:    make(map[string]*controlplane.ControllerIPSets),
 		policyCache: make(map[string]*policies.NPMNetworkPolicy),
+		deletedObjsCache: &deletedObjs{
+			deletedSets:     make(map[string]int),
+			deletedPolicies: make(map[string]int),
+		},
 		stopChannel: stopChannel,
 		dirtyCache:  newDirtyCache(),
 		mu:          &sync.Mutex{},
@@ -121,7 +131,8 @@ func (dp *DPShim) createIPSet(set *ipsets.IPSetMetadata) {
 		return
 	}
 
-	dp.setCache[setName] = controlplane.NewControllerIPSets(set)
+	curGenNum := dp.deletedObjsCache.getIPSetGenerationNumber(setName)
+	dp.setCache[setName] = controlplane.NewControllerIPSets(set, curGenNum+1)
 	dp.dirtyCache.modifyAddorUpdateSets(setName)
 }
 
@@ -146,11 +157,19 @@ func (dp *DPShim) deleteIPSet(setMetadata *ipsets.IPSetMetadata) {
 
 	delete(dp.setCache, setName)
 	dp.dirtyCache.modifyDeleteSets(setName)
+	curGenNum := set.GetIPSetGenerationNumber()
+	dp.deletedObjsCache.setIPSetGenerationNumber(setName, curGenNum)
 }
 
 func (dp *DPShim) AddToSets(setMetadatas []*ipsets.IPSetMetadata, podMetadata *dataplane.PodMetadata) error {
 	if len(setMetadatas) == 0 {
 		return nil
+	}
+
+	if !util.ValidateIPSetMemberIP(podMetadata.PodIP) {
+		msg := fmt.Sprintf("error: failed to add to sets: invalid ip %s", podMetadata.PodIP)
+		metrics.SendErrorLogAndMetric(util.IpsmID, msg)
+		return npmerrors.Errorf(npmerrors.AppendIPSet, true, msg)
 	}
 
 	dp.lock()
@@ -341,6 +360,9 @@ func (dp *DPShim) AddPolicy(networkpolicies *policies.NPMNetworkPolicy) error {
 	if vErr := policies.ValidatePolicy(networkpolicies); vErr != nil {
 		return npmerrors.Errorf(npmerrors.AddPolicy, false, fmt.Sprintf("couldn't add malformed policy: %s", vErr.Error()))
 	}
+
+	curGenNum := dp.deletedObjsCache.getPolicyGenerationNumber(networkpolicies.PolicyKey)
+	networkpolicies.SetGeneration(curGenNum + 1)
 	dp.policyCache[networkpolicies.PolicyKey] = networkpolicies
 	dp.dirtyCache.modifyAddorUpdatePolicies(networkpolicies.PolicyKey)
 
@@ -360,6 +382,12 @@ func (dp *DPShim) RemovePolicy(policyKey string) error {
 	// Here refers work in LIFO, DP gets unlocked first, then ApplyDataPlane will acquire lock again
 	dp.lock()
 	defer dp.unlock()
+
+	policy, ok := dp.policyCache[policyKey]
+	if ok {
+		curGenNum := policy.GetGeneration()
+		dp.deletedObjsCache.setPolicyGenerationNumber(policyKey, curGenNum)
+	}
 	// keeping err different so we can catch the defer func err
 	delete(dp.policyCache, policyKey)
 	dp.dirtyCache.modifyDeletePolicies(policyKey)
@@ -384,6 +412,13 @@ func (dp *DPShim) UpdatePolicy(networkpolicies *policies.NPMNetworkPolicy) error
 	// For simplicity, we will not be adding references of netpols to ipsets.
 	// DP in daemon will take care of tracking the references.
 
+	oldPolicy, ok := dp.policyCache[networkpolicies.PolicyKey]
+	if ok {
+		curGenNum := oldPolicy.GetGeneration()
+		revisionNum := oldPolicy.GetRevision()
+		networkpolicies.SetGeneration(curGenNum)
+		networkpolicies.SetRevision(revisionNum + 1)
+	}
 	dp.policyCache[networkpolicies.PolicyKey] = networkpolicies
 	dp.dirtyCache.modifyAddorUpdatePolicies(networkpolicies.PolicyKey)
 

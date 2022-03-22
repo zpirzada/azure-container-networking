@@ -127,6 +127,7 @@ func (gsp *GoalStateProcessor) processHydrationEvent(payload map[string]*protos.
 	// Hydration events are sent when the daemon first starts up, or a reconnection to controller happens.
 	// In this case, the controller will send a current state of the cache down to daemon.
 	// Daemon will need to calculate what updates and deleted have been missed and send them to the dataplane.
+	// Also Hydration event will reset all Generation and Revision numbers to sync with new controller info.
 
 	// Sequence of processing will be:
 	// Apply IPsets

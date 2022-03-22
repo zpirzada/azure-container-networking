@@ -1310,52 +1310,6 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func TestValidateIPBlock(t *testing.T) {
-	tests := []struct {
-		name    string
-		ipblock string
-		wantErr bool
-	}{
-		{
-			name:    "cidr",
-			ipblock: "172.17.0.0/16",
-			wantErr: false,
-		},
-		{
-			name:    "except ipblock",
-			ipblock: "172.17.1.0/24 nomatch",
-			wantErr: false,
-		},
-		{
-			name:    "incorrect ip format",
-			ipblock: "1234",
-			wantErr: true,
-		},
-		{
-			name:    "incorrect ip range",
-			ipblock: "256.1.2.3",
-			wantErr: true,
-		},
-		{
-			name:    "empty cidr",
-			ipblock: "",
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateIPBlock(tt.ipblock)
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
-
 func assertExpectedInfo(t *testing.T, iMgr *IPSetManager, info *expectedInfo) {
 	// 1. assert cache contents
 	// 1.1. make sure the main cache is equal, including members and references

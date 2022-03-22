@@ -30,15 +30,21 @@ type ControllerIPSets struct {
 	// NetpolReference is not used currently, depending on testing we may decide to keep it
 	// or delete it
 	NetPolReference map[string]struct{}
+	// generationNumber holds the incarnation number of this IPSet
+	generationNumber int
+	// revisionNumber holds the revision number of this IPSet for current generation
+	revisionNumber int
 }
 
-func NewControllerIPSets(metadata *ipsets.IPSetMetadata) *ControllerIPSets {
+func NewControllerIPSets(metadata *ipsets.IPSetMetadata, generationNum int) *ControllerIPSets {
 	return &ControllerIPSets{
-		IPSetMetadata:   metadata,
-		IPPodMetadata:   make(map[string]*dp.PodMetadata),
-		MemberIPSets:    make(map[string]*ipsets.IPSetMetadata),
-		ipsetReference:  make(map[string]struct{}),
-		NetPolReference: make(map[string]struct{}),
+		IPSetMetadata:    metadata,
+		IPPodMetadata:    make(map[string]*dp.PodMetadata),
+		MemberIPSets:     make(map[string]*ipsets.IPSetMetadata),
+		ipsetReference:   make(map[string]struct{}),
+		NetPolReference:  make(map[string]struct{}),
+		revisionNumber:   1,
+		generationNumber: generationNum,
 	}
 }
 
@@ -74,4 +80,16 @@ func (c *ControllerIPSets) DeleteReference(referenceName, referenceType string) 
 	case PolicyReference:
 		delete(c.NetPolReference, referenceName)
 	}
+}
+
+func (c *ControllerIPSets) IncRevision() {
+	c.revisionNumber++
+}
+
+func (c *ControllerIPSets) GetRevisionNumber() int {
+	return c.revisionNumber
+}
+
+func (c *ControllerIPSets) GetIPSetGenerationNumber() int {
+	return c.generationNumber
 }

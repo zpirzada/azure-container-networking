@@ -2,7 +2,6 @@ package ipsets
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/Azure/azure-container-networking/common"
@@ -212,7 +211,7 @@ func (iMgr *IPSetManager) AddToSets(addToSets []*IPSetMetadata, ip, podKey strin
 		return nil
 	}
 
-	if !validateIPSetMemberIP(ip) {
+	if !util.ValidateIPSetMemberIP(ip) {
 		msg := fmt.Sprintf("error: failed to add to sets: invalid ip %s", ip)
 		metrics.SendErrorLogAndMetric(util.IpsmID, msg)
 		return npmerrors.Errorf(npmerrors.AppendIPSet, true, msg)
@@ -251,8 +250,8 @@ func (iMgr *IPSetManager) RemoveFromSets(removeFromSets []*IPSetMetadata, ip, po
 		return nil
 	}
 
-	if !validateIPSetMemberIP(ip) {
-		msg := fmt.Sprintf("error: failed to add to sets: invalid ip %s", ip)
+	if !util.ValidateIPSetMemberIP(ip) {
+		msg := fmt.Sprintf("error: failed to remove from sets: invalid ip %s", ip)
 		metrics.SendErrorLogAndMetric(util.IpsmID, msg)
 		return npmerrors.Errorf(npmerrors.AppendIPSet, true, msg)
 	}
@@ -553,23 +552,4 @@ func (iMgr *IPSetManager) sanitizeDirtyCache() {
 func (iMgr *IPSetManager) clearDirtyCache() {
 	iMgr.toAddOrUpdateCache = make(map[string]struct{})
 	iMgr.toDeleteCache = make(map[string]struct{})
-}
-
-// validateIPSetMemberIP helps valid if a member added to an HashSet has valid IP or CIDR
-func validateIPSetMemberIP(ip string) bool {
-	// possible formats
-	// 192.168.0.1
-	// 192.168.0.1,tcp:25227
-	// 192.168.0.1 nomatch
-	// 192.168.0.0/24
-	// 192.168.0.0/24,tcp:25227
-	// 192.168.0.0/24 nomatch
-	// always guaranteed to have ip, not guaranteed to have port + protocol
-	ipDetails := strings.Split(ip, ",")
-	if util.IsIPV4(ipDetails[0]) {
-		return true
-	}
-
-	err := ValidateIPBlock(ip)
-	return err == nil
 }

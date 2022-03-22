@@ -22,11 +22,11 @@ const (
 
 var (
 	testNSSet             = ipsets.NewIPSetMetadata("test-ns-set", ipsets.Namespace)
-	testNSCPSet           = controlplane.NewControllerIPSets(testNSSet)
+	testNSCPSet           = controlplane.NewControllerIPSets(testNSSet, 1)
 	testKeyPodSet         = ipsets.NewIPSetMetadata("test-keyPod-set", ipsets.KeyLabelOfPod)
-	testKeyPodCPSet       = controlplane.NewControllerIPSets(testKeyPodSet)
+	testKeyPodCPSet       = controlplane.NewControllerIPSets(testKeyPodSet, 1)
 	testNestedKeyPodSet   = ipsets.NewIPSetMetadata("test-nestedkeyPod-set", ipsets.NestedLabelOfPod)
-	testNestedKeyPodCPSet = controlplane.NewControllerIPSets(testNestedKeyPodSet)
+	testNestedKeyPodCPSet = controlplane.NewControllerIPSets(testNestedKeyPodSet, 1)
 	testNetPol            = &policies.NPMNetworkPolicy{
 		Name:      "test-netpol",
 		NameSpace: "x",

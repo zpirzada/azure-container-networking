@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/version"
 )
 
@@ -321,5 +322,47 @@ func TestCompareSlices(t *testing.T) {
 
 	if !CompareSlices(list1, list2) {
 		t.Errorf("TestCompareSlices failed @ slice comparison 4")
+	}
+}
+
+func TestValidateIPBlock(t *testing.T) {
+	tests := []struct {
+		name    string
+		ipblock string
+		retVal  bool
+	}{
+		{
+			name:    "cidr",
+			ipblock: "172.17.0.0/16",
+			retVal:  true,
+		},
+		{
+			name:    "except ipblock",
+			ipblock: "172.17.1.0/24 nomatch",
+			retVal:  true,
+		},
+		{
+			name:    "incorrect ip format",
+			ipblock: "1234",
+			retVal:  false,
+		},
+		{
+			name:    "incorrect ip range",
+			ipblock: "256.1.2.3",
+			retVal:  false,
+		},
+		{
+			name:    "empty cidr",
+			ipblock: "",
+			retVal:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			retVal := ValidateIPBlock(tt.ipblock)
+			assert.Equal(t, tt.retVal, retVal)
+		})
 	}
 }

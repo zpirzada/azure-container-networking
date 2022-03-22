@@ -26,7 +26,7 @@ var (
 	testNSSet             = ipsets.NewIPSetMetadata("test-ns-set", ipsets.Namespace)
 	testKeyPodSet         = ipsets.NewIPSetMetadata("test-keyPod-set", ipsets.KeyLabelOfPod)
 	testNestedKeyPodSet   = ipsets.NewIPSetMetadata("test-nestedkeyPod-set", ipsets.NestedLabelOfPod)
-	testNestedKeyPodCPSet = controlplane.NewControllerIPSets(testNestedKeyPodSet)
+	testNestedKeyPodCPSet = controlplane.NewControllerIPSets(testNestedKeyPodSet, 1)
 	setPodKey1            = &ipsets.TranslatedIPSet{
 		Metadata: ipsets.NewIPSetMetadata("setpodkey1", ipsets.KeyLabelOfPod),
 	}

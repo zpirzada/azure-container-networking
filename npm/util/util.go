@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-container-networking/log"
+
 	"github.com/Masterminds/semver"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/tools/cache"
@@ -361,4 +362,31 @@ func IsIPV4(ip string) bool {
 
 	_, _, err := net.ParseCIDR(ip)
 	return err == nil
+}
+
+// TODO: This is an adhoc approach for linux, but need to refactor data structure for better management.
+func ValidateIPBlock(ipblock string) bool {
+	// TODO: This is fragile code with strong dependency with " "(space).
+	// onlyCidr has only cidr without "space" and "nomatch" in case except ipblock to validate cidr format.
+	onlyCidr := strings.Split(ipblock, " ")[0]
+	_, _, err := net.ParseCIDR(onlyCidr)
+	return err == nil
+}
+
+// validateIPSetMemberIP helps valid if a member added to an HashSet has valid IP or CIDR
+func ValidateIPSetMemberIP(ip string) bool {
+	// possible formats
+	// 192.168.0.1
+	// 192.168.0.1,tcp:25227
+	// 192.168.0.1 nomatch
+	// 192.168.0.0/24
+	// 192.168.0.0/24,tcp:25227
+	// 192.168.0.0/24 nomatch
+	// always guaranteed to have ip, not guaranteed to have port + protocol
+	ipDetails := strings.Split(ip, ",")
+	if IsIPV4(ipDetails[0]) {
+		return true
+	}
+
+	return ValidateIPBlock(ip)
 }

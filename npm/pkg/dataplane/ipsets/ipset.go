@@ -3,8 +3,6 @@ package ipsets
 import (
 	"errors"
 	"fmt"
-	"net"
-	"strings"
 
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/npm/util"
@@ -207,6 +205,10 @@ type IPSet struct {
 	ipsetReferCount int
 	// kernelReferCount keeps track of how many lists in the kernel refer to this ipset
 	kernelReferCount int
+	// generationNumber holds the incarnation number of this IPSet
+	generationNumber int
+	// revisionNumber holds the revision number of this IPSet for current generation
+	revisionNumber int
 }
 
 func NewIPSet(setMetadata *IPSetMetadata) *IPSet {
@@ -227,6 +229,8 @@ func NewIPSet(setMetadata *IPSetMetadata) *IPSet {
 		NetPolReference:  make(map[string]struct{}),
 		ipsetReferCount:  0,
 		kernelReferCount: 0,
+		revisionNumber:   1,
+		generationNumber: -1,
 	}
 	if set.Kind == HashSet {
 		set.IPPodKey = make(map[string]string)
@@ -388,16 +392,8 @@ func (set *IPSet) canSetBeSelectorIPSet() bool {
 		set.Type == NestedLabelOfPod)
 }
 
-// TODO: This is an adhoc approach for linux, but need to refactor data structure for better management.
-func ValidateIPBlock(ipblock string) error {
-	// TODO: This is fragile code with strong dependency with " "(space).
-	// onlyCidr has only cidr without "space" and "nomatch" in case except ipblock to validate cidr format.
-	onlyCidr := strings.Split(ipblock, " ")[0]
-	_, _, err := net.ParseCIDR(onlyCidr)
-	if err != nil {
-		return npmerrors.SimpleErrorWrapper("failed to parse CIDR", err)
-	}
-	return nil
+func (set *IPSet) IncRevision() {
+	set.revisionNumber++
 }
 
 func GetMembersOfTranslatedSets(members []string) []*IPSetMetadata {

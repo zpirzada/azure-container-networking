@@ -28,13 +28,19 @@ type NPMNetworkPolicy struct {
 	// podIP is key and endpoint ID as value
 	// Will be populated by dataplane and policy manager
 	PodEndpoints map[string]string
+	// generationNumber holds the incarnation number of this PolicyObj
+	generationNumber int
+	// revisionNumber holds the revision number of this PolicyObj for current generation
+	revisionNumber int
 }
 
 func NewNPMNetworkPolicy(netPolName, netPolNamespace string) *NPMNetworkPolicy {
 	return &NPMNetworkPolicy{
-		Name:      netPolName,
-		NameSpace: netPolNamespace,
-		PolicyKey: fmt.Sprintf("%s/%s", netPolNamespace, netPolName),
+		Name:             netPolName,
+		NameSpace:        netPolNamespace,
+		PolicyKey:        fmt.Sprintf("%s/%s", netPolNamespace, netPolName),
+		revisionNumber:   1,
+		generationNumber: 0,
 	}
 }
 
@@ -82,6 +88,26 @@ PodSelectorList: %s
 ACLs:
 %s`
 	return fmt.Sprintf(format, netPol.Name, netPol.NameSpace, podSelectorIPSetString, podSelectorListString, aclArrayString)
+}
+
+func (netPol *NPMNetworkPolicy) IncRevision() {
+	netPol.revisionNumber++
+}
+
+func (netPol *NPMNetworkPolicy) GetRevision() int {
+	return netPol.revisionNumber
+}
+
+func (netPol *NPMNetworkPolicy) SetRevision(revNum int) {
+	netPol.revisionNumber = revNum
+}
+
+func (netPol *NPMNetworkPolicy) SetGeneration(genNum int) {
+	netPol.generationNumber = genNum
+}
+
+func (netPol *NPMNetworkPolicy) GetGeneration() int {
+	return netPol.generationNumber
 }
 
 // ACLPolicy equivalent to a single iptable rule in linux
