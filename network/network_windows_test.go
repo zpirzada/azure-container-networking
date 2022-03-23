@@ -20,7 +20,7 @@ func TestNewAndDeleteNetworkImplHnsV2(t *testing.T) {
 
 	// this hnsv2 variable overwrites the package level variable in network
 	// we do this to avoid passing around os specific objects in platform agnostic code
-	hnsv2 = hnswrapper.Hnsv2wrapperFake{}
+	hnsv2 = hnswrapper.NewHnsv2wrapperFake()
 
 	nwInfo := &NetworkInfo{
 		Id:           "d3e97a83-ba4c-45d5-ba88-dc56757ece28",
