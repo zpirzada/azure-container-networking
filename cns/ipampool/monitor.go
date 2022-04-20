@@ -2,6 +2,7 @@ package ipampool
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ const (
 	DefaultRefreshDelay = 1 * time.Second
 	// DefaultMaxIPs default maximum allocatable IPs
 	DefaultMaxIPs = 250
+	// Subnet ARM ID /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/$(SUBNET)
+	subnetARMIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks/%s/subnets/%s"
 )
 
 type nodeNetworkConfigSpecUpdater interface {
@@ -49,8 +52,8 @@ type Monitor struct {
 	once        sync.Once
 }
 
-// Global Variables for Subnet and SubnetAddressSpace
-var subnet, subnetCIDR string
+// Global Variables for Subnet, Subnet Address Space and Subnet ARM ID
+var subnet, subnetCIDR, subnetARMID string
 
 func NewMonitor(httpService cns.HTTPService, nnccli nodeNetworkConfigSpecUpdater, opts *Options) *Monitor {
 	if opts.RefreshDelay < 1 {
@@ -91,17 +94,21 @@ func (pm *Monitor) Start(ctx context.Context) error {
 				continue
 			}
 		case nnc := <-pm.nncSource: // received a new NodeNetworkConfig, extract the data from it and re-reconcile.
-			pm.spec = nnc.Spec
 			scaler := nnc.Status.Scaler
 
-			// Set SubnetName and SubnetAddressSpace values to the global subnet and subnetCIDR variables.
+			// Set SubnetName, SubnetAddressSpace and Pod Network ARM ID values to the global subnet, subnetCIDR and subnetARM variables.
 			subnet = nnc.Status.NetworkContainers[0].SubnetName
 			subnetCIDR = nnc.Status.NetworkContainers[0].SubnetAddressSpace
+			subnetARMID = GenerateARMID(&nnc.Status.NetworkContainers[0])
 
 			pm.metastate.batch = scaler.BatchSize
 			pm.metastate.max = scaler.MaxIPCount
 			pm.metastate.minFreeCount, pm.metastate.maxFreeCount = CalculateMinFreeIPs(scaler), CalculateMaxFreeIPs(scaler)
-			pm.once.Do(func() { close(pm.started) }) // close the init channel the first time we receive a NodeNetworkConfig.
+			pm.once.Do(func() {
+				pm.spec = nnc.Spec // set the spec from the NNC initially (afterwards we write the Spec so we know target state).
+				logger.Printf("[ipam-pool-monitor] set initial pool spec %+v", pm.spec)
+				close(pm.started) // close the init channel the first time we fully receive a NodeNetworkConfig.
+			})
 		}
 		// if control has flowed through the select(s) to this point, we can now reconcile.
 		err := pm.reconcile(ctx)
@@ -157,7 +164,7 @@ func (pm *Monitor) reconcile(ctx context.Context) error {
 	allocatedIPs := pm.httpService.GetPodIPConfigState()
 	state := buildIPPoolState(allocatedIPs, pm.spec)
 	logger.Printf("ipam-pool-monitor state %+v", state)
-	observeIPPoolState(state, pm.metastate, []string{subnet, subnetCIDR})
+	observeIPPoolState(state, pm.metastate, []string{subnet, subnetCIDR, subnetARMID})
 
 	switch {
 	// pod count is increasing
@@ -343,13 +350,27 @@ func (pm *Monitor) GetStateSnapshot() cns.IpamPoolMonitorStateSnapshot {
 	}
 }
 
+// GenerateARMID uses the Subnet ARM ID format to populate the ARM ID with the metadata.
+// If either of the metadata attributes are empty, then the ARM ID will be an empty string.
+func GenerateARMID(nc *v1alpha.NetworkContainer) string {
+	subscription := nc.SubscriptionID
+	resourceGroup := nc.ResourceGroupID
+	vnetID := nc.VNETID
+	subnetID := nc.SubnetID
+
+	if subscription == "" || resourceGroup == "" || vnetID == "" || subnetID == "" {
+		return ""
+	}
+	return fmt.Sprintf(subnetARMIDTemplate, subscription, resourceGroup, vnetID, subnetID)
+}
+
 // Update ingests a NodeNetworkConfig, clamping some values to ensure they are legal and then
 // pushing it to the Monitor's source channel.
 // If the Monitor has been Started but is blocking until it receives an NNC, this will start
 // the pool reconcile loop.
 // If the Monitor has not been Started, this will block until Start() is called, which will
 // immediately read this passed NNC and start the pool reconcile loop.
-func (pm *Monitor) Update(nnc *v1alpha.NodeNetworkConfig) {
+func (pm *Monitor) Update(nnc *v1alpha.NodeNetworkConfig) error {
 	pm.clampScaler(&nnc.Status.Scaler)
 
 	// if the nnc has converged, observe the pool scaling latency (if any).
@@ -358,7 +379,9 @@ func (pm *Monitor) Update(nnc *v1alpha.NodeNetworkConfig) {
 		// observe elapsed duration for IP pool scaling
 		metric.ObserverPoolScaleLatency()
 	}
+	logger.Printf("[ipam-pool-monitor] pushing NodeNetworkConfig update, allocatedIPs = %d", allocatedIPs)
 	pm.nncSource <- *nnc
+	return nil
 }
 
 // clampScaler makes sure that the values stored in the scaler are sane.

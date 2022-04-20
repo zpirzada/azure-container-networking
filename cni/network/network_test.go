@@ -36,6 +36,7 @@ func TestMain(m *testing.M) {
 		Master:            eth0IfName,
 		IPsToRouteViaHost: []string{"169.254.20.10"},
 		Ipam: struct {
+			Mode          string `json:"mode,omitempty"`
 			Type          string `json:"type"`
 			Environment   string `json:"environment,omitempty"`
 			AddrSpace     string `json:"addressSpace,omitempty"`
@@ -368,6 +369,7 @@ func TestIpamAddFail(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var err error
 			for i, method := range tt.methods {
+				fmt.Println("method", method, "wanterr", tt.wantErr[i])
 				if tt.wantErr[i] {
 					plugin.ipamInvoker = NewMockIpamInvoker(false, true, false)
 				} else {
@@ -841,7 +843,7 @@ func TestPluginAKSSwiftAdd(t *testing.T) {
 	localNwCfg := cni.NetworkConfig{
 		CNIVersion:                 "0.3.0",
 		Name:                       "aksswift-net",
-		ExecutionMode:              string(util.AKSSwift),
+		ExecutionMode:              string(util.V4Swift),
 		EnableExactMatchForPodName: true,
 		Master:                     "eth0",
 	}
@@ -888,7 +890,7 @@ func TestPluginAKSSwiftDelete(t *testing.T) {
 	localNwCfg := cni.NetworkConfig{
 		CNIVersion:                 "0.3.0",
 		Name:                       "aksswift-net",
-		ExecutionMode:              string(util.AKSSwift),
+		ExecutionMode:              string(util.V4Swift),
 		EnableExactMatchForPodName: true,
 		Master:                     "eth0",
 	}
@@ -1060,7 +1062,7 @@ func TestGetNetworkName(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			nwName, _ := plugin.getNetworkName("", "", "", "", nil, &tt.nwCfg)
+			nwName, _ := plugin.getNetworkName("", nil, &tt.nwCfg)
 			require.Equal(t, tt.nwCfg.Name, nwName)
 		})
 	}
