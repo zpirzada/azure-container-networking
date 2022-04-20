@@ -2,6 +2,11 @@ name: Cyclonus Network Policy Extended Test
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "npm/**"
+      - "github/**"
+      - "test/**"
   schedule:
     # run once a day at midnight
     - cron: "0 0 * * *"
