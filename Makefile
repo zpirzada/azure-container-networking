@@ -20,6 +20,7 @@ GOOS ?= $(shell go env GOOS)
 GOARCH ?= $(shell go env GOARCH)
 GOOSES ?= "linux windows" # To override at the cli do: GOOSES="\"darwin bsd\""
 GOARCHES ?= "amd64 arm64" # To override at the cli do: GOARCHES="\"ppc64 mips\""
+WINVER ?= "10.0.20348.643"
 
 # Windows specific extensions
 ifeq ($(GOOS),windows)
@@ -180,7 +181,7 @@ containerize-buildah: # util target to build container images using buildah. do 
 		--platform $(PLATFORM) \
 		-f $(DOCKERFILE) \
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
-		-t $(REGISTRY)/$(IMAGE):$(TAG) \
+		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
 		.
 
 containerize-docker: # util target to build container images using docker buildx. do not invoke directly.
@@ -188,21 +189,21 @@ containerize-docker: # util target to build container images using docker buildx
 		--platform $(PLATFORM) \
 		-f $(DOCKERFILE) \
 		--build-arg VERSION=$(VERSION) $(EXTRA_BUILD_ARGS) \
-		-t $(REGISTRY)/$(IMAGE):$(TAG) \
+		-t $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
 		.
 
 container-tag-test: # util target to retag an image with -test suffix. do not invoke directly.
 	$(CONTAINER_BUILDER) tag \
-		$(REGISTRY)/$(IMAGE):$(TAG) \
-		$(REGISTRY)/$(IMAGE):$(TAG)-test
+		$(IMAGE_REGISTRY)/$(IMAGE):$(TAG) \
+		$(IMAGE_REGISTRY)/$(IMAGE):$(TAG)-test
 
 container-push: # util target to publish container image. do not invoke directly.
 	$(CONTAINER_BUILDER) push \
-		$(REGISTRY)/$(IMAGE):$(TAG)
+		$(IMAGE_REGISTRY)/$(IMAGE):$(TAG)
 
 container-pull: # util target to pull container image. do not invoke directly.
 	$(CONTAINER_BUILDER) pull \
-		$(REGISTRY)/$(IMAGE):$(TAG)
+		$(IMAGE_REGISTRY)/$(IMAGE):$(TAG)
 
 container-info: # util target to write container info file. do not invoke directly.
 	# these commands need to be root due to some ongoing perms issues in the pipeline.
@@ -350,34 +351,31 @@ azure-cnm-plugin-image: azure-cnm-plugin ## build the azure-cnm plugin container
 ## This section is for building multi-arch/os container image manifests.
 
 multiarch-manifest-create: # util target to compose multiarch container manifests from os/arch images.
-	$(CONTAINER_BUILDER) manifest create \
-		$(REGISTRY)/$(IMAGE):$(TAG) \
-		$(foreach OS,$(OSES),$(foreach ARCH,$(ARCHES),$(REGISTRY)/$(IMAGE):$(OS)-$(ARCH)-$(TAG)))
+	$(CONTAINER_BUILDER) manifest create $(IMAGE_REGISTRY)/$(IMAGE):$(TAG)
+	$(foreach PLATFORM,$(PLATFORMS),                                                                                                                                        \
+		$(if $(filter $(PLATFORM),windows/amd64),                                                                                                                           \
+			$(CONTAINER_BUILDER) manifest add --os-version=$(WINVER) $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) docker://$(IMAGE_REGISTRY)/$(IMAGE):$(subst /,-,$(PLATFORM))-$(TAG); \
+		,                                                                                                                                                                   \
+			$(CONTAINER_BUILDER) manifest add $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) docker://$(IMAGE_REGISTRY)/$(IMAGE):$(subst /,-,$(PLATFORM))-$(TAG);))
 
 multiarch-manifest-push: # util target to push multiarch container manifest.
-	$(CONTAINER_BUILDER) manifest push $(REGISTRY)/$(IMAGE):$(TAG) docker://$(REGISTRY)/$(IMAGE):$(TAG)
+	$(CONTAINER_BUILDER) manifest push --all $(IMAGE_REGISTRY)/$(IMAGE):$(TAG) docker://$(IMAGE_REGISTRY)/$(IMAGE):$(TAG)
 
 cni-manager-multiarch-manifest-create: ## build cni-manager multi-arch container manifest.
 	$(MAKE) multiarch-manifest-create \
-		OSES="$(OSES)" \
-		ARCHES="$(ARCHES)" \
-		REGISTRY=$(IMAGE_REGISTRY) \
+		PLATFORMS="$(PLATFORMS)" \
 		IMAGE=$(CNI_IMAGE) \
 		TAG=$(TAG)
 
 cns-multiarch-manifest-create: ## build azure-cns multi-arch container manifest.
 	$(MAKE) multiarch-manifest-create \
-		OSES="$(OSES)" \
-		ARCHES="$(ARCHES)" \
-		REGISTRY=$(IMAGE_REGISTRY) \
+		PLATFORMS="$(PLATFORMS)" \
 		IMAGE=$(CNS_IMAGE) \
 		TAG=$(TAG)
 
 npm-multiarch-manifest-create: ## build azure-npm multi-arch container manifest.
 	$(MAKE) multiarch-manifest-create \
-		OSES="$(OSES)" \
-		ARCHES="$(ARCHES)" \
-		REGISTRY=$(IMAGE_REGISTRY) \
+		PLATFORMS="$(PLATFORMS)" \
 		IMAGE=$(NPM_IMAGE) \
 		TAG=$(TAG)
 
