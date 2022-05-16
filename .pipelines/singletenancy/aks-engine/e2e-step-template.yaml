@@ -29,7 +29,7 @@ steps:
       echo Using AKS-Engine version $aksEVersion
 
       #download source
-      wget https://github.com/jaer-tsun/aks-engine/archive/v1.0.4.tar.gz
+      wget https://github.com/shreyashastantram/aks-engine/archive/v0.70.2.tar.gz
 
       # extract source
       #tar -zxf $aksEVersion.tar.gz
@@ -39,7 +39,7 @@ steps:
       mv aks-engine-*/* .
 
       # download binary
-      wget https://github.com/jaer-tsun/aks-engine/releases/download/v1.0.4/aks-engine-v1.0.4-linux-amd64.tar.gz
+      wget https://github.com/shreyashastantram/aks-engine/releases/download/v0.70.2/aks-engine-v0.70.2-linux-amd64.tar.gz
       rm -rf ./bin
       mkdir ./bin
 
@@ -110,6 +110,9 @@ steps:
         export IS_JENKINS=false 
         export DEBUG_CRASHING_PODS=true
         export AZURE_CORE_ONLY_SHOW_ERRORS=True
+        RGNAME=$RANDOM"kubernetes"
+        export NAME= $RGNAME
+        echo "##vso[task.setvariable variable=NAME]$NAME"
         echo Cluster Def $CLUSTER_DEFINITION
         cat $CLUSTER_DEFINITION
         make test-kubernetes
@@ -128,3 +131,14 @@ steps:
       artifactName: ${{ parameters.name }}
       pathtoPublish: "$(Build.ArtifactStagingDirectory)/${{ parameters.name }}"
     condition: always()
+
+  - task: AzureCLI@2
+      displayName: "Delete Test Cluster Resource Group"
+      condition: always()
+      inputs:
+        azureSubscription: $(AKS_ENGINE_SERVICE_CONNECTION)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Deleting: $(NAME)"
+          az group delete -n $(NAME) --yes
