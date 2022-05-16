@@ -306,7 +306,7 @@ func registerNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, in
 		nodeRegisterRequest cns.NodeRegisterRequest
 	)
 
-	nodeRegisterRequest.NumCPU = numCPU
+	nodeRegisterRequest.NumCores = numCPU
 	supportedApis, retErr := nmagent.GetNmAgentSupportedApis(httpc, "")
 
 	if retErr != nil {
