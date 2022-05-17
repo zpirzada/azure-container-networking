@@ -152,27 +152,27 @@ func (iMgr *IPSetManager) applyIPSets() error {
 // toDeleteSets:
 //      this function will loop through the dirty delete cache and adds existing set obj in HNS to toDeleteSets
 func (iMgr *IPSetManager) calculateNewSetPolicies(networkPolicies []hcn.NetworkPolicy) (*networkPolicyBuilder, error) {
-	setPolicyBuilder := &networkPolicyBuilder{
-		toAddSets:    map[string]*hcn.SetPolicySetting{},
-		toUpdateSets: map[string]*hcn.SetPolicySetting{},
-		toDeleteSets: map[string]*hcn.SetPolicySetting{},
-	}
 	existingSets, toDeleteSets := iMgr.segregateSetPolicies(networkPolicies, donotResetIPSets)
-	// some of this below logic can be abstracted a step above
 	toAddUpdateSetNames := iMgr.dirtyCache.setsToAddOrUpdate()
-	setPolicyBuilder.toDeleteSets = toDeleteSets
+	// map and slice capacities are doubled whenever max capacity is reached, meaning the map and slices would be resized at most once
+	halfNumAddUpdateSets := len(toAddUpdateSetNames) / 2
+	setPolicyBuilder := &networkPolicyBuilder{
+		toAddSets:    make(map[string]*hcn.SetPolicySetting, halfNumAddUpdateSets),
+		toUpdateSets: make(map[string]*hcn.SetPolicySetting, halfNumAddUpdateSets),
+		toDeleteSets: toDeleteSets,
+	}
 
 	// for faster look up changing a slice to map
 	existingSetNames := make(map[string]struct{})
 	for _, setName := range existingSets {
 		existingSetNames[setName] = struct{}{}
 	}
-	// (TODO) remove this log line later
-	klog.Infof("toAddUpdateSetNames %+v \n ", toAddUpdateSetNames)
-	klog.Infof("existingSetNames %+v \n ", existingSetNames)
+
+	setsToAdd := make([]string, 0, halfNumAddUpdateSets)
 	for setName := range toAddUpdateSetNames {
 		set, exists := iMgr.setMap[setName] // check if the Set exists
 		if !exists {
+			// should never occur
 			return nil, errors.Errorf(errors.AppendIPSet, false, fmt.Sprintf("ipset %s does not exist", setName))
 		}
 
@@ -180,30 +180,16 @@ func (iMgr *IPSetManager) calculateNewSetPolicies(networkPolicies []hcn.NetworkP
 		if err != nil {
 			return nil, err
 		}
-		// TODO we should add members first and then the Lists
 		_, ok := existingSetNames[setName]
 		if ok {
 			setPolicyBuilder.toUpdateSets[setName] = setPol
 		} else {
+			setsToAdd = append(setsToAdd, setName)
 			setPolicyBuilder.toAddSets[setName] = setPol
 		}
-		if set.Kind == ListSet {
-			for _, memberSet := range set.MemberIPSets {
-				// Always use prefixed name because we read setpolicy Name from HNS
-				if setPolicyBuilder.setNameExists(memberSet.Name) {
-					continue
-				}
-				setPol, err = convertToSetPolicy(memberSet)
-				if err != nil {
-					return nil, err
-				}
-				_, ok := existingSetNames[memberSet.Name]
-				if !ok {
-					setPolicyBuilder.toAddSets[memberSet.Name] = setPol
-				}
-			}
-		}
 	}
+
+	klog.Infof("[IPSetManager Windows] sets to create for the network: %s", strings.Join(setsToAdd, ","))
 
 	return setPolicyBuilder, nil
 }
