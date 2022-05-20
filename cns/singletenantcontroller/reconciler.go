@@ -88,7 +88,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (reco
 			req, err = CreateNCRequestFromDynamicNC(nnc.Status.NetworkContainers[i])
 			// in dynamic, we will also push this NNC to the IPAM Pool Monitor when we're done.
 			listenersToNotify = append(listenersToNotify, r.ipampoolmonitorcli)
-
 		}
 
 		if err != nil {

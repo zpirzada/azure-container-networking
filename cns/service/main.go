@@ -910,11 +910,12 @@ func InitializeCRDState(ctx context.Context, httpRestService cns.HTTPService, cn
 
 	// build default clientset.
 	kubeConfig, err := ctrl.GetConfig()
-	kubeConfig.UserAgent = fmt.Sprintf("azure-cns-%s", version)
 	if err != nil {
 		logger.Errorf("[Azure CNS] Failed to get kubeconfig for request controller: %v", err)
-		return err
+		return errors.Wrap(err, "failed to get kubeconfig")
 	}
+	kubeConfig.UserAgent = fmt.Sprintf("azure-cns-%s", version)
+
 	clientset, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to build clientset")
