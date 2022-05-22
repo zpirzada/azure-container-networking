@@ -133,12 +133,12 @@ steps:
     condition: always()
 
   - task: AzureCLI@2
-      displayName: "Delete Test Cluster Resource Group"
-      condition: always()
-      inputs:
-        azureSubscription: $(AKS_ENGINE_SERVICE_CONNECTION)
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          echo "Deleting: $(NAME)"
-          az group delete -n $(NAME) --yes
+    displayName: "Delete Test Cluster Resource Group"
+    condition: always()
+    inputs:
+      azureSubscription: $(AKS_ENGINE_SERVICE_CONNECTION)
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        echo "Deleting: $(NAME)"
+        az group delete -n $(NAME) --yes
