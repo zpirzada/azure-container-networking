@@ -111,7 +111,7 @@ steps:
         export DEBUG_CRASHING_PODS=true
         export AZURE_CORE_ONLY_SHOW_ERRORS=True
         RGNAME=$RANDOM"kubernetes"
-        export NAME= $RGNAME
+        export NAME=$RGNAME
         echo "##vso[task.setvariable variable=NAME]$NAME"
         echo Cluster Def $CLUSTER_DEFINITION
         cat $CLUSTER_DEFINITION
