@@ -33,7 +33,7 @@ steps:
 
       # extract source
       #tar -zxf $aksEVersion.tar.gz
-      tar -zxf v1.0.4.tar.gz
+      tar -zxf v0.70.2.tar.gz
 
       # move source to current directory
       mv aks-engine-*/* .
@@ -44,7 +44,7 @@ steps:
       mkdir ./bin
 
       # extract binary
-      tar -zxvf aks-engine-v1.0.4-linux-amd64.tar.gz -C bin
+      tar -zxvf aks-engine-v0.70.2-linux-amd64.tar.gz -C bin
       mv ./bin/aks-engine-*/* ./bin/
       ls -l ./bin
       ./bin/aks-engine version
