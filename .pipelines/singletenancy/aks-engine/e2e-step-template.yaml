@@ -110,9 +110,7 @@ steps:
         export IS_JENKINS=false 
         export DEBUG_CRASHING_PODS=true
         export AZURE_CORE_ONLY_SHOW_ERRORS=True
-        RGNAME=$RANDOM"kubernetes"
-        export NAME=$RGNAME
-        echo "##vso[task.setvariable variable=NAME]$NAME"
+        export CLEANUP_ON_EXIT=true
         echo Cluster Def $CLUSTER_DEFINITION
         cat $CLUSTER_DEFINITION
         make test-kubernetes
@@ -131,14 +129,3 @@ steps:
       artifactName: ${{ parameters.name }}
       pathtoPublish: "$(Build.ArtifactStagingDirectory)/${{ parameters.name }}"
     condition: always()
-
-  - task: AzureCLI@2
-    displayName: "Delete Test Cluster Resource Group"
-    condition: always()
-    inputs:
-      azureSubscription: $(AKS_ENGINE_SERVICE_CONNECTION)
-      scriptType: 'bash'
-      scriptLocation: 'inlineScript'
-      inlineScript: |
-        echo "Deleting: $(NAME)"
-        az group delete -n $(NAME) --yes
