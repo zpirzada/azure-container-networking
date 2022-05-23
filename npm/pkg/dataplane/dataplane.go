@@ -13,12 +13,7 @@ import (
 	"k8s.io/klog"
 )
 
-const (
-	// AzureNetworkName is default network Azure CNI creates
-	AzureNetworkName = "azure"
-
-	reconcileTimeInMinutes = 5
-)
+const reconcileTimeInMinutes = 5
 
 type PolicyMode string
 
@@ -208,7 +203,7 @@ func (dp *DataPlane) ApplyDataPlane() error {
 func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 	klog.Infof("[DataPlane] Add Policy called for %s", policy.PolicyKey)
 	// Create and add references for Selector IPSets first
-	err := dp.createIPSetsAndReferences(policy.PodSelectorIPSets, policy.PolicyKey, ipsets.SelectorType)
+	err := dp.createIPSetsAndReferences(policy.AllPodSelectorIPSets(), policy.PolicyKey, ipsets.SelectorType)
 	if err != nil {
 		klog.Infof("[DataPlane] error while adding Selector IPSet references: %s", err.Error())
 		return fmt.Errorf("[DataPlane] error while adding Selector IPSet references: %w", err)
@@ -259,7 +254,7 @@ func (dp *DataPlane) RemovePolicy(policyKey string) error {
 	}
 
 	// Remove references for Selector IPSets
-	err = dp.deleteIPSetsAndReferences(policy.PodSelectorIPSets, policy.PolicyKey, ipsets.SelectorType)
+	err = dp.deleteIPSetsAndReferences(policy.AllPodSelectorIPSets(), policy.PolicyKey, ipsets.SelectorType)
 	if err != nil {
 		return err
 	}

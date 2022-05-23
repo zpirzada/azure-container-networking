@@ -372,21 +372,22 @@ func (set *IPSet) hasMember(memberName string) bool {
 	return isMember
 }
 
-func (set *IPSet) getSetIntersection(existingIntersection map[string]struct{}) (map[string]struct{}, error) {
-	if !set.canSetBeSelectorIPSet() {
-		return nil, npmerrors.Errorf(
-			npmerrors.IPSetIntersection,
-			false,
-			fmt.Sprintf("[IPSet] Selector IPSet cannot be of type %s", set.Type.String()))
-	}
-	newIntersectionMap := make(map[string]struct{})
-	for ip := range set.IPPodKey {
-		if _, ok := existingIntersection[ip]; ok {
-			newIntersectionMap[ip] = struct{}{}
+// isIPAffiliated determines whether an IP belongs to the set or its member sets in the case of a list set.
+// This method and GetSetContents are good examples of how the ipset struct may have been better designed
+// as an interface with hash and list implementations. Not worth it to redesign though.
+func (set *IPSet) isIPAffiliated(ip string) bool {
+	if set.Kind == HashSet {
+		if _, ok := set.IPPodKey[ip]; ok {
+			return true
 		}
 	}
-
-	return newIntersectionMap, nil
+	for _, memberSet := range set.MemberIPSets {
+		_, ok := memberSet.IPPodKey[ip]
+		if ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (set *IPSet) canSetBeSelectorIPSet() bool {
