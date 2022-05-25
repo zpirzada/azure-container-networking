@@ -72,7 +72,6 @@ type NetPlugin struct {
 	report             *telemetry.CNIReport
 	tb                 *telemetry.TelemetryBuffer
 	nnsClient          NnsClient
-	hnsEndpointClient  network.AzureHNSEndpointClient
 	multitenancyClient MultitenancyClient
 }
 
@@ -106,7 +105,6 @@ func NewPlugin(name string,
 	config *common.PluginConfig,
 	client NnsClient,
 	multitenancyClient MultitenancyClient,
-	azHnsClient network.AzureHNSEndpointClient,
 ) (*NetPlugin, error) {
 	// Setup base plugin.
 	plugin, err := cni.NewPlugin(name, config.Version)
@@ -128,7 +126,6 @@ func NewPlugin(name string,
 		nm:                 nm,
 		nnsClient:          client,
 		multitenancyClient: multitenancyClient,
-		hnsEndpointClient:  azHnsClient,
 	}, nil
 }
 
@@ -399,6 +396,7 @@ func (plugin *NetPlugin) Add(args *cniSkel.CmdArgs) error {
 		return plugin.Errorf(errMsg)
 	}
 
+	platformInit(nwCfg)
 	if nwCfg.ExecutionMode == string(util.Baremetal) {
 		var res *nnscontracts.ConfigureContainerNetworkingResponse
 		log.Printf("Baremetal mode. Calling vnet agent for ADD")
@@ -897,6 +895,8 @@ func (plugin *NetPlugin) Delete(args *cniSkel.CmdArgs) error {
 		SetCustomDimensions(&cniMetric, nwCfg, err)
 		telemetry.SendCNIMetric(&cniMetric, plugin.tb)
 	}
+
+	platformInit(nwCfg)
 
 	log.Printf("Execution mode :%s", nwCfg.ExecutionMode)
 	if nwCfg.ExecutionMode == string(util.Baremetal) {

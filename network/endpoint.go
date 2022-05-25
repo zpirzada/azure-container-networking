@@ -197,11 +197,11 @@ func (nw *network) getEndpointByPOD(podName string, podNameSpace string, doExact
 
 func podNameMatches(source string, actualValue string, doExactMatch bool) bool {
 	if doExactMatch {
-		return (source == actualValue)
+		return source == actualValue
 	} else {
 		// If exact match flag is disabled we just check if the existing podname field for an endpoint
 		// starts with passed podname string.
-		return (actualValue == GetPodNameWithoutSuffix(source))
+		return actualValue == GetPodNameWithoutSuffix(source)
 	}
 }
 
