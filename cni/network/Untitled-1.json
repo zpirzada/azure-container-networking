@@ -1,0 +1,22 @@
+{
+    "ServiceArguments": {
+        "Version": "1.0"
+    },
+    "UserArguments": {
+        "GcsAuthIdType": "AuthKeyVault",
+        "GcsKeyVaultName": "https://anckv.vault.azure.net/",
+        "GcsCertificateName": "genevaame",
+        "GcsEnvironment": "DiagnosticsProd",
+        "GcsGenevaAccount": "AzureContainerNetworking",
+        "GcsNamespace": "AzureContainerNetworking",
+        "GenevaConfigVersion": "1.11",
+        "GcsRegion": "eastus2euap"
+    },
+    "EndpointConfigurations": [
+        {
+            "EndpointPath": "",
+            "EndpointPort": 15000,
+            "EndpointOtlp": "localhost:4319"
+        }
+    ]
+}
