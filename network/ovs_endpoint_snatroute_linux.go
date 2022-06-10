@@ -2,7 +2,6 @@ package network
 
 import (
 	"fmt"
-
 	"github.com/Azure/azure-container-networking/network/networkutils"
 	"github.com/Azure/azure-container-networking/network/ovssnat"
 )
@@ -35,8 +34,9 @@ func AddSnatEndpoint(client *OVSEndpointClient) error {
 	return nil
 }
 
-func AddSnatEndpointRules(client *OVSEndpointClient) error {
+func AddSnatEndpointRules(client *OVSEndpointClient,epInfo *EndpointInfo) error {
 	if client.enableSnatOnHost || client.allowInboundFromHostToNC || client.allowInboundFromNCToHost || client.enableSnatForDns {
+
 		// Allow specific Private IPs via Snat Bridge
 		if err := client.snatClient.AllowIPAddressesOnSnatBridge(); err != nil {
 			return err
@@ -58,6 +58,15 @@ func AddSnatEndpointRules(client *OVSEndpointClient) error {
 		}
 
 		if client.allowInboundFromHostToNC {
+
+			if epInfo.NetworkContainerEndpointPolicies != nil && len(epInfo.NetworkContainerEndpointPolicies) > 0 {
+				for _, policy := range epInfo.NetworkContainerEndpointPolicies {
+					if policy.Type == "ACL" {
+						// block all addresses
+					}
+				}
+			}
+
 			if err := client.snatClient.AllowInboundFromHostToNC(); err != nil {
 				return err
 			}

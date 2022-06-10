@@ -104,6 +104,7 @@ func (nw *network) newEndpointImpl(_ apipaClient, nl netlink.NetlinkInterface, p
 			nl,
 			ovsctl.NewOvsctl(),
 			plc)
+
 	} else if nw.Mode != opModeTransparent {
 		log.Printf("Bridge client")
 		epClient = NewLinuxBridgeEndpointClient(nw.extIf, hostIfName, contIfName, nw.Mode, nl, plc)

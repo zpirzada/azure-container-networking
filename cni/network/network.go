@@ -711,6 +711,7 @@ func (plugin *NetPlugin) createEndpointInternal(opt *createEndpointInternalOpt) 
 		VnetCidrs:          opt.nwCfg.VnetCidrs,
 		ServiceCidrs:       opt.nwCfg.ServiceCidrs,
 		NATInfo:            opt.natInfo,
+		NetworkContainerEndpointPolicies: opt.cnsNetworkConfig.EndpointPolicies,
 	}
 
 	epPolicies := getPoliciesFromRuntimeCfg(opt.nwCfg)

@@ -6,6 +6,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"github.com/Azure/azure-container-networking/cns"
 	"net"
 	"strings"
 
@@ -52,36 +53,37 @@ type endpoint struct {
 
 // EndpointInfo contains read-only information about an endpoint.
 type EndpointInfo struct {
-	Id                       string
-	ContainerID              string
-	NetNsPath                string
-	IfName                   string
-	SandboxKey               string
-	IfIndex                  int
-	MacAddress               net.HardwareAddr
-	DNS                      DNSInfo
-	IPAddresses              []net.IPNet
-	IPsToRouteViaHost        []string
-	InfraVnetIP              net.IPNet
-	Routes                   []RouteInfo
-	Policies                 []policy.Policy
-	Gateways                 []net.IP
-	EnableSnatOnHost         bool
-	EnableInfraVnet          bool
-	EnableMultiTenancy       bool
-	EnableSnatForDns         bool
-	AllowInboundFromHostToNC bool
-	AllowInboundFromNCToHost bool
-	NetworkContainerID       string
-	PODName                  string
-	PODNameSpace             string
-	Data                     map[string]interface{}
-	InfraVnetAddressSpace    string
-	SkipHotAttachEp          bool
-	IPV6Mode                 string
-	VnetCidrs                string
-	ServiceCidrs             string
-	NATInfo                  []policy.NATInfo
+	Id                               string
+	ContainerID                      string
+	NetNsPath                        string
+	IfName                           string
+	SandboxKey                       string
+	IfIndex                          int
+	MacAddress                       net.HardwareAddr
+	DNS                              DNSInfo
+	IPAddresses                      []net.IPNet
+	IPsToRouteViaHost                []string
+	InfraVnetIP                      net.IPNet
+	Routes                           []RouteInfo
+	Policies                         []policy.Policy
+	Gateways                         []net.IP
+	EnableSnatOnHost                 bool
+	EnableInfraVnet                  bool
+	EnableMultiTenancy               bool
+	EnableSnatForDns                 bool
+	AllowInboundFromHostToNC         bool
+	AllowInboundFromNCToHost         bool
+	NetworkContainerID               string
+	PODName                          string
+	PODNameSpace                     string
+	Data                             map[string]interface{}
+	InfraVnetAddressSpace            string
+	SkipHotAttachEp                  bool
+	IPV6Mode                         string
+	VnetCidrs                        string
+	ServiceCidrs                     string
+	NATInfo                          []policy.NATInfo
+	NetworkContainerEndpointPolicies []cns.NetworkContainerRequestPolicies
 }
 
 // RouteInfo contains information about an IP route.

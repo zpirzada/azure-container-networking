@@ -438,6 +438,7 @@ func (service *HTTPRestService) getNetworkContainerResponse(
 		LocalIPConfiguration:       savedReq.LocalIPConfiguration,
 		AllowHostToNCCommunication: savedReq.AllowHostToNCCommunication,
 		AllowNCToHostCommunication: savedReq.AllowNCToHostCommunication,
+		EndpointPolicies: savedReq.EndpointPolicies,
 	}
 
 	return getNetworkContainerResponse

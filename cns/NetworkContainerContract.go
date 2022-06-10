@@ -3,6 +3,7 @@ package cns
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
 	"net"
 	"strconv"
 	"strings"
@@ -368,6 +369,7 @@ type GetNetworkContainerResponse struct {
 	Response                   Response
 	AllowHostToNCCommunication bool
 	AllowNCToHostCommunication bool
+	EndpointPolicies 		   []NetworkContainerRequestPolicies
 }
 
 // DeleteNetworkContainerRequest specifies the details about the request to delete a specifc network container.
