@@ -301,7 +301,7 @@ func (dp *DataPlane) UpdatePolicy(policy *policies.NPMNetworkPolicy) error {
 	return nil
 }
 
-func (dp *DataPlane) GetAllIPSets() []string {
+func (dp *DataPlane) GetAllIPSets() map[string]string {
 	return dp.ipsetMgr.GetAllIPSets()
 }
 
