@@ -16,10 +16,12 @@ import (
 const (
 	maxNoNetRetryCount int = 240 // max wait time 240*5 == 20 mins
 	maxNoNetSleepTime  int = 5   // in seconds
-	unspecifiedPodKey      = ""
 )
 
-var errPolicyModeUnsupported = errors.New("only IPSet policy mode is supported")
+var (
+	errPolicyModeUnsupported = errors.New("only IPSet policy mode is supported")
+	errMismanagedPodKey      = errors.New("the pod key was not managed correctly when refreshing pod endpoints")
+)
 
 // initializeDataPlane will help gather network and endpoint details
 func (dp *DataPlane) initializeDataPlane() error {
@@ -40,6 +42,8 @@ func (dp *DataPlane) initializeDataPlane() error {
 		return err
 	}
 
+	// reset endpoint cache so that netpol references are removed for all endpoints while refreshing pod endpoints
+	dp.endpointCache = make(map[string]*npmEndpoint)
 	err = dp.refreshAllPodEndpoints()
 	if err != nil {
 		return err
@@ -122,13 +126,22 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 		return nil
 	}
 
-	if endpoint.IP != pod.PodIP {
-		// If the existing endpoint ID has changed, it means that the Pod has been recreated
-		// this results in old endpoint to be deleted, so we can safely ignore cleaning up policies
-		// and delete it from the cache.
-		delete(dp.endpointCache, pod.PodIP)
+	if endpoint.podKey == unspecifiedPodKey {
+		// while refreshing pod endpoints, newly discovered endpoints are given an unspecified pod key
+		if endpoint.isStalePodKey(pod.PodKey) {
+			// NOTE: if a pod restarts and takes up its previous IP, then its endpoint would be new and this branch would be taken.
+			// Updates to this pod would not occur. Pod IPs are expected to change on restart though.
+			// See: https://stackoverflow.com/questions/52362514/when-will-the-kubernetes-pod-ip-change
+			// If a pod does restart and take up its previous IP, then the pod can be deleted/restarted to mitigate this problem.
+			klog.Infof("ignoring pod update since pod with key %s is stale and likely was deleted", pod.PodKey)
+			return nil
+		}
+		endpoint.podKey = pod.PodKey
+	} else if pod.PodKey != endpoint.podKey {
+		return fmt.Errorf("pod key mismatch. Expected: %s, Actual: %s. Error: [%w]", pod.PodKey, endpoint.podKey, errMismanagedPodKey)
 	}
-	// Check if the removed IPSets have any network policy references
+
+	// for every ipset we're removing from the endpoint, remove from the endpoint any policy that requires the set
 	for _, setName := range pod.IPSetsToRemove {
 		selectorReference, err := dp.ipsetMgr.GetSelectorReferencesBySet(setName)
 		if err != nil {
@@ -139,21 +152,21 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 			// Now check if any of these network policies are applied on this endpoint.
 			// If yes then proceed to delete the network policy
 			// Remove policy should be deleting this netpol reference
-			if _, ok := endpoint.NetPolReference[policyKey]; ok {
+			if _, ok := endpoint.netPolReference[policyKey]; ok {
 				// Delete the network policy
 				endpointList := map[string]string{
-					endpoint.IP: endpoint.ID,
+					endpoint.ip: endpoint.id,
 				}
 				err := dp.policyMgr.RemovePolicy(policyKey, endpointList)
 				if err != nil {
 					return err
 				}
-				delete(endpoint.NetPolReference, policyKey)
+				delete(endpoint.netPolReference, policyKey)
 			}
 		}
 	}
 
-	// Check if any of the existing network policies needs to be applied
+	// for every ipset we're adding to the endpoint, consider adding to the endpoint every policy that the set touches
 	toAddPolicies := make(map[string]struct{})
 	for _, setName := range pod.IPSetsToAdd {
 		selectorReference, err := dp.ipsetMgr.GetSelectorReferencesBySet(setName)
@@ -168,10 +181,11 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 		}
 	}
 
-	// Now check if any of these network policies are applied on this endpoint.
-	// If not then proceed to apply the network policy
+	// for all of these policies, add the policy to the endpoint if:
+	// 1. it's not already there
+	// 2. the pod IP is part of every set that the policy requires (every set in the pod selector)
 	for policyKey := range toAddPolicies {
-		if _, ok := endpoint.NetPolReference[policyKey]; ok {
+		if _, ok := endpoint.netPolReference[policyKey]; ok {
 			continue
 		}
 
@@ -192,14 +206,14 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 
 		// Apply the network policy
 		endpointList := map[string]string{
-			endpoint.IP: endpoint.ID,
+			endpoint.ip: endpoint.id,
 		}
 		err = dp.policyMgr.AddPolicy(policy, endpointList)
 		if err != nil {
 			return err
 		}
 
-		endpoint.NetPolReference[policyKey] = struct{}{}
+		endpoint.netPolReference[policyKey] = struct{}{}
 	}
 
 	return nil
@@ -210,7 +224,7 @@ func (dp *DataPlane) getSelectorIPSets(policy *policies.NPMNetworkPolicy) map[st
 	for _, ipset := range policy.PodSelectorIPSets {
 		selectorIpSets[ipset.Metadata.GetPrefixName()] = struct{}{}
 	}
-	klog.Infof("policy %s has policy selector: %+v", policy.PolicyKey, selectorIpSets) // FIXME remove after debugging
+	klog.Infof("policy %s has policy selector: %+v", policy.PolicyKey, selectorIpSets)
 	return selectorIpSets
 }
 
@@ -234,10 +248,9 @@ func (dp *DataPlane) getEndpointsToApplyPolicy(policy *policies.NPMNetworkPolicy
 			klog.Infof("[DataPlane] Ignoring endpoint with IP %s since it was not found in the endpoint cache. This IP might not be in the HNS network", ip)
 			continue
 		}
-		endpointList[ip] = endpoint.ID
-		endpoint.NetPolReference[policy.PolicyKey] = struct{}{}
+		endpointList[ip] = endpoint.id
+		endpoint.netPolReference[policy.PolicyKey] = struct{}{}
 	}
-	klog.Infof("[DataPlane] Endpoints to apply policy %s: %+v", policy.PolicyKey, endpointList) // FIXME remove after debugging
 	return endpointList, nil
 }
 
@@ -250,12 +263,15 @@ func (dp *DataPlane) getAllPodEndpoints() ([]hcn.HostComputeEndpoint, error) {
 	return endpoints, nil
 }
 
-// refreshAllPodEndpoints will refresh all the pod endpoints
+// refreshAllPodEndpoints will refresh all the pod endpoints and create empty netpol references for new endpoints
 func (dp *DataPlane) refreshAllPodEndpoints() error {
 	endpoints, err := dp.getAllPodEndpoints()
 	if err != nil {
 		return err
 	}
+
+	currentTime := time.Now().Unix()
+	existingIPs := make(map[string]struct{})
 	for _, endpoint := range endpoints {
 		klog.Infof("Endpoints info %+v", endpoint.Id)
 		if len(endpoint.IpConfigurations) == 0 {
@@ -267,17 +283,58 @@ func (dp *DataPlane) refreshAllPodEndpoints() error {
 			klog.Infof("Endpoint ID %s has empty IPAddress field", endpoint.Id)
 			continue
 		}
-		ep := &NPMEndpoint{
-			Name:            endpoint.Name,
-			ID:              endpoint.Id,
-			NetPolReference: make(map[string]struct{}),
-			IP:              endpoint.IpConfigurations[0].IpAddress,
-		}
 
-		dp.endpointCache[ep.IP] = ep
-		klog.Infof("updating endpoint cache to include %s: %+v", ep.IP, ep) // FIXME remove after debugging
+		existingIPs[ip] = struct{}{}
+
+		oldNPMEP, ok := dp.endpointCache[ip]
+		if !ok {
+			// add the endpoint to the cache if it's not already there
+			npmEP := newNPMEndpoint(&endpoint)
+			dp.endpointCache[ip] = npmEP
+			// NOTE: TSGs rely on this log line
+			klog.Infof("updating endpoint cache to include %s: %+v", npmEP.ip, npmEP)
+		} else if oldNPMEP.id != endpoint.Id {
+			// multiple endpoints can have the same IP address, but there should be one endpoint ID per pod
+			// throw away old endpoints that have the same IP as a current endpoint (the old endpoint is getting deleted)
+			// we don't have to worry about cleaning up network policies on endpoints that are getting deleted
+			npmEP := newNPMEndpoint(&endpoint)
+			if oldNPMEP.podKey == unspecifiedPodKey {
+				klog.Infof("updating endpoint cache since endpoint changed for IP which never had a pod key. new endpoint: %s, old endpoint: %s, ip: %s", npmEP.id, oldNPMEP.id, npmEP.ip)
+				dp.endpointCache[ip] = npmEP
+			} else {
+				npmEP.stalePodKey = &staleKey{
+					key:       oldNPMEP.podKey,
+					timestamp: currentTime,
+				}
+				dp.endpointCache[ip] = npmEP
+				// NOTE: TSGs rely on this log line
+				klog.Infof("updating endpoint cache for previously cached IP %s: %+v with stalePodKey %+v", npmEP.ip, npmEP, npmEP.stalePodKey)
+			}
+		}
 	}
-	klog.Infof("endpoint cache after refreshing all pod endpoints: %+v", dp.endpointCache) // FIXME remove after debugging
+
+	// garbage collection for the endpoint cache
+	for ip, ep := range dp.endpointCache {
+		if _, ok := existingIPs[ip]; !ok {
+			if ep.podKey == unspecifiedPodKey {
+				if ep.stalePodKey == nil {
+					klog.Infof("deleting old endpoint which never had a pod key. ID: %s, IP: %s", ep.id, ip)
+					delete(dp.endpointCache, ip)
+				} else if int(currentTime-ep.stalePodKey.timestamp)/60 > minutesToKeepStalePodKey {
+					klog.Infof("deleting old endpoint which had a stale pod key. ID: %s, IP: %s, stalePodKey: %+v", ep.id, ip, ep.stalePodKey)
+					delete(dp.endpointCache, ip)
+				}
+			} else {
+				ep.stalePodKey = &staleKey{
+					key:       ep.podKey,
+					timestamp: currentTime,
+				}
+				ep.podKey = unspecifiedPodKey
+				klog.Infof("marking endpoint stale for at least %d minutes. ID: %s, IP: %s, new stalePodKey: %+v", minutesToKeepStalePodKey, ep.id, ip, ep.stalePodKey)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -292,32 +349,10 @@ func (dp *DataPlane) setNetworkIDByName(networkName string) error {
 	return nil
 }
 
-func (dp *DataPlane) getEndpointByIP(podIP string) (*NPMEndpoint, error) {
-	endpoints, err := dp.getAllPodEndpoints()
-	if err != nil {
-		return nil, err
-	}
-	for _, endpoint := range endpoints {
-		for _, ipConfig := range endpoint.IpConfigurations {
-			if ipConfig.IpAddress == podIP {
-				ep := &NPMEndpoint{
-					Name:            endpoint.Name,
-					ID:              endpoint.Id,
-					IP:              endpoint.IpConfigurations[0].IpAddress,
-					NetPolReference: make(map[string]struct{}),
-				}
-				return ep, nil
-			}
-		}
-	}
-
-	return nil, nil
-}
-
 func (dp *DataPlane) getAllEndpointIDs() []string {
 	endpointIDs := make([]string, 0, len(dp.endpointCache))
 	for _, endpoint := range dp.endpointCache {
-		endpointIDs = append(endpointIDs, endpoint.ID)
+		endpointIDs = append(endpointIDs, endpoint.id)
 	}
 	return endpointIDs
 }

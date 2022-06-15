@@ -38,7 +38,7 @@ func NewNPMNetworkPolicy(netPolName, netPolNamespace string) *NPMNetworkPolicy {
 	return &NPMNetworkPolicy{
 		Namespace:   netPolNamespace,
 		PolicyKey:   fmt.Sprintf("%s/%s", netPolNamespace, netPolName),
-		ACLPolicyID: aclPolicyID(netPolName, netPolNamespace),
+		ACLPolicyID: aclPolicyID(netPolNamespace, netPolName),
 	}
 }
 
