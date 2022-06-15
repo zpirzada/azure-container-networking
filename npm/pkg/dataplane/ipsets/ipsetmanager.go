@@ -552,10 +552,7 @@ func validateIPSetMemberIP(ip string) bool {
 	// 192.168.0.0/24 nomatch
 	// always guaranteed to have ip, not guaranteed to have port + protocol
 	ipDetails := strings.Split(ip, ",")
-	if util.IsIPV4(ipDetails[0]) {
-		return true
-	}
+	ipField := strings.Split(ipDetails[0], " ")
 
-	err := ValidateIPBlock(ip)
-	return err == nil
+	return util.IsIPV4(ipField[0])
 }
