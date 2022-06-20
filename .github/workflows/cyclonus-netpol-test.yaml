@@ -23,7 +23,7 @@ jobs:
         profile: [v1-default.yaml, v1-place-azure-chain-first.yaml, v2-default.yaml, v2-apply-on-need.yaml, v2-place-azure-after-kube-services.yaml]
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - uses: actions/setup-go@v2
         with:
