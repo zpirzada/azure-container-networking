@@ -17,7 +17,8 @@ type expectedInfo struct {
 	mainCache        []setMembers
 	toAddUpdateCache []*IPSetMetadata
 	toDeleteCache    []string
-	// setsForKernel represents the sets in toAddUpdateCache that should be in the kernel
+	// setsForKernel represents the sets in toAddUpdateCache that should be in the kernel.
+	// This field seems unnecessary since all usages have the same values as toAddUpdateCache.
 	setsForKernel []*IPSetMetadata
 
 	/*
@@ -69,6 +70,10 @@ var (
 	keyLabelOfPodSet = NewIPSetMetadata("test-set2", KeyLabelOfPod)
 	portSet          = NewIPSetMetadata("test-set3", NamedPorts)
 	list             = NewIPSetMetadata("test-list1", KeyLabelOfNamespace)
+
+	nsKeyList          = NewIPSetMetadata("test-ns-key-list", KeyLabelOfNamespace)
+	nsKeyValueList     = NewIPSetMetadata("test-ns-key-value-list", KeyValueLabelOfNamespace)
+	nestedPodLabelList = NewIPSetMetadata("test-nested-pod-label-list", NestedLabelOfPod)
 )
 
 func TestReconcileCache(t *testing.T) {
@@ -113,6 +118,62 @@ func TestReconcileCache(t *testing.T) {
 			assertExpectedInfo(t, iMgr, &expectedInfo{
 				mainCache: []setMembers{
 					{metadata: otherSet, members: []member{{testPodIP, isHashMember}}},
+				},
+				toAddUpdateCache: nil,
+				toDeleteCache:    tt.toDeleteCache,
+				setsForKernel:    nil,
+			})
+		})
+	}
+}
+
+func TestReconcileCacheWithEmptySet(t *testing.T) {
+	tests := []struct {
+		name          string
+		mode          IPSetMode
+		toDeleteCache []string
+	}{
+		{
+			name:          "Apply Always",
+			mode:          ApplyAllIPSets,
+			toDeleteCache: []string{nsKeyList.GetPrefixName()},
+		},
+		{
+			name:          "Apply On Need",
+			mode:          ApplyOnNeed,
+			toDeleteCache: nil,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &IPSetManagerCfg{
+				IPSetMode:          tt.mode,
+				NetworkName:        "azure",
+				AddEmptySetToLists: true,
+			}
+
+			cache := []*IPSetMetadata{nsKeyList, emptySetMetadata}
+
+			metrics.ReinitializeAll()
+			calls := GetApplyIPSetsTestCalls(cache, nil)
+			ioShim := common.NewMockIOShim(calls)
+			defer ioShim.VerifyCalls(t, calls)
+			iMgr := NewIPSetManager(cfg, ioShim)
+
+			// create two sets, one which can be deleted
+			iMgr.CreateIPSets([]*IPSetMetadata{nsKeyList})
+			nsKeySet, ok := iMgr.setMap[nsKeyList.GetPrefixName()]
+			require.True(t, ok, "list should be created")
+			_, ok = nsKeySet.MemberIPSets[emptySetMetadata.GetPrefixName()]
+			require.True(t, ok, "empty set should be a member of the list")
+
+			require.NoError(t, iMgr.ApplyIPSets())
+
+			iMgr.Reconcile()
+			assertExpectedInfo(t, iMgr, &expectedInfo{
+				mainCache: []setMembers{
+					{metadata: emptySetMetadata},
 				},
 				toAddUpdateCache: nil,
 				toDeleteCache:    tt.toDeleteCache,
@@ -308,6 +369,63 @@ func TestCreateIPSet(t *testing.T) {
 			iMgr := NewIPSetManager(tt.args.cfg, ioShim)
 			iMgr.CreateIPSets(tt.args.metadatas)
 			assertExpectedInfo(t, iMgr, &tt.expectedInfo)
+		})
+	}
+}
+
+func TestCreateListWithEmptySet(t *testing.T) {
+	tests := []struct {
+		name             string
+		mode             IPSetMode
+		toAddUpdateCache []*IPSetMetadata
+	}{
+		{
+			name: "Apply Always",
+			mode: ApplyAllIPSets,
+			toAddUpdateCache: []*IPSetMetadata{
+				nsKeyList,
+				nsKeyValueList,
+				nestedPodLabelList,
+				emptySetMetadata,
+			},
+		},
+		{
+			name: "Apply On Need",
+			mode: ApplyOnNeed,
+			toAddUpdateCache: []*IPSetMetadata{
+				emptySetMetadata,
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &IPSetManagerCfg{
+				IPSetMode:          tt.mode,
+				NetworkName:        "azure",
+				AddEmptySetToLists: true,
+			}
+
+			metrics.ReinitializeAll()
+			calls := GetApplyIPSetsTestCalls(nil, nil)
+			ioShim := common.NewMockIOShim(calls)
+			defer ioShim.VerifyCalls(t, calls)
+			iMgr := NewIPSetManager(cfg, ioShim)
+
+			iMgr.CreateIPSets([]*IPSetMetadata{nsKeyList, nsKeyValueList, nestedPodLabelList})
+
+			prefix := emptySetMetadata.GetPrefixName()
+			assertExpectedInfo(t, iMgr, &expectedInfo{
+				mainCache: []setMembers{
+					{metadata: nsKeyList, members: []member{{prefix, isSetMember}}},
+					{metadata: nsKeyValueList, members: []member{{prefix, isSetMember}}},
+					{metadata: nestedPodLabelList},
+					{metadata: emptySetMetadata},
+				},
+				toAddUpdateCache: tt.toAddUpdateCache,
+				toDeleteCache:    nil,
+				setsForKernel:    tt.toAddUpdateCache,
+			})
 		})
 	}
 }

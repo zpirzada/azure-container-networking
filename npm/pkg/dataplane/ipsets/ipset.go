@@ -6,6 +6,7 @@ import (
 
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/npm/util"
+	"k8s.io/klog"
 )
 
 type IPSetMetadata struct {
@@ -60,9 +61,13 @@ func (setMetadata *IPSetMetadata) GetPrefixName() string {
 		return fmt.Sprintf("%s%s", util.NamespaceLabelPrefix, setMetadata.Name)
 	case NestedLabelOfPod:
 		return fmt.Sprintf("%s%s", util.NestedLabelPrefix, setMetadata.Name)
+	case EmptyHashSet:
+		return fmt.Sprintf("%s%s", util.EmptySetPrefix, setMetadata.Name)
 	case UnknownType: // adding this to appease golint
+		klog.Errorf("experienced unknown type in set metadata: %+v", setMetadata)
 		return Unknown
 	default:
+		klog.Errorf("experienced unexpected type %d in set metadata: %+v", setMetadata.Type, setMetadata)
 		return Unknown
 	}
 }
@@ -82,6 +87,8 @@ func (setType SetType) getSetKind() SetKind {
 	case KeyLabelOfPod:
 		return HashSet
 	case KeyValueLabelOfPod:
+		return HashSet
+	case EmptyHashSet:
 		return HashSet
 	case KeyLabelOfNamespace:
 		return ListSet
@@ -132,6 +139,7 @@ type SetProperties struct {
 
 type SetType int8
 
+// Possble values for SetType
 const (
 	// Unknown SetType
 	UnknownType SetType = 0
@@ -154,6 +162,9 @@ const (
 	NestedLabelOfPod SetType = 7
 	// CIDRBlocks holds CIDR blocks
 	CIDRBlocks SetType = 8
+	// EmptyHashSet is a set meant to have no members
+	EmptyHashSet SetType = 9
+
 	// Unknown const for unknown string
 	Unknown string = "unknown"
 )
@@ -162,13 +173,14 @@ var (
 	setTypeName = map[SetType]string{
 		UnknownType:              Unknown,
 		Namespace:                "Namespace",
-		KeyLabelOfNamespace:      "KeyLabelOfNameSpace",
-		KeyValueLabelOfNamespace: "KeyValueLabelOfNameSpace",
+		KeyLabelOfNamespace:      "KeyLabelOfNamespace",
+		KeyValueLabelOfNamespace: "KeyValueLabelOfNamespace",
 		KeyLabelOfPod:            "KeyLabelOfPod",
 		KeyValueLabelOfPod:       "KeyValueLabelOfPod",
 		NamedPorts:               "NamedPorts",
 		NestedLabelOfPod:         "NestedLabelOfPod",
 		CIDRBlocks:               "CIDRBlocks",
+		EmptyHashSet:             "EmptySet",
 	}
 	// ErrIPSetInvalidKind is returned when IPSet kind is invalid
 	ErrIPSetInvalidKind = errors.New("invalid IPSet Kind")
@@ -342,11 +354,18 @@ func (set *IPSet) canBeForceDeleted() bool {
 		!set.referencedInList()
 }
 
-func (set *IPSet) canBeDeleted() bool {
+func (set *IPSet) canBeDeleted(ignorableMember *IPSet) bool {
+	var firstMember *IPSet
+	for _, member := range set.MemberIPSets {
+		firstMember = member
+		break
+	}
+	listMembersOk := len(set.MemberIPSets) == 0 || (len(set.MemberIPSets) == 1 && firstMember == ignorableMember)
+
 	return !set.usedByNetPol() &&
 		!set.referencedInList() &&
-		len(set.MemberIPSets) == 0 &&
-		len(set.IPPodKey) == 0
+		len(set.IPPodKey) == 0 &&
+		listMembersOk
 }
 
 // usedByNetPol check if an IPSet is referred in network policies.

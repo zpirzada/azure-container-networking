@@ -42,6 +42,10 @@ type DataPlane struct {
 
 func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChannel <-chan struct{}) (*DataPlane, error) {
 	metrics.InitializeAll()
+	if util.IsWindowsDP() {
+		klog.Infof("[DataPlane] enabling AddEmptySetToLists for Windows")
+		cfg.IPSetManagerCfg.AddEmptySetToLists = true
+	}
 	dp := &DataPlane{
 		Config:          cfg,
 		policyMgr:       policies.NewPolicyManager(ioShim, cfg.PolicyManagerCfg),
