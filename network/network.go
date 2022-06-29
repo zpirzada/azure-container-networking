@@ -28,16 +28,17 @@ const (
 
 // externalInterface is a host network interface that bridges containers to external networks.
 type externalInterface struct {
-	Name        string
-	Networks    map[string]*network
-	Subnets     []string
-	BridgeName  string
-	DNSInfo     DNSInfo
-	MacAddress  net.HardwareAddr
-	IPAddresses []*net.IPNet
-	Routes      []*route
-	IPv4Gateway net.IP
-	IPv6Gateway net.IP
+	Name          string
+	Networks      map[string]*network
+	Subnets       []string
+	BridgeName    string
+	DNSInfo       DNSInfo
+	MacAddress    net.HardwareAddr
+	IPAddresses   []*net.IPNet
+	Routes        []*route
+	IPv4Gateway   net.IP
+	IPv6Gateway   net.IP
+	OVSSwitchPort string
 }
 
 // A container network is a set of endpoints allowed to communicate with each other.

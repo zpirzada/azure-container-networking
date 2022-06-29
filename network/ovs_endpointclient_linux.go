@@ -99,6 +99,12 @@ func (client *OVSEndpointClient) AddEndpoints(epInfo *EndpointInfo) error {
 		return err
 	}
 
+	log.Printf("[ovs] Get ovs port for interface %v.", client.hostVethName)
+	epInfo.VethOVSSwitchPort, err = client.ovsctlClient.GetOVSPortNumber(client.hostVethName)
+	if err != nil {
+		log.Printf("[ovs] Get ofport failed with error %v", err)
+		return err
+	}
 	return nil
 }
 
@@ -109,18 +115,10 @@ func (client *OVSEndpointClient) AddEndpointRules(epInfo *EndpointInfo) error {
 	}
 
 	log.Printf("[ovs] Get ovs port for interface %v.", client.hostVethName)
-	containerOVSPort, err := client.ovsctlClient.GetOVSPortNumber(client.hostVethName)
-	if err != nil {
-		log.Printf("[ovs] Get ofport failed with error %v", err)
-		return err
-	}
+	containerOVSPort = epInfo.VethOVSSwitchPort
 
 	log.Printf("[ovs] Get ovs port for interface %v.", client.hostPrimaryIfName)
-	hostPort, err := client.ovsctlClient.GetOVSPortNumber(client.hostPrimaryIfName)
-	if err != nil {
-		log.Printf("[ovs] Get ofport failed with error %v", err)
-		return err
-	}
+	hostPort = epInfo.VethOVSSwitchPort
 
 	for _, ipAddr := range epInfo.IPAddresses {
 		// Add Arp Reply Rules
@@ -154,16 +152,10 @@ func (client *OVSEndpointClient) AddEndpointRules(epInfo *EndpointInfo) error {
 
 func (client *OVSEndpointClient) DeleteEndpointRules(ep *endpoint) {
 	log.Printf("[ovs] Get ovs port for interface %v.", ep.HostIfName)
-	containerPort, err := client.ovsctlClient.GetOVSPortNumber(client.hostVethName)
-	if err != nil {
-		log.Printf("[ovs] Get portnum failed with error %v", err)
-	}
+	containerPort := ep.VethOVSSwitchPort
 
 	log.Printf("[ovs] Get ovs port for interface %v.", client.hostPrimaryIfName)
-	hostPort, err := client.ovsctlClient.GetOVSPortNumber(client.hostPrimaryIfName)
-	if err != nil {
-		log.Printf("[ovs] Get portnum failed with error %v", err)
-	}
+	hostPort := ep.VethOVSSwitchPort
 
 	// Delete IP SNAT
 	log.Printf("[ovs] Deleting IP SNAT for port %v", containerPort)

@@ -48,6 +48,7 @@ type endpoint struct {
 	PODNameSpace             string `json:",omitempty"`
 	InfraVnetAddressSpace    string `json:",omitempty"`
 	NetNs                    string `json:",omitempty"`
+	VethOVSSwitchPort        string
 }
 
 // EndpointInfo contains read-only information about an endpoint.
@@ -82,6 +83,7 @@ type EndpointInfo struct {
 	VnetCidrs                string
 	ServiceCidrs             string
 	NATInfo                  []policy.NATInfo
+	VethOVSSwitchPort        string
 }
 
 // RouteInfo contains information about an IP route.
