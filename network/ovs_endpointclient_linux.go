@@ -115,10 +115,10 @@ func (client *OVSEndpointClient) AddEndpointRules(epInfo *EndpointInfo) error {
 	}
 
 	log.Printf("[ovs] Get ovs port for interface %v.", client.hostVethName)
-	containerOVSPort = epInfo.VethOVSSwitchPort
+	containerOVSPort := epInfo.VethOVSSwitchPort
 
 	log.Printf("[ovs] Get ovs port for interface %v.", client.hostPrimaryIfName)
-	hostPort = epInfo.VethOVSSwitchPort
+	hostPort := epInfo.VethOVSSwitchPort
 
 	for _, ipAddr := range epInfo.IPAddresses {
 		// Add Arp Reply Rules

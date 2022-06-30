@@ -40,6 +40,7 @@ type NetworkClient interface {
 	DeleteL2Rules(extIf *externalInterface)
 	SetBridgeMasterToHostInterface() error
 	SetHairpinOnHostInterface(bool) error
+	GetOVSPort(extIf *externalInterface) (string, error)
 }
 
 type EndpointClient interface {

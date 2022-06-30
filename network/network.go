@@ -74,6 +74,7 @@ type NetworkInfo struct {
 	IPV6Mode                      string
 	IPAMType                      string
 	ServiceCidrs                  string
+	OVSSwitchPort                 string
 }
 
 // SubnetInfo contains subnet information for a container network.
