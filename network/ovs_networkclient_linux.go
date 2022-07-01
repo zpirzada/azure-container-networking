@@ -118,7 +118,13 @@ func (client *OVSNetworkClient) AddL2Rules(extIf *externalInterface) error {
 	mac := extIf.MacAddress.String()
 	macHex := strings.Replace(mac, ":", "", -1)
 
-	ofport := extIf.OVSSwitchPort
+	//fetch ovs port number and add it to nwInfo struct
+	ofport, err := client.ovsctlClient.GetOVSPortNumber(client.hostInterfaceName)
+	if err != nil {
+		log.Printf("[ovs] Get ofport failed with error %v", err)
+		return err
+	}
+	extIf.OVSSwitchPort = ofport
 
 	// Arp SNAT Rule
 	log.Printf("[ovs] Adding ARP SNAT rule for egress traffic on interface %v", client.hostInterfaceName)
@@ -133,10 +139,6 @@ func (client *OVSNetworkClient) AddL2Rules(extIf *externalInterface) error {
 	}
 
 	return nil
-}
-
-func (client *OVSNetworkClient) GetOVSPort(extIf *externalInterface) (string, error) {
-	return client.ovsctlClient.GetOVSPortNumber(client.hostInterfaceName)
 }
 
 func (client *OVSNetworkClient) DeleteL2Rules(extIf *externalInterface) {

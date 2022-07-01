@@ -476,14 +476,6 @@ func (nm *networkManager) connectExternalInterface(extIf *externalInterface, nwI
 		return err
 	}
 
-	//fetch ovs port number and add it to nwInfo struct
-	extIf.OVSSwitchPort, err = networkClient.GetOVSPort(extIf)
-	if err != nil {
-		log.Printf("[ovs] Get ofport failed with error %v", err)
-		return err
-	}
-	nwInfo.OVSSwitchPort = extIf.OVSSwitchPort
-
 	// Add the bridge rules.
 	err = networkClient.AddL2Rules(extIf)
 	if err != nil {
