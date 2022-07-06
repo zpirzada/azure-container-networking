@@ -224,7 +224,6 @@ func (nw *network) newEndpointImpl(_ apipaClient, nl netlink.NetlinkInterface, p
 		ContainerID:              epInfo.ContainerID,
 		PODName:                  epInfo.PODName,
 		PODNameSpace:             epInfo.PODNameSpace,
-		VethOVSSwitchPort:        epInfo.VethOVSSwitchPort,
 	}
 
 	ep.Routes = append(ep.Routes, epInfo.Routes...)

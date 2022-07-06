@@ -35,6 +35,7 @@ type OVSEndpointClient struct {
 	netioshim                netio.NetIOInterface
 	ovsctlClient             ovsctl.OvsInterface
 	plClient                 platform.ExecClient
+	vethOVSSwitchPort        string
 }
 
 const (
@@ -69,6 +70,7 @@ func NewOVSEndpointClient(
 		ovsctlClient:             ovs,
 		plClient:                 plc,
 		netioshim:                &netio.NetIO{},
+		vethOVSSwitchPort:        nw.extIf.OVSSwitchPort,
 	}
 
 	NewInfraVnetClient(client, epInfo.Id[:7])
@@ -99,12 +101,6 @@ func (client *OVSEndpointClient) AddEndpoints(epInfo *EndpointInfo) error {
 		return err
 	}
 
-	log.Printf("[ovs] Get ovs port for interface %v.", client.hostVethName)
-	epInfo.VethOVSSwitchPort, err = client.ovsctlClient.GetOVSPortNumber(client.hostVethName)
-	if err != nil {
-		log.Printf("[ovs] Get ofport failed with error %v", err)
-		return err
-	}
 	return nil
 }
 
@@ -115,10 +111,10 @@ func (client *OVSEndpointClient) AddEndpointRules(epInfo *EndpointInfo) error {
 	}
 
 	log.Printf("[ovs] Get ovs port for interface %v.", client.hostVethName)
-	containerOVSPort := epInfo.VethOVSSwitchPort
+	containerOVSPort := client.vethOVSSwitchPort
 
 	log.Printf("[ovs] Get ovs port for interface %v.", client.hostPrimaryIfName)
-	hostPort := epInfo.VethOVSSwitchPort
+	hostPort := client.vethOVSSwitchPort
 
 	for _, ipAddr := range epInfo.IPAddresses {
 		// Add Arp Reply Rules
@@ -152,10 +148,10 @@ func (client *OVSEndpointClient) AddEndpointRules(epInfo *EndpointInfo) error {
 
 func (client *OVSEndpointClient) DeleteEndpointRules(ep *endpoint) {
 	log.Printf("[ovs] Get ovs port for interface %v.", ep.HostIfName)
-	containerPort := ep.VethOVSSwitchPort
+	containerPort := client.vethOVSSwitchPort
 
 	log.Printf("[ovs] Get ovs port for interface %v.", client.hostPrimaryIfName)
-	hostPort := ep.VethOVSSwitchPort
+	hostPort := client.vethOVSSwitchPort
 
 	// Delete IP SNAT
 	log.Printf("[ovs] Deleting IP SNAT for port %v", containerPort)
