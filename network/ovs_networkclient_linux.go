@@ -118,7 +118,7 @@ func (client *OVSNetworkClient) AddL2Rules(extIf *externalInterface) error {
 	mac := extIf.MacAddress.String()
 	macHex := strings.Replace(mac, ":", "", -1)
 
-	//fetch ovs port number and add it to nwInfo struct
+	// fetch ovs port number and add it to nwInfo struct
 	ofport, err := client.ovsctlClient.GetOVSPortNumber(client.hostInterfaceName)
 	if err != nil {
 		log.Printf("[ovs] Get ofport failed with error %v", err)
