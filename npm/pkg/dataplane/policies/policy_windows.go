@@ -19,8 +19,8 @@ var (
 		TCP:  "6",
 		UDP:  "17",
 		SCTP: "132",
-		// HNS thinks 256 as ANY protocol
-		UnspecifiedProtocol: "256",
+		// HNS considers "" as any protocol
+		UnspecifiedProtocol: "",
 	}
 
 	ErrNamedPortsNotSupported     = errors.New("Named Port translation is not supported in windows dataplane")
@@ -92,11 +92,7 @@ func (acl *ACLPolicy) convertToAclSettings(aclID string) (*NPMACLPolSettings, er
 		return policySettings, ErrProtocolNotSupported
 	}
 
-	if protoNum == "256" {
-		policySettings.Protocols = ""
-	} else {
-		policySettings.Protocols = protoNum
-	}
+	policySettings.Protocols = protoNum
 	// Ignore adding ruletype for now as there is a bug
 	// policySettings.RuleType = hcn.RuleTypeSwitch
 
