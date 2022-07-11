@@ -182,7 +182,7 @@ func (pMgr *PolicyManager) removePolicyByEndpointID(ruleID, epID string, noOfRul
 	}
 
 	if len(epObj.Policies) == 0 {
-		klog.Infof("[DataPlanewindows] No Policies to remove on %s ID Endpoint", epID)
+		klog.Infof("[DataPlanewindows] skipping removing policy on %s ID Endpoint because there are no ACLs on endpoint", epID)
 	}
 
 	epBuilder, err := splitEndpointPolicies(epObj.Policies)
@@ -203,8 +203,8 @@ func (pMgr *PolicyManager) removePolicyByEndpointID(ruleID, epID string, noOfRul
 			return nil
 		}
 	}
-	klog.Infof("[DataPlanewindows] Epbuilder ACL policies before removing %+v", epBuilder.aclPolicies)
-	klog.Infof("[DataPlanewindows] Epbuilder Other policies before removing %+v", epBuilder.otherPolicies)
+	klog.Infof("[DataPlanewindows] Epbuilder ACL policies remaining before removing others: %+v", epBuilder.prettyPrintACLs())
+	klog.Infof("[DataPlanewindows] Epbuilder Other policies remaining before removing others: %+v", epBuilder.otherPolicies)
 	epPolicies, err := epBuilder.getHCNPolicyRequest()
 	if err != nil {
 		return fmt.Errorf("unable to get HCN policy request while trying to remove policy. policy: %s, endpoint: %s, err: %s", ruleID, epID, err.Error())
@@ -318,7 +318,7 @@ func (epBuilder *endpointPolicyBuilder) compareAndRemovePolicies(ruleIDToRemove 
 		// First check if ID is present and equal, this saves compute cycles to compare both objects
 		if ruleIDToRemove == acl.Id {
 			// Remove the ACL policy from the list
-			klog.Infof("[PolicyManagerWindows] Found ACL with ID %s and removing it", acl.Id)
+			klog.Infof("[PolicyManagerWindows] while comparing, found ACL with ID %s and removing it", acl.Id)
 			toDeleteIndexes[i] = struct{}{}
 			lenOfRulesToRemove--
 			aclFound = true
@@ -349,7 +349,7 @@ func (epBuilder *endpointPolicyBuilder) resetAllNPMAclPolicies() bool {
 		// First check if ID is present and equal, this saves compute cycles to compare both objects
 		if strings.HasPrefix(acl.Id, policyIDPrefix) {
 			// Remove the ACL policy from the list
-			klog.Infof("[PolicyManagerWindows] Found ACL with ID %s and removing it", acl.Id)
+			klog.Infof("[PolicyManagerWindows] while resetting, found ACL with ID %s and removing it", acl.Id)
 			toDeleteIndexes[i] = struct{}{}
 			aclFound = true
 		}
@@ -378,4 +378,12 @@ func (epBuilder *endpointPolicyBuilder) removeACLPolicyAtIndex(indexes map[int]s
 func isNotFoundErr(err error) bool {
 	var notFoundErr hcn.EndpointNotFoundError
 	return errors.As(err, &notFoundErr)
+}
+
+func (epBuilder *endpointPolicyBuilder) prettyPrintACLs() string {
+	aclStrings := make([]string, len(epBuilder.aclPolicies))
+	for i, policy := range epBuilder.aclPolicies {
+		aclStrings[i] = fmt.Sprintf("%+v", *policy)
+	}
+	return strings.Join(aclStrings, ",")
 }
