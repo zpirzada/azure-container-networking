@@ -575,6 +575,6 @@ type NodeInfoResponse struct {
 
 // NodeRegisterRequest - Struct to hold the node register request.
 type NodeRegisterRequest struct {
-	NumCPU               int
+	NumCores             int
 	NmAgentSupportedApis []string
 }

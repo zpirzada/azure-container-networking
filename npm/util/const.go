@@ -183,6 +183,7 @@ const (
 	PodLabelPrefix       string = "podlabel-"
 	CIDRPrefix           string = "cidr-"
 	NestedLabelPrefix    string = "nestedlabel-"
+	EmptySetPrefix       string = "empty-"
 
 	NegationPrefix string = "not-"
 

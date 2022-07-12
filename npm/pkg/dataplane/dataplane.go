@@ -29,8 +29,9 @@ type DataPlane struct {
 	ipsetMgr  *ipsets.IPSetManager
 	networkID string
 	nodeName  string
+	// endpointCache stores all endpoints of the network (including off-node)
 	// Key is PodIP
-	endpointCache  map[string]*NPMEndpoint
+	endpointCache  map[string]*npmEndpoint
 	ioShim         *common.IOShim
 	updatePodCache map[string]*updateNPMPod
 	// pendingPolicies includes the policy keys of policies which may
@@ -39,24 +40,17 @@ type DataPlane struct {
 	stopChannel     <-chan struct{}
 }
 
-// TODO this struct could be made unexported
-type NPMEndpoint struct {
-	Name   string
-	ID     string
-	IP     string
-	PodKey string
-	// Map with Key as Network Policy name to to emulate set
-	// and value as struct{} for minimal memory consumption
-	NetPolReference map[string]struct{}
-}
-
 func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChannel <-chan struct{}) (*DataPlane, error) {
 	metrics.InitializeAll()
+	if util.IsWindowsDP() {
+		klog.Infof("[DataPlane] enabling AddEmptySetToLists for Windows")
+		cfg.IPSetManagerCfg.AddEmptySetToLists = true
+	}
 	dp := &DataPlane{
 		Config:          cfg,
 		policyMgr:       policies.NewPolicyManager(ioShim, cfg.PolicyManagerCfg),
 		ipsetMgr:        ipsets.NewIPSetManager(cfg.IPSetManagerCfg, ioShim),
-		endpointCache:   make(map[string]*NPMEndpoint),
+		endpointCache:   make(map[string]*npmEndpoint),
 		nodeName:        nodeName,
 		ioShim:          ioShim,
 		updatePodCache:  make(map[string]*updateNPMPod),
@@ -128,7 +122,7 @@ func (dp *DataPlane) AddToSets(setNames []*ipsets.IPSetMetadata, podMetadata *Po
 	if dp.shouldUpdatePod() {
 		klog.Infof("[DataPlane] Updating Sets to Add for pod key %s", podMetadata.PodKey)
 		if _, ok := dp.updatePodCache[podMetadata.PodKey]; !ok {
-			klog.Infof("[DataPlane] {AddToSet} pod key %s not found creating a new obj", podMetadata.PodKey)
+			klog.Infof("[DataPlane] {AddToSet} pod key %s not found in updatePodCache. creating a new obj", podMetadata.PodKey)
 			dp.updatePodCache[podMetadata.PodKey] = newUpdateNPMPod(podMetadata)
 		}
 
@@ -149,7 +143,7 @@ func (dp *DataPlane) RemoveFromSets(setNames []*ipsets.IPSetMetadata, podMetadat
 	if dp.shouldUpdatePod() {
 		klog.Infof("[DataPlane] Updating Sets to Remove for pod key %s", podMetadata.PodKey)
 		if _, ok := dp.updatePodCache[podMetadata.PodKey]; !ok {
-			klog.Infof("[DataPlane] {RemoveFromSet} pod key %s not found creating a new obj", podMetadata.PodKey)
+			klog.Infof("[DataPlane] {RemoveFromSet} pod key %s not found in updatePodCache. creating a new obj", podMetadata.PodKey)
 			dp.updatePodCache[podMetadata.PodKey] = newUpdateNPMPod(podMetadata)
 		}
 
@@ -223,6 +217,8 @@ func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 		return fmt.Errorf("[DataPlane] error while adding Rule IPSet references: %w", err)
 	}
 
+	// NOTE: if apply dataplane succeeds, but another area fails, then currently,
+	// netpol controller won't cache the netpol, and the IPSets applied will remain in the kernel since they will have a netpol reference
 	err = dp.ApplyDataPlane()
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while applying dataplane: %w", err)
@@ -301,7 +297,7 @@ func (dp *DataPlane) UpdatePolicy(policy *policies.NPMNetworkPolicy) error {
 	return nil
 }
 
-func (dp *DataPlane) GetAllIPSets() []string {
+func (dp *DataPlane) GetAllIPSets() map[string]string {
 	return dp.ipsetMgr.GetAllIPSets()
 }
 
