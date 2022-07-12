@@ -149,7 +149,7 @@ func (client *OVSEndpointClient) AddEndpointRules(epInfo *EndpointInfo) error {
 		return err
 	}
 
-	return AddSnatEndpointRules(client)
+	return AddSnatEndpointRules(client, epInfo)
 }
 
 func (client *OVSEndpointClient) DeleteEndpointRules(ep *endpoint) {

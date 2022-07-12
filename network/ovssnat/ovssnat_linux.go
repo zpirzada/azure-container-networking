@@ -9,6 +9,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/ebtables"
 	"github.com/Azure/azure-container-networking/iptables"
 	"github.com/Azure/azure-container-networking/log"
@@ -165,7 +166,7 @@ func getNCLocalAndGatewayIP(client *OVSSnatClient) (net.IP, net.IP) {
 /**
 	This function adds iptables rules that allows only host to NC communication and not the other way
 **/
-func (client *OVSSnatClient) AllowInboundFromHostToNC() error {
+func (client *OVSSnatClient) AllowInboundFromHostToNC(aclPolicies []cns.ValidAclPolicySetting) error {
 	bridgeIP, containerIP := getNCLocalAndGatewayIP(client)
 
 	// Create CNI Ouptut chain
@@ -180,12 +181,14 @@ func (client *OVSSnatClient) AllowInboundFromHostToNC() error {
 		return newErrorOVSSnatClient(err.Error())
 	}
 
-	// Allow connection from Host to NC
-	matchCondition := fmt.Sprintf("-s %s -d %s", bridgeIP.String(), containerIP.String())
-	err := iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.CNIOutputChain, matchCondition, iptables.Accept)
-	if err != nil {
-		log.Printf("AllowInboundFromHostToNC: Inserting output rule failed: %v", err)
-		return newErrorOVSSnatClient(err.Error())
+	if len(aclPolicies) > 0 {
+		if err := client.AllowInboundFromHostToNCWithPolicies(bridgeIP, containerIP, aclPolicies); err != nil {
+			return err
+		}
+	} else {
+		if err := client.AllowInboundFromHostToNCDefault(bridgeIP, containerIP); err != nil {
+			return err
+		}
 	}
 
 	// Create cniinput chain
@@ -201,8 +204,8 @@ func (client *OVSSnatClient) AllowInboundFromHostToNC() error {
 	}
 
 	// Accept packets from NC only if established connection
-	matchCondition = fmt.Sprintf(" -i %s -m state --state %s,%s", SnatBridgeName, iptables.Established, iptables.Related)
-	err = iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.CNIInputChain, matchCondition, iptables.Accept)
+	matchCondition := fmt.Sprintf(" -i %s -m state --state %s,%s", SnatBridgeName, iptables.Established, iptables.Related)
+	err := iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.CNIInputChain, matchCondition, iptables.Accept)
 	if err != nil {
 		log.Printf("AllowInboundFromHostToNC: Inserting input rule failed: %v", err)
 		return newErrorOVSSnatClient(err.Error())
@@ -216,6 +219,52 @@ func (client *OVSSnatClient) AllowInboundFromHostToNC() error {
 	if err != nil {
 		log.Printf("AllowInboundFromHostToNC: Error adding static arp entry for ip %s mac %s: %v", containerIP, snatContainerVeth.HardwareAddr.String(), err)
 		return newErrorOVSSnatClient(err.Error())
+	}
+
+	return nil
+}
+
+func (client *OVSSnatClient) AllowInboundFromHostToNCDefault(bridgeIP, containerIP net.IP) error {
+	// Allow connection from Host to NC IP address
+	// this says match where the source IP is the below Host bridge IP
+	// and match where the destination is the containers APIPA IP
+	matchCondition := fmt.Sprintf("-s %s -d %s", bridgeIP.String(), containerIP.String())
+	err := iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.CNIInputChain, matchCondition, iptables.Accept)
+	if err != nil {
+		log.Printf("AllowInboundFromHostToNC: Inserting output rule failed: %v", err)
+		return newErrorOVSSnatClient(err.Error())
+	}
+
+	return nil
+}
+
+func (client *OVSSnatClient) AllowInboundFromNCToHostDefault(bridgeIP, containerIP net.IP) error {
+	// Allow connection from Host to NC IP address
+	// this says match where the source IP is the containers APIPA IP
+	// and match where the destination is the Host bridge IP
+	matchCondition := fmt.Sprintf("-s %s -d %s", containerIP.String(), bridgeIP.String())
+	err := iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.CNIInputChain, matchCondition, iptables.Accept)
+	if err != nil {
+		log.Printf("AllowInboundFromNcToHost: Inserting output rule failed: %v", err)
+		return newErrorOVSSnatClient(err.Error())
+	}
+
+	return nil
+}
+
+func (client *OVSSnatClient) AllowInboundFromHostToNCWithPolicies(bridgeIP, containerIP net.IP, aclPolicies []cns.ValidAclPolicySetting) error {
+	// Allow connection from Host to NC IP address with port/protocol provided in NC's ACLPolicy
+	// this says match where the source IP is the below Host bridge IP
+	// and match where the destination is the containers APIPA IP
+	for _, policy := range aclPolicies {
+		if policy.Direction == cns.DirectionTypeIn && policy.RemoteAddresses == "{NetworkContainerIP}" {
+			matchCondition := fmt.Sprintf("-p %s --dport %s -s %s -d %s", policy.Protocols, policy.RemotePorts, bridgeIP.String(), containerIP.String())
+			err := iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.CNIInputChain, matchCondition, iptables.Accept)
+			if err != nil {
+				log.Printf("AllowInboundFromHostToNCWithPolicy: Inserting output rule failed: %v", err)
+				return newErrorOVSSnatClient(err.Error())
+			}
+		}
 	}
 
 	return nil
@@ -241,49 +290,69 @@ func (client *OVSSnatClient) DeleteInboundFromHostToNC() error {
 	return err
 }
 
+func (client *OVSSnatClient) AllowInboundFromNCToHostWithPolicies(bridgeIP, containerIP net.IP, aclPolicies []cns.ValidAclPolicySetting) error {
+	// Allow connection from NC to HOST IP address with port/protocol provided in NC's ACLPolicy
+	// this says match where the source IP is the containers APIPA IP
+	// and match where the destination is the HOST APIPA IP
+	for _, policy := range aclPolicies {
+		if policy.Direction == cns.DirectionTypeIn && policy.RemoteAddresses == "{HostApipaIP}" {
+			matchCondition := fmt.Sprintf("-p %s --dport %s -s %s -d %s", policy.Protocols, policy.RemotePorts, containerIP.String(), bridgeIP.String())
+			err := iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.CNIInputChain, matchCondition, iptables.Accept)
+			if err != nil {
+				log.Printf("AllowInboundFromNCToHostWithPolicy: Inserting output rule failed: %v", err)
+				return newErrorOVSSnatClient(err.Error())
+			}
+		}
+	}
+
+	return nil
+}
+
 /**
 	This function adds iptables rules that allows only NC to Host communication and not the other way
 **/
-func (client *OVSSnatClient) AllowInboundFromNCToHost() error {
+func (client *OVSSnatClient) AllowInboundFromNCToHost(aclPolicies []cns.ValidAclPolicySetting) error {
 	bridgeIP, containerIP := getNCLocalAndGatewayIP(client)
 
 	// Create CNI Input chain
 	if err := iptables.CreateChain(iptables.V4, iptables.Filter, iptables.CNIInputChain); err != nil {
-		log.Printf("AllowInboundFromHostToNC: Creating %v failed with error: %v", iptables.CNIInputChain, err)
+		log.Printf("AllowInboundFromNCToHost: Creating %v failed with error: %v", iptables.CNIInputChain, err)
 		return err
 	}
 
 	// Forward traffic from Input to cniinput chain
 	if err := iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.Input, "", iptables.CNIInputChain); err != nil {
-		log.Printf("AllowInboundFromHostToNC: Inserting forward rule to %v failed with error: %v", iptables.CNIInputChain, err)
+		log.Printf("AllowInboundFromNCToHost: Inserting forward rule to %v failed with error: %v", iptables.CNIInputChain, err)
 		return err
 	}
 
-	// Allow NC to Host connection
-	matchCondition := fmt.Sprintf("-s %s -d %s", containerIP.String(), bridgeIP.String())
-	err := iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.CNIInputChain, matchCondition, iptables.Accept)
-	if err != nil {
-		log.Printf("AllowInboundFromHostToNC: Inserting output rule failed: %v", err)
-		return err
+	if len(aclPolicies) > 0 {
+		if err := client.AllowInboundFromNCToHostWithPolicies(bridgeIP, containerIP, aclPolicies); err != nil {
+			return err
+		}
+	} else {
+		if err := client.AllowInboundFromNCToHostDefault(bridgeIP, containerIP); err != nil {
+			return err
+		}
 	}
 
 	// Create CNI output chain
 	if err := iptables.CreateChain(iptables.V4, iptables.Filter, iptables.CNIOutputChain); err != nil {
-		log.Printf("AllowInboundFromHostToNC: Creating %v failed with error: %v", iptables.CNIOutputChain, err)
+		log.Printf("AllowInboundFromNCToHost: Creating %v failed with error: %v", iptables.CNIOutputChain, err)
 		return err
 	}
 
 	// Forward traffic from Output to CNI Output chain
 	if err := iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.Output, "", iptables.CNIOutputChain); err != nil {
-		log.Printf("AllowInboundFromHostToNC: Inserting forward rule to %v failed with error: %v", iptables.CNIOutputChain, err)
+		log.Printf("AllowInboundFromNCToHost: Inserting forward rule to %v failed with error: %v", iptables.CNIOutputChain, err)
 		return err
 	}
 
 	// Accept packets from Host only if established connection
-	matchCondition = fmt.Sprintf(" -o %s -m state --state %s,%s", SnatBridgeName, iptables.Established, iptables.Related)
-	err = iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.CNIOutputChain, matchCondition, iptables.Accept)
+	matchCondition := fmt.Sprintf(" -o %s -m state --state %s,%s", SnatBridgeName, iptables.Established, iptables.Related)
+	err := iptables.InsertIptableRule(iptables.V4, iptables.Filter, iptables.CNIOutputChain, matchCondition, iptables.Accept)
 	if err != nil {
-		log.Printf("AllowInboundFromHostToNC: Inserting input rule failed: %v", err)
+		log.Printf("AllowInboundFromNCToHost: Inserting input rule failed: %v", err)
 		return err
 	}
 

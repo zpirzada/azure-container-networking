@@ -1,7 +1,10 @@
 package network
 
 import (
+	"encoding/json"
 	"fmt"
+
+	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/network/networkutils"
 	"github.com/Azure/azure-container-networking/network/ovssnat"
 )
@@ -34,7 +37,7 @@ func AddSnatEndpoint(client *OVSEndpointClient) error {
 	return nil
 }
 
-func AddSnatEndpointRules(client *OVSEndpointClient,epInfo *EndpointInfo) error {
+func AddSnatEndpointRules(client *OVSEndpointClient, epInfo *EndpointInfo) error {
 	if client.enableSnatOnHost || client.allowInboundFromHostToNC || client.allowInboundFromNCToHost || client.enableSnatForDns {
 
 		// Allow specific Private IPs via Snat Bridge
@@ -57,23 +60,27 @@ func AddSnatEndpointRules(client *OVSEndpointClient,epInfo *EndpointInfo) error 
 			return err
 		}
 
-		if client.allowInboundFromHostToNC {
-
-			if epInfo.NetworkContainerEndpointPolicies != nil && len(epInfo.NetworkContainerEndpointPolicies) > 0 {
-				for _, policy := range epInfo.NetworkContainerEndpointPolicies {
-					if policy.Type == "ACL" {
-						// block all addresses
+		aclPolicies := make([]cns.ValidAclPolicySetting, 0)
+		if epInfo.NetworkContainerEndpointPolicies != nil && len(epInfo.NetworkContainerEndpointPolicies) > 0 {
+			for _, policy := range epInfo.NetworkContainerEndpointPolicies {
+				if policy.Type == cns.ACLPolicyType {
+					var requestedAclPolicy cns.ValidAclPolicySetting
+					if err := json.Unmarshal(policy.Settings, &requestedAclPolicy); err != nil {
+						return err
 					}
+					aclPolicies = append(aclPolicies, requestedAclPolicy)
 				}
 			}
+		}
 
-			if err := client.snatClient.AllowInboundFromHostToNC(); err != nil {
+		if client.allowInboundFromHostToNC {
+			if err := client.snatClient.AllowInboundFromHostToNC(aclPolicies); err != nil {
 				return err
 			}
 		}
 
 		if client.allowInboundFromNCToHost {
-			return client.snatClient.AllowInboundFromNCToHost()
+			return client.snatClient.AllowInboundFromNCToHost(aclPolicies)
 		}
 	}
 

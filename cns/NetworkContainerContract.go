@@ -3,7 +3,6 @@ package cns
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
 	"net"
 	"strconv"
 	"strings"
@@ -369,7 +368,7 @@ type GetNetworkContainerResponse struct {
 	Response                   Response
 	AllowHostToNCCommunication bool
 	AllowNCToHostCommunication bool
-	EndpointPolicies 		   []NetworkContainerRequestPolicies
+	EndpointPolicies           []NetworkContainerRequestPolicies
 }
 
 // DeleteNetworkContainerRequest specifies the details about the request to delete a specifc network container.
@@ -531,13 +530,14 @@ const (
 	ActionTypeBlock  string = "Block"
 	DirectionTypeIn  string = "In"
 	DirectionTypeOut string = "Out"
+	ACLPolicyType    string = "ACLPolicy"
 )
 
 // Validate - Validates network container request policies
 func (networkContainerRequestPolicy *NetworkContainerRequestPolicies) Validate() error {
 	// validate ACL policy
 	if networkContainerRequestPolicy != nil {
-		if strings.EqualFold(networkContainerRequestPolicy.Type, "ACLPolicy") && strings.EqualFold(networkContainerRequestPolicy.EndpointType, "APIPA") {
+		if strings.EqualFold(networkContainerRequestPolicy.Type, ACLPolicyType) && strings.EqualFold(networkContainerRequestPolicy.EndpointType, "APIPA") {
 			var requestedAclPolicy ValidAclPolicySetting
 			if err := json.Unmarshal(networkContainerRequestPolicy.Settings, &requestedAclPolicy); err != nil {
 				return fmt.Errorf("ACL policy failed to pass validation with error: %+v ", err)

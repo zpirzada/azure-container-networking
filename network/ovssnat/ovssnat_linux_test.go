@@ -46,11 +46,11 @@ func TestAllowInboundFromHostToNC(t *testing.T) {
 		t.Errorf("Error adding dummy interface %v", err)
 	}
 
-	if err := client.AllowInboundFromHostToNC(); err != nil {
+	if err := client.AllowInboundFromHostToNC(nil); err != nil {
 		t.Errorf("Error adding inbound rule: %v", err)
 	}
 
-	if err := client.AllowInboundFromHostToNC(); err != nil {
+	if err := client.AllowInboundFromHostToNC(nil); err != nil {
 		t.Errorf("Error adding existing inbound rule: %v", err)
 	}
 
@@ -93,11 +93,11 @@ func TestAllowInboundFromNCToHost(t *testing.T) {
 		t.Errorf("Error adding dummy interface %v", err)
 	}
 
-	if err := client.AllowInboundFromNCToHost(); err != nil {
+	if err := client.AllowInboundFromNCToHost(nil); err != nil {
 		t.Errorf("Error adding inbound rule: %v", err)
 	}
 
-	if err := client.AllowInboundFromNCToHost(); err != nil {
+	if err := client.AllowInboundFromNCToHost(nil); err != nil {
 		t.Errorf("Error adding existing inbound rule: %v", err)
 	}
 
