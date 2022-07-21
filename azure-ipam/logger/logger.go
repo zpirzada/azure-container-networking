@@ -28,9 +28,11 @@ func New(cfg *Config) (*zap.Logger, func(), error) {
 	loggerCfg.OutputPaths = getLogOutputPath(cfg.OutputPaths)
 	loggerCfg.ErrorOutputPaths = getErrOutputPath(cfg.ErrorOutputPaths)
 	loggerCfg.EncoderConfig = zapcore.EncoderConfig{
+		TimeKey:     "time",
 		MessageKey:  "msg",
 		LevelKey:    "level",
 		EncodeLevel: zapcore.LowercaseLevelEncoder,
+		EncodeTime:  zapcore.ISO8601TimeEncoder,
 	}
 
 	logger, err := loggerCfg.Build()

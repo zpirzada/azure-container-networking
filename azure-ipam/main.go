@@ -21,11 +21,11 @@ func main() {
 
 func executePlugin() error {
 	// logger config
-	var loggerCfg *logger.Config
-	loggerCfg.Level = "debug"
-	loggerCfg.OutputPaths = "stdout"
-	loggerCfg.ErrorOutputPaths = "stderr"
-
+	loggerCfg := &logger.Config{
+		Level:            "debug",
+		OutputPaths:      "var/log/azure-ipam.log",
+		ErrorOutputPaths: "var/log/azure-ipam.log",
+	}
 	// Create logger
 	pluginLogger, cleanup, err := logger.New(loggerCfg)
 	if err != nil {
@@ -48,5 +48,11 @@ func executePlugin() error {
 	}
 
 	// Execute CNI plugin
-	return skel.PluginMainWithError(plugin.CmdAdd, plugin.CmdCheck, plugin.CmdDel, version.All, bv.BuildString(pluginName))
+	cniErr := skel.PluginMainWithError(plugin.CmdAdd, plugin.CmdCheck, plugin.CmdDel, version.All, bv.BuildString(pluginName))
+	if cniErr != nil {
+		cniErr.Print()
+		return cniErr
+	}
+
+	return nil
 }
