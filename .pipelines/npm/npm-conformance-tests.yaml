@@ -107,15 +107,18 @@ jobs:
         ws22-1:
           AZURE_CLUSTER: "conf-ws22-1"
           PROFILE: "v2-default"
-          IS_STRESS_TEST: "false"
         ws22-2:
           AZURE_CLUSTER: "conf-ws22-2"
           PROFILE: "v2-default"
-          IS_STRESS_TEST: "false"
-        # ws22-3:
-        #   AZURE_CLUSTER: "conf-ws22-3"
-        #   PROFILE: "v2-default"
-        #   IS_STRESS_TEST: "false"
+        ws22-3:
+          AZURE_CLUSTER: "conf-ws22-3"
+          PROFILE: "v2-default"
+        ws22-4:
+          AZURE_CLUSTER: "conf-ws22-4"
+          PROFILE: "v2-default"
+        ws22-5:
+          AZURE_CLUSTER: "conf-ws22-5"
+          PROFILE: "v2-default"
     pool:
       name: $(BUILD_POOL_NAME_DEFAULT)
       demands:
@@ -230,23 +233,16 @@ jobs:
           sleep 180
 
           echo 'all pods status to start'
-          ./kubectl get pod -A -owide
+          ./kubectl --kubeconfig=./kubeconfig get pod -A -owide
           echo 'all pod resources to start'
-          ./kubectl top pod -A
+          ./kubectl --kubeconfig=./kubeconfig top pod -A
           echo 'all node resources to start'
-          ./kubectl top node
+          ./kubectl --kubeconfig=./kubeconfig top node
 
           ## create the output folder and include the kubeconfig there
           npmLogsFolder=$(System.DefaultWorkingDirectory)/npmLogs_$(AZURE_CLUSTER)
           mkdir -p $npmLogsFolder
           cp ./kubeconfig $npmLogsFolder/kubeconfig
-
-          ## write to all NPM pod logs in the background (do this in the background instead of after to make sure the logs aren't truncated)
-          npmPodList=`kubectl --kubeconfig=./kubeconfig get pods -n kube-system | grep npm | awk '{print $1}'`
-          echo "Found NPM pods: $npmPodList"
-          for npmPod in $npmPodList; do
-              ./kubectl --kubeconfig=./kubeconfig logs -n kube-system $npmPod -f > $npmLogsFolder/$npmPod-logs.txt &
-          done
 
           ## Run all Conformance tests in the background
           echo $FQDN
@@ -256,43 +252,23 @@ jobs:
               # there can't be a command after e2e.test because the exit code is important
           }
 
-          exitCode=0
-          if [ $(IS_STRESS_TEST) == "true" ]; then
-              echo "Running $NUM_PARALLEL_JOBS_FOR_STRESS_TEST conformance tests at once and writing outputs to files"
-              declare -a conformancePIDs
-              for round in $(seq 1 $NUM_PARALLEL_JOBS_FOR_STRESS_TEST); do
-                  # for each iteration, run the conformance test and echos in the background, and write the output of the conformance test to a file
-                  echo "starting conformance test #$round" && \
-                      runConformance > $npmLogsFolder/conformance-results-$round && \
-                      echo "finished conformance test #$round" &
-                  pidOfConformanceTest=$!
-                  conformancePIDs+=($pidOfConformanceTest)
-              done
-
-              # wait until all conformance tests finish and take note of any failed tests
-              for round in $(seq 1 $NUM_PARALLEL_JOBS_FOR_STRESS_TEST); do
-                  i=$((round-1))
-                  wait ${conformancePIDs[$i]}
-                  exitCode=$?
-                  if [ $exitCode != 0 ]; then
-                      echo "conformance test #$round failed"
-                      break
-                  fi
-              done
-          else
-            # run the conformance test in the foreground and write the output to stdout and a file
-            runConformance > $npmLogsFolder/conformance-results
-            exitCode=$?
-          fi
-          # kill the background processes (the logs) that have this process' pid (i.e. $$) as a parent
-          pkill -P $$
+          # run the conformance test and write the output to stdout and a file
+          runConformance > $npmLogsFolder/conformance-results
+          exitCode=$?
 
           echo 'all pods status at end'
-          ./kubectl get pod -A -owide
+          ./kubectl --kubeconfig=./kubeconfig get pod -A -owide
           echo 'all pod resources at end'
-          ./kubectl top pod -A
+          ./kubectl --kubeconfig=./kubeconfig top pod -A
           echo 'all node resources at end'
-          ./kubectl top node
+          ./kubectl --kubeconfig=./kubeconfig top node
+
+          # capture logs after
+          npmPodList=`kubectl --kubeconfig=./kubeconfig get pods -n kube-system | grep npm | awk '{print $1}'`
+          echo "Found NPM pods: $npmPodList"
+          for npmPod in $npmPodList; do
+              ./kubectl --kubeconfig=./kubeconfig logs -n kube-system $npmPod -f > $npmLogsFolder/$npmPod-logs.txt
+          done
 
           exit $exitCode
         displayName: "Run Test Suite and Get Logs"
