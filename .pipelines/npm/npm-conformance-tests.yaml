@@ -264,13 +264,15 @@ jobs:
           wrongK8sVersion="Netpol API"
           toSkip="\[LinuxOnly\]|$nomatch1|$nomatch2|$nomatch3|$nomatch4|$cidrExcept1|$cidrExcept2|$namedPorts|$wrongK8sVersion|SCTP"
           runConformance () {
-              ./e2e.test --provider=local --allowed-not-ready-nodes=1 --kubeconfig=$KC --node-os-distro=windows --ginkgo.skip="$toSkip" --ginkgo.focus="NetworkPolicy"  
+              $(Pipeline.Workspace)/Test/e2e.test --provider=local --allowed-not-ready-nodes=1 --kubeconfig=$KC --node-os-distro=windows --ginkgo.skip="$toSkip" --ginkgo.focus="NetworkPolicy" --delete-namespace=false
               # there can't be a command after e2e.test because the exit code is important
           }
 
           # run the conformance test and write the output to stdout and a file
+          echo "STARTING conformance"
           runConformance > $npmLogsFolder/conformance-results
           exitCode=$?
+          echo "FINISHED conformance"
 
           echo 'all pods status at end'
           ./kubectl --kubeconfig=./kubeconfig get pod -A -owide
@@ -283,7 +285,7 @@ jobs:
           npmPodList=`kubectl --kubeconfig=./kubeconfig get pods -n kube-system | grep npm | awk '{print $1}'`
           echo "Found NPM pods: $npmPodList"
           for npmPod in $npmPodList; do
-              ./kubectl --kubeconfig=./kubeconfig logs -n kube-system $npmPod -f > $npmLogsFolder/$npmPod-logs.txt
+              ./kubectl --kubeconfig=./kubeconfig logs -n kube-system $npmPod > $npmLogsFolder/$npmPod-logs.txt
           done
 
           exit $exitCode
