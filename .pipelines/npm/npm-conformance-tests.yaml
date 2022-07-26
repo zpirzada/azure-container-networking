@@ -150,7 +150,7 @@ jobs:
                   --name awin22 \
                   --os-type Windows \
                   --os-sku Windows2022 \
-                  --node-vm-size Standard_D4s_v3 \
+                  --node-vm-size Standard_D2_v2 \
                   --node-count 3
             else
               echo "Creating Linux Cluster"; 
