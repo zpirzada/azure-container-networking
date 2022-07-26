@@ -8,4 +8,4 @@ $server = "server: $cpEndpoint"
 (Get-Content $env:CONTAINER_SANDBOX_MOUNT_POINT\kubeconfigtemplate.yaml).
     replace("<ca>", $caBase64).
     replace("<server>", $server.Trim()).
-    replace("<token>", $token) | Set-Content $env:CONTAINER_SANDBOX_MOUNT_POINT\kubeconfig -Force
+    replace("<token>", $token) | Set-Content C:\k\kubeconfig -Force
