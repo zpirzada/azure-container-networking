@@ -264,7 +264,7 @@ jobs:
           wrongK8sVersion="Netpol API"
           toSkip="\[LinuxOnly\]|$nomatch1|$nomatch2|$nomatch3|$nomatch4|$cidrExcept1|$cidrExcept2|$namedPorts|$wrongK8sVersion|SCTP"
           runConformance () {
-              $(Pipeline.Workspace)/Test/e2e.test --provider=local --allowed-not-ready-nodes=1 --kubeconfig=$KC --node-os-distro=windows --ginkgo.skip="$toSkip" --ginkgo.focus="NetworkPolicy" --delete-namespace=false
+              $(Pipeline.Workspace)/Test/e2e.test --provider=local --allowed-not-ready-nodes=1 --kubeconfig=./kubeconfig --node-os-distro=windows --ginkgo.skip="$toSkip" --ginkgo.focus="NetworkPolicy" --delete-namespace=false
               # there can't be a command after e2e.test because the exit code is important
           }
 
