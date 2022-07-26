@@ -132,7 +132,7 @@ jobs:
                   --network-plugin azure \
                   --vm-set-type VirtualMachineScaleSets \
                   --kubernetes-version v1.23 \
-                  --node-vm-size Standard_D4s_v3 \
+                  --node-vm-size Standard_D2_v2 \
                   --node-count 1
 
               # don't schedule anything on the linux system pool
@@ -150,7 +150,7 @@ jobs:
                   --name awin22 \
                   --os-type Windows \
                   --os-sku Windows2022 \
-                  --node-vm-size Standard_D4s_v3 \
+                  --node-vm-size Standard_D2_v2 \
                   --node-count 3
             else
               echo "Creating Linux Cluster"; 
@@ -258,8 +258,7 @@ jobs:
       demands:
         - agent.os -equals Linux
         - Role -equals Build
-    dependsOn:
-      [Create_Cluster_and_Run_Test, setup]
+    dependsOn: [Create_Cluster_and_Run_Test, setup]
     variables:
       RESOURCE_GROUP: $[ dependencies.setup.outputs['EnvironmentalVariables.RESOURCE_GROUP'] ]
     steps:
