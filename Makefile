@@ -31,6 +31,7 @@ endif
 
 # Build directories.
 REPO_ROOT = $(shell git rev-parse --show-toplevel)
+AZURE_IPAM_DIR = $(REPO_ROOT)/azure-ipam
 CNM_DIR = $(REPO_ROOT)/cnm/plugin
 CNI_NET_DIR = $(REPO_ROOT)/cni/network/plugin
 CNI_IPAM_DIR = $(REPO_ROOT)/cni/ipam/plugin
@@ -41,6 +42,7 @@ CNS_DIR = $(REPO_ROOT)/cns/service
 NPM_DIR = $(REPO_ROOT)/npm/cmd
 OUTPUT_DIR = $(REPO_ROOT)/output
 BUILD_DIR = $(OUTPUT_DIR)/$(GOOS)_$(GOARCH)
+AUZRE_IPAM_BUILD_DIR = $(BUILD_DIR)/azure-ipam
 IMAGE_DIR  = $(OUTPUT_DIR)/images
 CNM_BUILD_DIR = $(BUILD_DIR)/cnm
 CNI_BUILD_DIR = $(BUILD_DIR)/cni
@@ -121,6 +123,9 @@ azure-npm: azure-npm-binary npm-archive
 
 ##@ Binaries 
 
+# Build the delegated IPAM plugin binary.
+azure-ipam-binary:
+	cd $(AZURE_IPAM_DIR) && CGO_ENABLED=0 go build -v -o $(AUZRE_IPAM_BUILD_DIR)/azure-ipam$(EXE_EXT) -ldflags "-X main.version=$(VERSION)" -gcflags="-dwarflocationlists=true"
 # Build the Azure CNM binary.
 cnm-binary:
 	cd $(CNM_DIR) && CGO_ENABLED=0 go build -v -o $(CNM_BUILD_DIR)/azure-vnet-plugin$(EXE_EXT) -ldflags "-X main.version=$(VERSION)" -gcflags="-dwarflocationlists=true"
