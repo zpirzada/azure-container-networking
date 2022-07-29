@@ -26,7 +26,7 @@ jobs:
           mkdir -p '$(GOBIN)'
           mkdir -p '$(GOPATH)/pkg'
           BUILD_NUMBER=$(Build.BuildNumber)
-          RG=conf-$(echo "npm-`date "+%Y-%m-%d-%S"`")
+          RG=conf-$(echo "npm-`date "+%Y-%m-%d-%M-%S"`")
           TAG=$(make version)-conformance-test
           echo "Resource group: $RG"
           echo "Image tag: $TAG"
@@ -224,7 +224,7 @@ jobs:
                   --name awin22 \
                   --os-type Windows \
                   --os-sku Windows2022 \
-                  --node-vm-size Standard_DS2_v2 \
+                  --node-vm-size Standard_DS3_v2 \
                   --node-count 3 \
                   --max-pods 120
             else
