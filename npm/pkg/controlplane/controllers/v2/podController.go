@@ -92,7 +92,13 @@ func (c *PodController) needSync(eventType string, obj interface{}) (string, boo
 		return key, needSync
 	}
 
-	if !hasValidPodIP(podObj) {
+	if !hasValidPodIP(podObj) { // podObj.Status.Phase == corev1.PodFailed) {
+		// TODO: ensure it is in failed state when has status Error and no IP
+		conditionsStrings := make([]string, len(podObj.Status.Conditions))
+		for i, condition := range podObj.Status.Conditions {
+			conditionsStrings[i] = fmt.Sprintf("[%+v]", condition)
+		}
+		klog.Infof("DEBUGME: Pod %s/%s has no IP. status: %v. conditions: %+v", podObj.Namespace, podObj.Name, podObj.Status.Phase, conditionsStrings)
 		return key, needSync
 	}
 
