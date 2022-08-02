@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/netio"
 	"github.com/Azure/azure-container-networking/netlink"
+	"github.com/Azure/azure-container-networking/netns"
 	"github.com/Azure/azure-container-networking/network/networkutils"
 	"github.com/Azure/azure-container-networking/ovsctl"
 	"github.com/Azure/azure-container-networking/platform"
@@ -89,21 +90,42 @@ func (nw *network) newEndpointImpl(_ apipaClient, nl netlink.NetlinkInterface, p
 	}
 
 	if vlanid != 0 {
-		log.Printf("OVS client")
-		if _, ok := epInfo.Data[SnatBridgeIPKey]; ok {
-			nw.SnatBridgeIP = epInfo.Data[SnatBridgeIPKey].(string)
-		}
+		if nw.Mode == opModeNative {
+			log.Printf("Native client")
+			vlanVethName := fmt.Sprintf("%s.%d", nw.extIf.Name, vlanid)
+			vnetNSName := fmt.Sprintf("az_ns_%d", vlanid)
 
-		epClient = NewOVSEndpointClient(
-			nw,
-			epInfo,
-			hostIfName,
-			contIfName,
-			vlanid,
-			localIP,
-			nl,
-			ovsctl.NewOvsctl(),
-			plc)
+			epClient = &NativeEndpointClient{
+				primaryHostIfName: nw.extIf.Name,
+				vlanIfName:        vlanVethName,
+				vnetVethName:      hostIfName,
+				containerVethName: contIfName,
+				vnetNSName:        vnetNSName,
+				nw:                nw,
+				vlanID:            vlanid,
+				netnsClient:       netns.New(),
+				netlink:           nl,
+				netioshim:         &netio.NetIO{},
+				plClient:          plc,
+				netUtilsClient:    networkutils.NewNetworkUtils(nl, plc),
+			}
+		} else {
+			log.Printf("OVS client")
+			if _, ok := epInfo.Data[SnatBridgeIPKey]; ok {
+				nw.SnatBridgeIP = epInfo.Data[SnatBridgeIPKey].(string)
+			}
+
+			epClient = NewOVSEndpointClient(
+				nw,
+				epInfo,
+				hostIfName,
+				contIfName,
+				vlanid,
+				localIP,
+				nl,
+				ovsctl.NewOvsctl(),
+				plc)
+		}
 	} else if nw.Mode != opModeTransparent {
 		log.Printf("Bridge client")
 		epClient = NewLinuxBridgeEndpointClient(nw.extIf, hostIfName, contIfName, nw.Mode, nl, plc)
@@ -239,7 +261,28 @@ func (nw *network) deleteEndpointImpl(nl netlink.NetlinkInterface, plc platform.
 	// entering the container netns and hence works both for CNI and CNM.
 	if ep.VlanID != 0 {
 		epInfo := ep.getInfo()
-		epClient = NewOVSEndpointClient(nw, epInfo, ep.HostIfName, "", ep.VlanID, ep.LocalIP, nl, ovsctl.NewOvsctl(), plc)
+		if nw.Mode == opModeNative {
+			log.Printf("Native client")
+			vlanVethName := fmt.Sprintf("%s.%d", nw.extIf.Name, ep.VlanID)
+			vnetNSName := fmt.Sprintf("az_ns_%d", ep.VlanID)
+
+			epClient = &NativeEndpointClient{
+				primaryHostIfName: nw.extIf.Name,
+				vlanIfName:        vlanVethName,
+				vnetVethName:      ep.HostIfName,
+				containerVethName: "",
+				vnetNSName:        vnetNSName,
+				nw:                nw,
+				vlanID:            ep.VlanID,
+				netnsClient:       netns.New(),
+				netlink:           nl,
+				netioshim:         &netio.NetIO{},
+				plClient:          plc,
+				netUtilsClient:    networkutils.NewNetworkUtils(nl, plc),
+			}
+		} else {
+			epClient = NewOVSEndpointClient(nw, epInfo, ep.HostIfName, "", ep.VlanID, ep.LocalIP, nl, ovsctl.NewOvsctl(), plc)
+		}
 	} else if nw.Mode != opModeTransparent {
 		epClient = NewLinuxBridgeEndpointClient(nw.extIf, ep.HostIfName, "", nw.Mode, nl, plc)
 	} else {

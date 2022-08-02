@@ -18,6 +18,7 @@ const (
 	opModeBridge      = "bridge"
 	opModeTunnel      = "tunnel"
 	opModeTransparent = "transparent"
+	opModeNative      = "native"
 	opModeDefault     = opModeTunnel
 )
 

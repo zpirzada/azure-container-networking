@@ -88,6 +88,9 @@ func (nm *networkManager) newNetworkImpl(nwInfo *NetworkInfo, extIf *externalInt
 				return nil, fmt.Errorf("Ipv6 forwarding failed: %w", err)
 			}
 		}
+	case opModeNative:
+		log.Printf("Native mode")
+		ifName = extIf.Name
 	default:
 		return nil, errNetworkModeInvalid
 	}
