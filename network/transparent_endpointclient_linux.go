@@ -53,7 +53,6 @@ func NewTransparentEndpointClient(
 	nl netlink.NetlinkInterface,
 	plc platform.ExecClient,
 ) *TransparentEndpointClient {
-
 	client := &TransparentEndpointClient{
 		bridgeName:        extIf.BridgeName,
 		hostPrimaryIfName: extIf.Name,

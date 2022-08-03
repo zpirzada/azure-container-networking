@@ -41,7 +41,6 @@ func NewLinuxBridgeEndpointClient(
 	nl netlink.NetlinkInterface,
 	plc platform.ExecClient,
 ) *LinuxBridgeEndpointClient {
-
 	client := &LinuxBridgeEndpointClient{
 		bridgeName:        extIf.BridgeName,
 		hostPrimaryIfName: extIf.Name,

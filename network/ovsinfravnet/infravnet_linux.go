@@ -75,8 +75,8 @@ func (client *OVSInfraVnetClient) CreateInfraVnetRules(
 	bridgeName string,
 	infraIP net.IPNet,
 	hostPrimaryMac string,
-	hostPort string) error {
-
+	hostPort string,
+) error {
 	ovs := ovsctl.NewOvsctl()
 
 	infraContainerPort, err := ovs.GetOVSPortNumber(client.hostInfraVethName)
@@ -132,8 +132,8 @@ func (client *OVSInfraVnetClient) ConfigureInfraVnetContainerInterface(infraIP n
 func (client *OVSInfraVnetClient) DeleteInfraVnetRules(
 	bridgeName string,
 	infraIP net.IPNet,
-	hostPort string) {
-
+	hostPort string,
+) {
 	ovs := ovsctl.NewOvsctl()
 
 	log.Printf("[ovs] Deleting MAC DNAT rule for infravnet IP address %v", infraIP.IP.String())
