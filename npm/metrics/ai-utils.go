@@ -83,7 +83,11 @@ func SendMetric(metric aitelemetry.Metric) {
 
 // SendLog sends log
 func SendLog(operationID int, msg string, printLog bool) {
-	msg = fmt.Sprintf("%s - (NPM v%d)", msg, npmVersion)
+	osName := "linux"
+	if util.IsWindowsDP() {
+		osName = "windows"
+	}
+	msg = fmt.Sprintf("%s - (NPM v%d) - (%s)", msg, npmVersion, osName)
 	report := aitelemetry.Report{
 		Message:          msg,
 		Context:          strconv.Itoa(operationID),
