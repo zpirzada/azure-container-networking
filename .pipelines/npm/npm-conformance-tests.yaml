@@ -67,93 +67,93 @@ jobs:
         ws22-1:
           AZURE_CLUSTER: "conf-ws22-1"
           PROFILE: "v2-default"
-        ws22-2:
-          AZURE_CLUSTER: "conf-ws22-2"
-          PROFILE: "v2-default"
-        ws22-3:
-          AZURE_CLUSTER: "conf-ws22-3"
-          PROFILE: "v2-default"
-        ws22-4:
-          AZURE_CLUSTER: "conf-ws22-4"
-          PROFILE: "v2-default"
-        ws22-5:
-          AZURE_CLUSTER: "conf-ws22-5"
-          PROFILE: "v2-default"
-        ws22-6:
-          AZURE_CLUSTER: "conf-ws22-6"
-          PROFILE: "v2-default"
-        ws22-7:
-          AZURE_CLUSTER: "conf-ws22-7"
-          PROFILE: "v2-default"
-        ws22-8:
-          AZURE_CLUSTER: "conf-ws22-8"
-          PROFILE: "v2-default"
-        ws22-9:
-          AZURE_CLUSTER: "conf-ws22-9"
-          PROFILE: "v2-default"
-        ws22-10:
-          AZURE_CLUSTER: "conf-ws22-10"
-          PROFILE: "v2-default"
-        ws22-11:
-          AZURE_CLUSTER: "conf-ws22-11"
-          PROFILE: "v2-default"
-        ws22-12:
-          AZURE_CLUSTER: "conf-ws22-12"
-          PROFILE: "v2-default"
-        ws22-13:
-          AZURE_CLUSTER: "conf-ws22-13"
-          PROFILE: "v2-default"
-        ws22-14:
-          AZURE_CLUSTER: "conf-ws22-14"
-          PROFILE: "v2-default"
-        ws22-15:
-          AZURE_CLUSTER: "conf-ws22-15"
-          PROFILE: "v2-default"
-        ws22-16:
-          AZURE_CLUSTER: "conf-ws22-16"
-          PROFILE: "v2-default"
-        ws22-17:
-          AZURE_CLUSTER: "conf-ws22-17"
-          PROFILE: "v2-default"
-        ws22-18:
-          AZURE_CLUSTER: "conf-ws22-18"
-          PROFILE: "v2-default"
-        ws22-19:
-          AZURE_CLUSTER: "conf-ws22-19"
-          PROFILE: "v2-default"
-        ws22-20:
-          AZURE_CLUSTER: "conf-ws22-20"
-          PROFILE: "v2-default"
-        ws22-21:
-          AZURE_CLUSTER: "conf-ws22-21"
-          PROFILE: "v2-default"
-        ws22-22:
-          AZURE_CLUSTER: "conf-ws22-22"
-          PROFILE: "v2-default"
-        ws22-23:
-          AZURE_CLUSTER: "conf-ws22-23"
-          PROFILE: "v2-default"
-        ws22-24:
-          AZURE_CLUSTER: "conf-ws22-24"
-          PROFILE: "v2-default"
-        ws22-25:
-          AZURE_CLUSTER: "conf-ws22-25"
-          PROFILE: "v2-default"
-        ws22-26:
-          AZURE_CLUSTER: "conf-ws22-26"
-          PROFILE: "v2-default"
-        ws22-27:
-          AZURE_CLUSTER: "conf-ws22-27"
-          PROFILE: "v2-default"
-        ws22-28:
-          AZURE_CLUSTER: "conf-ws22-28"
-          PROFILE: "v2-default"
-        ws22-29:
-          AZURE_CLUSTER: "conf-ws22-29"
-          PROFILE: "v2-default"
-        ws22-30:
-          AZURE_CLUSTER: "conf-ws22-30"
-          PROFILE: "v2-default"
+        # ws22-2:
+        #   AZURE_CLUSTER: "conf-ws22-2"
+        #   PROFILE: "v2-default"
+        # ws22-3:
+        #   AZURE_CLUSTER: "conf-ws22-3"
+        #   PROFILE: "v2-default"
+        # ws22-4:
+        #   AZURE_CLUSTER: "conf-ws22-4"
+        #   PROFILE: "v2-default"
+        # ws22-5:
+        #   AZURE_CLUSTER: "conf-ws22-5"
+        #   PROFILE: "v2-default"
+        # ws22-6:
+        #   AZURE_CLUSTER: "conf-ws22-6"
+        #   PROFILE: "v2-default"
+        # ws22-7:
+        #   AZURE_CLUSTER: "conf-ws22-7"
+        #   PROFILE: "v2-default"
+        # ws22-8:
+        #   AZURE_CLUSTER: "conf-ws22-8"
+        #   PROFILE: "v2-default"
+        # ws22-9:
+        #   AZURE_CLUSTER: "conf-ws22-9"
+        #   PROFILE: "v2-default"
+        # ws22-10:
+        #   AZURE_CLUSTER: "conf-ws22-10"
+        #   PROFILE: "v2-default"
+        # ws22-11:
+        #   AZURE_CLUSTER: "conf-ws22-11"
+        #   PROFILE: "v2-default"
+        # ws22-12:
+        #   AZURE_CLUSTER: "conf-ws22-12"
+        #   PROFILE: "v2-default"
+        # ws22-13:
+        #   AZURE_CLUSTER: "conf-ws22-13"
+        #   PROFILE: "v2-default"
+        # ws22-14:
+        #   AZURE_CLUSTER: "conf-ws22-14"
+        #   PROFILE: "v2-default"
+        # ws22-15:
+        #   AZURE_CLUSTER: "conf-ws22-15"
+        #   PROFILE: "v2-default"
+        # ws22-16:
+        #   AZURE_CLUSTER: "conf-ws22-16"
+        #   PROFILE: "v2-default"
+        # ws22-17:
+        #   AZURE_CLUSTER: "conf-ws22-17"
+        #   PROFILE: "v2-default"
+        # ws22-18:
+        #   AZURE_CLUSTER: "conf-ws22-18"
+        #   PROFILE: "v2-default"
+        # ws22-19:
+        #   AZURE_CLUSTER: "conf-ws22-19"
+        #   PROFILE: "v2-default"
+        # ws22-20:
+        #   AZURE_CLUSTER: "conf-ws22-20"
+        #   PROFILE: "v2-default"
+        # ws22-21:
+        #   AZURE_CLUSTER: "conf-ws22-21"
+        #   PROFILE: "v2-default"
+        # ws22-22:
+        #   AZURE_CLUSTER: "conf-ws22-22"
+        #   PROFILE: "v2-default"
+        # ws22-23:
+        #   AZURE_CLUSTER: "conf-ws22-23"
+        #   PROFILE: "v2-default"
+        # ws22-24:
+        #   AZURE_CLUSTER: "conf-ws22-24"
+        #   PROFILE: "v2-default"
+        # ws22-25:
+        #   AZURE_CLUSTER: "conf-ws22-25"
+        #   PROFILE: "v2-default"
+        # ws22-26:
+        #   AZURE_CLUSTER: "conf-ws22-26"
+        #   PROFILE: "v2-default"
+        # ws22-27:
+        #   AZURE_CLUSTER: "conf-ws22-27"
+        #   PROFILE: "v2-default"
+        # ws22-28:
+        #   AZURE_CLUSTER: "conf-ws22-28"
+        #   PROFILE: "v2-default"
+        # ws22-29:
+        #   AZURE_CLUSTER: "conf-ws22-29"
+        #   PROFILE: "v2-default"
+        # ws22-30:
+        #   AZURE_CLUSTER: "conf-ws22-30"
+        #   PROFILE: "v2-default"
     pool:
       name: $(BUILD_POOL_NAME_DEFAULT)
       demands:
@@ -224,7 +224,7 @@ jobs:
                   --name awin22 \
                   --os-type Windows \
                   --os-sku Windows2022 \
-                  --node-vm-size Standard_DS3_v2 \
+                  --node-vm-size Standard_DS2_v2 \
                   --node-count 3 \
                   --max-pods 120
             else
@@ -251,9 +251,12 @@ jobs:
 
             # deploy azure-npm
             ./kubectl --kubeconfig=./kubeconfig apply -f https://raw.githubusercontent.com/Azure/azure-container-networking/master/npm/azure-npm.yaml
+            npmImage=acnpublic.azurecr.io/azure-npm:v1.4.28-44-g5a0b057f # https://github.com/Azure/azure-container-networking/pull/1503 @ 9:27 8/8
+            ./kubectl --kubeconfig=./kubeconfig set image daemonset/azure-npm -n kube-system azure-npm=$npmImage
 
             # deploy azure-npm-win
             ./kubectl --kubeconfig=./kubeconfig apply -f https://raw.githubusercontent.com/Azure/azure-container-networking/master/npm/examples/windows/azure-npm.yaml
+            ./kubectl --kubeconfig=./kubeconfig set image daemonset/azure-npm-win -n kube-system azure-npm=$npmImage
 
             # swap NPM profile with one specified as parameter
             ./kubectl --kubeconfig=./kubeconfig apply -f https://raw.githubusercontent.com/Azure/azure-container-networking/master/npm/profiles/$(PROFILE).yaml
