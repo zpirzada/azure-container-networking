@@ -251,7 +251,7 @@ jobs:
 
             # deploy azure-npm
             ./kubectl --kubeconfig=./kubeconfig apply -f https://raw.githubusercontent.com/Azure/azure-container-networking/master/npm/azure-npm.yaml
-            npmImage=acnpublic.azurecr.io/azure-npm:v1.4.28-44-g5a0b057f # https://github.com/Azure/azure-container-networking/pull/1503 @ 9:27 8/8
+            npmImage=acnpublic.azurecr.io/azure-npm:v1.4.30-8-g7fe2c540 # same PR @1:09 8/16 # v1.4.28-44-g5a0b057f # https://github.com/Azure/azure-container-networking/pull/1503 @ 9:27 8/8
             ./kubectl --kubeconfig=./kubeconfig set image daemonset/azure-npm -n kube-system azure-npm=$npmImage
 
             # deploy azure-npm-win
