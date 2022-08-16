@@ -352,6 +352,7 @@ func (c *PodController) syncPod(key string) error {
 	*/
 	if pod.Status.PodIP == "" {
 		if npmPodExists {
+			klog.Infof("[syncPod] cleaning up cached, non-complete pod with empty IP. pod: %s", key)
 			operationKind = metrics.DeleteOp
 			if err = c.cleanUpDeletedPod(key); err != nil {
 				return fmt.Errorf("error: clean up failed when pod is running with empty IP. err: %w", err)
