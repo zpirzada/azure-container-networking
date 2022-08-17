@@ -105,9 +105,8 @@ func (c *PodController) needSync(eventType string, obj interface{}) (string, boo
 	if !hasValidPodIP(podObj) {
 		if eventType == addEvent {
 			return key, needSync
-		} else {
-			op = metrics.UpdateWithEmptyIPOp
 		}
+		op = metrics.UpdateWithEmptyIPOp
 	}
 
 	if isHostNetworkPod(podObj) {
@@ -122,7 +121,7 @@ func (c *PodController) needSync(eventType string, obj interface{}) (string, boo
 		return key, needSync
 	}
 
-	metrics.IncPodEventCount(op)
+	metrics.IncPodEventTotal(op)
 	needSync = true
 	return key, needSync
 }

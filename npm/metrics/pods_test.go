@@ -14,11 +14,11 @@ func TestRecordControllerPodExecTime(t *testing.T) {
 	})
 }
 
-func TestIncPodEventCount(t *testing.T) {
+func TestIncPodEventTotal(t *testing.T) {
 	InitializeAll()
-	for _, op := range []OperationKind{CreateOp} { //, UpdateOp, DeleteOp, UpdateWithEmptyIPOp} {
-		IncPodEventCount(op)
-		val, err := getPodEventCount(op)
+	for _, op := range []OperationKind{CreateOp, UpdateOp, DeleteOp, UpdateWithEmptyIPOp} {
+		IncPodEventTotal(op)
+		val, err := getPodEventTotal(op)
 		promutil.NotifyIfErrors(t, err)
 		require.Equal(t, 1, val, "expected metric count to be incremented for op: %s", op)
 	}

@@ -14,14 +14,14 @@ func GetControllerPodExecCount(op OperationKind, hadError bool) (int, error) {
 	return getCountVecValue(controllerPodExecTime, getCRUDExecTimeLabels(op, hadError))
 }
 
-func IncPodEventCount(op OperationKind) {
-	podEventCount.With(getPodEventCountLabels(op)).Inc()
+func IncPodEventTotal(op OperationKind) {
+	podEventCount.With(getPodEventTotalLabels(op)).Inc()
 }
 
-func getPodEventCount(op OperationKind) (int, error) {
-	return getCounterVecValue(podEventCount, getPodEventCountLabels(op))
+func getPodEventTotal(op OperationKind) (int, error) {
+	return getTotalVecValue(podEventCount, getPodEventTotalLabels(op))
 }
 
-func getPodEventCountLabels(op OperationKind) prometheus.Labels {
+func getPodEventTotalLabels(op OperationKind) prometheus.Labels {
 	return prometheus.Labels{operationLabel: string(op)}
 }

@@ -62,8 +62,8 @@ const (
 	delta99th      float64 = 0.001
 
 	// controller workqueue metrics
-	podEventCountName = "pod_event_count"
-	podEventCountHelp = "The total number of pod events ever added to the controller workqueue"
+	podEventTotalName = "pod_event_total"
+	podEventTotalHelp = "The total number of pod events ever added to the controller workqueue"
 )
 
 // Gauge metrics have the methods Inc(), Dec(), and Set(float64)
@@ -99,7 +99,7 @@ var (
 
 	// controller workqueue metrics
 	podEventCount       *prometheus.CounterVec
-	podEventCountLabels = []string{operationLabel}
+	podEventTotalLabels = []string{operationLabel}
 )
 
 type RegistryType string
@@ -272,11 +272,11 @@ func newPodEventCount() *prometheus.CounterVec {
 		prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: controllerPrefix,
-			Name:      podEventCountName,
-			Help:      podEventCountHelp,
+			Name:      podEventTotalName,
+			Help:      podEventTotalHelp,
 		},
-		podEventCountLabels,
+		podEventTotalLabels,
 	)
-	register(counter, podEventCountName, ClusterMetrics)
+	register(counter, podEventTotalName, ClusterMetrics)
 	return counter
 }
