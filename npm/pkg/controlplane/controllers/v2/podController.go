@@ -42,8 +42,6 @@ type PodController struct {
 	workqueue workqueue.RateLimitingInterface
 	dp        dataplane.GenericDataplane
 	podMap    map[string]*common.NpmPod // Key is <nsname>/<podname>
-	// ipMap maps IP to pod key. It is relevant to the block comment in syncPod
-	ipMap map[string]string
 	sync.RWMutex
 	npmNamespaceCache *NpmNamespaceCache
 }
@@ -54,7 +52,6 @@ func NewPodController(podInformer coreinformer.PodInformer, dp dataplane.Generic
 		workqueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "Pods"),
 		dp:                dp,
 		podMap:            make(map[string]*common.NpmPod),
-		ipMap:             make(map[string]string),
 		npmNamespaceCache: npmNamespaceCache,
 	}
 
@@ -85,10 +82,6 @@ func (c *PodController) LengthOfPodMap() int {
 }
 
 // needSync filters the event if the event is not required to handle
-// TODO allow sync for Running pods with empty IP if the pod exists in the pod cache?
-// This would reduce member count in kernel, and allow us to delete ipsets that reference the pod's old IP.
-// Might not be worth it since customers likely don't want to use clusters that are so memory-constrained that
-// many of their pods are stuck in Error state with this Running but empty IP state.
 func (c *PodController) needSync(eventType string, obj interface{}) (string, bool) {
 	needSync := false
 	var key string
@@ -334,36 +327,6 @@ func (c *PodController) syncPod(key string) error {
 		}
 	}
 
-	/*
-		Sometimes in Windows Server '22 nodes, pods will enter and remain in an Error state, where the Pod is running but has an empty IP.
-		Originally, the pod wasn't getting cleaned up (since it won't be completed), and the pod's old IP remained a part of the pod's old IPSets.
-		Any new pod that takes up the IP may have unexpected network policy behavior.
-
-		At this point, we could see a Running pod with an empty IP only if deletePod() enqueued it, yet the current pod is Running when we get it from podLister.
-
-		The old pod would have state similar to:
-			status: Running
-			IP: empty
-			conditions:
-			- [{Type:Initialized Status:True LastProbeTime:0001-01-01 00:00:00 +0000 UTC LastTransitionTime:2022-08-08 17:12:41 +0000 GMT Reason: Message:}]
-			- [{Type:Ready Status:False LastProbeTime:0001-01-01 00:00:00 +0000 UTC LastTransitionTime:2022-08-08 21:25:46 +0000 GMT Reason:ContainersNotReady ...}]
-			- [{Type:ContainersReady Status:False LastProbeTime:0001-01-01 00:00:00 +0000 UTC LastTransitionTime:2022-08-08 21:30:01 +0000 GMT Reason:ContainersNotReady ...}]
-			- [{Type:PodScheduled Status:True LastProbeTime:0001-01-01 00:00:00 +0000 UTC LastTransitionTime:2022-08-08 17:12:41 +0000 GMT Reason: Message:}]
-	*/
-	if pod.Status.PodIP == "" {
-		if npmPodExists {
-			klog.Infof("[syncPod] cleaning up cached, non-complete pod with empty IP. pod: %s", key)
-			operationKind = metrics.DeleteOp
-			if err = c.cleanUpDeletedPod(key); err != nil {
-				return fmt.Errorf("error: clean up failed when pod is running with empty IP. err: %w", err)
-			}
-			return nil
-		}
-
-		// ignore update if somehow the Pod doesn't exist in the cache
-		return nil
-	}
-
 	operationKind, err = c.syncAddAndUpdatePod(pod)
 	if err != nil {
 		return fmt.Errorf("failed to sync pod due to %w", err)
@@ -399,7 +362,6 @@ func (c *PodController) syncAddedPod(podObj *corev1.Pod) error {
 	// Create npmPod and add it to the podMap
 	npmPodObj := common.NewNpmPod(podObj)
 	c.podMap[podKey] = npmPodObj
-	c.ipMap[podObj.Status.PodIP] = podKey
 
 	// Get lists of podLabelKey and podLabelKey + podLavelValue ,and then start adding them to ipsets.
 	for labelKey, labelVal := range podObj.Labels {
@@ -432,15 +394,6 @@ func (c *PodController) syncAddedPod(podObj *corev1.Pod) error {
 func (c *PodController) syncAddAndUpdatePod(newPodObj *corev1.Pod) (metrics.OperationKind, error) {
 	var err error
 	podKey, _ := cache.MetaNamespaceKeyFunc(newPodObj)
-
-	oldPodKeyForIP := c.ipMap[newPodObj.Status.PodIP]
-	if oldPodKeyForIP != podKey {
-		klog.Infof("[syncAddAndUpdatePod] cleaning up old pod %s for IP %s", oldPodKeyForIP, newPodObj.Status.PodIP)
-		err = c.cleanUpDeletedPod(oldPodKeyForIP)
-		if err != nil {
-			return metrics.DeleteOp, fmt.Errorf("[syncAddAndUpdatePod] error: failed to clean up old pod %s for IP %s with err: %w", oldPodKeyForIP, newPodObj.Status.PodIP, err)
-		}
-	}
 
 	// lock before using nsMap since nsMap is shared with namespace controller
 	c.npmNamespaceCache.Lock()
@@ -613,11 +566,6 @@ func (c *PodController) cleanUpDeletedPod(cachedNpmPodKey string) error {
 	}
 
 	delete(c.podMap, cachedNpmPodKey)
-
-	podKey := c.ipMap[cachedNpmPod.PodIP]
-	if podKey == cachedNpmPodKey {
-		delete(c.ipMap, cachedNpmPod.PodIP)
-	}
 	return nil
 }
 
