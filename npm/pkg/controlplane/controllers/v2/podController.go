@@ -14,7 +14,6 @@ import (
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/util"
-	npmerrors "github.com/Azure/azure-container-networking/npm/util/errors"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,9 +32,19 @@ type NamedPortOperation string
 const (
 	deleteNamedPort NamedPortOperation = "del"
 	addNamedPort    NamedPortOperation = "add"
+
+	addEvent    string = "ADD"
+	updateEvent string = "UPDATE"
 )
 
-var kubeAllNamespaces = &ipsets.IPSetMetadata{Name: util.KubeAllNamespacesFlag, Type: ipsets.KeyLabelOfNamespace}
+var (
+	kubeAllNamespaces = &ipsets.IPSetMetadata{Name: util.KubeAllNamespacesFlag, Type: ipsets.KeyLabelOfNamespace}
+
+	eventOperations = map[string]metrics.OperationKind{
+		addEvent:    metrics.CreateOp,
+		updateEvent: metrics.UpdateOp,
+	}
+)
 
 type PodController struct {
 	podLister corelisters.PodLister
@@ -92,8 +101,13 @@ func (c *PodController) needSync(eventType string, obj interface{}) (string, boo
 		return key, needSync
 	}
 
+	op := eventOperations[eventType]
 	if !hasValidPodIP(podObj) {
-		return key, needSync
+		if eventType == addEvent {
+			return key, needSync
+		} else {
+			op = metrics.UpdateWithEmptyIPOp
+		}
 	}
 
 	if isHostNetworkPod(podObj) {
@@ -108,12 +122,13 @@ func (c *PodController) needSync(eventType string, obj interface{}) (string, boo
 		return key, needSync
 	}
 
+	metrics.IncPodEventCount(op)
 	needSync = true
 	return key, needSync
 }
 
 func (c *PodController) addPod(obj interface{}) {
-	key, needSync := c.needSync("ADD", obj)
+	key, needSync := c.needSync(addEvent, obj)
 	if !needSync {
 		return
 	}
@@ -129,7 +144,7 @@ func (c *PodController) addPod(obj interface{}) {
 }
 
 func (c *PodController) updatePod(old, newp interface{}) {
-	key, needSync := c.needSync("UPDATE", newp)
+	key, needSync := c.needSync(updateEvent, newp)
 	if !needSync {
 		return
 	}
@@ -340,10 +355,14 @@ func (c *PodController) syncAddedPod(podObj *corev1.Pod) error {
 		podObj.Name, podObj.Spec.NodeName, podObj.Labels, podObj.Status.PodIP)
 
 	if !util.IsIPV4(podObj.Status.PodIP) {
-		msg := fmt.Sprintf("[syncAddedPod] Error: ADD POD  [%s/%s/%s/%+v/%s] failed as the PodIP is not valid ipv4 address", podObj.Namespace,
+		msg := fmt.Sprintf("[syncAddedPod] Error: ADD POD  [%s/%s/%s/%+v] failed as the PodIP is not valid ipv4 address. ip: [%s]", podObj.Namespace,
 			podObj.Name, podObj.Spec.NodeName, podObj.Labels, podObj.Status.PodIP)
 		metrics.SendErrorLogAndMetric(util.PodID, msg)
-		return npmerrors.Errorf(npmerrors.AddPod, true, msg)
+		// return nil so that we don't requeue.
+		// Wait until an update event comes from API Server where the IP is valid e.g. if the IP is empty.
+		// There may be latency in receiving the update event versus retrying on our own,
+		// but this prevents us from retrying indefinitely for pods stuck in Running state with no IP as seen in AKS Windows Server '22.
+		return nil
 	}
 
 	var err error

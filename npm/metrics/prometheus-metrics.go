@@ -54,14 +54,16 @@ const (
 	namespaceExecTimeName           = "namespace_exec_time"
 	controllerNamespaceExecTimeHelp = "Execution time in milliseconds for adding/updating/deleting a namespace"
 
-	// TODO add health metrics
-
 	quantileMedian float64 = 0.5
 	deltaMedian    float64 = 0.05
 	quantile90th   float64 = 0.9
 	delta90th      float64 = 0.01
 	quantil99th    float64 = 0.99
 	delta99th      float64 = 0.001
+
+	// controller workqueue metrics
+	podEventCountName = "pod_event_count"
+	podEventCountHelp = "The total number of pod events ever added to the controller workqueue"
 )
 
 // Gauge metrics have the methods Inc(), Dec(), and Set(float64)
@@ -95,7 +97,9 @@ var (
 	controllerNamespaceExecTime *prometheus.SummaryVec
 	controllerExecTimeLabels    = []string{operationLabel, hadErrorLabel}
 
-	// TODO add health metrics
+	// controller workqueue metrics
+	podEventCount       *prometheus.CounterVec
+	podEventCountLabels = []string{operationLabel}
 )
 
 type RegistryType string
@@ -112,6 +116,8 @@ const (
 	UpdateOp OperationKind = "update"
 	DeleteOp OperationKind = "delete"
 	NoOp     OperationKind = "noop"
+	// UpdateWithEmptyIPOp is intended to be used for the PodEvent counter only
+	UpdateWithEmptyIPOp OperationKind = "update-with-empty-ip"
 )
 
 func (op OperationKind) isValid() bool {
@@ -128,14 +134,11 @@ func (op OperationKind) isValid() bool {
 // TODO consider refactoring the functionality of the metrics package into a "Metrics" struct with methods (this would require code changes throughout npm).
 // Would need to consider how it seems like you can't register a metric twice, even in a separate registry, so you couldn't throw away the Metrics struct and create a new one.
 func InitializeAll() {
-	// TODO introduce isFanOut parameter to determine when to create fan-out controller/daemon metrics
 	if haveInitialized {
 		klog.Infof("metrics have already been initialized")
 	} else {
 		initializeDaemonMetrics()
 		initializeControllerMetrics()
-		// TODO include dataplane health metrics:
-		// num failures for apply ipsets, updating policies, deleting policies, and running periodic policy tasks, etc.
 		log.Logf("Finished initializing all Prometheus metrics")
 		haveInitialized = true
 	}
@@ -177,7 +180,9 @@ func initializeDaemonMetrics() {
 func initializeControllerMetrics() {
 	// CLUSTER METRICS
 	numPolicies = createClusterGauge(numPoliciesName, numPoliciesHelp)
-	// TODO include health metrics: num failures for validating policies & ipsets
+
+	// controller workqueue metrics
+	podEventCount = newPodEventCount()
 
 	// NODE METRICS
 	addPolicyExecTime = createNodeSummaryVec(addPolicyExecTimeName, "", addPolicyExecTimeHelp, addPolicyExecTimeLabels)
@@ -260,4 +265,18 @@ func createNodeSummaryVec(name, subsystem, helpMessage string, labels []string) 
 
 func createControllerExecTimeSummaryVec(name, helpMessage string) *prometheus.SummaryVec {
 	return createNodeSummaryVec(name, controllerPrefix, helpMessage, controllerExecTimeLabels)
+}
+
+func newPodEventCount() *prometheus.CounterVec {
+	counter := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: controllerPrefix,
+			Name:      podEventCountName,
+			Help:      podEventCountHelp,
+		},
+		podEventCountLabels,
+	)
+	register(counter, podEventCountName, ClusterMetrics)
+	return counter
 }
