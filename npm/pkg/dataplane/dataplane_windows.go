@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
 	"github.com/Azure/azure-container-networking/npm/util"
 	npmerrors "github.com/Azure/azure-container-networking/npm/util/errors"
@@ -105,7 +106,7 @@ func (dp *DataPlane) shouldUpdatePod() bool {
 // 2. Will check for existing applicable network policies and applies it on endpoint
 func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 	klog.Infof("[DataPlane] updatePod called for Pod Key %s", pod.PodKey)
-	if pod.NodeName != dp.nodeName && !pod.MarkedforDelete {
+	if pod.NodeName != dp.nodeName && !pod.MarkedForDelete {
 		// Ignore updates if the pod is not part of this node.
 		// If the pod is marked for delete, then the pod is on the node if and only if the endpoint's pod key equals this pod key.
 		klog.Infof("[DataPlane] ignoring update pod as expected Node: [%s] got: [%s]. pod: [%s]", dp.nodeName, pod.NodeName, pod.PodKey)
@@ -137,12 +138,12 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 		// Updates to this pod would not occur. Pod IPs are expected to change on restart though.
 		// See: https://stackoverflow.com/questions/52362514/when-will-the-kubernetes-pod-ip-change
 		// If a pod does restart and take up its previous IP, then the pod can be deleted/restarted to mitigate this problem.
-		klog.Infof("ignoring pod update since pod with key %s is stale and likely was deleted for endpoint %s", pod.PodKey, endpoint.ID)
+		klog.Infof("ignoring pod update since pod with key %s is stale and likely was deleted for endpoint %s", pod.PodKey, endpoint.id)
 		return nil
 	}
 
 	// handle scenario where pod marked for delete
-	if pod.MarkedforDelete {
+	if pod.MarkedForDelete {
 		// From looking at logs, it seems most likely that HNS endpoints are always updated before we receive/process a pod deletion in the controller.
 		// Therefore, we should never (or at least rarely) try to delete policies off of an endpoint that is getting destroyed.
 		// Instead, if the pod is marked for delete, we would likely only reach this code path if we encounter the situation numbered above.
@@ -150,15 +151,15 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 			// If the pod is marked for delete, then the pod is on the node if and only if the endpoint's pod key equals this pod key.
 			klog.Infof(
 				"[DataPlane] ignoring update pod since pod is marked for delete and the pod isn't assigned to this endpoint. pod: %s. endpoint ID: %s. endpoint pod key: %s",
-				pod.PodKey, endpoint.ID, endpoint.PodKey)
+				pod.PodKey, endpoint.id, endpoint.podKey)
 			return nil
 		}
 
-		msg := fmt.Sprintf("[DataPlane] deleting pod and cleaning up policies from endpoint. pod: %s. endpoint: %s", pod.PodKey, endpoint.ID)
+		msg := fmt.Sprintf("[DataPlane] deleting pod and cleaning up policies from endpoint. pod: %s. endpoint: %s", pod.PodKey, endpoint.id)
 		metrics.SendLog(util.DaemonDataplaneID, msg, metrics.PrintLog)
 
 		endpoint.stalePodKey = &staleKey{
-			key:       ep.PodKey,
+			key:       endpoint.podKey,
 			timestamp: time.Now().Unix(),
 		}
 		endpoint.podKey = unspecifiedPodKey
@@ -167,7 +168,7 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 		if err := dp.policyMgr.ResetEndpoint(endpoint.id); err != nil {
 			klog.Infof("[DataPlane] resetting endpoint policies unsuccessful for pod marked for delete. endpoint ID: %s. pod key: %s", endpoint.id, pod.PodKey)
 		}
-		endpoint.netPolReference = make(map[string]string)
+		endpoint.netPolReference = make(map[string]struct{})
 
 		return nil
 	}
