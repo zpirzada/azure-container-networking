@@ -164,17 +164,10 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 		endpoint.podKey = unspecifiedPodKey
 
 		// remove all policies on the endpoint
-		for policyKey := range endpoint.netPolReference {
-			// Delete the network policy
-			endpointList := map[string]string{
-				endpoint.ip: endpoint.id,
-			}
-			err := dp.policyMgr.RemovePolicy(policyKey, endpointList)
-			if err != nil {
-				klog.Infof("[DataPlane] remove policy unsuccessful for pod marked for delete. policy key: %s. endpoint ID: %s. pod key: %s", policyKey, endpoint.id, pod.PodKey)
-			}
-			delete(endpoint.netPolReference, policyKey)
+		if err := dp.policyMgr.ResetEndpoint(endpoint.id); err != nil {
+			klog.Infof("[DataPlane] resetting endpoint policies unsuccessful for pod marked for delete. endpoint ID: %s. pod key: %s", endpoint.id, pod.PodKey)
 		}
+		endpoint.netPolReference = make(map[string]string)
 
 		return nil
 	}
