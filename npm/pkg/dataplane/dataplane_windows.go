@@ -20,7 +20,7 @@ const (
 
 var (
 	errPolicyModeUnsupported = errors.New("only IPSet policy mode is supported")
-	errMismanagedPodKey      = errors.New("the pod key was not managed correctly when refreshing pod endpoints")
+	errMismanagedPodKey      = errors.New("the endpoint corresponds to a different pod")
 )
 
 // initializeDataPlane will help gather network and endpoint details
@@ -105,9 +105,10 @@ func (dp *DataPlane) shouldUpdatePod() bool {
 // 2. Will check for existing applicable network policies and applies it on endpoint
 func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 	klog.Infof("[DataPlane] updatePod called for Pod Key %s", pod.PodKey)
-	// Check if pod is part of this node
-	if pod.NodeName != dp.nodeName {
-		klog.Infof("[DataPlane] ignoring update pod as expected Node: [%s] got: [%s]", dp.nodeName, pod.NodeName)
+	if pod.NodeName != dp.nodeName && !pod.markedForDelete {
+		// Ignore updates if the pod is not part of this node.
+		// If the pod is marked for delete, then the pod is on the node if and only if the endpoint's pod key equals this pod key.
+		klog.Infof("[DataPlane] ignoring update pod as expected Node: [%s] got: [%s]. pod: [%s]", dp.nodeName, pod.NodeName, pod.PodKey)
 		return nil
 	}
 
@@ -122,20 +123,57 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 	if !ok {
 		// ignore this err and pod endpoint will be deleted in ApplyDP
 		// if the endpoint is not found, it means the pod is not part of this node or pod got deleted.
-		klog.Warningf("[DataPlane] did not find endpoint with IPaddress %s", pod.PodIP)
+		klog.Warningf("[DataPlane] did not find endpoint with IPaddress %s for pod %s", pod.PodIP, pod.PodKey)
+		return nil
+	}
+
+	// While refreshing pod endpoints, newly discovered endpoints are given an unspecified pod key.
+	// Additionally, a pod key may be stale if the pod was wrongly assigned to the endpoint for this scenario:
+	// 1. pod A previously had IP i and EP x
+	// 2. pod A restarts w/ no ip AND NPM restarts AND pod B comes up with the same IP i and EP y
+	// 3. controller processes an update event for pod A with IP i before the update event for pod B with IP i, so pod A is wrongly assigned to EP y
+	if endpoint.isStalePodKey(pod.PodKey) {
+		// NOTE: if a pod restarts and takes up its previous IP, then its endpoint would be new and this branch would be taken.
+		// Updates to this pod would not occur. Pod IPs are expected to change on restart though.
+		// See: https://stackoverflow.com/questions/52362514/when-will-the-kubernetes-pod-ip-change
+		// If a pod does restart and take up its previous IP, then the pod can be deleted/restarted to mitigate this problem.
+		klog.Infof("ignoring pod update since pod with key %s is stale and likely was deleted for endpoint %s", pod.PodKey, endpoint.ID)
+		return nil
+	}
+
+	// handle scenario where pod marked for delete
+	if pod.markedForDelete {
+		// If the pod is marked for delete, then the pod is on the node if and only if the endpoint's pod key equals this pod key.
+		if endpoint.podKey != pod.PodKey {
+			klog.Infof(
+				"[DataPlane] ignoring update pod since pod is marked for delete and the pod isn't assigned to this endpoint. pod: %s. endpoint ID: %s. endpoint pod key: %s",
+				pod.PodKey, endpoint.ID, endpoint.PodKey)
+			return nil
+		}
+
+		endpoint.stalePodKey = &staleKey{
+			key:       ep.PodKey,
+			timestamp: time.Now().Unix(),
+		}
+		endpoint.podKey = unspecifiedPodKey
+
+		// remove all policies on the endpoint
+		for policyKey := range endpoint.netPolReference {
+			// Delete the network policy
+			endpointList := map[string]string{
+				endpoint.ip: endpoint.id,
+			}
+			err := dp.policyMgr.RemovePolicy(policyKey, endpointList)
+			if err != nil {
+				klog.Infof("[DataPlane] remove policy unsuccessful for pod marked for delete. policy key: %s. endpoint ID: %s. pod key: %s", policyKey, endpoint.id, pod.PodKey)
+			}
+			delete(endpoint.netPolReference, policyKey)
+		}
+
 		return nil
 	}
 
 	if endpoint.podKey == unspecifiedPodKey {
-		// while refreshing pod endpoints, newly discovered endpoints are given an unspecified pod key
-		if endpoint.isStalePodKey(pod.PodKey) {
-			// NOTE: if a pod restarts and takes up its previous IP, then its endpoint would be new and this branch would be taken.
-			// Updates to this pod would not occur. Pod IPs are expected to change on restart though.
-			// See: https://stackoverflow.com/questions/52362514/when-will-the-kubernetes-pod-ip-change
-			// If a pod does restart and take up its previous IP, then the pod can be deleted/restarted to mitigate this problem.
-			klog.Infof("ignoring pod update since pod with key %s is stale and likely was deleted", pod.PodKey)
-			return nil
-		}
 		endpoint.podKey = pod.PodKey
 	} else if pod.PodKey != endpoint.podKey {
 		return fmt.Errorf("pod key mismatch. Expected: %s, Actual: %s. Error: [%w]", pod.PodKey, endpoint.podKey, errMismanagedPodKey)
