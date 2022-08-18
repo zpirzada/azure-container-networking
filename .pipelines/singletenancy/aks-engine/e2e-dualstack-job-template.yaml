@@ -106,7 +106,7 @@ stages:
             - Role -equals Build
         steps:
           - bash: |
-              git clone https://github.com/kubernetes/kubernetes.git
+              git clone https://github.com/kubernetes/kubernetes.git --branch v1.24.3
               cd kubernetes
               export PATH=$PATH:/usr/local/go/bin/
               make WHAT=test/e2e/e2e.test
@@ -145,7 +145,7 @@ stages:
           displayName: "Run Test Suite"
         - task: AzureCLI@2
           displayName: "Delete Test Cluster Resource Group"
-          condition: always()
+          condition: succeeded()
           inputs:
             azureSubscription: $(BUILD_VALIDATIONS_SERVICE_CONNECTION)
             scriptType: 'bash'
