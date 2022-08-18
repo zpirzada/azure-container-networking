@@ -185,6 +185,7 @@ func (dp *DataPlane) ApplyDataPlane() error {
 	}
 
 	if dp.shouldUpdatePod() {
+		// lock
 		for podKey, pod := range dp.updatePodCache {
 			err := dp.updatePod(pod)
 			if err != nil {

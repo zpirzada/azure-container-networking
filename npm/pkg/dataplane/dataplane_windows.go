@@ -143,13 +143,19 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 
 	// handle scenario where pod marked for delete
 	if pod.markedForDelete {
-		// If the pod is marked for delete, then the pod is on the node if and only if the endpoint's pod key equals this pod key.
+		// From looking at logs, it seems most likely that HNS endpoints are always updated before we receive/process a pod deletion in the controller.
+		// Therefore, we should never (or at least rarely) try to delete policies off of an endpoint that is getting destroyed.
+		// Instead, if the pod is marked for delete, we would likely only reach this code path if we encounter the situation numbered above.
 		if endpoint.podKey != pod.PodKey {
+			// If the pod is marked for delete, then the pod is on the node if and only if the endpoint's pod key equals this pod key.
 			klog.Infof(
 				"[DataPlane] ignoring update pod since pod is marked for delete and the pod isn't assigned to this endpoint. pod: %s. endpoint ID: %s. endpoint pod key: %s",
 				pod.PodKey, endpoint.ID, endpoint.PodKey)
 			return nil
 		}
+
+		msg := fmt.Sprintf("[DataPlane] deleting pod and cleaning up policies from endpoint. pod: %s. endpoint: %s", pod.PodKey, endpoint.ID)
+		metrics.SendLog(util.DaemonDataplaneID, msg, metrics.PrintLog)
 
 		endpoint.stalePodKey = &staleKey{
 			key:       ep.PodKey,
