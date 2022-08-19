@@ -355,9 +355,9 @@ func (c *PodController) syncAddedPod(podObj *corev1.Pod) error {
 		podObj.Name, podObj.Spec.NodeName, podObj.Labels, podObj.Status.PodIP)
 
 	if !util.IsIPV4(podObj.Status.PodIP) {
-		msg := fmt.Sprintf("[syncAddedPod] Error: ADD POD  [%s/%s/%s/%+v] failed as the PodIP is not valid ipv4 address. ip: [%s]", podObj.Namespace,
+		msg := fmt.Sprintf("[syncAddedPod] warning: ADD POD  [%s/%s/%s/%+v] ignored as the PodIP is not valid ipv4 address. ip: [%s]", podObj.Namespace,
 			podObj.Name, podObj.Spec.NodeName, podObj.Labels, podObj.Status.PodIP)
-		metrics.SendErrorLogAndMetric(util.PodID, msg)
+		metrics.SendLog(util.PodID, msg, metrics.PrintLog)
 		// return nil so that we don't requeue.
 		// Wait until an update event comes from API Server where the IP is valid e.g. if the IP is empty.
 		// There may be latency in receiving the update event versus retrying on our own,

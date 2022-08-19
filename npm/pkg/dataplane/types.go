@@ -40,7 +40,7 @@ type PodMetadata struct {
 	PodKey          string
 	PodIP           string
 	NodeName        string
-	MarkedForDelete bool
+	markedForDelete bool
 }
 
 func NewPodMetadata(podKey, podIP, nodeName string) *PodMetadata {
@@ -48,14 +48,18 @@ func NewPodMetadata(podKey, podIP, nodeName string) *PodMetadata {
 		PodKey:          podKey,
 		PodIP:           podIP,
 		NodeName:        nodeName,
-		MarkedForDelete: false,
+		markedForDelete: false,
 	}
 }
 
 func NewPodMetadataMarkedForDelete(podKey, podIP, nodeName string) *PodMetadata {
 	pm := NewPodMetadata(podKey, podIP, nodeName)
-	pm.MarkedForDelete = true
+	pm.markedForDelete = true
 	return pm
+}
+
+func (pm *PodMetadata) isMarkedForDelete() bool {
+	return pm.markedForDelete
 }
 
 func newUpdateNPMPod(podMetadata *PodMetadata) *updateNPMPod {

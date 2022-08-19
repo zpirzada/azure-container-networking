@@ -103,10 +103,16 @@ func (dp *DataPlane) shouldUpdatePod() bool {
 
 // updatePod has two responsibilities in windows
 // 1. Will call into dataplane and updates endpoint references of this pod.
-// 2. Will check for existing applicable network policies and applies it on endpoint
+// 2. Will check for existing applicable network policies and applies it on endpoint.
+// Assumptions:
+// Not possible to know a pod's IP before endpoints are refreshed (i.e. IP has an endpoint ID switch means that the pod assigned to the first ID is dead)
 func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
+	if pod.isMarkedForDelete() {
+		return dp.updatePodForDelete(pod)
+	}
+
 	klog.Infof("[DataPlane] updatePod called for Pod Key %s", pod.PodKey)
-	if pod.NodeName != dp.nodeName && !pod.MarkedForDelete {
+	if pod.NodeName != dp.nodeName {
 		// Ignore updates if the pod is not part of this node.
 		// If the pod is marked for delete, then the pod is on the node if and only if the endpoint's pod key equals this pod key.
 		klog.Infof("[DataPlane] ignoring update pod as expected Node: [%s] got: [%s]. pod: [%s]", dp.nodeName, pod.NodeName, pod.PodKey)
@@ -129,47 +135,12 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 	}
 
 	// While refreshing pod endpoints, newly discovered endpoints are given an unspecified pod key.
-	// Additionally, a pod key may be stale if the pod was wrongly assigned to the endpoint for this scenario:
-	// 1. pod A previously had IP i and EP x
-	// 2. pod A restarts w/ no ip AND NPM restarts AND pod B comes up with the same IP i and EP y
-	// 3. controller processes an update event for pod A with IP i before the update event for pod B with IP i, so pod A is wrongly assigned to EP y
 	if endpoint.isStalePodKey(pod.PodKey) {
 		// NOTE: if a pod restarts and takes up its previous IP, then its endpoint would be new and this branch would be taken.
 		// Updates to this pod would not occur. Pod IPs are expected to change on restart though.
 		// See: https://stackoverflow.com/questions/52362514/when-will-the-kubernetes-pod-ip-change
 		// If a pod does restart and take up its previous IP, then the pod can be deleted/restarted to mitigate this problem.
-		klog.Infof("ignoring pod update since pod with key %s is stale and likely was deleted for endpoint %s", pod.PodKey, endpoint.id)
-		return nil
-	}
-
-	// handle scenario where pod marked for delete
-	if pod.MarkedForDelete {
-		// From looking at logs, it seems most likely that HNS endpoints are always updated before we receive/process a pod deletion in the controller.
-		// Therefore, we should never (or at least rarely) try to delete policies off of an endpoint that is getting destroyed.
-		// Instead, if the pod is marked for delete, we would likely only reach this code path if we encounter the situation numbered above.
-		if endpoint.podKey != pod.PodKey {
-			// If the pod is marked for delete, then the pod is on the node if and only if the endpoint's pod key equals this pod key.
-			klog.Infof(
-				"[DataPlane] ignoring update pod since pod is marked for delete and the pod isn't assigned to this endpoint. pod: %s. endpoint ID: %s. endpoint pod key: %s",
-				pod.PodKey, endpoint.id, endpoint.podKey)
-			return nil
-		}
-
-		msg := fmt.Sprintf("[DataPlane] deleting pod and cleaning up policies from endpoint. pod: %s. endpoint: %s", pod.PodKey, endpoint.id)
-		metrics.SendLog(util.DaemonDataplaneID, msg, metrics.PrintLog)
-
-		endpoint.stalePodKey = &staleKey{
-			key:       endpoint.podKey,
-			timestamp: time.Now().Unix(),
-		}
-		endpoint.podKey = unspecifiedPodKey
-
-		// remove all policies on the endpoint
-		if err := dp.policyMgr.ResetEndpoint(endpoint.id); err != nil {
-			klog.Infof("[DataPlane] resetting endpoint policies unsuccessful for pod marked for delete. endpoint ID: %s. pod key: %s", endpoint.id, pod.PodKey)
-		}
-		endpoint.netPolReference = make(map[string]struct{})
-
+		klog.Infof("[DataPlane] ignoring pod update since pod with key %s is stale and likely was deleted for endpoint %s", pod.PodKey, endpoint.id)
 		return nil
 	}
 
@@ -257,6 +228,94 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 	return nil
 }
 
+// updatePodForDelete resets the endpoint corresponding to the pod's IP.
+// This functionality is required for the edge case below.
+// Assumptions:
+// Not possible to know a pod's IP before endpoints are refreshed (i.e. IP has an endpoint ID switch means that the pod assigned to the first ID is dead)
+/*
+	Notes on the edge case in memory-starved Windows Server '22 where:
+	- pod A previously had IP and EP x
+	- around same time:
+		- pod A restarts
+		- NPM restarts
+		- pod B comes up with same IP and EP y
+	- controller events can be jumbled e.g. an update event for pod A w/ its old IP can happen before the pod B create event
+
+	To start, have a new EP with an unspecified pod key:
+	1. B --> A w/ IP --> A's cleanup:
+	- in updatePod(), proceed as usual for B
+	- in updatePod(), get a mismanaged err for A, which is good. Requeued in controller
+	- eventually, the pod will be cleaned up
+	- A's cleanup should be ignored in updatePodForDelete(), or else the controller will requeue
+	2. A w/ IP --> B comes up --> A's cleanup:
+	- in updatePod(), A's policies applied to EP
+	- in updatePod(), get a get a mismanaged err for B. Requeued in controller
+	- in updatePodForDelete(), A's cleanup triggers 1) policies removed and 2) endpoint marked unspecified with A stale
+	- on B retry, all ipsets are in the podupdatecache
+	- in updatePod(), proceed as usual for B
+	3. A w/ IP--> A's cleanup --> B comes up:
+	- in updatePod(), A's policies applied to EP
+	- in updatePodForDelete(), A's cleanup triggers 1) policies removed and 2) endpoint marked unspecified with A stale
+	- in updatePod(), proceed as usual for B
+
+	From looking at logs, it seems most likely that HNS endpoints are always updated before we receive/process a pod deletion in the controller.
+	Therefore, we should never (or at least rarely) try to delete policies off of an endpoint that is getting destroyed.
+	Instead, if the pod is marked for delete, we would likely only reach this code path if we encounter number 2 or 3.
+*/
+func (dp *DataPlane) updatePodForDelete(pod *updateNPMPod) error {
+	// No need to make compute-intensive refreshAllPodEndpoints() call.
+	// Instead, only get the HNS endpoint within ResetEndpoint().
+	// This function will handle the case where the endpoint doesn't exist anymore,
+	// and we will ignore the reset if the pod key is stale (the endpoint belongs to another pod),
+	// i.e. an updatePod() call came in for another Pod of the same IP.
+	klog.Infof("[DataPlane] updatePodForDelete called for Pod Key %s", pod.PodKey)
+
+	// Check if pod is already present in cache
+	endpoint, ok := dp.endpointCache[pod.PodIP]
+	if !ok {
+		// ignore this err and pod endpoint will be deleted in ApplyDP
+		// if the endpoint is not found, it means the pod is not part of this node or pod got deleted.
+		klog.Warningf("[DataPlane] for pod marked for delete, did not find endpoint with IPaddress %s for pod %s", pod.PodIP, pod.PodKey)
+		return nil
+	}
+
+	// While refreshing pod endpoints, newly discovered endpoints are given an unspecified pod key.
+	// In this code path, a pod key may be stale if the pod was wrongly assigned to the endpoint for this scenario:
+	// 1. pod A previously had IP i and EP x
+	// 2. pod A restarts w/ no ip AND NPM restarts AND pod B comes up with the same IP i and EP y
+	// 3. controller processes an update event for pod A with IP i before the update event for pod B with IP i, so pod A is wrongly assigned to EP y
+	if endpoint.isStalePodKey(pod.PodKey) {
+		// this check is technically covered by the podKey mismatch check below, assuming podKey can never equal staleKey
+		klog.Infof("[DataPlane] ignoring pod marked for delete since pod with key %s is stale and likely was deleted for endpoint %s", pod.PodKey, endpoint.id)
+		return nil
+	}
+
+	if endpoint.podKey != pod.PodKey {
+		// If the pod is marked for delete, then the pod is on the node if and only if the endpoint's pod key equals this pod key.
+		klog.Infof(
+			"[DataPlane] ignoring update pod since pod is marked for delete and the pod isn't assigned to this endpoint. pod: %s. endpoint ID: %s. endpoint pod key: %s",
+			pod.PodKey, endpoint.id, endpoint.podKey)
+		return nil
+	}
+
+	msg := fmt.Sprintf("[DataPlane] deleting pod and cleaning up policies from endpoint. pod: %s. endpoint: %s", pod.PodKey, endpoint.id)
+	metrics.SendLog(util.DaemonDataplaneID, msg, metrics.PrintLog)
+
+	endpoint.stalePodKey = &staleKey{
+		key:       endpoint.podKey,
+		timestamp: time.Now().Unix(),
+	}
+	endpoint.podKey = unspecifiedPodKey
+
+	// remove all policies on the endpoint
+	if err := dp.policyMgr.ResetEndpoint(endpoint.id); err != nil {
+		klog.Warningf("[DataPlane] warning: resetting endpoint policies unsuccessful for pod marked for delete. endpoint ID: %s. pod key: %s", endpoint.id, pod.PodKey)
+	}
+	endpoint.netPolReference = make(map[string]struct{})
+
+	return nil
+}
+
 func (dp *DataPlane) getSelectorIPSets(policy *policies.NPMNetworkPolicy) map[string]struct{} {
 	selectorIpSets := make(map[string]struct{})
 	for _, ipset := range policy.PodSelectorIPSets {
@@ -337,6 +396,7 @@ func (dp *DataPlane) refreshAllPodEndpoints() error {
 			npmEP := newNPMEndpoint(&endpoint)
 			if oldNPMEP.podKey == unspecifiedPodKey {
 				klog.Infof("updating endpoint cache since endpoint changed for IP which never had a pod key. new endpoint: %s, old endpoint: %s, ip: %s", npmEP.id, oldNPMEP.id, npmEP.ip)
+				npmEP.stalePodKey = oldNPMEP.stalePodKey
 				dp.endpointCache[ip] = npmEP
 			} else {
 				npmEP.stalePodKey = &staleKey{
