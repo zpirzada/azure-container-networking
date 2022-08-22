@@ -104,9 +104,11 @@ func (c *PodController) needSync(eventType string, obj interface{}) (string, boo
 
 	op := eventOperations[eventType]
 	if !hasValidPodIP(podObj) {
-		if eventType == addEvent {
+		if eventType == addEvent || podObj.Status.Phase != corev1.PodRunning {
 			return key, needSync
 		}
+		klog.Infof("[needSync] adding pod with empty IP. pod: [%+v]. status: [%+v]. conditions: [%+v]. podIPs: [%+v]. InitContainerStatuses: [%+v]. ContainerStatuses: [%+v]. EphemeralContainerStatuses: [%+v]",
+			podObj, podObj.Status, podObj.Status.Conditions, podObj.Status.PodIPs, podObj.Status.InitContainerStatuses, podObj.Status.ContainerStatuses, podObj.Status.EphemeralContainerStatuses)
 		op = metrics.UpdateWithEmptyIPOp
 	}
 
