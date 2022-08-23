@@ -67,63 +67,63 @@ jobs:
         ws22-1:
           AZURE_CLUSTER: "conf-ws22-1"
           PROFILE: "v2-default"
-        # ws22-2:
-        #   AZURE_CLUSTER: "conf-ws22-2"
-        #   PROFILE: "v2-default"
-        # ws22-3:
-        #   AZURE_CLUSTER: "conf-ws22-3"
-        #   PROFILE: "v2-default"
-        # ws22-4:
-        #   AZURE_CLUSTER: "conf-ws22-4"
-        #   PROFILE: "v2-default"
-        # ws22-5:
-        #   AZURE_CLUSTER: "conf-ws22-5"
-        #   PROFILE: "v2-default"
-        # ws22-6:
-        #   AZURE_CLUSTER: "conf-ws22-6"
-        #   PROFILE: "v2-default"
-        # ws22-7:
-        #   AZURE_CLUSTER: "conf-ws22-7"
-        #   PROFILE: "v2-default"
-        # ws22-8:
-        #   AZURE_CLUSTER: "conf-ws22-8"
-        #   PROFILE: "v2-default"
-        # ws22-9:
-        #   AZURE_CLUSTER: "conf-ws22-9"
-        #   PROFILE: "v2-default"
-        # ws22-10:
-        #   AZURE_CLUSTER: "conf-ws22-10"
-        #   PROFILE: "v2-default"
-        # ws22-11:
-        #   AZURE_CLUSTER: "conf-ws22-11"
-        #   PROFILE: "v2-default"
-        # ws22-12:
-        #   AZURE_CLUSTER: "conf-ws22-12"
-        #   PROFILE: "v2-default"
-        # ws22-13:
-        #   AZURE_CLUSTER: "conf-ws22-13"
-        #   PROFILE: "v2-default"
-        # ws22-14:
-        #   AZURE_CLUSTER: "conf-ws22-14"
-        #   PROFILE: "v2-default"
-        # ws22-15:
-        #   AZURE_CLUSTER: "conf-ws22-15"
-        #   PROFILE: "v2-default"
-        # ws22-16:
-        #   AZURE_CLUSTER: "conf-ws22-16"
-        #   PROFILE: "v2-default"
-        # ws22-17:
-        #   AZURE_CLUSTER: "conf-ws22-17"
-        #   PROFILE: "v2-default"
-        # ws22-18:
-        #   AZURE_CLUSTER: "conf-ws22-18"
-        #   PROFILE: "v2-default"
-        # ws22-19:
-        #   AZURE_CLUSTER: "conf-ws22-19"
-        #   PROFILE: "v2-default"
-        # ws22-20:
-        #   AZURE_CLUSTER: "conf-ws22-20"
-        #   PROFILE: "v2-default"
+        ws22-2:
+          AZURE_CLUSTER: "conf-ws22-2"
+          PROFILE: "v2-default"
+        ws22-3:
+          AZURE_CLUSTER: "conf-ws22-3"
+          PROFILE: "v2-default"
+        ws22-4:
+          AZURE_CLUSTER: "conf-ws22-4"
+          PROFILE: "v2-default"
+        ws22-5:
+          AZURE_CLUSTER: "conf-ws22-5"
+          PROFILE: "v2-default"
+        ws22-6:
+          AZURE_CLUSTER: "conf-ws22-6"
+          PROFILE: "v2-default"
+        ws22-7:
+          AZURE_CLUSTER: "conf-ws22-7"
+          PROFILE: "v2-default"
+        ws22-8:
+          AZURE_CLUSTER: "conf-ws22-8"
+          PROFILE: "v2-default"
+        ws22-9:
+          AZURE_CLUSTER: "conf-ws22-9"
+          PROFILE: "v2-default"
+        ws22-10:
+          AZURE_CLUSTER: "conf-ws22-10"
+          PROFILE: "v2-default"
+        ws22-11:
+          AZURE_CLUSTER: "conf-ws22-11"
+          PROFILE: "v2-default"
+        ws22-12:
+          AZURE_CLUSTER: "conf-ws22-12"
+          PROFILE: "v2-default"
+        ws22-13:
+          AZURE_CLUSTER: "conf-ws22-13"
+          PROFILE: "v2-default"
+        ws22-14:
+          AZURE_CLUSTER: "conf-ws22-14"
+          PROFILE: "v2-default"
+        ws22-15:
+          AZURE_CLUSTER: "conf-ws22-15"
+          PROFILE: "v2-default"
+        ws22-16:
+          AZURE_CLUSTER: "conf-ws22-16"
+          PROFILE: "v2-default"
+        ws22-17:
+          AZURE_CLUSTER: "conf-ws22-17"
+          PROFILE: "v2-default"
+        ws22-18:
+          AZURE_CLUSTER: "conf-ws22-18"
+          PROFILE: "v2-default"
+        ws22-19:
+          AZURE_CLUSTER: "conf-ws22-19"
+          PROFILE: "v2-default"
+        ws22-20:
+          AZURE_CLUSTER: "conf-ws22-20"
+          PROFILE: "v2-default"
         # ws22-21:
         #   AZURE_CLUSTER: "conf-ws22-21"
         #   PROFILE: "v2-default"
@@ -251,7 +251,7 @@ jobs:
 
             # deploy azure-npm
             ./kubectl --kubeconfig=./kubeconfig apply -f https://raw.githubusercontent.com/Azure/azure-container-networking/master/npm/azure-npm.yaml
-            npmImage=acnpublic.azurecr.io/azure-npm:v1.4.30-8-g7fe2c540 # same PR @1:09 8/16 # v1.4.28-44-g5a0b057f # https://github.com/Azure/azure-container-networking/pull/1503 @ 9:27 8/8
+            npmImage=acnpublic.azurecr.io/azure-npm:v1.4.32-20-gc56232eb # 1503 @5:41 8/22 # v1.4.30-8-g7fe2c540 # same PR @1:09 8/16 # v1.4.28-44-g5a0b057f # https://github.com/Azure/azure-container-networking/pull/1503 @ 9:27 8/8
             ./kubectl --kubeconfig=./kubeconfig set image daemonset/azure-npm -n kube-system azure-npm=$npmImage
 
             # deploy azure-npm-win
