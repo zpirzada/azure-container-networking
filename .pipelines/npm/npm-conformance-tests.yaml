@@ -93,63 +93,63 @@ jobs:
         ws22-1:
           AZURE_CLUSTER: "conf-1-ws22"
           PROFILE: "v2-default"
-        # ws22-2:
-        #   AZURE_CLUSTER: "conf-2-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-3:
-        #   AZURE_CLUSTER: "conf-3-ws22-3"
-        #   PROFILE: "v2-default"
-        # ws22-4:
-        #   AZURE_CLUSTER: "conf-4-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-5:
-        #   AZURE_CLUSTER: "conf-5-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-6:
-        #   AZURE_CLUSTER: "conf-6-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-7:
-        #   AZURE_CLUSTER: "conf-7-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-8:
-        #   AZURE_CLUSTER: "conf-8-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-9:
-        #   AZURE_CLUSTER: "conf-9-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-10:
-        #   AZURE_CLUSTER: "conf-10-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-11:
-        #   AZURE_CLUSTER: "conf-11-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-12:
-        #   AZURE_CLUSTER: "conf-12-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-13:
-        #   AZURE_CLUSTER: "conf-13-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-14:
-        #   AZURE_CLUSTER: "conf-14-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-15:
-        #   AZURE_CLUSTER: "conf-15-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-16:
-        #   AZURE_CLUSTER: "conf-16-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-17:
-        #   AZURE_CLUSTER: "conf-17-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-18:
-        #   AZURE_CLUSTER: "conf-18-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-19:
-        #   AZURE_CLUSTER: "conf-19-ws22"
-        #   PROFILE: "v2-default"
-        # ws22-20:
-        #   AZURE_CLUSTER: "conf-20-ws22"
-        #   PROFILE: "v2-default"
+        ws22-2:
+          AZURE_CLUSTER: "conf-2-ws22"
+          PROFILE: "v2-default"
+        ws22-3:
+          AZURE_CLUSTER: "conf-3-ws22"
+          PROFILE: "v2-default"
+        ws22-4:
+          AZURE_CLUSTER: "conf-4-ws22"
+          PROFILE: "v2-default"
+        ws22-5:
+          AZURE_CLUSTER: "conf-5-ws22"
+          PROFILE: "v2-default"
+        ws22-6:
+          AZURE_CLUSTER: "conf-6-ws22"
+          PROFILE: "v2-default"
+        ws22-7:
+          AZURE_CLUSTER: "conf-7-ws22"
+          PROFILE: "v2-default"
+        ws22-8:
+          AZURE_CLUSTER: "conf-8-ws22"
+          PROFILE: "v2-default"
+        ws22-9:
+          AZURE_CLUSTER: "conf-9-ws22"
+          PROFILE: "v2-default"
+        ws22-10:
+          AZURE_CLUSTER: "conf-10-ws22"
+          PROFILE: "v2-default"
+        ws22-11:
+          AZURE_CLUSTER: "conf-11-ws22"
+          PROFILE: "v2-default"
+        ws22-12:
+          AZURE_CLUSTER: "conf-12-ws22"
+          PROFILE: "v2-default"
+        ws22-13:
+          AZURE_CLUSTER: "conf-13-ws22"
+          PROFILE: "v2-default"
+        ws22-14:
+          AZURE_CLUSTER: "conf-14-ws22"
+          PROFILE: "v2-default"
+        ws22-15:
+          AZURE_CLUSTER: "conf-15-ws22"
+          PROFILE: "v2-default"
+        ws22-16:
+          AZURE_CLUSTER: "conf-16-ws22"
+          PROFILE: "v2-default"
+        ws22-17:
+          AZURE_CLUSTER: "conf-17-ws22"
+          PROFILE: "v2-default"
+        ws22-18:
+          AZURE_CLUSTER: "conf-18-ws22"
+          PROFILE: "v2-default"
+        ws22-19:
+          AZURE_CLUSTER: "conf-19-ws22"
+          PROFILE: "v2-default"
+        ws22-20:
+          AZURE_CLUSTER: "conf-20-ws22"
+          PROFILE: "v2-default"
     pool:
       name: $(BUILD_POOL_NAME_DEFAULT)
       demands:
