@@ -7,11 +7,13 @@ const (
 	Default   ExecutionMode = "default"
 	Baremetal ExecutionMode = "baremetal"
 	V4Swift   ExecutionMode = "v4swift"
+	DualStack ExecutionMode = "dualModeswift"
 )
 
 type IpamMode string
 
 // IPAM modes
 const (
-	V4Overlay IpamMode = "v4overlay"
+	V4Overlay        IpamMode = "v4overlay"
+	dualStackOverlay IpamMode = "dualModeOverlay"
 )
