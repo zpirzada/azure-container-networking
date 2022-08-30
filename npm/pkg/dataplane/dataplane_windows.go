@@ -242,15 +242,24 @@ func (dp *DataPlane) getEndpointsToApplyPolicy(policy *policies.NPMNetworkPolicy
 	}
 
 	endpointList := make(map[string]string)
+	missingIPs := make([]string, 0)
 	for ip := range netpolSelectorIPs {
 		endpoint, ok := dp.endpointCache[ip]
 		if !ok {
-			klog.Infof("[DataPlane] Ignoring endpoint with IP %s since it was not found in the endpoint cache. This IP might not be in the HNS network", ip)
+			missingIPs = append(missingIPs, ip)
 			continue
 		}
 		endpointList[ip] = endpoint.id
 		endpoint.netPolReference[policy.PolicyKey] = struct{}{}
+
+		// delete this IP for potential, minor memory savings
+		delete(netpolSelectorIPs, ip)
 	}
+
+	if len(missingIPs) > 0 {
+		klog.Infof("[DataPlane] ignoring applying policy to the following endpoint IPs since they were not found in the endpoint cache. These IPs might not be in the HNS network: %+v", missingIPs)
+	}
+
 	return endpointList, nil
 }
 
