@@ -296,8 +296,8 @@ func TestAddMultiplePods(t *testing.T) {
 			dataplane.NewPodMetadata("test-ns/test-pod-2", "1.2.3.5,8080", ""),
 		).
 		Return(nil).Times(1)
-	// TODO: ideally we call ApplyDataplane only twice since we know that there are no operations to perform for the ns that already exists
-	dp.EXPECT().ApplyDataPlane().Return(nil).Times(3)
+	// call ApplyDataplane only twice since the third addPod call is a no-op
+	dp.EXPECT().ApplyDataPlane().Return(nil).Times(2)
 
 	addPod(t, f, podObj1)
 	addPod(t, f, podObj2)

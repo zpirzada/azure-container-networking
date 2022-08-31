@@ -205,8 +205,8 @@ func TestAddNamespace(t *testing.T) {
 	}
 
 	dp.EXPECT().AddToLists(setsToAddNamespaceTo[1:], setsToAddNamespaceTo[:1]).Return(nil).Times(1)
-	// TODO: ideally we call ApplyDataplane only once since we know that there are no operations to perform for the ns that already exists
-	dp.EXPECT().ApplyDataPlane().Return(nil).Times(2)
+	// call ApplyDataplane only twice since the second addNamespace call is a no-op
+	dp.EXPECT().ApplyDataPlane().Return(nil).Times(1)
 
 	// Call into add NS
 	addNamespace(t, f, nsObj)
