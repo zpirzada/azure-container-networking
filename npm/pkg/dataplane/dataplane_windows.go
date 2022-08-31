@@ -322,14 +322,19 @@ func (dp *DataPlane) refreshAllPodEndpoints() error {
 	}
 
 	// garbage collection for the endpoint cache
+	toDeleteNoPodKey := make(map[string]string)
+	toDeleteWithPodKey := make(map[string]staleKeyWithID)
 	for ip, ep := range dp.endpointCache {
 		if _, ok := existingIPs[ip]; !ok {
 			if ep.podKey == unspecifiedPodKey {
 				if ep.stalePodKey == nil {
-					klog.Infof("deleting old endpoint which never had a pod key. ID: %s, IP: %s", ep.id, ip)
+					toDeleteNoPodKey[ip] = ep.id
 					delete(dp.endpointCache, ip)
 				} else if int(currentTime-ep.stalePodKey.timestamp)/60 > minutesToKeepStalePodKey {
-					klog.Infof("deleting old endpoint which had a stale pod key. ID: %s, IP: %s, stalePodKey: %+v", ep.id, ip, ep.stalePodKey)
+					toDeleteWithPodKey[ip] = staleKeyWithID{
+						staleKey: *ep.stalePodKey,
+						id:       ep.id,
+					}
 					delete(dp.endpointCache, ip)
 				}
 			} else {
@@ -341,6 +346,15 @@ func (dp *DataPlane) refreshAllPodEndpoints() error {
 				klog.Infof("marking endpoint stale for at least %d minutes. ID: %s, IP: %s, new stalePodKey: %+v", minutesToKeepStalePodKey, ep.id, ip, ep.stalePodKey)
 			}
 		}
+	}
+
+	if len(toDeleteNoPodKey) > 0 {
+		// prints in this format: map[1.2.3.4:id1} 5.6.7.8:id2}]
+		klog.Infof("deleting old endpoints which never had a pod key: %+v", toDeleteNoPodKey)
+	}
+	if len(toDeleteWithPodKey) > 0 {
+		// prints in this format: map[1.2.3.4:{staleKey:{key:key1 timestamp:34} id:id1} 5.6.7.8:{staleKey:{key:key2 timestamp:12} id:id2}]
+		klog.Infof("deleting old endpoints which had stale pod keys: %+v", ep.id, ip, ep.stalePodKey)
 	}
 
 	return nil

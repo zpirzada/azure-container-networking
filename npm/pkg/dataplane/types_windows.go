@@ -26,6 +26,11 @@ type staleKey struct {
 	timestamp int64
 }
 
+type staleKeyWithID struct {
+	staleKey
+	id string
+}
+
 // newNPMEndpoint initializes npmEndpoint and copies relevant information from hcn.HostComputeEndpoint.
 // This function must be defined in a file with a windows build tag for proper vendoring since it uses the hcn pkg
 func newNPMEndpoint(endpoint *hcn.HostComputeEndpoint) *npmEndpoint {
