@@ -221,7 +221,7 @@ func (nsc *NamespaceController) processNextWorkItem() bool {
 }
 
 // syncNamespace compares the actual state with the desired, and attempts to converge the two.
-func (nsc *NamespaceController) syncNamespace(nsKey string) (err error) {
+func (nsc *NamespaceController) syncNamespace(nsKey string) error {
 	// timer for recording execution times
 	timer := metrics.StartNewTimer()
 
@@ -231,8 +231,7 @@ func (nsc *NamespaceController) syncNamespace(nsKey string) (err error) {
 	// apply dataplane and record exec time after syncing
 	operationKind := metrics.NoOp
 	defer func() {
-		// Should not apply other controllers' changes if we don't touch the dataplane.
-		// May encounter an HNS error, which would wrongly cause this item to requeue.
+		// No need to apply other controllers' changes if we don't touch the dataplane.
 		if operationKind == metrics.NoOp {
 			return
 		}
@@ -252,9 +251,9 @@ func (nsc *NamespaceController) syncNamespace(nsKey string) (err error) {
 
 		if dperr != nil {
 			if err == nil {
-				err = fmt.Errorf("failed to apply dataplane changes while syncing namespace. err: %w", dperr)
+				metrics.SendErrorLogAndMetric(util.NSID, "failed to apply dataplane changes while syncing namespace. err: [%s]", dperr.Error())
 			} else {
-				err = fmt.Errorf("failed to sync namespace and apply dataplane changes. sync err: [%w], apply err: [%v]", err, dperr)
+				metrics.SendErrorLogAndMetric(util.NSID, "failed to sync namespace and apply dataplane changes. sync err: [%s]. apply err: [%s]", err.Error(), dperr.Error())
 			}
 		}
 	}()
@@ -305,7 +304,7 @@ func (nsc *NamespaceController) syncNamespace(nsKey string) (err error) {
 		return err
 	}
 
-	return err
+	return nil
 }
 
 // syncAddNamespace handles adding namespace to ipset.
@@ -339,7 +338,6 @@ func (nsc *NamespaceController) syncAddNamespace(nsObj *corev1.Namespace) error 
 }
 
 // syncUpdateNamespace handles updating namespace in ipset.
-// It returns either a metrics.CreateOp or metrics.UpdateOp.
 func (nsc *NamespaceController) syncUpdateNamespace(newNsObj *corev1.Namespace) (metrics.OperationKind, error) {
 	var err error
 	newNsName, newNsLabel := newNsObj.ObjectMeta.Name, newNsObj.ObjectMeta.Labels

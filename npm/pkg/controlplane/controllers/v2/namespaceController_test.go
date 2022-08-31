@@ -205,7 +205,7 @@ func TestAddNamespace(t *testing.T) {
 	}
 
 	dp.EXPECT().AddToLists(setsToAddNamespaceTo[1:], setsToAddNamespaceTo[:1]).Return(nil).Times(1)
-	// call ApplyDataplane only twice since the second addNamespace call is a no-op
+	// call ApplyDataplane only once since the second addNamespace call is a no-op
 	dp.EXPECT().ApplyDataPlane().Return(nil).Times(1)
 
 	// Call into add NS

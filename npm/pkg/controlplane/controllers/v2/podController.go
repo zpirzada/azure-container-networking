@@ -243,7 +243,7 @@ func (c *PodController) processNextWorkItem() bool {
 }
 
 // syncPod compares the actual state with the desired, and attempts to converge the two.
-func (c *PodController) syncPod(key string) (err error) {
+func (c *PodController) syncPod(key string) error {
 	// timer for recording execution times
 	timer := metrics.StartNewTimer()
 
@@ -260,8 +260,7 @@ func (c *PodController) syncPod(key string) (err error) {
 	// apply dataplane and record exec time after syncing
 	operationKind := metrics.NoOp
 	defer func() {
-		// Should not apply other controllers' changes if we don't touch the dataplane.
-		// May encounter an HNS error, which would wrongly cause this item to requeue.
+		// No need to apply other controllers' changes if we don't touch the dataplane.
 		if operationKind == metrics.NoOp {
 			return
 		}
@@ -277,9 +276,9 @@ func (c *PodController) syncPod(key string) (err error) {
 
 		if dperr != nil {
 			if err == nil {
-				err = fmt.Errorf("failed to apply dataplane changes while syncing pod. err: %w", dperr)
+				metrics.SendErrorLogAndMetric(util.NSID, "failed to apply dataplane changes while syncing pod. err: [%s]", dperr.Error())
 			} else {
-				err = fmt.Errorf("failed to sync pod and apply dataplane changes. sync err: [%w], apply err: [%v]", err, dperr)
+				metrics.SendErrorLogAndMetric(util.NSID, "failed to sync pod and apply dataplane changes. sync err: [%s]. apply err: [%s]", err.Error(), dperr.Error())
 			}
 		}
 	}()
@@ -320,7 +319,7 @@ func (c *PodController) syncPod(key string) (err error) {
 		if err = c.cleanUpDeletedPod(key); err != nil {
 			return fmt.Errorf("error: %w when when pod is in completed state", err)
 		}
-		return err
+		return nil
 	}
 
 	cachedNpmPod, npmPodExists := c.podMap[key]
@@ -338,7 +337,7 @@ func (c *PodController) syncPod(key string) (err error) {
 		return fmt.Errorf("failed to sync pod due to %w", err)
 	}
 
-	return err
+	return nil
 }
 
 func (c *PodController) syncAddedPod(podObj *corev1.Pod) error {
@@ -397,7 +396,6 @@ func (c *PodController) syncAddedPod(podObj *corev1.Pod) error {
 }
 
 // syncAddAndUpdatePod handles updating pod ip in its label's ipset.
-// It returns either a metrics.CreateOp or metrics.UpdateOp.
 func (c *PodController) syncAddAndUpdatePod(newPodObj *corev1.Pod) (metrics.OperationKind, error) {
 	var err error
 	podKey, _ := cache.MetaNamespaceKeyFunc(newPodObj)
