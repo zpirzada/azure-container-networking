@@ -107,6 +107,11 @@ func (dp *DataPlane) RunPeriodicTasks() {
 				// in Windows, does nothing
 				// in Linux, locks policy manager but can be interrupted
 				dp.policyMgr.Reconcile()
+
+				// the pod and namespace controllers won't retry failed calls to ApplyDataplane
+				if err := dp.ApplyDataPlane(); err != nil {
+					metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "[DataPlane] error: failed to apply dataplane in periodic tasks. err: %s", err.Error())
+				}
 			}
 		}
 	}()
