@@ -221,7 +221,7 @@ func (nsc *NamespaceController) processNextWorkItem() bool {
 }
 
 // syncNamespace compares the actual state with the desired, and attempts to converge the two.
-func (nsc *NamespaceController) syncNamespace(nsKey string) error {
+func (nsc *NamespaceController) syncNamespace(nsKey string) (err error) {
 	// timer for recording execution times
 	timer := metrics.StartNewTimer()
 
@@ -231,6 +231,12 @@ func (nsc *NamespaceController) syncNamespace(nsKey string) error {
 	// apply dataplane and record exec time after syncing
 	operationKind := metrics.NoOp
 	defer func() {
+		// Should not apply other controllers' changes if we don't touch the dataplane.
+		// May encounter an HNS error, which would wrongly cause this item to requeue.
+		if operationKind == metrics.NoOp {
+			return
+		}
+
 		if err != nil {
 			klog.Infof("[syncNamespace] failed to sync namespace, but will apply any changes to the dataplane. err: %s", err.Error())
 		}
@@ -299,7 +305,7 @@ func (nsc *NamespaceController) syncNamespace(nsKey string) error {
 		return err
 	}
 
-	return nil
+	return err
 }
 
 // syncAddNamespace handles adding namespace to ipset.
@@ -333,6 +339,7 @@ func (nsc *NamespaceController) syncAddNamespace(nsObj *corev1.Namespace) error 
 }
 
 // syncUpdateNamespace handles updating namespace in ipset.
+// It returns either a metrics.CreateOp or metrics.UpdateOp.
 func (nsc *NamespaceController) syncUpdateNamespace(newNsObj *corev1.Namespace) (metrics.OperationKind, error) {
 	var err error
 	newNsName, newNsLabel := newNsObj.ObjectMeta.Name, newNsObj.ObjectMeta.Labels
