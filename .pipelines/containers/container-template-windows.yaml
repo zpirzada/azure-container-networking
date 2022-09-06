@@ -13,7 +13,7 @@ steps:
 
 - powershell: |
     echo "using tag ${{ parameters.tag }}"
-    Start-Sleep -s 10
+    Start-Sleep -s 60
     powershell.exe -command "& { . .\build\scripts\windows.ps1; Retry({${{ parameters.name }}-image windows-${{ parameters.arch }}-${{ parameters.tag }}}) }"
   name: image_build
   displayName: Image Build
