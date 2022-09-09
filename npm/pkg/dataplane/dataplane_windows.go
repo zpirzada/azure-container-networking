@@ -1,6 +1,7 @@
 package dataplane
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -280,10 +281,25 @@ func (dp *DataPlane) getEndpointsToApplyPolicy(policy *policies.NPMNetworkPolicy
 
 func (dp *DataPlane) getAllPodEndpoints() ([]hcn.HostComputeEndpoint, error) {
 	klog.Infof("Getting all endpoints for Network ID %s", dp.networkID)
-	endpoints, err := dp.ioShim.Hns.ListEndpointsOfNetwork(dp.networkID)
+	hcnQuery := hcn.HostComputeQuery{
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		Flags: hcn.HostComputeQueryFlagsNone,
+	}
+
+	filterMap := map[string]string{"VirtualNetwork": dp.networkID, "IsRemoteEndpoint": "true"}
+	filter, err := json.Marshal(filterMap)
 	if err != nil {
 		return nil, err
 	}
+	hcnQuery.Filter = string(filter)
+	endpoints, err := dp.ioShim.Hns.ListEndpointsQuery(hcnQuery)
+	if err != nil {
+		return nil, err
+	}
+
 	return endpoints, nil
 }
 

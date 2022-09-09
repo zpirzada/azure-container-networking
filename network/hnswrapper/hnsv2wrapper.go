@@ -64,6 +64,10 @@ func (f Hnsv2wrapper) GetEndpointByID(endpointId string) (*hcn.HostComputeEndpoi
 	return hcn.GetEndpointByID(endpointId)
 }
 
+func (f Hnsv2wrapper) ListEndpointsQuery(query hcn.HostComputeQuery) ([]hcn.HostComputeEndpoint, error) {
+	return hcn.ListEndpointsQuery(query)
+}
+
 func (f Hnsv2wrapper) ListEndpointsOfNetwork(networkId string) ([]hcn.HostComputeEndpoint, error) {
 	return hcn.ListEndpointsOfNetwork(networkId)
 }

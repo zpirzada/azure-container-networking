@@ -238,6 +238,27 @@ func (f Hnsv2wrapperFake) RemoveNamespaceEndpoint(namespaceId string, endpointId
 	return nil
 }
 
+func (f Hnsv2wrapperFake) ListEndpointsQuery(query hcn.HostComputeQuery) ([]hcn.HostComputeEndpoint, error) {
+	f.Lock()
+	defer f.Unlock()
+	delayHnsCall(f.Delay)
+	endpoints := make([]hcn.HostComputeEndpoint, 0)
+	// Can only support query for networkID
+	var queryMap map[string]string
+	err := json.Unmarshal([]byte(query.Filter), queryMap)
+	if err != nil {
+		return nil, newErrorFakeHNS(err.Error())
+	}
+
+	networkID := queryMap["VirtualNetwork"]
+	for _, endpoint := range f.Cache.endpoints {
+		if endpoint.HostComputeNetwork == networkID {
+			endpoints = append(endpoints, *endpoint.GetHCNObj())
+		}
+	}
+	return endpoints, nil
+}
+
 func (f Hnsv2wrapperFake) ListEndpointsOfNetwork(networkId string) ([]hcn.HostComputeEndpoint, error) {
 	f.Lock()
 	defer f.Unlock()

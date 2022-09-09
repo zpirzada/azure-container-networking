@@ -320,6 +320,11 @@ func (h Hnsv2wrapperwithtimeout) GetEndpointByID(endpointId string) (*hcn.HostCo
 	}
 }
 
+func (h Hnsv2wrapperwithtimeout) ListEndpointsQuery(query hcn.HostComputeQuery) ([]hcn.HostComputeEndpoint, error) {
+	// Not implementing as this is not required.
+	return nil, nil
+}
+
 func (h Hnsv2wrapperwithtimeout) ListEndpointsOfNetwork(networkId string) ([]hcn.HostComputeEndpoint, error) {
 	r := make(chan ListEndpointsFuncResult)
 	ctx, cancel := context.WithTimeout(context.TODO(), h.HnsCallTimeout)
