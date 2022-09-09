@@ -289,7 +289,7 @@ func (dp *DataPlane) getAllPodEndpoints() ([]hcn.HostComputeEndpoint, error) {
 		Flags: hcn.HostComputeQueryFlagsNone,
 	}
 
-	filterMap := map[string]string{"VirtualNetwork": dp.networkID, "IsRemoteEndpoint": "true"}
+	filterMap := map[string]string{"VirtualNetwork": dp.networkID, "IsRemoteEndpoint": "false"}
 	filter, err := json.Marshal(filterMap)
 	if err != nil {
 		return nil, err
