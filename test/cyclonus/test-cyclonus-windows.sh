@@ -1,5 +1,9 @@
-curl -fsSL github.com/mattfenwick/cyclonus/releases/latest/download/cyclonus_linux_amd64.tar.gz | tar -zxv
-./cyclonus_linux_amd64/cyclonus generate \
+# curl -fsSL github.com/mattfenwick/cyclonus/releases/latest/download/cyclonus_linux_amd64.tar.gz | tar -zxv
+# ./cyclonus_linux_amd64/cyclonus generate \
+git clone https://github.com/huntergregory/cyclonus.git
+cd cyclonus/
+git checkout sleep-and-retry-after-failing
+./cmd/cyclonus/cyclonus generate \
     --noisy=true \
     --retries=7 \
     --ignore-loopback=true \
