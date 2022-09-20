@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/Azure/azure-container-networking/aitelemetry"
 	"github.com/Azure/azure-container-networking/zapai"
 	logfmt "github.com/jsternberg/zap-logfmt"
 	"github.com/microsoft/ApplicationInsights-Go/appinsights"
@@ -68,7 +69,12 @@ func main() {
 	defer aiclose()
 
 	// build the AI core
-	aicore := zapai.NewCore(zapcore.DebugLevel, aisink)
+	//aicore := zapai.NewCore(zapcore.DebugLevel, aisink)
+	aicore := zapai.NewCoreWithVMMeta(zapcore.DebugLevel, aisink, aitelemetry.AIConfig{
+		AppName:        "ancExampleApp",
+		AppVersion:     "0.0.1",
+		RefreshTimeout: 10,
+	})
 	// (optional): add the zap Field to AI Tag mappers
 	aicore = aicore.WithFieldMappers(zapai.DefaultMappers)
 
@@ -111,7 +117,6 @@ func main() {
 		Sub:                subn,
 	}
 
-	// log with zap.Object
 	log.Debug("testing message-1", zap.Object("ex1", &ex1))
 	log.Debug("testing message-2", zap.Object("ex2", &ex2))
 
