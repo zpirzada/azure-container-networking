@@ -1,8 +1,8 @@
 # curl -fsSL github.com/mattfenwick/cyclonus/releases/latest/download/cyclonus_linux_amd64.tar.gz | tar -zxv
 # ./cyclonus_linux_amd64/cyclonus generate \
-git clone https://github.com/huntergregory/cyclonus.git
+git clone --branch sleep-and-retry-after-failing --depth=1 https://github.com/huntergregory/cyclonus.git
 cd cyclonus/
-git checkout sleep-and-retry-after-failing
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ./cmd/cyclonus/cyclonus ./cmd/cyclonus
 ./cmd/cyclonus/cyclonus generate \
     --noisy=true \
     --retries=7 \
