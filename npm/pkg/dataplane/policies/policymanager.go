@@ -126,17 +126,17 @@ func (pMgr *PolicyManager) AddPolicy(policy *NPMNetworkPolicy, endpointList map[
 
 	// Call actual dataplane function to apply changes
 	timer := metrics.StartNewTimer()
-	err := pMgr.addPolicy(policy, endpointList)
+	// err := pMgr.addPolicy(policy, endpointList)
 	metrics.RecordACLRuleExecTime(timer) // record execution time regardless of failure
-	if err != nil {
-		// NOTE: in Linux, Prometheus metrics may be off at this point since some ACL rules may have been applied successfully
-		// In Windows, Prometheus metrics may be off at this point since we don't know how many endpoints had rules applied successfully.
-		msg := fmt.Sprintf("failed to add policy: %s", err.Error())
-		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s", msg)
-		return npmerrors.Errorf(npmerrors.AddPolicy, false, msg)
-	}
+	// if err != nil {
+	// 	// NOTE: in Linux, Prometheus metrics may be off at this point since some ACL rules may have been applied successfully
+	// 	// In Windows, Prometheus metrics may be off at this point since we don't know how many endpoints had rules applied successfully.
+	// 	msg := fmt.Sprintf("failed to add policy: %s", err.Error())
+	// 	metrics.SendErrorLogAndMetric(util.IptmID, "error: %s", msg)
+	// 	return npmerrors.Errorf(npmerrors.AddPolicy, false, msg)
+	// }
 
-	// update Prometheus metrics on success
+	// // update Prometheus metrics on success
 	numEndpoints := 1
 	if util.IsWindowsDP() {
 		numEndpoints = len(endpointList)
@@ -167,15 +167,15 @@ func (pMgr *PolicyManager) RemovePolicy(policyKey string) error {
 	defer pMgr.policyMap.Unlock()
 
 	// Call actual dataplane function to apply changes
-	err := pMgr.removePolicy(policy, nil)
-	// currently we only have acl rule exec time for "adding" rules, so we skip recording here
-	if err != nil {
-		// NOTE: in Linux, Prometheus metrics may be off at this point since some ACL rules may have been applied successfully.
-		// In Windows, Prometheus metrics may be off at this point since we don't know how many endpoints had rules applied successfully.
-		msg := fmt.Sprintf("failed to remove policy: %s", err.Error())
-		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s", msg)
-		return npmerrors.Errorf(npmerrors.RemovePolicy, false, msg)
-	}
+	// err := pMgr.removePolicy(policy, nil)
+	// // currently we only have acl rule exec time for "adding" rules, so we skip recording here
+	// if err != nil {
+	// 	// NOTE: in Linux, Prometheus metrics may be off at this point since some ACL rules may have been applied successfully.
+	// 	// In Windows, Prometheus metrics may be off at this point since we don't know how many endpoints had rules applied successfully.
+	// 	msg := fmt.Sprintf("failed to remove policy: %s", err.Error())
+	// 	metrics.SendErrorLogAndMetric(util.IptmID, "error: %s", msg)
+	// 	return npmerrors.Errorf(npmerrors.RemovePolicy, false, msg)
+	// }
 
 	// update Prometheus metrics on success
 	numEndpoints := 1

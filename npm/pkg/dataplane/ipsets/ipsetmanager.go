@@ -461,11 +461,11 @@ func (iMgr *IPSetManager) ApplyIPSets() error {
 	// Call the appropriate apply ipsets
 	prometheusTimer := metrics.StartNewTimer()
 	defer metrics.RecordIPSetExecTime(prometheusTimer) // record execution time regardless of failure
-	err := iMgr.applyIPSets()
-	if err != nil {
-		metrics.SendErrorLogAndMetric(util.IpsmID, "error: failed to apply ipsets: %s", err.Error())
-		return err
-	}
+	// err := iMgr.applyIPSets()
+	// if err != nil {
+	// 	metrics.SendErrorLogAndMetric(util.IpsmID, "error: failed to apply ipsets: %s", err.Error())
+	// 	return err
+	// }
 
 	iMgr.clearDirtyCache()
 	// TODO could also set the number of ipsets in NPM (not necessarily in kernel) here using len(iMgr.setMap)

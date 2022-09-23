@@ -14,7 +14,7 @@ import (
 	"k8s.io/klog"
 )
 
-const reconcileTimeInMinutes = 5
+const reconcileTimeInMinutes = 1
 
 type PolicyMode string
 
@@ -98,15 +98,15 @@ func (dp *DataPlane) RunPeriodicTasks() {
 			case <-dp.stopChannel:
 				return
 			case <-ticker.C:
-				// send the heartbeat log in another go routine in case it takes a while
-				go metrics.SendHeartbeatWithNumPolicies()
+				// 			// send the heartbeat log in another go routine in case it takes a while
+				// 			go metrics.SendHeartbeatWithNumPolicies()
 
-				// locks ipset manager
-				dp.ipsetMgr.Reconcile()
+				// 			// locks ipset manager
+				// 			dp.ipsetMgr.Reconcile()
 
-				// in Windows, does nothing
-				// in Linux, locks policy manager but can be interrupted
-				dp.policyMgr.Reconcile()
+				// 			// in Windows, does nothing
+				// 			// in Linux, locks policy manager but can be interrupted
+				// 			dp.policyMgr.Reconcile()
 			}
 		}
 	}()
@@ -213,36 +213,36 @@ func (dp *DataPlane) ApplyDataPlane() error {
 		return fmt.Errorf("[DataPlane] error while applying IPSets: %w", err)
 	}
 
-	if dp.shouldUpdatePod() {
-		err := dp.refreshAllPodEndpoints()
-		if err != nil {
-			metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "[DataPlane] failed to refresh endpoints while updating pods. err: [%s]", err.Error())
-			return fmt.Errorf("[DataPlane] failed to refresh endpoints while updating pods. err: [%w]", err)
-		}
+	// if dp.shouldUpdatePod() {
+	// 	err := dp.refreshAllPodEndpoints()
+	// 	if err != nil {
+	// 		metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "[DataPlane] failed to refresh endpoints while updating pods. err: [%s]", err.Error())
+	// 		return fmt.Errorf("[DataPlane] failed to refresh endpoints while updating pods. err: [%w]", err)
+	// 	}
 
-		// lock updatePodCache while driving goal state to kernel
-		// prevents another ApplyDataplane call from updating the same pods
-		dp.updatePodCache.Lock()
-		defer dp.updatePodCache.Unlock()
+	// 	// lock updatePodCache while driving goal state to kernel
+	// 	// prevents another ApplyDataplane call from updating the same pods
+	// 	dp.updatePodCache.Lock()
+	// 	defer dp.updatePodCache.Unlock()
 
-		var aggregateErr error
-		for podKey, pod := range dp.updatePodCache.cache {
-			err := dp.updatePod(pod)
-			if err != nil {
-				if aggregateErr == nil {
-					aggregateErr = fmt.Errorf("failed to update pod while applying the dataplane. key: [%s], err: [%w]", podKey, err)
-				} else {
-					aggregateErr = fmt.Errorf("failed to update pod while applying the dataplane. key: [%s], err: [%s]. previous err: [%w]", podKey, err.Error(), aggregateErr)
-				}
-				metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "failed to update pod while applying the dataplane. key: [%s], err: [%s]", podKey, err.Error())
-				continue
-			}
-			delete(dp.updatePodCache.cache, podKey)
-		}
-		if aggregateErr != nil {
-			return fmt.Errorf("[DataPlane] error while updating pods: %w", err)
-		}
+	// 	var aggregateErr error
+	for podKey := range dp.updatePodCache.cache {
+		// err := dp.updatePod(pod)
+		// if err != nil {
+		// 	if aggregateErr == nil {
+		// 		aggregateErr = fmt.Errorf("failed to update pod while applying the dataplane. key: [%s], err: [%w]", podKey, err)
+		// 	} else {
+		// 		aggregateErr = fmt.Errorf("failed to update pod while applying the dataplane. key: [%s], err: [%s]. previous err: [%w]", podKey, err.Error(), aggregateErr)
+		// 	}
+		// 	metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "failed to update pod while applying the dataplane. key: [%s], err: [%s]", podKey, err.Error())
+		// 	continue
+		// }
+		delete(dp.updatePodCache.cache, podKey)
 	}
+	// 	if aggregateErr != nil {
+	// 		return fmt.Errorf("[DataPlane] error while updating pods: %w", err)
+	// 	}
+	// }
 	return nil
 }
 

@@ -215,6 +215,7 @@ func (pMgr *PolicyManager) removePolicyByEndpointID(ruleID, epID string, noOfRul
 
 	err = pMgr.ioShim.Hns.ApplyEndpointPolicy(epObj, hcn.RequestTypeUpdate, epPolicies)
 	if err != nil {
+		// FIXME ignore endpoint not found error if we want to, although a requeue would ignore the endpoint not found error at the get above
 		return fmt.Errorf("unable to apply changes when removing policy. policy: %s, endpoint: %s, err: %w", ruleID, epID, err)
 	}
 	return nil
