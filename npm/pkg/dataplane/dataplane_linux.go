@@ -34,3 +34,7 @@ func (dp *DataPlane) refreshAllPodEndpoints() error {
 	// NOOP in Linux
 	return nil
 }
+
+func (dp *DataPlane) testHNSRefresh() {
+	return
+}

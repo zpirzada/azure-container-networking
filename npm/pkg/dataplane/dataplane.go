@@ -98,6 +98,7 @@ func (dp *DataPlane) RunPeriodicTasks() {
 			case <-dp.stopChannel:
 				return
 			case <-ticker.C:
+				dp.testHNSRefresh()
 				// 			// send the heartbeat log in another go routine in case it takes a while
 				// 			go metrics.SendHeartbeatWithNumPolicies()
 
