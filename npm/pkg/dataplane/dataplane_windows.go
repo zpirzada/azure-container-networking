@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-container-networking/npm/metrics"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
 	"github.com/Azure/azure-container-networking/npm/util"
 	npmerrors "github.com/Azure/azure-container-networking/npm/util/errors"
@@ -27,13 +28,13 @@ var (
 func (dp *DataPlane) testHNSRefresh() {
 	sleepDuration := 1 * time.Minute
 
-	// TODO prometheus
-
 	klog.Infof("DEBUGME: Getting ALL endpoints for Network ID %s", dp.networkID)
+	timer := metrics.StartNewTimer()
 	endpoints, err := dp.ioShim.Hns.ListEndpointsOfNetwork(dp.networkID)
 	if err != nil {
 		klog.Errorf("DEBUGME: FAILED LIST Getting ALL endpoints for Network ID %s", dp.networkID)
 	} else {
+		metrics.RecordHNSRefreshExecTime(timer, "all", len(endpoints))
 		klog.Infof("DEBUGME: SUCCESS Getting ALL endpoints for Network ID %s. There were %d endpoints", dp.networkID, len(endpoints))
 	}
 
@@ -53,10 +54,12 @@ func (dp *DataPlane) testHNSRefresh() {
 	} else {
 		hcnQuery.Filter = string(filter)
 		klog.Infof("DEBUGME: Getting LOCAL endpoints for Network ID %s", dp.networkID)
+		timer := metrics.StartNewTimer()
 		endpoints, err := dp.ioShim.Hns.ListEndpointsQuery(hcnQuery)
 		if err != nil {
 			klog.Errorf("DEBUGME: FAILED LIST Getting LOCAL endpoints for Network ID %s", dp.networkID)
 		} else {
+			metrics.RecordHNSRefreshExecTime(timer, "local", len(endpoints))
 			klog.Infof("DEBUGME: SUCCESS Getting LOCAL endpoints for Network ID %s. There were %d endpoints", dp.networkID, len(endpoints))
 		}
 	}
@@ -87,10 +90,12 @@ func (dp *DataPlane) testHNSRefresh() {
 	}
 	hcnQuery.Filter = string(filter)
 	klog.Infof("DEBUGME: Getting SINGLE endpoint for Network ID %s, Pod key %s, IP %s", dp.networkID, podKey, updatePod.PodIP)
+	timer = metrics.StartNewTimer()
 	endpoints, err = dp.ioShim.Hns.ListEndpointsQuery(hcnQuery)
 	if err != nil {
 		klog.Errorf("DEBUGME: FAILED LIST Getting SINGLE endpoint for Network ID %s", dp.networkID)
 	} else {
+		metrics.RecordHNSRefreshExecTime(timer, "single", len(endpoints))
 		klog.Infof("DEBUGME: SUCCESS Getting SINGLE endpoint for Network ID %s. There were %d endpoints", dp.networkID, len(endpoints))
 	}
 }

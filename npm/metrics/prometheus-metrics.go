@@ -54,6 +54,13 @@ const (
 	namespaceExecTimeName           = "namespace_exec_time"
 	controllerNamespaceExecTimeHelp = "Execution time in milliseconds for adding/updating/deleting a namespace"
 
+	// DEBUGME perf metrics
+	hnsRefreshMethodLabel       = "method"
+	hnsRefreshNumEndpointsLabel = "num_endpoints"
+
+	hnsRefreshExecTimeName = "hns_refresh_exec_time"
+	hnsRefreshExecTimeHelp = "Execution time in milliseconds for refreshing Pod Endpoints with the given method and number of endpoints"
+
 	// TODO add health metrics
 
 	quantileMedian float64 = 0.5
@@ -94,6 +101,10 @@ var (
 	controllerPodExecTime       *prometheus.SummaryVec
 	controllerNamespaceExecTime *prometheus.SummaryVec
 	controllerExecTimeLabels    = []string{operationLabel, hadErrorLabel}
+
+	// DEBUGME perf metrics
+	hnsRefreshExecTime       *prometheus.SummaryVec
+	hnsRefreshExecTimeLabels = []string{hnsRefreshMethodLabel, hnsRefreshNumEndpointsLabel}
 
 	// TODO add health metrics
 )
@@ -171,6 +182,9 @@ func initializeDaemonMetrics() {
 	// NODE METRICS
 	addACLRuleExecTime = createNodeSummary(addACLRuleExecTimeName, addACLRuleExecTimeHelp)
 	addIPSetExecTime = createNodeSummary(addIPSetExecTimeName, addIPSetExecTimeHelp)
+
+	// DEBUGME perf metrics
+	hnsRefreshExecTime = createNodeSummaryVec(hnsRefreshExecTimeName, "", hnsRefreshExecTimeHelp, hnsRefreshExecTimeLabels)
 }
 
 // initializeControllerMetrics creates metrics modified by the controller
