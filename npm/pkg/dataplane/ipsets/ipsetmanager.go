@@ -443,11 +443,16 @@ func (iMgr *IPSetManager) RemoveFromList(listMetadata *IPSetMetadata, setMetadat
 	return nil
 }
 
+func (iMgr *IPSetManager) HaveEmptyDirtyCache() bool {
+	return iMgr.dirtyCache.numSetsToAddOrUpdate() == 0 &&
+		iMgr.dirtyCache.numSetsToDelete() == 0
+}
+
 func (iMgr *IPSetManager) ApplyIPSets() error {
 	iMgr.Lock()
 	defer iMgr.Unlock()
 
-	if iMgr.dirtyCache.numSetsToAddOrUpdate() == 0 && iMgr.dirtyCache.numSetsToDelete() == 0 {
+	if iMgr.HaveEmptyDirtyCache() {
 		klog.Info("[IPSetManager] No IPSets to apply")
 		return nil
 	}

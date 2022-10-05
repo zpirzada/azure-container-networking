@@ -14,16 +14,20 @@ import (
 	"k8s.io/klog"
 )
 
-const reconcileTimeInMinutes = 5
+const (
+	applyDataplaneMaxDuration = time.Duration(2 * time.Second)
+	reconcileDuration         = time.Duration(5 * time.Minute)
+)
 
 type PolicyMode string
 
-// TODO put NodeName in Config?
 type Config struct {
+	ShouldApplyIPSetsInBackground bool
 	*ipsets.IPSetManagerCfg
 	*policies.PolicyManagerCfg
 }
 
+// TODO: probably don't need this lock anymore if we're locking the DP for all IPSet operations
 type updatePodCache struct {
 	sync.Mutex
 	cache map[string]*updateNPMPod
@@ -55,6 +59,7 @@ type DataPlane struct {
 	ioShim         *common.IOShim
 	updatePodCache *updatePodCache
 	stopChannel    <-chan struct{}
+	batchHelper    *batchHelper
 }
 
 func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChannel <-chan struct{}) (*DataPlane, error) {
@@ -63,6 +68,7 @@ func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChann
 		klog.Infof("[DataPlane] enabling AddEmptySetToLists for Windows")
 		cfg.IPSetManagerCfg.AddEmptySetToLists = true
 	}
+
 	dp := &DataPlane{
 		Config:         cfg,
 		policyMgr:      policies.NewPolicyManager(ioShim, cfg.PolicyManagerCfg),
@@ -72,7 +78,10 @@ func NewDataPlane(nodeName string, ioShim *common.IOShim, cfg *Config, stopChann
 		ioShim:         ioShim,
 		updatePodCache: newUpdatePodCache(),
 		stopChannel:    stopChannel,
+		batchHelper:    newBatchHelper(cfg.ShouldApplyIPSetsInBackground),
 	}
+
+	klog.Infof("booting up dataplane. max batches: [%d]. config: [%+v]", dp.batchHelper.maxBatches(), dp.Config)
 
 	err := dp.BootupDataplane()
 	if err != nil {
@@ -90,8 +99,33 @@ func (dp *DataPlane) BootupDataplane() error {
 
 // RunPeriodicTasks runs periodic tasks. Should only be called once.
 func (dp *DataPlane) RunPeriodicTasks() {
+	// Apply the Dataplane in the background
+	if dp.ShouldApplyIPSetsInBackground {
+		go func() {
+			ticker := time.NewTicker(applyDataplaneMaxDuration)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-dp.batchHelper.justAppliedSignal:
+					klog.Info("[DataPlane] resetting ticker for applying IPSets")
+					ticker.Stop()
+					ticker = time.NewTicker(applyDataplaneMaxDuration)
+				case <-ticker.C:
+					dp.LockDataPlane()
+					if !dp.ipsetMgr.HaveEmptyDirtyCache() {
+						klog.Info("[DataPlane] applying dataplane in periodic call")
+						dp.applyIPSets()
+					}
+					dp.UnlockDataPlane()
+				}
+			}
+		}()
+	}
+
+	// run reconcile tasks
 	go func() {
-		ticker := time.NewTicker(time.Minute * time.Duration(reconcileTimeInMinutes))
+		ticker := time.NewTicker(reconcileDuration)
 		defer ticker.Stop()
 
 		for {
@@ -218,9 +252,12 @@ func (dp *DataPlane) RemoveFromList(listName *ipsets.IPSetMetadata, setNames []*
 // dataplane instead of multiple ipset operations calls ipset operations calls to dataplane.
 // The dp MUST be locked when this function is called.
 func (dp *DataPlane) ApplyDataPlane() error {
-	err := dp.ipsetMgr.ApplyIPSets()
-	if err != nil {
-		return fmt.Errorf("[DataPlane] error while applying IPSets: %w", err)
+	dp.batchHelper.incrementBatches()
+	if dp.batchHelper.shouldApply() {
+		klog.Info("[DataPlane] applying dataplane after reaching max batches")
+		if err := dp.applyIPSets(); err != nil {
+			return fmt.Errorf("[DataPlane] error while applying dataplane: %w", err)
+		}
 	}
 
 	if dp.shouldUpdatePod() {
@@ -256,6 +293,20 @@ func (dp *DataPlane) ApplyDataPlane() error {
 	return nil
 }
 
+// applyDataPlane applies IPSets, then if successful, updates Pod Policies.
+// It sets the number of batches to the number of failed batches.
+// The dp MUST be locked when this function is called.
+func (dp *DataPlane) applyIPSets() error {
+	err := dp.ipsetMgr.ApplyIPSets()
+	dp.batchHelper.markAsApplied()
+	if err != nil {
+		return fmt.Errorf("[DataPlane] error while applying IPSets: %w", err)
+	}
+
+	dp.batchHelper.resetBatches()
+	return nil
+}
+
 // AddPolicy takes in a translated NPMNetworkPolicy object and applies on dataplane
 func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 	klog.Infof("[DataPlane] Add Policy called for %s", policy.PolicyKey)
@@ -267,6 +318,8 @@ func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error adding policy ipsets: %w", err)
 	}
+
+	klog.Info("[DataPlane] successfully added ipsets. now adding policy")
 
 	endpointList, err := dp.getEndpointsToApplyPolicy(policy)
 	if err != nil {
@@ -297,7 +350,7 @@ func (dp *DataPlane) addPolicyIPSets(policy *policies.NPMNetworkPolicy) error {
 
 	// NOTE: if apply dataplane succeeds, but another area fails, then currently,
 	// netpol controller won't cache the netpol, and the IPSets applied will remain in the kernel since they will have a netpol reference
-	err = dp.ApplyDataPlane()
+	err = dp.applyIPSets()
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while applying dataplane: %w", err)
 	}
@@ -321,7 +374,8 @@ func (dp *DataPlane) RemovePolicy(policyKey string) error {
 		return fmt.Errorf("[DataPlane] error while removing policy: %w", err)
 	}
 
-	// modify IPSets
+	klog.Info("[DataPlane] successfully removed policy. now removing ipsets")
+
 	// FIXME: in Windows, should probably lock while Removing the Policy too to avoid races with Pod Controller's thread
 	dp.LockDataPlane()
 	defer dp.UnlockDataPlane()
@@ -338,7 +392,7 @@ func (dp *DataPlane) RemovePolicy(policyKey string) error {
 		return err
 	}
 
-	err = dp.ApplyDataPlane()
+	err = dp.applyIPSets()
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while applying dataplane: %w", err)
 	}

@@ -4,7 +4,10 @@ import (
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
 	"github.com/Azure/azure-container-networking/npm/util"
+	"k8s.io/klog"
 )
+
+const applyDataplaneMaxBatches = 50
 
 type GenericDataplane interface {
 	BootupDataplane() error
@@ -73,5 +76,53 @@ func (npmPod *updateNPMPod) updateIPSetsToAdd(setNames []*ipsets.IPSetMetadata) 
 func (npmPod *updateNPMPod) updateIPSetsToRemove(setNames []*ipsets.IPSetMetadata) {
 	for _, set := range setNames {
 		npmPod.IPSetsToRemove = append(npmPod.IPSetsToRemove, set.GetPrefixName())
+	}
+}
+
+type batchHelper struct {
+	numBatches        int
+	inBackground      bool
+	justAppliedSignal chan struct{}
+}
+
+func newBatchHelper(inBackground bool) *batchHelper {
+	var signal chan struct{}
+	if inBackground {
+		// FIXME not sure if we need a large buffer to prevent deadlock
+		// buffer of 1 works for local UTs
+		signal = make(chan struct{}, 123456)
+	}
+	return &batchHelper{
+		numBatches:        0,
+		inBackground:      inBackground,
+		justAppliedSignal: signal,
+	}
+}
+
+func (bh *batchHelper) incrementBatches() {
+	bh.numBatches += 1
+	klog.Infof("[DataPlane] incremented number of batches for ApplyDataPlane to %d", bh.numBatches)
+}
+
+func (bh *batchHelper) resetBatches() {
+	bh.numBatches = 0
+	klog.Info("[DataPlane] reset number of batches for ApplyDataPlane")
+}
+
+func (bh *batchHelper) maxBatches() int {
+	if bh.inBackground {
+		return applyDataplaneMaxBatches
+	}
+	return 1
+}
+
+func (bh *batchHelper) shouldApply() bool {
+	return bh.numBatches >= bh.maxBatches()
+}
+
+func (bh *batchHelper) markAsApplied() {
+	if bh.inBackground {
+		klog.Infof("[DataPlane] marking batchHelper as applied")
+		bh.justAppliedSignal <- struct{}{}
 	}
 }

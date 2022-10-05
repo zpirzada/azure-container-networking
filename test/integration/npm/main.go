@@ -29,6 +29,7 @@ var (
 			PolicyMode:           policies.IPSetPolicyMode,
 			PlaceAzureChainFirst: util.PlaceAzureChainFirst,
 		},
+		ShouldApplyIPSetsInBackground: true,
 	}
 
 	nodeName   = "testNode"
@@ -89,6 +90,7 @@ func main() {
 		NodeName: "",
 	}
 
+	dp.LockDataPlane()
 	// add all types of ipsets, some with members added
 	panicOnError(dp.AddToSets([]*ipsets.IPSetMetadata{ipsets.TestNSSet.Metadata}, podMetadata))
 	podMetadataB := &dataplane.PodMetadata{
@@ -106,9 +108,11 @@ func main() {
 	dp.CreateIPSets([]*ipsets.IPSetMetadata{ipsets.TestKVPodSet.Metadata, ipsets.TestNamedportSet.Metadata, ipsets.TestCIDRSet.Metadata})
 
 	panicOnError(dp.ApplyDataPlane())
+	dp.UnlockDataPlane()
 
 	printAndWait(true)
 
+	dp.LockDataPlane()
 	if includeLists {
 		panicOnError(dp.AddToLists([]*ipsets.IPSetMetadata{ipsets.TestKeyNSList.Metadata, ipsets.TestKVNSList.Metadata}, []*ipsets.IPSetMetadata{ipsets.TestNSSet.Metadata}))
 
@@ -125,7 +129,9 @@ func main() {
 	panicOnError(dp.AddToSets([]*ipsets.IPSetMetadata{ipsets.TestKeyPodSet.Metadata, ipsets.TestNSSet.Metadata}, podMetadataD))
 	dp.DeleteIPSet(ipsets.TestKVPodSet.Metadata, util.SoftDelete)
 	panicOnError(dp.ApplyDataPlane())
+	dp.UnlockDataPlane()
 
+	dp.LockDataPlane()
 	if includeLists {
 		panicOnError(dp.AddToLists([]*ipsets.IPSetMetadata{ipsets.TestNestedLabelList.Metadata}, []*ipsets.IPSetMetadata{ipsets.TestKVPodSet.Metadata, ipsets.TestNSSet.Metadata}))
 	}
@@ -135,6 +141,7 @@ func main() {
 
 	dp.DeleteIPSet(ipsets.TestNSSet.Metadata, util.SoftDelete)
 	panicOnError(dp.ApplyDataPlane())
+	dp.UnlockDataPlane()
 	printAndWait(true)
 
 	panicOnError(dp.AddPolicy(testNetPol))
@@ -151,8 +158,10 @@ func main() {
 		PodIP:    "10.240.0.91",
 		NodeName: nodeName,
 	}
+	dp.LockDataPlane()
 	panicOnError(dp.AddToSets([]*ipsets.IPSetMetadata{ipsets.TestKeyPodSet.Metadata, ipsets.TestNSSet.Metadata}, podMetadataD))
 	panicOnError(dp.ApplyDataPlane())
+	dp.UnlockDataPlane()
 	printAndWait(true)
 
 	panicOnError(dp.RemovePolicy(testNetPol.PolicyKey))
@@ -176,17 +185,20 @@ func main() {
 
 	unusedSet1 := ipsets.NewIPSetMetadata("unused-set1", ipsets.CIDRBlocks)
 	fmt.Printf("\ncreating an empty set, it should be deleted by reconcile: %s\n", unusedSet1.GetHashedName())
+	dp.LockDataPlane()
 	dp.CreateIPSets([]*ipsets.IPSetMetadata{unusedSet1})
 	panicOnError(dp.ApplyDataPlane())
+	dp.UnlockDataPlane()
 
 	fmt.Printf("sleeping %d seconds to allow reconcile (update the reconcile time in dataplane.go to be less than %d seconds)\n", finalSleepTimeInSeconds, finalSleepTimeInSeconds)
 	time.Sleep(time.Duration(finalSleepTimeInSeconds) * time.Second)
 
 	unusedSet2 := ipsets.NewIPSetMetadata("unused-set2", ipsets.CIDRBlocks)
 	fmt.Printf("\ncreating an unused set %s. The prior empty set %s should be deleted on this apply\n", unusedSet2.GetHashedName(), unusedSet1.GetHashedName())
+	dp.LockDataPlane()
 	dp.CreateIPSets([]*ipsets.IPSetMetadata{unusedSet2})
 	panicOnError(dp.ApplyDataPlane())
-
+	dp.UnlockDataPlane()
 }
 
 func panicOnError(err error) {

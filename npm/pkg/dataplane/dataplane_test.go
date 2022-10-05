@@ -26,6 +26,7 @@ var (
 			PolicyMode:           policies.IPSetPolicyMode,
 			PlaceAzureChainFirst: util.PlaceAzureChainFirst,
 		},
+		ShouldApplyIPSetsInBackground: false,
 	}
 
 	setPodKey1 = &ipsets.TranslatedIPSet{
