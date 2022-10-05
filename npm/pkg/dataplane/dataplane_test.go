@@ -26,7 +26,10 @@ var (
 			PolicyMode:           policies.IPSetPolicyMode,
 			PlaceAzureChainFirst: util.PlaceAzureChainFirst,
 		},
+		// TODO test all config options in UTs
+		// TODO add dp lock calls for modifying IPSets
 		ShouldApplyIPSetsInBackground: false,
+		EnableLock:                    false,
 	}
 
 	setPodKey1 = &ipsets.TranslatedIPSet{

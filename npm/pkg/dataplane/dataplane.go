@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	applyDataplaneMaxDuration = time.Duration(2 * time.Second)
+	// NOTE: with an apply duration < ~3 seconds, having any Policy calls will yield an effective max batch size of 1
+	applyDataplaneMaxDuration = time.Duration(30 * time.Second)
 	reconcileDuration         = time.Duration(5 * time.Minute)
 )
 
@@ -23,6 +24,7 @@ type PolicyMode string
 
 type Config struct {
 	ShouldApplyIPSetsInBackground bool
+	EnableLock                    bool
 	*ipsets.IPSetManagerCfg
 	*policies.PolicyManagerCfg
 }
@@ -148,11 +150,15 @@ func (dp *DataPlane) RunPeriodicTasks() {
 }
 
 func (dp *DataPlane) LockDataPlane() {
-	dp.dpLock.Lock()
+	if dp.EnableLock {
+		dp.dpLock.Lock()
+	}
 }
 
 func (dp *DataPlane) UnlockDataPlane() {
-	dp.dpLock.Unlock()
+	if dp.EnableLock {
+		dp.dpLock.Unlock()
+	}
 }
 
 func (dp *DataPlane) GetIPSet(setName string) *ipsets.IPSet {

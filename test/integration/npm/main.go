@@ -30,6 +30,7 @@ var (
 			PlaceAzureChainFirst: util.PlaceAzureChainFirst,
 		},
 		ShouldApplyIPSetsInBackground: true,
+		EnableLock:                    true,
 	}
 
 	nodeName   = "testNode"

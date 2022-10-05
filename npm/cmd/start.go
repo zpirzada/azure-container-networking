@@ -40,6 +40,7 @@ var npmV2DataplaneCfg = &dataplane.Config{
 		// NOTE: PlaceAzureChainFirst must be set later by the npm ConfigMap or default config
 	},
 	// ShouldApplyIPSetsInBackground is set below
+	// EnableLock is set below
 }
 
 func newStartNPMCmd() *cobra.Command {
@@ -134,8 +135,10 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 
 		if util.IsWindowsDP() {
 			npmV2DataplaneCfg.ShouldApplyIPSetsInBackground = true
+			npmV2DataplaneCfg.EnableLock = true
 		} else {
 			npmV2DataplaneCfg.ShouldApplyIPSetsInBackground = false
+			npmV2DataplaneCfg.EnableLock = false
 		}
 
 		dp, err = dataplane.NewDataPlane(models.GetNodeName(), common.NewIOShim(), npmV2DataplaneCfg, stopChannel)
