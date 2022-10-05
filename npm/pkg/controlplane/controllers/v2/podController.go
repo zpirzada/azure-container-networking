@@ -257,11 +257,17 @@ func (c *PodController) syncPod(key string) error {
 	// Get the Pod resource with this namespace/name
 	pod, err := c.podLister.Pods(namespace).Get(name)
 
-	// apply dataplane and record exec time after syncing
+	c.Lock()
+	c.dp.LockDataPlane()
+
+	// after syncing: unlock everything, apply dataplane, and record exec time
 	operationKind := metrics.NoOp
 	defer func() {
+		c.Unlock()
+
 		// No need to apply other controllers' changes if we don't touch the dataplane.
 		if operationKind == metrics.NoOp {
+			c.dp.UnlockDataPlane()
 			return
 		}
 
@@ -270,6 +276,7 @@ func (c *PodController) syncPod(key string) error {
 		}
 
 		dperr := c.dp.ApplyDataPlane()
+		c.dp.UnlockDataPlane()
 
 		// can't record this in another deferred func since deferred funcs are processed in LIFO order
 		metrics.RecordControllerPodExecTime(timer, operationKind, err != nil && dperr != nil)
@@ -282,9 +289,6 @@ func (c *PodController) syncPod(key string) error {
 			}
 		}
 	}()
-
-	c.Lock()
-	defer c.Unlock()
 
 	if err != nil {
 		if apierrors.IsNotFound(err) {

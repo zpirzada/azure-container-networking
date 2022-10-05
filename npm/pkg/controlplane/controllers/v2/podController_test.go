@@ -279,6 +279,9 @@ func TestAddMultiplePods(t *testing.T) {
 	podMetadata1 := dataplane.NewPodMetadata("test-ns/test-pod-1", "1.2.3.4", "")
 	podMetadata2 := dataplane.NewPodMetadata("test-ns/test-pod-2", "1.2.3.5", "")
 
+	// lock/unlock three times because there are three sync events
+	dp.EXPECT().LockDataPlane().Times(3)
+	dp.EXPECT().UnlockDataPlane().Times(3)
 	dp.EXPECT().AddToLists([]*ipsets.IPSetMetadata{kubeAllNamespaces}, mockIPSets[:1]).Return(nil).Times(1)
 	for _, metaData := range []*dataplane.PodMetadata{podMetadata1, podMetadata2} {
 		dp.EXPECT().AddToSets(mockIPSets[:1], metaData).Return(nil).Times(1)
@@ -337,6 +340,8 @@ func TestAddPod(t *testing.T) {
 	}
 	podMetadata1 := dataplane.NewPodMetadata("test-namespace/test-pod", "1.2.3.4", "")
 
+	dp.EXPECT().LockDataPlane().Times(1)
+	dp.EXPECT().UnlockDataPlane().Times(1)
 	dp.EXPECT().AddToLists([]*ipsets.IPSetMetadata{kubeAllNamespaces}, mockIPSets[:1]).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[:1], podMetadata1).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[1:], podMetadata1).Return(nil).Times(1)
@@ -411,6 +416,9 @@ func TestDeletePod(t *testing.T) {
 	}
 	podMetadata1 := dataplane.NewPodMetadata("test-namespace/test-pod", "1.2.3.4", "")
 
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists([]*ipsets.IPSetMetadata{kubeAllNamespaces}, mockIPSets[:1]).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[:1], podMetadata1).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[1:], podMetadata1).Return(nil).Times(1)
@@ -524,6 +532,9 @@ func TestDeletePodWithTombstoneAfterAddingPod(t *testing.T) {
 	}
 	podMetadata1 := dataplane.NewPodMetadata("test-namespace/test-pod", "1.2.3.4", "")
 
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists([]*ipsets.IPSetMetadata{kubeAllNamespaces}, mockIPSets[:1]).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[:1], podMetadata1).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[1:], podMetadata1).Return(nil).Times(1)
@@ -584,6 +595,9 @@ func TestLabelUpdatePod(t *testing.T) {
 	}
 	podMetadata1 := dataplane.NewPodMetadata("test-namespace/test-pod", "1.2.3.4", "")
 
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists([]*ipsets.IPSetMetadata{kubeAllNamespaces}, mockIPSets[:1]).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[:1], podMetadata1).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[1:], podMetadata1).Return(nil).Times(1)
@@ -638,6 +652,9 @@ func TestIPAddressUpdatePod(t *testing.T) {
 	}
 	podMetadata1 := dataplane.NewPodMetadata("test-namespace/test-pod", "1.2.3.4", "")
 
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists([]*ipsets.IPSetMetadata{kubeAllNamespaces}, mockIPSets[:1]).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[:1], podMetadata1).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[1:], podMetadata1).Return(nil).Times(1)
@@ -707,6 +724,9 @@ func TestPodStatusUpdatePod(t *testing.T) {
 	}
 	podMetadata1 := dataplane.NewPodMetadata("test-namespace/test-pod", "1.2.3.4", "")
 
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists([]*ipsets.IPSetMetadata{kubeAllNamespaces}, mockIPSets[:1]).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[:1], podMetadata1).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[1:], podMetadata1).Return(nil).Times(1)

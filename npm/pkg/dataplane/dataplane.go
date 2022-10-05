@@ -46,6 +46,7 @@ type DataPlane struct {
 	*Config
 	policyMgr *policies.PolicyManager
 	ipsetMgr  *ipsets.IPSetManager
+	dpLock    sync.Mutex
 	networkID string
 	nodeName  string
 	// endpointCache stores all endpoints of the network (including off-node)
@@ -107,14 +108,17 @@ func (dp *DataPlane) RunPeriodicTasks() {
 				// in Windows, does nothing
 				// in Linux, locks policy manager but can be interrupted
 				dp.policyMgr.Reconcile()
-
-				// the pod and namespace controllers won't retry failed calls to ApplyDataplane
-				if err := dp.ApplyDataPlane(); err != nil {
-					metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "[DataPlane] error: failed to apply dataplane in periodic tasks. err: %s", err.Error())
-				}
 			}
 		}
 	}()
+}
+
+func (dp *DataPlane) LockDataPlane() {
+	dp.dpLock.Lock()
+}
+
+func (dp *DataPlane) UnlockDataPlane() {
+	dp.dpLock.Unlock()
 }
 
 func (dp *DataPlane) GetIPSet(setName string) *ipsets.IPSet {
@@ -211,7 +215,8 @@ func (dp *DataPlane) RemoveFromList(listName *ipsets.IPSetMetadata, setNames []*
 // they do not change apply changes into dataplane. This function needs to be called at the
 // end of IPSet operations of a given controller event, it will check for the dirty ipset list
 // and accordingly makes changes in dataplane. This function helps emulate a single call to
-// dataplane instead of multiple ipset operations calls ipset operations calls to dataplane
+// dataplane instead of multiple ipset operations calls ipset operations calls to dataplane.
+// The dp MUST be locked when this function is called.
 func (dp *DataPlane) ApplyDataPlane() error {
 	err := dp.ipsetMgr.ApplyIPSets()
 	if err != nil {
@@ -255,6 +260,27 @@ func (dp *DataPlane) ApplyDataPlane() error {
 func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 	klog.Infof("[DataPlane] Add Policy called for %s", policy.PolicyKey)
 
+	// FIXME: in Windows, should probably lock while Adding the Policy too to avoid races with Pod Controller's thread
+	dp.LockDataPlane()
+	err := dp.addPolicyIPSets(policy)
+	dp.UnlockDataPlane()
+	if err != nil {
+		return fmt.Errorf("[DataPlane] error adding policy ipsets: %w", err)
+	}
+
+	endpointList, err := dp.getEndpointsToApplyPolicy(policy)
+	if err != nil {
+		return err
+	}
+
+	err = dp.policyMgr.AddPolicy(policy, endpointList)
+	if err != nil {
+		return fmt.Errorf("[DataPlane] error while adding policy: %w", err)
+	}
+	return nil
+}
+
+func (dp *DataPlane) addPolicyIPSets(policy *policies.NPMNetworkPolicy) error {
 	// Create and add references for Selector IPSets first
 	err := dp.createIPSetsAndReferences(policy.AllPodSelectorIPSets(), policy.PolicyKey, ipsets.SelectorType)
 	if err != nil {
@@ -275,15 +301,7 @@ func (dp *DataPlane) AddPolicy(policy *policies.NPMNetworkPolicy) error {
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while applying dataplane: %w", err)
 	}
-	endpointList, err := dp.getEndpointsToApplyPolicy(policy)
-	if err != nil {
-		return err
-	}
 
-	err = dp.policyMgr.AddPolicy(policy, endpointList)
-	if err != nil {
-		return fmt.Errorf("[DataPlane] error while adding policy: %w", err)
-	}
 	return nil
 }
 
@@ -302,6 +320,12 @@ func (dp *DataPlane) RemovePolicy(policyKey string) error {
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while removing policy: %w", err)
 	}
+
+	// modify IPSets
+	// FIXME: in Windows, should probably lock while Removing the Policy too to avoid races with Pod Controller's thread
+	dp.LockDataPlane()
+	defer dp.UnlockDataPlane()
+
 	// Remove references for Rule IPSets first
 	err = dp.deleteIPSetsAndReferences(policy.RuleIPSets, policy.PolicyKey, ipsets.NetPolType)
 	if err != nil {

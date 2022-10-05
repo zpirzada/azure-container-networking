@@ -204,6 +204,9 @@ func TestAddNamespace(t *testing.T) {
 		ipsets.NewIPSetMetadata("app:test-namespace", ipsets.KeyValueLabelOfNamespace),
 	}
 
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists(setsToAddNamespaceTo[1:], setsToAddNamespaceTo[:1]).Return(nil).Times(1)
 	// call ApplyDataplane only once since the second addNamespace call is a no-op
 	dp.EXPECT().ApplyDataPlane().Return(nil).Times(1)
@@ -262,6 +265,9 @@ func TestUpdateNamespace(t *testing.T) {
 		ipsets.NewIPSetMetadata("app:test-namespace", ipsets.KeyValueLabelOfNamespace),
 	}
 
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists(setsToAddNamespaceTo[1:], setsToAddNamespaceTo[:1]).Return(nil).Times(1)
 	dp.EXPECT().ApplyDataPlane().Return(nil).Times(2)
 	dp.EXPECT().RemoveFromList(setsToAddNamespaceTo[3], setsToAddNamespaceTo[:1]).Return(nil).Times(1)
@@ -329,6 +335,9 @@ func TestAddNamespaceLabel(t *testing.T) {
 		ipsets.NewIPSetMetadata("app:test-namespace", ipsets.KeyValueLabelOfNamespace),
 	}
 
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists(setsToAddNamespaceTo[1:], setsToAddNamespaceTo[:1]).Return(nil).Times(1)
 	dp.EXPECT().ApplyDataPlane().Return(nil).Times(2)
 	dp.EXPECT().RemoveFromList(setsToAddNamespaceTo[3], setsToAddNamespaceTo[:1]).Return(nil).Times(1)
@@ -400,6 +409,8 @@ func TestAddNamespaceLabelSameRv(t *testing.T) {
 		ipsets.NewIPSetMetadata("app:test-namespace", ipsets.KeyValueLabelOfNamespace),
 	}
 
+	dp.EXPECT().LockDataPlane().Times(1)
+	dp.EXPECT().UnlockDataPlane().Times(1)
 	dp.EXPECT().AddToLists(setsToAddNamespaceTo[1:], setsToAddNamespaceTo[:1]).Return(nil).Times(1)
 	dp.EXPECT().ApplyDataPlane().Return(nil).Times(1)
 
@@ -470,8 +481,13 @@ func TestDeleteandUpdateNamespaceLabel(t *testing.T) {
 	// and reflect.deepequal returns false if the order of slice is not equal.
 	// But we have multiple checks in following code which validate the desired behavior so using gomock.Any
 	// makes no difference
+
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists(gomock.Any(), setsToAddNamespaceTo[:1]).Return(nil).Times(1)
 	dp.EXPECT().ApplyDataPlane().Return(nil).Times(2)
+
 	setsToAddNamespaceToNew := []*ipsets.IPSetMetadata{
 		ipsets.NewIPSetMetadata("update:false", ipsets.KeyValueLabelOfNamespace),
 	}
@@ -555,6 +571,10 @@ func TestNewNameSpaceUpdate(t *testing.T) {
 	// and reflect.deepequal returns false if the order of slice is not equal.
 	// But we have multiple checks in following code which validate the desired behavior so using gomock.Any
 	// makes no difference
+
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists(gomock.Any(), setsToAddNamespaceTo[:1]).Return(nil).Times(1)
 	dp.EXPECT().ApplyDataPlane().Return(nil).Times(2)
 
@@ -617,6 +637,9 @@ func TestDeleteNamespace(t *testing.T) {
 		ipsets.NewIPSetMetadata("app:test-namespace", ipsets.KeyValueLabelOfNamespace),
 	}
 
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists(setsToAddNamespaceTo[1:], setsToAddNamespaceTo[:1]).Return(nil).Times(1)
 	dp.EXPECT().ApplyDataPlane().Return(nil).Times(2)
 
@@ -695,6 +718,9 @@ func TestDeleteNamespaceWithTombstoneAfterAddingNameSpace(t *testing.T) {
 		ipsets.NewIPSetMetadata("app:test-namespace", ipsets.KeyValueLabelOfNamespace),
 	}
 
+	// lock/unlock twice because there are two sync events
+	dp.EXPECT().LockDataPlane().Times(2)
+	dp.EXPECT().UnlockDataPlane().Times(2)
 	dp.EXPECT().AddToLists(setsToAddNamespaceTo[1:], setsToAddNamespaceTo[:1]).Return(nil).Times(1)
 	dp.EXPECT().ApplyDataPlane().Return(nil).Times(2)
 

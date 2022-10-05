@@ -18,6 +18,11 @@ type GenericDataplane interface {
 	AddToLists(listMetadatas []*ipsets.IPSetMetadata, setMetadatas []*ipsets.IPSetMetadata) error
 	RemoveFromList(listMetadata *ipsets.IPSetMetadata, setMetadatas []*ipsets.IPSetMetadata) error
 	ApplyDataPlane() error
+	// LockDataPlane must be called before making calls to modify IPSets/Lists, including ApplyDataPlane.
+	// For the Dataplane implementation, it should currently NOT be called for Add/Update/RemovePolicy.
+	LockDataPlane()
+	// UnlockDataPlane must be called when the consumer is done with the Lock.
+	UnlockDataPlane()
 	// GetAllPolicies is deprecated and only used in the goalstateprocessor, which is deprecated
 	GetAllPolicies() []string
 	AddPolicy(policies *policies.NPMNetworkPolicy) error

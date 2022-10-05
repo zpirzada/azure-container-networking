@@ -228,11 +228,18 @@ func (nsc *NamespaceController) syncNamespace(nsKey string) error {
 	// Get the Namespace resource with this key
 	nsObj, err := nsc.nameSpaceLister.Get(nsKey)
 
-	// apply dataplane and record exec time after syncing
+	// hold lock to avoid racing condition with PodController
+	nsc.npmNamespaceCache.Lock()
+	nsc.dp.LockDataPlane()
+
+	// after syncing: unlock everything, apply dataplane, and record exec time
 	operationKind := metrics.NoOp
 	defer func() {
+		nsc.npmNamespaceCache.Unlock()
+
 		// No need to apply other controllers' changes if we don't touch the dataplane.
 		if operationKind == metrics.NoOp {
+			nsc.dp.UnlockDataPlane()
 			return
 		}
 
@@ -241,6 +248,7 @@ func (nsc *NamespaceController) syncNamespace(nsKey string) error {
 		}
 
 		dperr := nsc.dp.ApplyDataPlane()
+		nsc.dp.UnlockDataPlane()
 
 		// NOTE: it may seem like Prometheus is considering some ns create events as updates.
 		// This happens when pod create events beat ns create events, so the pod controller will create the ipset
@@ -258,9 +266,6 @@ func (nsc *NamespaceController) syncNamespace(nsKey string) error {
 		}
 	}()
 
-	// hold lock to avoid racing condition with PodController
-	nsc.npmNamespaceCache.Lock()
-	defer nsc.npmNamespaceCache.Unlock()
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			klog.Infof("Namespace %s not found, may be it is deleted", nsKey)
