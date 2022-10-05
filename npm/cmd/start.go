@@ -135,7 +135,7 @@ func start(config npmconfig.Config, flags npmconfig.Flags) error {
 
 		if util.IsWindowsDP() {
 			npmV2DataplaneCfg.ShouldApplyIPSetsInBackground = true
-			npmV2DataplaneCfg.EnableLock = true
+			npmV2DataplaneCfg.EnableLock = false
 		} else {
 			npmV2DataplaneCfg.ShouldApplyIPSetsInBackground = false
 			npmV2DataplaneCfg.EnableLock = false

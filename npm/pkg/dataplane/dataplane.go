@@ -16,7 +16,7 @@ import (
 
 const (
 	// NOTE: with an apply duration < ~3 seconds, having any Policy calls will yield an effective max batch size of 1
-	applyDataplaneMaxDuration = time.Duration(30 * time.Second)
+	applyDataplaneMaxDuration = time.Duration(8 * time.Minute)
 	reconcileDuration         = time.Duration(5 * time.Minute)
 )
 
@@ -183,22 +183,22 @@ func (dp *DataPlane) AddToSets(setNames []*ipsets.IPSetMetadata, podMetadata *Po
 	if err != nil {
 		return fmt.Errorf("[DataPlane] error while adding to set: %w", err)
 	}
-	if dp.shouldUpdatePod() {
-		klog.Infof("[DataPlane] Updating Sets to Add for pod key %s", podMetadata.PodKey)
+	// if dp.shouldUpdatePod() {
+	// 	klog.Infof("[DataPlane] Updating Sets to Add for pod key %s", podMetadata.PodKey)
 
-		// lock updatePodCache while reading/modifying or setting the updatePod in the cache
-		dp.updatePodCache.Lock()
-		defer dp.updatePodCache.Unlock()
+	// 	// lock updatePodCache while reading/modifying or setting the updatePod in the cache
+	// 	dp.updatePodCache.Lock()
+	// 	defer dp.updatePodCache.Unlock()
 
-		updatePod, ok := dp.updatePodCache.cache[podMetadata.PodKey]
-		if !ok {
-			klog.Infof("[DataPlane] {AddToSet} pod key %s not found in updatePodCache. creating a new obj", podMetadata.PodKey)
-			updatePod = newUpdateNPMPod(podMetadata)
-			dp.updatePodCache.cache[podMetadata.PodKey] = updatePod
-		}
+	// 	updatePod, ok := dp.updatePodCache.cache[podMetadata.PodKey]
+	// 	if !ok {
+	// 		klog.Infof("[DataPlane] {AddToSet} pod key %s not found in updatePodCache. creating a new obj", podMetadata.PodKey)
+	// 		updatePod = newUpdateNPMPod(podMetadata)
+	// 		dp.updatePodCache.cache[podMetadata.PodKey] = updatePod
+	// 	}
 
-		updatePod.updateIPSetsToAdd(setNames)
-	}
+	// 	updatePod.updateIPSetsToAdd(setNames)
+	// }
 
 	return nil
 }
@@ -211,22 +211,22 @@ func (dp *DataPlane) RemoveFromSets(setNames []*ipsets.IPSetMetadata, podMetadat
 		return fmt.Errorf("[DataPlane] error while removing from set: %w", err)
 	}
 
-	if dp.shouldUpdatePod() {
-		klog.Infof("[DataPlane] Updating Sets to Remove for pod key %s", podMetadata.PodKey)
+	// if dp.shouldUpdatePod() {
+	// 	klog.Infof("[DataPlane] Updating Sets to Remove for pod key %s", podMetadata.PodKey)
 
-		// lock updatePodCache while reading/modifying or setting the updatePod in the cache
-		dp.updatePodCache.Lock()
-		defer dp.updatePodCache.Unlock()
+	// 	// lock updatePodCache while reading/modifying or setting the updatePod in the cache
+	// 	dp.updatePodCache.Lock()
+	// 	defer dp.updatePodCache.Unlock()
 
-		updatePod, ok := dp.updatePodCache.cache[podMetadata.PodKey]
-		if !ok {
-			klog.Infof("[DataPlane] {RemoveFromSet} pod key %s not found in updatePodCache. creating a new obj", podMetadata.PodKey)
-			updatePod = newUpdateNPMPod(podMetadata)
-			dp.updatePodCache.cache[podMetadata.PodKey] = updatePod
-		}
+	// 	updatePod, ok := dp.updatePodCache.cache[podMetadata.PodKey]
+	// 	if !ok {
+	// 		klog.Infof("[DataPlane] {RemoveFromSet} pod key %s not found in updatePodCache. creating a new obj", podMetadata.PodKey)
+	// 		updatePod = newUpdateNPMPod(podMetadata)
+	// 		dp.updatePodCache.cache[podMetadata.PodKey] = updatePod
+	// 	}
 
-		updatePod.updateIPSetsToRemove(setNames)
-	}
+	// 	updatePod.updateIPSetsToRemove(setNames)
+	// }
 
 	return nil
 }
@@ -266,36 +266,36 @@ func (dp *DataPlane) ApplyDataPlane() error {
 		}
 	}
 
-	if dp.shouldUpdatePod() {
-		err := dp.refreshAllPodEndpoints()
-		if err != nil {
-			metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "[DataPlane] failed to refresh endpoints while updating pods. err: [%s]", err.Error())
-			return fmt.Errorf("[DataPlane] failed to refresh endpoints while updating pods. err: [%w]", err)
-		}
+	// if dp.shouldUpdatePod() {
+	// 	err := dp.refreshAllPodEndpoints()
+	// 	if err != nil {
+	// 		metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "[DataPlane] failed to refresh endpoints while updating pods. err: [%s]", err.Error())
+	// 		return fmt.Errorf("[DataPlane] failed to refresh endpoints while updating pods. err: [%w]", err)
+	// 	}
 
-		// lock updatePodCache while driving goal state to kernel
-		// prevents another ApplyDataplane call from updating the same pods
-		dp.updatePodCache.Lock()
-		defer dp.updatePodCache.Unlock()
+	// 	// lock updatePodCache while driving goal state to kernel
+	// 	// prevents another ApplyDataplane call from updating the same pods
+	// 	dp.updatePodCache.Lock()
+	// 	defer dp.updatePodCache.Unlock()
 
-		var aggregateErr error
-		for podKey, pod := range dp.updatePodCache.cache {
-			err := dp.updatePod(pod)
-			if err != nil {
-				if aggregateErr == nil {
-					aggregateErr = fmt.Errorf("failed to update pod while applying the dataplane. key: [%s], err: [%w]", podKey, err)
-				} else {
-					aggregateErr = fmt.Errorf("failed to update pod while applying the dataplane. key: [%s], err: [%s]. previous err: [%w]", podKey, err.Error(), aggregateErr)
-				}
-				metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "failed to update pod while applying the dataplane. key: [%s], err: [%s]", podKey, err.Error())
-				continue
-			}
-			delete(dp.updatePodCache.cache, podKey)
-		}
-		if aggregateErr != nil {
-			return fmt.Errorf("[DataPlane] error while updating pods: %w", err)
-		}
-	}
+	// 	var aggregateErr error
+	// 	for podKey, pod := range dp.updatePodCache.cache {
+	// 		err := dp.updatePod(pod)
+	// 		if err != nil {
+	// 			if aggregateErr == nil {
+	// 				aggregateErr = fmt.Errorf("failed to update pod while applying the dataplane. key: [%s], err: [%w]", podKey, err)
+	// 			} else {
+	// 				aggregateErr = fmt.Errorf("failed to update pod while applying the dataplane. key: [%s], err: [%s]. previous err: [%w]", podKey, err.Error(), aggregateErr)
+	// 			}
+	// 			metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "failed to update pod while applying the dataplane. key: [%s], err: [%s]", podKey, err.Error())
+	// 			continue
+	// 		}
+	// 		delete(dp.updatePodCache.cache, podKey)
+	// 	}
+	// 	if aggregateErr != nil {
+	// 		return fmt.Errorf("[DataPlane] error while updating pods: %w", err)
+	// 	}
+	// }
 	return nil
 }
 

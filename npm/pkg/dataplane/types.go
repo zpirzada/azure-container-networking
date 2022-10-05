@@ -7,7 +7,7 @@ import (
 	"k8s.io/klog"
 )
 
-const applyDataplaneMaxBatches = 50
+const applyDataplaneMaxBatches = 999
 
 type GenericDataplane interface {
 	BootupDataplane() error
