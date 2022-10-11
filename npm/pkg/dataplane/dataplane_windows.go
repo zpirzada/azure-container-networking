@@ -25,78 +25,15 @@ var (
 )
 
 func (dp *DataPlane) testHNSRefresh() {
-	// sleepDuration := 1 * time.Minute
-
 	klog.Infof("DEBUGME: Getting ALL endpoints for Network ID %s", dp.networkID)
 	timer := metrics.StartNewTimer()
 	endpoints, err := dp.ioShim.Hns.ListEndpointsOfNetwork(dp.networkID)
 	if err != nil {
 		klog.Errorf("DEBUGME: FAILED LIST Getting ALL endpoints for Network ID %s", dp.networkID)
 	} else {
-		metrics.RecordHNSRefreshExecTime(timer, "all", len(endpoints))
+		metrics.RecordHNSRefreshExecTime(timer, len(endpoints))
 		klog.Infof("DEBUGME: SUCCESS Getting ALL endpoints for Network ID %s. There were %d endpoints", dp.networkID, len(endpoints))
 	}
-
-	// time.Sleep(sleepDuration)
-
-	// hcnQuery := hcn.HostComputeQuery{
-	// 	SchemaVersion: hcn.SchemaVersion{
-	// 		Major: 1,
-	// 		Minor: 0,
-	// 	},
-	// 	Flags: hcn.HostComputeQueryFlagsNone,
-	// }
-	// filterMap := map[string]string{"VirtualNetwork": dp.networkID, "IsRemoteEndpoint": "False"}
-	// filter, err := json.Marshal(filterMap)
-	// if err != nil {
-	// 	klog.Errorf("DEBUGME: FAILED MARSHAL Getting LOCAL endpoints for Network ID %s", dp.networkID)
-	// } else {
-	// 	hcnQuery.Filter = string(filter)
-	// 	klog.Infof("DEBUGME: Getting LOCAL endpoints for Network ID %s", dp.networkID)
-	// 	timer := metrics.StartNewTimer()
-	// 	endpoints, err := dp.ioShim.Hns.ListEndpointsQuery(hcnQuery)
-	// 	if err != nil {
-	// 		klog.Errorf("DEBUGME: FAILED LIST Getting LOCAL endpoints for Network ID %s", dp.networkID)
-	// 	} else {
-	// 		metrics.RecordHNSRefreshExecTime(timer, "local", len(endpoints))
-	// 		klog.Infof("DEBUGME: SUCCESS Getting LOCAL endpoints for Network ID %s. There were %d endpoints", dp.networkID, len(endpoints))
-	// 	}
-	// }
-
-	// time.Sleep(sleepDuration)
-
-	// hcnQuery = hcn.HostComputeQuery{
-	// 	SchemaVersion: hcn.SchemaVersion{
-	// 		Major: 1,
-	// 		Minor: 0,
-	// 	},
-	// 	Flags: hcn.HostComputeQueryFlagsNone,
-	// }
-	// podKey := "UNSPECIFIED"
-	// var updatePod *updateNPMPod
-	// for podKey, updatePod = range dp.updatePodCache.cache {
-	// 	break
-	// }
-	// if updatePod == nil {
-	// 	klog.Infof("DEBUGME: NO PODS for Getting SINGLE endpoint for Network ID %s.", dp.networkID)
-	// 	return
-	// }
-	// filterMap["IPAddress"] = updatePod.PodIP
-	// filter, err = json.Marshal(filterMap)
-	// if err != nil {
-	// 	klog.Errorf("DEBUGME: FAILED MARSHAL Getting SINGLE endpoint for Network ID %s", dp.networkID)
-	// 	return
-	// }
-	// hcnQuery.Filter = string(filter)
-	// klog.Infof("DEBUGME: Getting SINGLE endpoint for Network ID %s, Pod key %s, IP %s", dp.networkID, podKey, updatePod.PodIP)
-	// timer = metrics.StartNewTimer()
-	// endpoints, err = dp.ioShim.Hns.ListEndpointsQuery(hcnQuery)
-	// if err != nil {
-	// 	klog.Errorf("DEBUGME: FAILED LIST Getting SINGLE endpoint for Network ID %s", dp.networkID)
-	// } else {
-	// 	metrics.RecordHNSRefreshExecTime(timer, "single", len(endpoints))
-	// 	klog.Infof("DEBUGME: SUCCESS Getting SINGLE endpoint for Network ID %s. There were %d endpoints", dp.networkID, len(endpoints))
-	// }
 }
 
 // initializeDataPlane will help gather network and endpoint details
