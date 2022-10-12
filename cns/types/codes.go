@@ -40,6 +40,8 @@ const (
 	UnsupportedNCVersion                   ResponseCode = 38
 	FailedToRunIPTableCmd                  ResponseCode = 39
 	NilEndpointStateStore                  ResponseCode = 40
+	NmAgentServerInternalError             ResponseCode = 42
+	NmAgentBadRequestError                 ResponseCode = 43
 	UnexpectedError                        ResponseCode = 99
 )
 

@@ -1478,3 +1478,57 @@ func (service *HTTPRestService) nmAgentSupportedApisHandler(w http.ResponseWrite
 
 	logger.Response(service.Name, nmAgentSupportedApisResponse, resp.ReturnCode, serviceErr)
 }
+
+func (service *HTTPRestService) registerNode(w http.ResponseWriter, r *http.Request) {
+	logger.Printf("[Azure CNS] registerNode")
+	logger.Request(service.Name, "registerNode", nil)
+
+	var (
+		returnCode    types.ResponseCode
+		req           cns.RegisterNodeRequest
+		returnMessage string
+		err           error
+		resp          *http.Response
+	)
+
+	err = service.Listener.Decode(w, r, &req)
+	logger.Request(service.Name, &req, err)
+
+	if err != nil {
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPost:
+		resp, err = service.nmagentClient.RegisterNode(&req)
+		if err != nil {
+			returnCode = types.UnexpectedError
+			returnMessage = fmt.Sprintf("[Azure CNS] Error. registerNode failed %v", err.Error())
+		} else {
+			defer resp.Body.Close()
+			switch resp.StatusCode {
+			case http.StatusOK:
+				returnMessage = "[Azure CNS] registerNode Successes!"
+				return
+			case http.StatusInternalServerError:
+				returnMessage = "[Azure CNS] Error. registerNode failed due to Nmagent server internal error."
+				returnCode = types.NmAgentServerInternalError
+			case http.StatusBadRequest:
+				returnMessage = "[Azure CNS] Error. registerNode failed due to bad request error."
+				returnCode = types.NmAgentBadRequestError
+
+			default:
+				returnMessage = fmt.Sprintf("[Azure CNS] Error. registerNode failed with StatusCode: %d", resp.StatusCode)
+				returnCode = types.UnexpectedError
+			}
+		}
+
+	default:
+		returnMessage = "[Azure CNS] Error. registerNode did not receive a POST."
+		returnCode = types.UnsupportedVerb
+	}
+	cnsResponse := cns.Response{ReturnCode: returnCode, Message: returnMessage}
+
+	serviceErr := service.Listener.Encode(w, &cnsResponse)
+	logger.Response(service.Name, cnsResponse, returnCode, serviceErr)
+}

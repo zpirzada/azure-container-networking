@@ -10,6 +10,7 @@ import (
 	"context"
 
 	"github.com/Azure/azure-container-networking/nmagent"
+	"github.com/Azure/azure-container-networking/cns"
 )
 
 // NMAgentClientFake can be used to query to VM Host info.
@@ -20,6 +21,7 @@ type NMAgentClientFake struct {
 	SupportedAPIsF          func(context.Context) ([]string, error)
 	GetNCVersionF           func(context.Context, nmagent.NCVersionRequest) (nmagent.NCVersion, error)
 	GetNCVersionListF       func(context.Context) (nmagent.NCVersionList, error)
+	RegisterNodeFunc     func() (*cns.RegisterNodeResponse, error)
 }
 
 func (c *NMAgentClientFake) PutNetworkContainer(ctx context.Context, req *nmagent.PutNetworkContainerRequest) error {
@@ -44,4 +46,8 @@ func (c *NMAgentClientFake) GetNCVersion(ctx context.Context, req nmagent.NCVers
 
 func (c *NMAgentClientFake) GetNCVersionList(ctx context.Context) (nmagent.NCVersionList, error) {
 	return c.GetNCVersionListF(ctx)
+}
+
+func (c *NMAgentClientFake) RegisterNode() (*cns.RegisterNodeResponse, error) {
+	return c.RegisterNodeFunc()
 }
