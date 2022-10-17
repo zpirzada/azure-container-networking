@@ -387,3 +387,38 @@ func (NCVersionListRequest) Validate() error {
 	// cannot be made invalid it's fine for this to simply...
 	return nil
 }
+
+var _ Request = &RegisterNodeStandAloneRequest{}
+
+type RegisterNodeStandAloneRequest struct {
+	HomeAz string
+}
+
+// Body is a no-op method to satisfy the Request interface while indicating
+// that there is no body for a RegisterNodeStandAlone Request.
+func (r *RegisterNodeStandAloneRequest) Body() (io.Reader, error) {
+	return nil, nil
+}
+
+// Method indicates that RegisterNodeStandAlone requests are POST requests.
+func (r *RegisterNodeStandAloneRequest) Method() string {
+	return http.MethodPost
+}
+
+// Path returns the necessary URI path for invoking a RegisterNodeStandAlone request.
+func (r *RegisterNodeStandAloneRequest) Path() string {
+	return "/RegisterNode"
+}
+
+// Validate is a no-op method because RegisterNodeStandAloneRequest have no parameters,
+// and therefore can never be invalid.
+func (r *RegisterNodeStandAloneRequest) Validate() error {
+	err := internal.ValidationError{}
+	if r.HomeAz == "" {
+		err.MissingFields = append(err.MissingFields, "HomeAz")
+	}
+	if err.IsEmpty() {
+		return nil
+	}
+	return err
+}

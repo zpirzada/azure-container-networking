@@ -19,6 +19,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/types"
 	"github.com/Azure/azure-container-networking/cns/wireserver"
 	nma "github.com/Azure/azure-container-networking/nmagent"
+	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/platform"
 	"github.com/pkg/errors"
 )
@@ -1482,47 +1483,46 @@ func (service *HTTPRestService) nmAgentSupportedApisHandler(w http.ResponseWrite
 func (service *HTTPRestService) registerNode(w http.ResponseWriter, r *http.Request) {
 	logger.Printf("[Azure CNS] registerNode")
 	logger.Request(service.Name, "registerNode", nil)
+	ctx := r.Context()
 
 	var (
 		returnCode    types.ResponseCode
 		req           cns.RegisterNodeRequest
 		returnMessage string
 		err           error
-		resp          *http.Response
 	)
 
 	err = service.Listener.Decode(w, r, &req)
 	logger.Request(service.Name, &req, err)
-
 	if err != nil {
 		return
 	}
 
 	switch r.Method {
 	case http.MethodPost:
-		resp, err = service.nmagentClient.RegisterNode(&req)
+		rnr := nma.RegisterNodeStandAloneRequest{
+			HomeAz: req.HomeAz,
+		}
+		err = service.nmagentMultiClient.NewClient.RegisterNodeStandAlone(ctx, rnr)
 		if err != nil {
-			returnCode = types.UnexpectedError
-			returnMessage = fmt.Sprintf("[Azure CNS] Error. registerNode failed %v", err.Error())
-		} else {
-			defer resp.Body.Close()
-			switch resp.StatusCode {
-			case http.StatusOK:
-				returnMessage = "[Azure CNS] registerNode Successes!"
-				return
-			case http.StatusInternalServerError:
-				returnMessage = "[Azure CNS] Error. registerNode failed due to Nmagent server internal error."
-				returnCode = types.NmAgentServerInternalError
-			case http.StatusBadRequest:
-				returnMessage = "[Azure CNS] Error. registerNode failed due to bad request error."
-				returnCode = types.NmAgentBadRequestError
-
-			default:
-				returnMessage = fmt.Sprintf("[Azure CNS] Error. registerNode failed with StatusCode: %d", resp.StatusCode)
+			apiError := nma.Error{}
+			if ok := errors.As(err, &apiError); ok {
+				switch apiError.StatusCode() {
+				case http.StatusInternalServerError:
+					returnMessage = "[Azure CNS] Error. registerNode failed due to Nmagent server internal error."
+					returnCode = types.NmAgentServerInternalError
+				case http.StatusBadRequest:
+					returnMessage = "[Azure CNS] Error. registerNode failed due to bad request error."
+					returnCode = types.NmAgentBadRequestError
+				default:
+					returnCode = types.UnexpectedError
+					returnMessage = fmt.Sprintf("[Azure CNS] Error. registerNode failed with StatusCode: %d", apiError.StatusCode())
+				}
+			} else {
 				returnCode = types.UnexpectedError
+				returnMessage = fmt.Sprintf("[Azure CNS] Error. registerNode failed %v", err.Error())
 			}
 		}
-
 	default:
 		returnMessage = "[Azure CNS] Error. registerNode did not receive a POST."
 		returnCode = types.UnsupportedVerb

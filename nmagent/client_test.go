@@ -622,3 +622,67 @@ func TestGetNCVersionList(t *testing.T) {
 		})
 	}
 }
+
+func TestNMAgentRegisterNodeStandAlone(t *testing.T) {
+	tests := []struct {
+		name      string
+		req       nmagent.RegisterNodeStandAloneRequest
+		expPath   string
+		resp      map[string]interface{}
+		shouldErr bool
+	}{
+		{
+			"happy path",
+			nmagent.RegisterNodeStandAloneRequest{HomeAz: "az01"},
+			"/machine/plugins/?comp=nmagent&type=RegisterNode",
+			map[string]interface{}{
+				"httpStatusCode": "200",
+			},
+			false,
+		},
+		{
+			"non-200",
+			nmagent.RegisterNodeStandAloneRequest{HomeAz: "az01"},
+			"/machine/plugins/?comp=nmagent&type=RegisterNode",
+			map[string]interface{}{
+				"httpStatusCode": "500",
+			},
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			var gotPath string
+			client := nmagent.NewTestClient(&TestTripper{
+				RoundTripF: func(req *http.Request) (*http.Response, error) {
+					gotPath = req.URL.Path
+					rr := httptest.NewRecorder()
+					err := json.NewEncoder(rr).Encode(test.resp)
+					if err != nil {
+						t.Fatal("unexpected error encoding response: err:", err)
+					}
+					rr.WriteHeader(http.StatusOK)
+					return rr.Result(), nil
+				},
+			})
+
+			err := client.RegisterNodeStandAlone(context.TODO(), test.req)
+			if err != nil && !test.shouldErr {
+				t.Fatal("unexpected error: err:", err)
+			}
+
+			if err == nil && test.shouldErr {
+				fmt.Println(err)
+				t.Fatal("expected error but received none")
+			}
+
+			if gotPath != test.expPath {
+				t.Error("paths differ: got:", gotPath, "exp:", test.expPath)
+			}
+		})
+	}
+}

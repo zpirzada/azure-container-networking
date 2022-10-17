@@ -3,7 +3,6 @@ package restserver
 import (
 	"context"
 	"net"
-	"net/http"
 	"sync"
 	"time"
 

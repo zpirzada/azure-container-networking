@@ -338,7 +338,7 @@ type NmAgentSupportedApisResponse struct {
 	SupportedApis []string
 }
 type RegisterNodeRequest struct {
-	FQDN []string `json:"fqdn"`
+	HomeAz string
 }
 
 type RegisterNodeResponse struct {

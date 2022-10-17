@@ -484,3 +484,41 @@ func TestNCVersionRequestValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestNCVersionRequestValidate(t *testing.T) {
+	tests := []struct {
+		name          string
+		req           nmagent.RegisterNodeStandAloneRequest
+		shouldBeValid bool
+	}{
+		{
+			"empty",
+			nmagent.RegisterNodeStandAloneRequest{},
+			false,
+		},
+
+		{
+			"with HomeAz",
+			nmagent.RegisterNodeStandAloneRequest{
+				HomeAz: "az01",
+			},
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := test.req.Validate()
+			if err != nil && test.shouldBeValid {
+				t.Fatal("request was not valid when it should have been: err:", err)
+			}
+
+			if err == nil && !test.shouldBeValid {
+				t.Fatal("expected request to be invalid when it was valid")
+			}
+		})
+	}
+}
