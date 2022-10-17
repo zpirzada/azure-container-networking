@@ -340,7 +340,3 @@ type NmAgentSupportedApisResponse struct {
 type RegisterNodeRequest struct {
 	HomeAz string
 }
-
-type RegisterNodeResponse struct {
-	Response Response
-}
