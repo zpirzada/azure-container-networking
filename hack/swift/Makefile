@@ -9,6 +9,7 @@ AZCLI   ?= docker run -v $(AZCFG):/root/.azure -v $(KUBECFG):/root/.kube -v $(SS
 
 # overrideable variables
 USER       ?= $(whoami)
+OSSKU      ?= Ubuntu
 CLUSTER    ?= $(USER)-$(REGION)
 GROUP      ?= $(CLUSTER)
 REGION     ?= centraluseuap
@@ -84,6 +85,7 @@ byocni-up: rg-up net-up ## Brings up a swift cluster $name in $SUB/$REGION
 		--vnet-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/nodenet \
 		--pod-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/podnet \
 		--generate-ssh-keys \
+		--os-sku $(OSSKU)
 		--yes
 	@$(MAKE) set-kubeconf
 
