@@ -19,7 +19,6 @@ import (
 	"github.com/Azure/azure-container-networking/cns/types"
 	"github.com/Azure/azure-container-networking/cns/wireserver"
 	nma "github.com/Azure/azure-container-networking/nmagent"
-	"github.com/Azure/azure-container-networking/common"
 	"github.com/Azure/azure-container-networking/platform"
 	"github.com/pkg/errors"
 )
@@ -1480,21 +1479,19 @@ func (service *HTTPRestService) nmAgentSupportedApisHandler(w http.ResponseWrite
 	logger.Response(service.Name, nmAgentSupportedApisResponse, resp.ReturnCode, serviceErr)
 }
 
-func (service *HTTPRestService) registerNode(w http.ResponseWriter, r *http.Request) {
-	logger.Printf("[Azure CNS] registerNode")
-	logger.Request(service.Name, "registerNode", nil)
+// registerNodeStandAlone calls nmagent to create context selector in the specific AZ
+func (service *HTTPRestService) registerNodeStandAlone(w http.ResponseWriter, r *http.Request) {
+	logger.Printf("[Azure CNS] registerNodeStandAlone")
+	logger.Request(service.Name, "registerNodeStandAlone", nil)
 	ctx := r.Context()
 
-	var (
-		returnCode    types.ResponseCode
-		req           cns.RegisterNodeRequest
-		returnMessage string
-		err           error
-	)
-
-	err = service.Listener.Decode(w, r, &req)
+	var req cns.RegisterNodeRequest
+	err := service.Listener.Decode(w, r, &req)
 	logger.Request(service.Name, &req, err)
 	if err != nil {
+		returnMessage := fmt.Sprintf("[Azure CNS] registerNodeStandAlone failed in decoding request, %v", err)
+		returnCode := types.UnexpectedError
+		service.setResponse(w, returnCode, cns.Response{Message: returnMessage, ReturnCode: returnCode})
 		return
 	}
 
@@ -1503,32 +1500,43 @@ func (service *HTTPRestService) registerNode(w http.ResponseWriter, r *http.Requ
 		rnr := nma.RegisterNodeStandAloneRequest{
 			HomeAz: req.HomeAz,
 		}
-		err = service.nmagentMultiClient.NewClient.RegisterNodeStandAlone(ctx, rnr)
+		err = service.nma.RegisterNodeStandAlone(ctx, rnr)
 		if err != nil {
 			apiError := nma.Error{}
 			if ok := errors.As(err, &apiError); ok {
 				switch apiError.StatusCode() {
 				case http.StatusInternalServerError:
-					returnMessage = "[Azure CNS] Error. registerNode failed due to Nmagent server internal error."
-					returnCode = types.NmAgentServerInternalError
+					returnMessage := "[Azure CNS] Error. registerNodeStandAlone failed due to Nmagent server internal error."
+					returnCode := types.NmAgentServerInternalError
+					service.setResponse(w, returnCode, cns.Response{Message: returnMessage, ReturnCode: returnCode})
+					return
+				case http.StatusUnauthorized:
+					returnMessage := "[Azure CNS] Error. registerNodeStandAlone failed to authenticate with OwningServiceInstanceId"
+					returnCode := types.StatusUnauthorized
+					service.setResponse(w, returnCode, cns.Response{Message: returnMessage, ReturnCode: returnCode})
+					return
 				case http.StatusBadRequest:
-					returnMessage = "[Azure CNS] Error. registerNode failed due to bad request error."
-					returnCode = types.NmAgentBadRequestError
+					returnMessage := "[Azure CNS] Error. registerNodeStandAlone failed due to bad request error."
+					returnCode := types.NmAgentBadRequestError
+					service.setResponse(w, returnCode, cns.Response{Message: returnMessage, ReturnCode: returnCode})
+					return
 				default:
-					returnCode = types.UnexpectedError
-					returnMessage = fmt.Sprintf("[Azure CNS] Error. registerNode failed with StatusCode: %d", apiError.StatusCode())
+					returnCode := types.UnexpectedError
+					returnMessage := fmt.Sprintf("[Azure CNS] Error. registerNodeStandAlone failed with StatusCode: %d", apiError.StatusCode())
+					service.setResponse(w, returnCode, cns.Response{Message: returnMessage, ReturnCode: returnCode})
+					return
 				}
-			} else {
-				returnCode = types.UnexpectedError
-				returnMessage = fmt.Sprintf("[Azure CNS] Error. registerNode failed %v", err.Error())
 			}
+			returnCode := types.UnexpectedError
+			returnMessage := fmt.Sprintf("[Azure CNS] Error. registerNodeStandAlone failed %v", err.Error())
+			service.setResponse(w, returnCode, cns.Response{Message: returnMessage, ReturnCode: returnCode})
+			return
 		}
-	default:
-		returnMessage = "[Azure CNS] Error. registerNode did not receive a POST."
-		returnCode = types.UnsupportedVerb
-	}
-	cnsResponse := cns.Response{ReturnCode: returnCode, Message: returnMessage}
+		service.setResponse(w, types.Success, cns.Response{})
 
-	serviceErr := service.Listener.Encode(w, &cnsResponse)
-	logger.Response(service.Name, cnsResponse, returnCode, serviceErr)
+	default:
+		returnMessage := "[Azure CNS] Error. registerNodeStandAlone did not receive a POST."
+		returnCode := types.UnsupportedVerb
+		service.setResponse(w, returnCode, cns.Response{Message: returnMessage, ReturnCode: returnCode})
+	}
 }

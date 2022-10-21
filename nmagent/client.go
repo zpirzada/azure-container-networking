@@ -235,6 +235,7 @@ func (c *Client) GetNCVersionList(ctx context.Context) (NCVersionList, error) {
 	return out, nil
 }
 
+// RegisterNodeStandAlone calls nmagent to create context selector in the specific AZ
 func (c *Client) RegisterNodeStandAlone(ctx context.Context, rnr RegisterNodeStandAloneRequest) error {
 	req, err := c.buildRequest(ctx, &rnr)
 	if err != nil {

@@ -485,7 +485,7 @@ func TestNCVersionRequestValidate(t *testing.T) {
 	}
 }
 
-func TestNCVersionRequestValidate(t *testing.T) {
+func TestRegisterNodeStandAloneValidate(t *testing.T) {
 	tests := []struct {
 		name          string
 		req           nmagent.RegisterNodeStandAloneRequest

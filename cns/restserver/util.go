@@ -923,3 +923,8 @@ func (service *HTTPRestService) createNetworkContainers(createNetworkContainerRe
 		Message:    "",
 	}
 }
+
+func (service *HTTPRestService) setResponse(w http.ResponseWriter, returnCode types.ResponseCode, response interface{}) {
+	serviceErr := service.Listener.Encode(w, &response)
+	logger.Response(service.Name, response, returnCode, serviceErr)
+}

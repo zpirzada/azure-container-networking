@@ -41,6 +41,7 @@ var clientPaths = []string{
 	cns.NMAgentSupportedAPIs,
 	cns.DeleteNetworkContainer,
 	cns.NetworkContainersURLPath,
+	cns.RegisterNodeStandAlone,
 }
 
 type do interface {
@@ -809,5 +810,47 @@ func (c *Client) PostAllNetworkContainers(ctx context.Context, createNcRequest c
 		return errors.Wrap(err, "decoding PostNetworkContainersResponse as JSON")
 	}
 
+	return nil
+}
+
+// RegisterNodeStandAlone calls nmagent to create context selector in the specific AZ
+func (c *Client) RegisterNodeStandAlone(ctx context.Context, registerNodeRequest cns.RegisterNodeRequest) error {
+	if registerNodeRequest.HomeAz == "" {
+		return errors.New("request missing home Az")
+	}
+
+	// Now that the request is valid it can be packaged as an HTTP request:
+	body, err := json.Marshal(registerNodeRequest)
+	if err != nil {
+		return errors.Wrap(err, "encoding request body as json")
+	}
+	u := c.routes[cns.RegisterNodeStandAlone]
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return errors.Wrap(err, "building HTTP request")
+	}
+
+	// send the HTTP request
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "sending HTTP request")
+	}
+	defer resp.Body.Close()
+
+	// decode the response to see if it was successful
+	var registerNodeResponse cns.Response
+	err = json.NewDecoder(resp.Body).Decode(&registerNodeResponse)
+	if err != nil {
+		return errors.Wrap(err, "decoding JSON response")
+	}
+
+	// if there was a non-zero response code, this is an error that
+	// should be communicated back to the caller...
+	if registerNodeResponse.ReturnCode != types.Success {
+		return &CNSClientError{
+			Code: registerNodeResponse.ReturnCode,
+			Err:  errors.New(registerNodeResponse.Message),
+		}
+	}
 	return nil
 }

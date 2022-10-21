@@ -170,9 +170,7 @@ func TestMain(m *testing.M) {
 	logger.InitLogger(logName, 0, 0, tmpLogDir+"/")
 	config := common.ServiceConfig{}
 
-	httpRestService, err := restserver.NewHTTPRestService(&config, &fakes.WireserverClientFake{}, restserver.NmagentMultiClient{
-		OldClient: &fakes.NMAgentClientFake{},
-	}, nil)
+	httpRestService, err := restserver.NewHTTPRestService(&config, &fakes.WireserverClientFake{}, &fakes.NMAgentClientFake{}, nil)
 	svc = httpRestService.(*restserver.HTTPRestService)
 	svc.Name = "cns-test-server"
 	fakeNNC := v1alpha.NodeNetworkConfig{
@@ -2259,6 +2257,72 @@ func TestPostAllNetworkContainers(t *testing.T) {
 				for i := 0; i < len(test.expReq.CreateNetworkContainerRequests); i++ {
 					assert.Equal(t, test.expReq.CreateNetworkContainerRequests[i], gotReq.CreateNetworkContainerRequests[i])
 				}
+			}
+		})
+	}
+}
+
+func TestRegisterNodeStandAlone(t *testing.T) {
+	emptyRoutes, _ := buildRoutes(defaultBaseURL, clientPaths)
+	tests := []struct {
+		name      string
+		shouldErr bool
+		req       cns.RegisterNodeRequest
+		exp       cns.Response
+	}{
+		{
+			"happy path",
+			false,
+			cns.RegisterNodeRequest{
+				HomeAz: "01",
+			},
+			cns.Response{
+				ReturnCode: types.Success,
+				Message:    "success",
+			},
+		},
+		{
+			"missing home AZ in request",
+			true,
+			cns.RegisterNodeRequest{
+				HomeAz: "",
+			},
+			cns.Response{},
+		},
+		{
+			"internal error",
+			true,
+			cns.RegisterNodeRequest{
+				HomeAz: "01",
+			},
+			cns.Response{
+				ReturnCode: types.NmAgentServerInternalError,
+				Message:    "internal error",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := &Client{
+				client: &mockdo{
+					errToReturn:            nil,
+					objToReturn:            test.exp,
+					httpStatusCodeToReturn: http.StatusOK,
+				},
+				routes: emptyRoutes,
+			}
+
+			err := client.RegisterNodeStandAlone(context.Background(), test.req)
+			if err != nil && !test.shouldErr {
+				t.Fatal("unexpected error: err:", err)
+			}
+
+			if err == nil && test.shouldErr {
+				t.Fatal("expected an error but received none")
 			}
 		})
 	}

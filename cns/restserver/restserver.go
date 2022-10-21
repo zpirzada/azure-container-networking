@@ -46,7 +46,7 @@ type nmagentClient interface {
 	SupportedAPIs(context.Context) ([]string, error)
 	GetNCVersion(context.Context, nma.NCVersionRequest) (nma.NCVersion, error)
 	GetNCVersionList(context.Context) (nma.NCVersionList, error)
-	RegisterNode(request *cns.RegisterNodeRequest) (*http.Response, error)
+	RegisterNodeStandAlone(context.Context, nma.RegisterNodeStandAloneRequest) error
 }
 
 // HTTPRestService represents http listener for CNS - Container Networking Service.
@@ -230,7 +230,7 @@ func (service *HTTPRestService) Init(config *common.ServiceConfig) error {
 	listener.AddHandler(cns.PathDebugPodContext, service.handleDebugPodContext)
 	listener.AddHandler(cns.PathDebugRestData, service.handleDebugRestData)
 	listener.AddHandler(cns.NetworkContainersURLPath, service.getOrRefreshNetworkContainers)
-	listener.AddHandler(cns.RegisterNode, service.registerNode)
+	listener.AddHandler(cns.RegisterNodeStandAlone, service.registerNodeStandAlone)
 
 	// handlers for v0.2
 	listener.AddHandler(cns.V2Prefix+cns.SetEnvironmentPath, service.setEnvironment)
@@ -254,7 +254,7 @@ func (service *HTTPRestService) Init(config *common.ServiceConfig) error {
 	listener.AddHandler(cns.V2Prefix+cns.CreateHostNCApipaEndpointPath, service.createHostNCApipaEndpoint)
 	listener.AddHandler(cns.V2Prefix+cns.DeleteHostNCApipaEndpointPath, service.deleteHostNCApipaEndpoint)
 	listener.AddHandler(cns.V2Prefix+cns.NmAgentSupportedApisPath, service.nmAgentSupportedApisHandler)
-	listener.AddHandler(cns.V2Prefix+cns.RegisterNode, service.registerNode)
+	listener.AddHandler(cns.V2Prefix+cns.RegisterNodeStandAlone, service.registerNodeStandAlone)
 
 	// Initialize HTTP client to be reused in CNS
 	connectionTimeout, _ := service.GetOption(acn.OptHttpConnectionTimeout).(int)
