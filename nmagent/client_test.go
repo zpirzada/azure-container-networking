@@ -676,7 +676,6 @@ func TestNMAgentRegisterNodeStandAlone(t *testing.T) {
 			}
 
 			if err == nil && test.shouldErr {
-				fmt.Println(err)
 				t.Fatal("expected error but received none")
 			}
 

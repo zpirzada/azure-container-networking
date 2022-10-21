@@ -391,7 +391,7 @@ func (NCVersionListRequest) Validate() error {
 var _ Request = &RegisterNodeStandAloneRequest{}
 
 type RegisterNodeStandAloneRequest struct {
-	HomeAz string
+	HomeAz string `json:"HomeAz"`
 }
 
 // Body is a no-op method to satisfy the Request interface while indicating
