@@ -540,11 +540,13 @@ func (service *HTTPRestService) AssignAnyAvailableIPConfig(podInfo cns.PodInfo) 
 	for _, ipState := range service.PodIPConfigState {
 		if ipState.GetState() == types.Available {
 			if err := service.assignIPConfig(ipState, podInfo); err != nil {
+				ipRequestFailedCount.WithLabelValues(AssignIPConfigFailure).Inc()
 				return cns.PodIpInfo{}, err
 			}
 
 			podIPInfo := cns.PodIpInfo{}
 			if err := service.populateIPConfigInfoUntransacted(ipState, &podIPInfo); err != nil {
+				ipRequestFailedCount.WithLabelValues(PopulateIPConfigFailure).Inc()
 				return cns.PodIpInfo{}, err
 			}
 
@@ -552,6 +554,7 @@ func (service *HTTPRestService) AssignAnyAvailableIPConfig(podInfo cns.PodInfo) 
 		}
 	}
 	//nolint:goerr113
+	ipRequestFailedCount.WithLabelValues(NoIPsAvailableFailure).Inc()
 	return cns.PodIpInfo{}, fmt.Errorf("no IPs available, waiting on Azure CNS to allocate more")
 }
 

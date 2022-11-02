@@ -10,6 +10,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
+const (
+	AssignIPConfigFailure   = "assignIPConfig"
+	PopulateIPConfigFailure = "populateIPConfig"
+	NoIPsAvailableFailure   = "noIPsAvailable"
+)
+
 var httpRequestLatency = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Name: "http_request_latency_seconds",
@@ -57,6 +63,14 @@ var syncHostNCVersionLatency = prometheus.NewHistogramVec(
 	[]string{"ok"},
 )
 
+var ipRequestFailedCount = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "cx_ip_request_failed_count_total",
+		Help: "Count of the number of times that can not assign IPs when customer want to get an IP address",
+	},
+	[]string{AssignIPConfigFailure, PopulateIPConfigFailure, NoIPsAvailableFailure},
+)
+
 func init() {
 	metrics.Registry.MustRegister(
 		httpRequestLatency,
@@ -64,6 +78,7 @@ func init() {
 		ipConfigStatusStateTransitionTime,
 		syncHostNCVersionCount,
 		syncHostNCVersionLatency,
+		ipRequestFailedForNoIPsCount,
 	)
 }
 
