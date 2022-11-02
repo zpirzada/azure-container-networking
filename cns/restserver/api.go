@@ -770,7 +770,7 @@ func (service *HTTPRestService) setOrchestratorType(w http.ResponseWriter, r *ht
 // getHomeAz retrieves home AZ of host
 func (service *HTTPRestService) getHomeAz(w http.ResponseWriter, r *http.Request) {
 	logger.Printf("[Azure CNS] getHomeAz")
-	logger.Request(service.Name, " getHomeAz", nil)
+	logger.Request(service.Name, "getHomeAz", nil)
 	ctx := r.Context()
 
 	switch r.Method {

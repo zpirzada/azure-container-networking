@@ -49,6 +49,7 @@ type HTTPService interface {
 	GetPendingReleaseIPConfigs() []IPConfigurationStatus
 	GetPodIPConfigState() map[string]IPConfigurationStatus
 	MarkIPAsPendingRelease(numberToMark int) (map[string]IPConfigurationStatus, error)
+	GetHomeAz(ctx context.Context) GetHomeAzResponse
 }
 
 // This is used for KubernetesCRD orchestrator Type where NC has multiple ips.

@@ -19,25 +19,26 @@ const (
 )
 
 type CNSConfig struct {
-	ChannelMode                 string
-	EnablePprof                 bool
-	EnableSubnetScarcity        bool
-	InitializeFromCNI           bool
-	ManagedSettings             ManagedSettings
-	MetricsBindAddress          string
-	SyncHostNCTimeoutMs         int
-	SyncHostNCVersionIntervalMs int
-	TLSCertificatePath          string
-	TLSEndpoint                 string
-	TLSPort                     string
-	TLSSubjectName              string
-	TelemetrySettings           TelemetrySettings
-	UseHTTPS                    bool
-	WireserverIP                string
-	KeyVaultSettings            KeyVaultSettings
-	MSISettings                 MSISettings
-	ProgramSNATIPTables         bool
-	ManageEndpointState         bool
+	ChannelMode                  string
+	EnablePprof                  bool
+	EnableSubnetScarcity         bool
+	InitializeFromCNI            bool
+	ManagedSettings              ManagedSettings
+	MetricsBindAddress           string
+	SyncHostNCTimeoutMs          int
+	SyncHostNCVersionIntervalMs  int
+	TLSCertificatePath           string
+	TLSEndpoint                  string
+	TLSPort                      string
+	TLSSubjectName               string
+	TelemetrySettings            TelemetrySettings
+	UseHTTPS                     bool
+	WireserverIP                 string
+	KeyVaultSettings             KeyVaultSettings
+	MSISettings                  MSISettings
+	ProgramSNATIPTables          bool
+	ManageEndpointState          bool
+	HomeAzCacheRetryIntervalSecs int
 }
 
 type TelemetrySettings struct {
@@ -182,5 +183,9 @@ func SetCNSConfigDefaults(config *CNSConfig) {
 	}
 	if config.SyncHostNCTimeoutMs == 0 {
 		config.SyncHostNCTimeoutMs = 500 //nolint:gomnd // default times
+	}
+	if config.HomeAzCacheRetryIntervalSecs == 0 {
+		// set the default homeAzCache retry interval to 15 seconds
+		config.HomeAzCacheRetryIntervalSecs = 15
 	}
 }

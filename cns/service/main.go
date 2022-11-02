@@ -645,6 +645,20 @@ func main() {
 			logger.Errorf("Failed to init HTTPService, err:%v.\n", err)
 			return
 		}
+
+		// caching homeAz
+		go func() {
+			for {
+				getHomeAzResponse := httpRestService.GetHomeAz(rootCtx)
+				if getHomeAzResponse.Response.ReturnCode == cnstypes.NmAgentUnSupportedAPIError {
+					logger.Printf("HomeAz not supported in this nmagent version. keep retrying for it to get updated underneath")
+					time.Sleep(time.Duration(cnsconfig.HomeAzCacheRetryIntervalSecs) * time.Second)
+				} else {
+					logger.Response("Cached home az when cns starts", getHomeAzResponse, getHomeAzResponse.Response.ReturnCode, nil)
+					return
+				}
+			}
+		}()
 	}
 
 	// Initialze state in if CNS is running in CRD mode
