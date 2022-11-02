@@ -874,6 +874,69 @@ func TestChainLineNumber(t *testing.T) {
 	}
 }
 
+func TestAppendAzureChainJumpOutputRule(t *testing.T) {
+	tests := []struct {
+		name    string
+		calls   []testutils.TestCmd
+		wantErr bool
+	}{
+		{
+			name: "no jump rule yet",
+			calls: []testutils.TestCmd{
+				{Cmd: listLineNumbersCommandStrings, PipedToCommand: true},
+				{Cmd: []string{"grep", "AZURE-NPM"}, ExitCode: 1},
+				{Cmd: []string{"iptables", "-w", "60", "-I", "FORWARD", "-j", "AZURE-NPM", "-m", "conntrack", "--ctstate", "NEW"}},
+			},
+			wantErr: false,
+		},
+		// {
+		// 	name: "no jump rule yet and insert fails",
+		// 	calls: []testutils.TestCmd{
+		// 		{Cmd: listLineNumbersCommandStrings, PipedToCommand: true},
+		// 		{Cmd: []string{"grep", "AZURE-NPM"}, ExitCode: 1},
+		// 		{Cmd: []string{"iptables", "-w", "60", "-I", "OUTPUT", "-j", "AZURE-NPM", "-m", "conntrack", "--ctstate", "NEW"}, ExitCode: 1},
+		// 	},
+		// 	wantErr: true,
+		// },
+		// {
+		// 	name: "command error while grepping",
+		// 	calls: []testutils.TestCmd{
+		// 		{Cmd: listLineNumbersCommandStrings, PipedToCommand: true, HasStartError: true, ExitCode: 1},
+		// 		{Cmd: []string{"grep", "AZURE-NPM"}},
+		// 	},
+		// 	wantErr: true,
+		// },
+		{
+			name: "jump rule exists",
+			calls: []testutils.TestCmd{
+				{Cmd: listLineNumbersCommandStrings, PipedToCommand: true},
+				{
+					Cmd:    []string{"grep", "AZURE-NPM"},
+					Stdout: "1    AZURE-NPM  all  --  0.0.0.0/0            0.0.0.0/0    ...",
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			ioshim := common.NewMockIOShim(tt.calls)
+			//defer ioshim.VerifyCalls(t, tt.calls)
+			cfg := &PolicyManagerCfg{
+				PolicyMode: IPSetPolicyMode, // value doesn't matter for Linux
+			}
+			pMgr := NewPolicyManager(ioshim, cfg)
+			err := pMgr.appendAzureChainJumpRuleFromOutputChain()
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func getFakeDestroyCommand(chain string) testutils.TestCmd {
 	return testutils.TestCmd{Cmd: []string{"iptables", "-w", "60", "-X", chain}}
 }

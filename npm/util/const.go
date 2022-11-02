@@ -85,6 +85,7 @@ const (
 	IptablesKubeServicesChain          string = "KUBE-SERVICES"
 	IptablesForwardChain               string = "FORWARD"
 	IptablesInputChain                 string = "INPUT"
+	IptablesOutputChain                string = "OUTPUT"
 	IptablesAzureChain                 string = "AZURE-NPM"
 	IptablesAzureAcceptChain           string = "AZURE-NPM-ACCEPT"
 	IptablesAzureKubeSystemChain       string = "AZURE-NPM-KUBE-SYSTEM"

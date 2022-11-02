@@ -46,6 +46,7 @@ var (
 		util.IptablesNewState,
 	}
 	jumpFromForwardToAzureChainArgs = append([]string{util.IptablesForwardChain}, jumpToAzureChainArgs...)
+	jumpFromOutputToAzureChainArgs  = append([]string{util.IptablesOutputChain}, jumpToAzureChainArgs...)
 
 	removeDeprecatedJumpIgnoredErrors = []*exitErrorInfo{
 		{
@@ -65,6 +66,10 @@ var (
 	listForwardEntriesArgs = []string{
 		util.IptablesWaitFlag, util.IptablesDefaultWaitTime, util.IptablesTableFlag, util.IptablesFilterTable,
 		util.IptablesNumericFlag, util.IptablesListFlag, util.IptablesForwardChain, util.IptablesLineNumbersFlag,
+	}
+	listOutputEntriesArgs = []string{
+		util.IptablesWaitFlag, util.IptablesDefaultWaitTime, util.IptablesTableFlag, util.IptablesFilterTable,
+		util.IptablesNumericFlag, util.IptablesListFlag, util.IptablesOutputChain, util.IptablesLineNumbersFlag,
 	}
 	spaceByte                                 = []byte(" ")
 	errNoLineNumber                           = errors.New("no line number found")
@@ -147,23 +152,26 @@ func isBaseChain(chain string) bool {
 }
 
 /*
-	Called once at startup.
-	Like the rest of PolicyManager, minimizes the number of OS calls by consolidating all possible actions into one iptables-restore call.
+Called once at startup.
+Like the rest of PolicyManager, minimizes the number of OS calls by consolidating all possible actions into one iptables-restore call.
 
-	1. Delete the deprecated jump from FORWARD to AZURE-NPM chain (if it exists).
-	2. Cleanup old NPM chains, and configure base chains and their rules.
-		1. Do the following via iptables-restore --noflush:
-			- flush all deprecated chains
-			- flush old v2 policy chains
-			- create/flush the base chains
-			- add rules for the base chains, except for AZURE-NPM (so that PolicyManager will be deactivated)
-		2. In the background:
-			- delete all deprecated chains
-			- delete old v2 policy chains
-	3. Add/reposition the jump from FORWARD chain to AZURE-NPM chain.
+1. Delete the deprecated jump from FORWARD to AZURE-NPM chain (if it exists).
+2. Cleanup old NPM chains, and configure base chains and their rules.
+ 1. Do the following via iptables-restore --noflush:
+    - flush all deprecated chains
+    - flush old v2 policy chains
+    - create/flush the base chains
+    - add rules for the base chains, except for AZURE-NPM (so that PolicyManager will be deactivated)
+ 2. In the background:
+    - delete all deprecated chains
+    - delete old v2 policy chains
 
-	TODO: could use one grep call instead of separate calls for getting jump line nums and for getting deprecated chains and old v2 policy chains
-		- would use a grep pattern like so: <line num...AZURE-NPM>|<Chain AZURE-NPM>
+3. Add/reposition the jump from FORWARD chain to AZURE-NPM chain.
+
+4. Add the jump from OUTPUT chain to AZURE-NPM chain.
+
+TODO: could use one grep call instead of separate calls for getting jump line nums and for getting deprecated chains and old v2 policy chains
+  - would use a grep pattern like so: <line num...AZURE-NPM>|<Chain AZURE-NPM>
 */
 func (pMgr *PolicyManager) bootup(_ []string) error {
 	klog.Infof("booting up iptables Azure chains")
@@ -198,15 +206,29 @@ func (pMgr *PolicyManager) bootup(_ []string) error {
 		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s with error: %s", baseErrString, err.Error())
 		return npmerrors.SimpleErrorWrapper(baseErrString, err) // we used to ignore this error in v1
 	}
+
+	// 4. add the jump to AZURE-NPM from OUTPUT chain
+	if err := pMgr.appendAzureChainJumpRuleFromOutputChain(); err != nil {
+		baseErrString := "failed to add/reposition jump from OUTPUT chain to AZURE-NPM chain"
+		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s with error: %s", baseErrString, err.Error())
+		return npmerrors.SimpleErrorWrapper(baseErrString, err)
+	}
 	return nil
 }
 
 // reconcile does the following:
 // - creates the jump rule from FORWARD chain to AZURE-NPM chain (if it does not exist) and makes sure it's after the jumps to KUBE-FORWARD & KUBE-SERVICES chains (if they exist).
+// - creates the jump rule from OUTPUT chain to AZURE-NPM chain (if it does not exist).
 // - cleans up stale policy chains. It can be forced to stop this process if reconcileManager.forceLock() is called.
 func (pMgr *PolicyManager) reconcile() {
 	if err := pMgr.positionAzureChainJumpRule(); err != nil {
 		msg := fmt.Sprintf("failed to reconcile jump rule to Azure-NPM due to %s", err.Error())
+		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s", msg)
+		klog.Error(msg)
+	}
+
+	if err := pMgr.appendAzureChainJumpRuleFromOutputChain(); err != nil {
+		msg := fmt.Sprintf("failed to reconcile jump rule from OUTPUT to Azure-NPM due to %s", err.Error())
 		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s", msg)
 		klog.Error(msg)
 	}
@@ -417,6 +439,45 @@ func (pMgr *PolicyManager) positionAzureChainJumpRule() error {
 		return npmerrors.SimpleErrorWrapper(baseErrString, err)
 	}
 	return nil
+}
+
+// add the jump from OUTPUT chain to AZURE-NPM chain if it doesn't exist
+func (pMgr *PolicyManager) appendAzureChainJumpRuleFromOutputChain() error {
+	// check if azure chain exists in output chain
+	azureChainExists, err := pMgr.azureChainExistsOutput(util.IptablesAzureChain)
+	if err != nil {
+		baseErrString := "failed to check if jump from OUTPUT chain to AZURE-NPM chain"
+		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s: %s", baseErrString, err.Error())
+		return npmerrors.SimpleErrorWrapper(baseErrString, err)
+	}
+
+	if azureChainExists {
+		// the azure jump exists
+		return nil
+	}
+
+	// append the azure jump from OUTPUT chain
+	klog.Infof("Inserting jump from OUTPUT chain to AZURE-NPM chain")
+	if insertErrCode, err := pMgr.runIPTablesCommand(util.IptablesAppendFlag, jumpFromOutputToAzureChainArgs...); err != nil {
+		baseErrString := "failed to insert jump from OUTPUT chain to AZURE-NPM chain"
+		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s with error code %d and error %s", baseErrString, insertErrCode, err.Error())
+		return npmerrors.SimpleErrorWrapper(baseErrString, err)
+	}
+	return nil
+}
+
+// check if azure chain exists in output chain
+func (pMgr *PolicyManager) azureChainExistsOutput(chain string) (bool, error) {
+	listOutputEntriesCommand := pMgr.ioShim.Exec.Command(util.Iptables, listOutputEntriesArgs...)
+	grepCommand := pMgr.ioShim.Exec.Command(ioutil.Grep, chain)
+	_, gotMatches, err := ioutil.PipeCommandToGrep(listOutputEntriesCommand, grepCommand)
+	if err != nil {
+		return false, npmerrors.SimpleErrorWrapper(fmt.Sprintf("failed to determine line number for jump from OUTPUT chain to %s chain", chain), err)
+	}
+	if !gotMatches {
+		return false, nil
+	}
+	return true, nil
 }
 
 // returns 0 if the chain does not exist
