@@ -191,14 +191,14 @@ func (pMgr *PolicyManager) bootup(_ []string) error {
 	}
 
 	// 3. add/reposition the jump to AZURE-NPM
-	if err := pMgr.positionAzureChainJumpRule(util.IptablesForwardChain); err != nil {
+	if err := pMgr.positionAzureChainJumpRule(util.IptablesForwardChain, pMgr.PlaceAzureChainFirst); err != nil {
 		baseErrString := "failed to add/reposition jump from FORWARD chain to AZURE-NPM chain"
 		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s with error: %s", baseErrString, err.Error())
 		return npmerrors.SimpleErrorWrapper(baseErrString, err) // we used to ignore this error in v1
 	}
 
 	// 4. add the jump to AZURE-NPM from OUTPUT chain
-	if err := pMgr.positionAzureChainJumpRule(util.IptablesOutputChain); err != nil {
+	if err := pMgr.positionAzureChainJumpRule(util.IptablesOutputChain, util.PlaceAzureChainAfterKubeServices); err != nil {
 		baseErrString := "failed to add/reposition jump from OUTPUT chain to AZURE-NPM chain"
 		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s with error: %s", baseErrString, err.Error())
 		return npmerrors.SimpleErrorWrapper(baseErrString, err) // we used to ignore this error in v1
@@ -211,14 +211,14 @@ func (pMgr *PolicyManager) bootup(_ []string) error {
 // - creates the jump rule from OUTPUT chain to AZURE-NPM chain (if it does not exist).
 // - cleans up stale policy chains. It can be forced to stop this process if reconcileManager.forceLock() is called.
 func (pMgr *PolicyManager) reconcile() {
-	if err := pMgr.positionAzureChainJumpRule(util.IptablesForwardChain); err != nil {
-		msg := fmt.Sprintf("failed to reconcile jump rule to Azure-NPM due to %s", err.Error())
+	if err := pMgr.positionAzureChainJumpRule(util.IptablesForwardChain, pMgr.PlaceAzureChainFirst); err != nil {
+		msg := fmt.Sprintf("failed to reconcile jump rule from FORWARD to Azure-NPM due to %s", err.Error())
 		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s", msg)
 		klog.Error(msg)
 	}
 
-	if err := pMgr.positionAzureChainJumpRule(util.IptablesOutputChain); err != nil {
-		msg := fmt.Sprintf("failed to reconcile jump rule to Azure-NPM due to %s", err.Error())
+	if err := pMgr.positionAzureChainJumpRule(util.IptablesOutputChain, util.PlaceAzureChainAfterKubeServices); err != nil {
+		msg := fmt.Sprintf("failed to reconcile jump rule from OUTPUT to Azure-NPM due to %s", err.Error())
 		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s", msg)
 		klog.Error(msg)
 	}
@@ -360,7 +360,7 @@ func (pMgr *PolicyManager) creatorForBootup(currentChains map[string]struct{}) *
 // add/reposition the jump from a given chain to AZURE-NPM chain to be in the correct position based on config:
 // option 1) jump to AZURE-NPM chain should be the first rule
 // option 2) jump to AZURE-NPM chain should be after the jump to KUBE-SERVICES chain (this is the default for the OUTPUT chain for IPVS compatibility)
-func (pMgr *PolicyManager) positionAzureChainJumpRule(fromChain string) error {
+func (pMgr *PolicyManager) positionAzureChainJumpRule(fromChain string, placeAzureChainFirst bool) error {
 	// get the line number for the azure jump
 	azureChainLineNum, err := pMgr.chainLineNumber(util.IptablesAzureChain, fromChain)
 	if err != nil {
@@ -369,14 +369,14 @@ func (pMgr *PolicyManager) positionAzureChainJumpRule(fromChain string) error {
 		return npmerrors.SimpleErrorWrapper(baseErrString, err)
 	}
 
-	if pMgr.PlaceAzureChainFirst == util.PlaceAzureChainFirst && azureChainLineNum == 1 && fromChain == util.IptablesForwardChain {
+	if placeAzureChainFirst == util.PlaceAzureChainFirst && azureChainLineNum == 1 {
 		// the azure jump is in the right position, so we're done
 		return nil
 	}
 
 	// place the azure jump in the first position, unless we want option 2 above and the kube jump exists
 	targetIndex := 1
-	if pMgr.PlaceAzureChainFirst == util.PlaceAzureChainAfterKubeServices || fromChain == util.IptablesOutputChain {
+	if placeAzureChainFirst == util.PlaceAzureChainAfterKubeServices {
 		kubeChainLineNum, err := pMgr.chainLineNumber(util.IptablesKubeServicesChain, fromChain)
 		if err != nil {
 			baseErrString := "failed to get index of jump from " + fromChain + " chain to KUBE-SERVICES chain"

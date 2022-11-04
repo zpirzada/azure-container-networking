@@ -949,7 +949,7 @@ func TestPositionAzureChainJumpRule(t *testing.T) {
 				PlaceAzureChainFirst: tt.placeAzureChainFirst,
 			}
 			pMgr := NewPolicyManager(ioshim, cfg)
-			err := pMgr.positionAzureChainJumpRule(tt.fromChain)
+			err := pMgr.positionAzureChainJumpRule(tt.fromChain, pMgr.PlaceAzureChainFirst)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
