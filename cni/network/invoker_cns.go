@@ -81,7 +81,7 @@ func (invoker *CNSIPAMInvoker) Add(addConfig IPAMAddConfig) (IPAMAddResult, erro
 	response, err := invoker.cnsClient.RequestIPAddress(context.TODO(), ipconfig)
 	if err != nil {
 		log.Printf("Failed to get IP address from CNS with error %v, response: %v", err, response)
-		return IPAMAddResult{}, errors.Wrap(err, "Failed to get IP address from CNS with error")
+		return IPAMAddResult{}, errors.Wrap(err, "failed to get IP address from CNS")
 	}
 
 	info := IPv4ResultInfo{
