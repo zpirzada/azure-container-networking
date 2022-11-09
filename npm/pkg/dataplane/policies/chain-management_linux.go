@@ -198,7 +198,7 @@ func (pMgr *PolicyManager) bootup(_ []string) error {
 	}
 
 	// 4. add the jump to AZURE-NPM from OUTPUT chain
-	if err := pMgr.positionAzureChainJumpRule(util.IptablesOutputChain, util.PlaceAzureChainAfterKubeServices); err != nil {
+	if err := pMgr.positionAzureChainJumpRule(util.IptablesOutputChain, pMgr.PlaceAzureChainFirst); err != nil {
 		baseErrString := "failed to add/reposition jump from OUTPUT chain to AZURE-NPM chain"
 		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s with error: %s", baseErrString, err.Error())
 		return npmerrors.SimpleErrorWrapper(baseErrString, err) // we used to ignore this error in v1
@@ -217,7 +217,7 @@ func (pMgr *PolicyManager) reconcile() {
 		klog.Error(msg)
 	}
 
-	if err := pMgr.positionAzureChainJumpRule(util.IptablesOutputChain, util.PlaceAzureChainAfterKubeServices); err != nil {
+	if err := pMgr.positionAzureChainJumpRule(util.IptablesOutputChain, pMgr.PlaceAzureChainFirst); err != nil {
 		msg := fmt.Sprintf("failed to reconcile jump rule from OUTPUT to Azure-NPM due to %s", err.Error())
 		metrics.SendErrorLogAndMetric(util.IptmID, "error: %s", msg)
 		klog.Error(msg)

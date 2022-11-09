@@ -64,8 +64,8 @@ func GetBootupTestCalls() []testutils.TestCmd {
 		{Cmd: []string{"iptables", "-w", "60", "-I", "FORWARD", "-j", "AZURE-NPM", "-m", "conntrack", "--ctstate", "NEW"}},
 		{Cmd: []string{"iptables", "-w", "60", "-t", "filter", "-n", "--line-numbers", "-L", "OUTPUT"}, PipedToCommand: true},
 		{Cmd: []string{"grep", "AZURE-NPM"}, ExitCode: 1},
-		{Cmd: []string{"iptables", "-w", "60", "-t", "filter", "-n", "--line-numbers", "-L", "OUTPUT"}, PipedToCommand: true},
-		{Cmd: []string{"grep", "KUBE-SERVICES"}, ExitCode: 1},
+		//	{Cmd: []string{"iptables", "-w", "60", "-t", "filter", "-n", "--line-numbers", "-L", "OUTPUT"}, PipedToCommand: true},
+		//  {Cmd: []string{"grep", "KUBE-SERVICES"}, ExitCode: 1},
 		{Cmd: []string{"iptables", "-w", "60", "-I", "OUTPUT", "-j", "AZURE-NPM", "-m", "conntrack", "--ctstate", "NEW"}},
 	}
 }
