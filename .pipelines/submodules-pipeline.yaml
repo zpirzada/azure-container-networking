@@ -260,7 +260,7 @@ stages:
       displayName: AKS Swift
       pipelineBuildImage: "$(BUILD_IMAGE)"
       testDropgz: true
-      clusterName: "submodules-swifte2e"
+      clusterName: "submodswift"
       osSku: "Ubuntu"
 
   - stage: cleanup
