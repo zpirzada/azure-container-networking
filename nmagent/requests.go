@@ -65,6 +65,12 @@ type PutNetworkContainerRequest struct {
 	// PrimaryAddress is the primary customer address of the interface in the
 	// management VNet
 	PrimaryAddress string `json:"-"`
+
+	// AzID is the home AZ ID of the network container
+	AzID uint `json:"azID"`
+
+	// EnableAZR denotes whether AZR is enabled for network container or not
+	EnableAZR bool `json:"enableAZR"`
 }
 
 // Body marshals the JSON fields of the request and produces an Reader intended
