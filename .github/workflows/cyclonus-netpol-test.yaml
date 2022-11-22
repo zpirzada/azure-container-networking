@@ -8,7 +8,7 @@ on:
   pull_request:
     paths:
       - 'npm/**'
-      - 'github/**'
+      - '.github/**'
       - 'test/**'
   schedule:
     # run once a day at midnight
