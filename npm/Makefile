@@ -10,4 +10,5 @@ generate:
 			make -C $$dir $@; \
 	done
 
+
 .PHONY: all generate
