@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	AssignIPConfigFailure   = "assignIPConfig"
-	PopulateIPConfigFailure = "populateIPConfig"
-	NoIPsAvailableFailure   = "noIPsAvailable"
+	AssignIPConfigFailure   = "assign_ip_config_failure"
+	PopulateIPConfigFailure = "populate_ip_config_failure"
+	NoIPsAvailableFailure   = "no_ips_available_failure"
 )
 
 var httpRequestLatency = prometheus.NewHistogramVec(
@@ -78,7 +78,7 @@ func init() {
 		ipConfigStatusStateTransitionTime,
 		syncHostNCVersionCount,
 		syncHostNCVersionLatency,
-		ipRequestFailedForNoIPsCount,
+		ipRequestFailedCount,
 	)
 }
 
