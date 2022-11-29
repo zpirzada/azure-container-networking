@@ -1267,6 +1267,30 @@ func (service *HTTPRestService) publishNetworkContainer(w http.ResponseWriter, r
 	logger.Response(service.Name, response, response.Response.ReturnCode, err)
 }
 
+//nolint:revive // the previous receiver naming "service" is bad, this is correct:
+func (h *HTTPRestService) doUnpublish(ctx context.Context, req cns.UnpublishNetworkContainerRequest, dcr nmagent.DeleteContainerRequest) (string, types.ResponseCode) {
+	innerReqBytes := req.DeleteNetworkContainerRequestBody
+
+	err := json.Unmarshal(innerReqBytes, &dcr)
+	if err != nil {
+		returnMessage := fmt.Sprintf("Failed to unpublish Network Container: %s", req.NetworkContainerID)
+		returnCode := types.NetworkContainerUnpublishFailed
+		logger.Errorf("[Azure-CNS] %s", returnMessage)
+		return returnMessage, returnCode
+	}
+
+	err = h.nma.DeleteNetworkContainer(ctx, dcr)
+	// nolint:bodyclose // existing code needs refactoring
+	if err != nil {
+		returnMessage := fmt.Sprintf("Failed to unpublish Network Container: %s", req.NetworkContainerID)
+		returnCode := types.NetworkContainerUnpublishFailed
+		logger.Errorf("[Azure-CNS] %s", returnMessage)
+		return returnMessage, returnCode
+	}
+
+	return "", types.Success
+}
+
 // Unpublish Network Container by calling nmagent
 func (service *HTTPRestService) unpublishNetworkContainer(w http.ResponseWriter, r *http.Request) {
 	logger.Printf("[Azure-CNS] UnpublishNetworkContainer")
@@ -1348,12 +1372,8 @@ func (service *HTTPRestService) unpublishNetworkContainer(w http.ResponseWriter,
 				AuthenticationToken: ncParameters.AuthToken,
 			}
 
-			err = service.nma.DeleteNetworkContainer(ctx, dcr)
-			if err != nil {
-				returnMessage = fmt.Sprintf("Failed to unpublish Network Container: %s", req.NetworkContainerID)
-				returnCode = types.NetworkContainerUnpublishFailed
-				logger.Errorf("[Azure-CNS] %s", returnMessage)
-			}
+			// Unpublish Network Container
+			returnMessage, returnCode = service.doUnpublish(ctx, req, dcr)
 		}
 
 		// Remove the NC version URL entry added during publish
