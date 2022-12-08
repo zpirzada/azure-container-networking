@@ -207,6 +207,7 @@ func TestSetCNSConfigDefaults(t *testing.T) {
 				KeyVaultSettings: KeyVaultSettings{
 					RefreshIntervalInHrs: 12,
 				},
+				PopulateHomeAzCacheRetryIntervalSecs: 15,
 			},
 		},
 		{
@@ -229,6 +230,7 @@ func TestSetCNSConfigDefaults(t *testing.T) {
 				KeyVaultSettings: KeyVaultSettings{
 					RefreshIntervalInHrs: 3,
 				},
+				PopulateHomeAzCacheRetryIntervalSecs: 10,
 			},
 			want: CNSConfig{
 				ChannelMode: "Other",
@@ -248,6 +250,7 @@ func TestSetCNSConfigDefaults(t *testing.T) {
 				KeyVaultSettings: KeyVaultSettings{
 					RefreshIntervalInHrs: 3,
 				},
+				PopulateHomeAzCacheRetryIntervalSecs: 10,
 			},
 		},
 	}

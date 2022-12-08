@@ -522,6 +522,10 @@ func main() {
 		return
 	}
 
+	homeAzMonitor := restserver.NewHomeAzMonitor(nmaClient, time.Duration(cnsconfig.PopulateHomeAzCacheRetryIntervalSecs)*time.Second)
+	logger.Printf("start the goroutine for refreshing homeAz")
+	homeAzMonitor.Start()
+
 	if cnsconfig.ChannelMode == cns.Managed {
 		config.ChannelMode = cns.Managed
 		privateEndpoint = cnsconfig.ManagedSettings.PrivateEndpoint
@@ -609,7 +613,7 @@ func main() {
 	// Create CNS object.
 
 	httpRestService, err := restserver.NewHTTPRestService(&config, &wireserver.Client{HTTPClient: &http.Client{}}, nmaClient,
-		endpointStateStore, conflistGenerator)
+		endpointStateStore, conflistGenerator, homeAzMonitor)
 	if err != nil {
 		logger.Errorf("Failed to create CNS object, err:%v.\n", err)
 		return
@@ -834,6 +838,9 @@ func main() {
 			logger.Printf("[Azure CNS] Failed to delete default ext network due to error: %v", err)
 		}
 	}
+
+	logger.Printf("end the goroutine for refreshing homeAz")
+	homeAzMonitor.Stop()
 
 	logger.Printf("stop cns service")
 	// Cleanup.
