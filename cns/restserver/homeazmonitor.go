@@ -108,6 +108,7 @@ func (h *HomeAzMonitor) refresh() {
 
 // Populate makes call to nmagent to retrieve home az if getHomeAz api is supported by nmagent
 func (h *HomeAzMonitor) Populate(ctx context.Context) {
+	logger.Printf("[HomeAzMonitor] populating home az cache")
 	supportedApis, err := h.SupportedAPIs(ctx)
 	if err != nil {
 		returnMessage := fmt.Sprintf("[HomeAzMonitor] failed to query nmagent's supported apis, %v", err)
@@ -159,7 +160,7 @@ func (h *HomeAzMonitor) Populate(ctx context.Context) {
 
 // update constructs a GetHomeAzResponse entity and update its cache
 func (h *HomeAzMonitor) update(code types.ResponseCode, msg string, homeAzResponse cns.HomeAzResponse) {
-	logger.Debugf(msg)
+	logger.Printf(msg)
 	resp := cns.GetHomeAzResponse{
 		Response: cns.Response{
 			ReturnCode: code,
