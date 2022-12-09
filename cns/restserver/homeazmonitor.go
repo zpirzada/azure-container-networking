@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Azure/azure-container-networking/cns/logger"
+
 	"github.com/Azure/azure-container-networking/cns"
 	"github.com/Azure/azure-container-networking/cns/types"
-	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/nmagent"
 	"github.com/patrickmn/go-cache"
 	"github.com/pkg/errors"
@@ -26,15 +27,17 @@ type HomeAzMonitor struct {
 	// channel used as signal to end of the goroutine for populating home az cache
 	closing                  chan struct{}
 	cacheRefreshIntervalSecs time.Duration
+	AZId                     uint
 }
 
 // NewHomeAzMonitor creates a new HomeAzMonitor object
-func NewHomeAzMonitor(client nmagentClient, cacheRefreshIntervalSecs time.Duration) *HomeAzMonitor {
+func NewHomeAzMonitor(client nmagentClient, cacheRefreshIntervalSecs time.Duration, AZId uint) *HomeAzMonitor {
 	return &HomeAzMonitor{
 		nmagentClient:            client,
 		cacheRefreshIntervalSecs: cacheRefreshIntervalSecs,
 		values:                   cache.New(cache.NoExpiration, cache.NoExpiration),
 		closing:                  make(chan struct{}),
+		AZId:                     AZId,
 	}
 }
 
@@ -50,6 +53,18 @@ func (h *HomeAzMonitor) updateCacheValue(resp cns.GetHomeAzResponse) {
 
 // readCacheValue reads home az cache value
 func (h *HomeAzMonitor) readCacheValue() cns.GetHomeAzResponse {
+	if h.AZId != 0 {
+		return cns.GetHomeAzResponse{
+			Response: cns.Response{
+				ReturnCode: types.Success,
+				Message:    "successfully got home az",
+			},
+			HomeAzResponse: cns.HomeAzResponse{
+				IsSupported: true,
+				HomeAz:      h.AZId,
+			},
+		}
+	}
 	cachedResp, found := h.values.Get(homeAzCacheKey)
 	if !found {
 		return cns.GetHomeAzResponse{Response: cns.Response{
@@ -144,7 +159,7 @@ func (h *HomeAzMonitor) Populate(ctx context.Context) {
 
 // update constructs a GetHomeAzResponse entity and update its cache
 func (h *HomeAzMonitor) update(code types.ResponseCode, msg string, homeAzResponse cns.HomeAzResponse) {
-	log.Debugf(msg)
+	logger.Debugf(msg)
 	resp := cns.GetHomeAzResponse{
 		Response: cns.Response{
 			ReturnCode: code,

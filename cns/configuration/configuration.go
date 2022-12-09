@@ -23,29 +23,30 @@ const (
 )
 
 type CNSConfig struct {
-	ChannelMode                 string
-	EnablePprof                 bool
-	EnableSubnetScarcity        bool
-	InitializeFromCNI           bool
-	ManagedSettings             ManagedSettings
-	MetricsBindAddress          string
-	SyncHostNCTimeoutMs         int
-	SyncHostNCVersionIntervalMs int
-	TLSCertificatePath          string
-	TLSEndpoint                 string
-	TLSPort                     string
-	TLSSubjectName              string
-	TelemetrySettings           TelemetrySettings
-	UseHTTPS                    bool
-	WireserverIP                string
-	KeyVaultSettings            KeyVaultSettings
-	MSISettings                 MSISettings
-	ProgramSNATIPTables         bool
-	ManageEndpointState         bool
-	CNIConflistScenario         string
-	EnableCNIConflistGeneration bool
-	CNIConflistFilepath         string
+	ChannelMode                          string
+	EnablePprof                          bool
+	EnableSubnetScarcity                 bool
+	InitializeFromCNI                    bool
+	ManagedSettings                      ManagedSettings
+	MetricsBindAddress                   string
+	SyncHostNCTimeoutMs                  int
+	SyncHostNCVersionIntervalMs          int
+	TLSCertificatePath                   string
+	TLSEndpoint                          string
+	TLSPort                              string
+	TLSSubjectName                       string
+	TelemetrySettings                    TelemetrySettings
+	UseHTTPS                             bool
+	WireserverIP                         string
+	KeyVaultSettings                     KeyVaultSettings
+	MSISettings                          MSISettings
+	ProgramSNATIPTables                  bool
+	ManageEndpointState                  bool
+	CNIConflistScenario                  string
+	EnableCNIConflistGeneration          bool
+	CNIConflistFilepath                  string
 	PopulateHomeAzCacheRetryIntervalSecs int
+	AZId                                 uint
 }
 
 type TelemetrySettings struct {
