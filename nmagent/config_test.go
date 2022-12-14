@@ -3,9 +3,8 @@ package nmagent_test
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-
 	"github.com/Azure/azure-container-networking/nmagent"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestConfig(t *testing.T) {
@@ -63,7 +62,7 @@ func TestConfig(t *testing.T) {
 func TestNMAgentConfig(t *testing.T) {
 	tests := []struct {
 		name         string
-		wireserverIp string
+		wireserverIP string
 		exp          nmagent.Config
 		shouldErr    bool
 	}{
@@ -126,7 +125,7 @@ func TestNMAgentConfig(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			got, err := nmagent.NewConfig(test.wireserverIp)
+			got, err := nmagent.NewConfig(test.wireserverIP)
 			if err != nil && !test.shouldErr {
 				t.Fatal("unexpected error fetching nmagent config: err:", err)
 			}
