@@ -40,29 +40,17 @@ type updateNPMPod struct {
 // todo definitely requires further optimization between the intersection
 // of types, PodMetadata, NpmPod and corev1.pod
 type PodMetadata struct {
-	PodKey          string
-	PodIP           string
-	NodeName        string
-	markedForDelete bool
+	PodKey   string
+	PodIP    string
+	NodeName string
 }
 
 func NewPodMetadata(podKey, podIP, nodeName string) *PodMetadata {
 	return &PodMetadata{
-		PodKey:          podKey,
-		PodIP:           podIP,
-		NodeName:        nodeName,
-		markedForDelete: false,
+		PodKey:   podKey,
+		PodIP:    podIP,
+		NodeName: nodeName,
 	}
-}
-
-func NewPodMetadataMarkedForDelete(podKey, podIP, nodeName string) *PodMetadata {
-	pm := NewPodMetadata(podKey, podIP, nodeName)
-	pm.markedForDelete = true
-	return pm
-}
-
-func (pm *PodMetadata) isMarkedForDelete() bool {
-	return pm.markedForDelete
 }
 
 func (p *PodMetadata) Namespace() string {
