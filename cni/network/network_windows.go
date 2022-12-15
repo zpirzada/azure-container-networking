@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -20,7 +21,7 @@ import (
 	hnsv2 "github.com/Microsoft/hcsshim/hcn"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
-	cniTypesCurr "github.com/containernetworking/cni/pkg/types/current"
+	cniTypesCurr "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows/registry"
 )
@@ -70,7 +71,6 @@ func (plugin *NetPlugin) handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId 
 		result := &cniTypesCurr.Result{
 			IPs: []*cniTypesCurr.IPConfig{
 				{
-					Version: "4",
 					Address: address,
 					Gateway: net.ParseIP(hnsEndpoint.GatewayAddress),
 				},
@@ -85,7 +85,6 @@ func (plugin *NetPlugin) handleConsecutiveAdd(args *cniSkel.CmdArgs, endpointId 
 
 		if nwCfg.IPV6Mode != "" && len(epInfo.IPAddresses) > 1 {
 			ipv6Config := &cniTypesCurr.IPConfig{
-				Version: "6",
 				Address: epInfo.IPAddresses[1],
 			}
 
@@ -156,9 +155,14 @@ func (plugin *NetPlugin) getNetworkName(netNs string, ipamAddResult *IPAMAddResu
 	// This will happen during ADD call
 	if ipamAddResult != nil && ipamAddResult.ncResponse != nil {
 		// networkName will look like ~ azure-vlan1-172-28-1-0_24
-		subnet := ipamAddResult.ipv4Result.IPs[0].Address
-		networkName := strings.Replace(subnet.String(), ".", "-", -1)
-		networkName = strings.Replace(networkName, "/", "_", -1)
+		ipAddrNet := ipamAddResult.ipv4Result.IPs[0].Address
+		prefix, err := netip.ParsePrefix(ipAddrNet.String())
+		if err != nil {
+			log.Printf("Error parsing %s network CIDR: %v.", ipAddrNet.String(), err)
+			return "", errors.Wrapf(err, "cns returned invalid CIDR %s", ipAddrNet.String())
+		}
+		networkName := strings.ReplaceAll(prefix.Masked().String(), ".", "-")
+		networkName = strings.ReplaceAll(networkName, "/", "_")
 		networkName = fmt.Sprintf("%s-vlan%v-%v", nwCfg.Name, ipamAddResult.ncResponse.MultiTenancyInfo.ID, networkName)
 		return networkName, nil
 	}

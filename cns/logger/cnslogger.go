@@ -32,7 +32,11 @@ func NewCNSLogger(fileName string, logLevel, logTarget int, logDir string) (*CNS
 }
 
 func (c *CNSLogger) InitAI(aiConfig aitelemetry.AIConfig, disableTraceLogging, disableMetricLogging, disableEventLogging bool) {
-	th, err := aitelemetry.NewAITelemetry("", aiMetadata, aiConfig)
+	c.InitAIWithIKey(aiConfig, aiMetadata, disableTraceLogging, disableMetricLogging, disableEventLogging)
+}
+
+func (c *CNSLogger) InitAIWithIKey(aiConfig aitelemetry.AIConfig, instrumentationKey string, disableTraceLogging, disableMetricLogging, disableEventLogging bool) {
+	th, err := aitelemetry.NewAITelemetry("", instrumentationKey, aiConfig)
 	if err != nil {
 		c.logger.Errorf("Error initializing AI Telemetry:%v", err)
 		return
@@ -76,6 +80,17 @@ func (c *CNSLogger) Printf(format string, args ...any) {
 
 func (c *CNSLogger) Debugf(format string, args ...any) {
 	c.logger.Debugf(format, args...)
+
+	if c.th == nil || c.DisableTraceLogging {
+		return
+	}
+
+	msg := fmt.Sprintf(format, args...)
+	c.sendTraceInternal(msg)
+}
+
+func (c *CNSLogger) Warnf(format string, args ...any) {
+	c.logger.Warnf(format, args...)
 
 	if c.th == nil || c.DisableTraceLogging {
 		return

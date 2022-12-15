@@ -1,6 +1,8 @@
 package dataplane
 
 import (
+	"strings"
+
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/ipsets"
 	"github.com/Azure/azure-container-networking/npm/pkg/dataplane/policies"
 	"github.com/Azure/azure-container-networking/npm/util"
@@ -18,6 +20,7 @@ type GenericDataplane interface {
 	AddToLists(listMetadatas []*ipsets.IPSetMetadata, setMetadatas []*ipsets.IPSetMetadata) error
 	RemoveFromList(listMetadata *ipsets.IPSetMetadata, setMetadatas []*ipsets.IPSetMetadata) error
 	ApplyDataPlane() error
+	// GetAllPolicies is deprecated and only used in the goalstateprocessor, which is deprecated
 	GetAllPolicies() []string
 	AddPolicy(policies *policies.NPMNetworkPolicy) error
 	RemovePolicy(PolicyKey string) error
@@ -60,6 +63,10 @@ func NewPodMetadataMarkedForDelete(podKey, podIP, nodeName string) *PodMetadata 
 
 func (pm *PodMetadata) isMarkedForDelete() bool {
 	return pm.markedForDelete
+}
+
+func (p *PodMetadata) Namespace() string {
+	return strings.Split(p.PodKey, "/")[0]
 }
 
 func newUpdateNPMPod(podMetadata *PodMetadata) *updateNPMPod {

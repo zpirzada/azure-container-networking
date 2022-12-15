@@ -25,6 +25,10 @@ func InitAI(aiConfig aitelemetry.AIConfig, disableTraceLogging, disableMetricLog
 	Log.InitAI(aiConfig, disableTraceLogging, disableMetricLogging, disableEventLogging)
 }
 
+func InitAIWithIKey(aiConfig aitelemetry.AIConfig, instrumentationKey string, disableTraceLogging, disableMetricLogging, disableEventLogging bool) {
+	Log.InitAIWithIKey(aiConfig, instrumentationKey, disableTraceLogging, disableMetricLogging, disableEventLogging)
+}
+
 func SetContextDetails(orchestrator, nodeID string) {
 	Log.SetContextDetails(orchestrator, nodeID)
 }
@@ -35,6 +39,10 @@ func Printf(format string, args ...any) {
 
 func Debugf(format string, args ...any) {
 	Log.Debugf(format, args...)
+}
+
+func Warnf(format string, args ...any) {
+	Log.Warnf(format, args...)
 }
 
 func LogEvent(event aitelemetry.Event) {

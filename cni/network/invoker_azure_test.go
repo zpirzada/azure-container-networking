@@ -11,7 +11,7 @@ import (
 	"github.com/Azure/azure-container-networking/network"
 	cniSkel "github.com/containernetworking/cni/pkg/skel"
 	cniTypes "github.com/containernetworking/cni/pkg/types"
-	cniTypesCurr "github.com/containernetworking/cni/pkg/types/current"
+	cniTypesCurr "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,17 +92,6 @@ func getResult(ip string) []*cniTypesCurr.Result {
 		},
 	}
 	return res
-}
-
-// used in the tests below, unused ignores tags
-type ipamStruct struct { //nolint:unused
-	Mode          string `json:"mode,omitempty"`
-	Type          string `json:"type"`
-	Environment   string `json:"environment,omitempty"`
-	AddrSpace     string `json:"addressSpace,omitempty"`
-	Subnet        string `json:"subnet,omitempty"`
-	Address       string `json:"ipAddress,omitempty"`
-	QueryInterval string `json:"queryInterval,omitempty"`
 }
 
 func getNwInfo(subnetv4, subnetv6 string) *network.NetworkInfo {
@@ -268,7 +257,7 @@ func TestAzureIPAMInvoker_Delete(t *testing.T) {
 			args: args{
 				address: getCIDRNotationForAddress("10.0.0.4/24"),
 				nwCfg: &cni.NetworkConfig{
-					Ipam: ipamStruct{
+					IPAM: cni.IPAM{
 						Address: "10.0.0.4",
 					},
 				},
@@ -285,7 +274,7 @@ func TestAzureIPAMInvoker_Delete(t *testing.T) {
 			args: args{
 				address: getCIDRNotationForAddress("2001:db8:abcd:0015::0/64"),
 				nwCfg: &cni.NetworkConfig{
-					Ipam: ipamStruct{
+					IPAM: cni.IPAM{
 						Address: "2001:db8:abcd:0015::0/64",
 					},
 				},
@@ -304,7 +293,7 @@ func TestAzureIPAMInvoker_Delete(t *testing.T) {
 			args: args{
 				address: nil,
 				nwCfg: &cni.NetworkConfig{
-					Ipam: ipamStruct{
+					IPAM: cni.IPAM{
 						Address: "2001:db8:abcd:0015::0/64",
 					},
 				},
@@ -324,7 +313,7 @@ func TestAzureIPAMInvoker_Delete(t *testing.T) {
 			args: args{
 				address: getCIDRNotationForAddress("10.0.0.4/24"),
 				nwCfg: &cni.NetworkConfig{
-					Ipam: ipamStruct{
+					IPAM: cni.IPAM{
 						Address: "10.0.0.4/24",
 					},
 				},
@@ -344,7 +333,7 @@ func TestAzureIPAMInvoker_Delete(t *testing.T) {
 			args: args{
 				address: getCIDRNotationForAddress("2001:db8:abcd:0015::0/64"),
 				nwCfg: &cni.NetworkConfig{
-					Ipam: ipamStruct{
+					IPAM: cni.IPAM{
 						Address: "10.0.0.4/24",
 					},
 				},

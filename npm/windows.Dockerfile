@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/oss/go/microsoft/golang:1.18-windowsservercore-ltsc2022 AS builder
+FROM mcr.microsoft.com/oss/go/microsoft/golang:1.19-windowsservercore-ltsc2022 AS builder
 # Build args
 ARG VERSION
 ARG NPM_AI_PATH
@@ -9,7 +9,7 @@ RUN mkdir /usr/bin/
 # Copy the source
 COPY . .
 
-RUN $Env:CGO_ENABLED=0; go build -v -o /usr/bin/npm.exe -ldflags """-X main.version=${env:VERSION} -X ${env:NPM_AI_PATH}=${env:NPM_AI_ID}""" -gcflags="-dwarflocationlists=true" ./npm/cmd/
+RUN $Env:CGO_ENABLED=0; go build -mod vendor -v -o /usr/bin/npm.exe -ldflags """-X main.version=${env:VERSION} -X ${env:NPM_AI_PATH}=${env:NPM_AI_ID}""" -gcflags="-dwarflocationlists=true" ./npm/cmd/
 
 # Copy into final image
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
