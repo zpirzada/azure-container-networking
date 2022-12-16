@@ -60,16 +60,12 @@ const (
 	delta90th      float64 = 0.01
 	quantil99th    float64 = 0.99
 	delta99th      float64 = 0.001
-
-	// controller workqueue metrics
-	podEventTotalName = "pod_event_total"
-	podEventTotalHelp = "The total number of pod events ever added to the controller workqueue"
 )
 
 // Gauge metrics have the methods Inc(), Dec(), and Set(float64)
 // Summary metrics have the method Observe(float64)
 // For any Vector metric, you can call With(prometheus.Labels) before the above methods
-//   e.g. SomeGaugeVec.With(prometheus.Labels{label1: val1, label2: val2, ...).Dec()
+// e.g. SomeGaugeVec.With(prometheus.Labels{label1: val1, label2: val2, ...).Dec()
 var (
 	nodeRegistry    = prometheus.NewRegistry()
 	clusterRegistry = prometheus.NewRegistry()
@@ -96,10 +92,6 @@ var (
 	controllerPodExecTime       *prometheus.SummaryVec
 	controllerNamespaceExecTime *prometheus.SummaryVec
 	controllerExecTimeLabels    = []string{operationLabel, hadErrorLabel}
-
-	// controller workqueue metrics
-	podEventCount       *prometheus.CounterVec
-	podEventTotalLabels = []string{operationLabel}
 )
 
 type RegistryType string
@@ -116,8 +108,6 @@ const (
 	UpdateOp OperationKind = "update"
 	DeleteOp OperationKind = "delete"
 	NoOp     OperationKind = "noop"
-	// UpdateWithEmptyIPOp is intended to be used for the PodEvent counter only
-	UpdateWithEmptyIPOp OperationKind = "update-with-empty-ip"
 )
 
 func (op OperationKind) isValid() bool {
@@ -180,9 +170,6 @@ func initializeDaemonMetrics() {
 func initializeControllerMetrics() {
 	// CLUSTER METRICS
 	numPolicies = createClusterGauge(numPoliciesName, numPoliciesHelp)
-
-	// controller workqueue metrics
-	podEventCount = newPodEventCount()
 
 	// NODE METRICS
 	addPolicyExecTime = createNodeSummaryVec(addPolicyExecTimeName, "", addPolicyExecTimeHelp, addPolicyExecTimeLabels)
@@ -265,18 +252,4 @@ func createNodeSummaryVec(name, subsystem, helpMessage string, labels []string) 
 
 func createControllerExecTimeSummaryVec(name, helpMessage string) *prometheus.SummaryVec {
 	return createNodeSummaryVec(name, controllerPrefix, helpMessage, controllerExecTimeLabels)
-}
-
-func newPodEventCount() *prometheus.CounterVec {
-	counter := prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: controllerPrefix,
-			Name:      podEventTotalName,
-			Help:      podEventTotalHelp,
-		},
-		podEventTotalLabels,
-	)
-	register(counter, podEventTotalName, ClusterMetrics)
-	return counter
 }

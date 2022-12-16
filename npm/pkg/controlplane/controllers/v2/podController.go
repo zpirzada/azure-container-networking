@@ -37,14 +37,7 @@ const (
 	updateEvent string = "UPDATE"
 )
 
-var (
-	kubeAllNamespaces = &ipsets.IPSetMetadata{Name: util.KubeAllNamespacesFlag, Type: ipsets.KeyLabelOfNamespace}
-
-	eventOperations = map[string]metrics.OperationKind{
-		addEvent:    metrics.CreateOp,
-		updateEvent: metrics.UpdateOp,
-	}
-)
+var kubeAllNamespaces = &ipsets.IPSetMetadata{Name: util.KubeAllNamespacesFlag, Type: ipsets.KeyLabelOfNamespace}
 
 type PodController struct {
 	podLister corelisters.PodLister
@@ -101,14 +94,9 @@ func (c *PodController) needSync(eventType string, obj interface{}) (string, boo
 		return key, needSync
 	}
 
-	op := eventOperations[eventType]
-	if !hasValidPodIP(podObj) {
-		if eventType == addEvent || podObj.Status.Phase != corev1.PodRunning {
-			return key, needSync
-		}
-		klog.Infof("[needSync] adding pod with empty IP. pod: [%+v]. status: [%+v]. conditions: [%+v]. podIPs: [%+v]. InitContainerStatuses: [%+v]. ContainerStatuses: [%+v]. EphemeralContainerStatuses: [%+v]",
-			podObj, podObj.Status, podObj.Status.Conditions, podObj.Status.PodIPs, podObj.Status.InitContainerStatuses, podObj.Status.ContainerStatuses, podObj.Status.EphemeralContainerStatuses)
-		op = metrics.UpdateWithEmptyIPOp
+	// should enqueue updates for Pods with an empty IP if they are also Running
+	if !hasValidPodIP(podObj) && (eventType == addEvent || podObj.Status.Phase != corev1.PodRunning) {
+		return key, needSync
 	}
 
 	if isHostNetworkPod(podObj) {
@@ -123,7 +111,6 @@ func (c *PodController) needSync(eventType string, obj interface{}) (string, boo
 		return key, needSync
 	}
 
-	metrics.IncPodEventTotal(op)
 	needSync = true
 	return key, needSync
 }

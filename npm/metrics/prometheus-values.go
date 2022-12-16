@@ -35,28 +35,12 @@ func getCountValue(collector prometheus.Collector) (int, error) {
 	return int(dtoMetric.Summary.GetSampleCount()), nil
 }
 
-func getTotal(collector prometheus.Collector) (int, error) {
-	dtoMetric, err := getDTOMetric(collector)
-	if err != nil {
-		return 0, err
-	}
-	return int(dtoMetric.Counter.GetValue()), nil
-}
-
 func getCountVecValue(summaryVecMetric *prometheus.SummaryVec, labels prometheus.Labels) (int, error) {
 	collector, ok := summaryVecMetric.With(labels).(prometheus.Collector)
 	if !ok {
 		return 0, errNotCollector
 	}
 	return getCountValue(collector)
-}
-
-func getTotalVecValue(counterVecMetric *prometheus.CounterVec, labels prometheus.Labels) (int, error) {
-	collector, ok := counterVecMetric.With(labels).(prometheus.Collector)
-	if !ok {
-		return 0, errNotCollector
-	}
-	return getTotal(collector)
 }
 
 func getCRUDExecTimeLabels(op OperationKind, hadError bool) prometheus.Labels {
