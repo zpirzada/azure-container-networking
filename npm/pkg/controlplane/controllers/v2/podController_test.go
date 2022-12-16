@@ -654,23 +654,27 @@ func TestEmptyIPUpdate(t *testing.T) {
 	dp.EXPECT().AddToLists([]*ipsets.IPSetMetadata{kubeAllNamespaces}, mockIPSets[:1]).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[:1], podMetadata1).Return(nil).Times(1)
 	dp.EXPECT().AddToSets(mockIPSets[1:], podMetadata1).Return(nil).Times(1)
-	dp.EXPECT().
-		AddToSets(
-			[]*ipsets.IPSetMetadata{ipsets.NewIPSetMetadata("app:test-pod", ipsets.NamedPorts)},
-			dataplane.NewPodMetadata("test-namespace/test-pod", "1.2.3.4,8080", ""),
-		).
-		Return(nil).Times(1)
+	if !util.IsWindowsDP() {
+		dp.EXPECT().
+			AddToSets(
+				[]*ipsets.IPSetMetadata{ipsets.NewIPSetMetadata("app:test-pod", ipsets.NamedPorts)},
+				dataplane.NewPodMetadata("test-namespace/test-pod", "1.2.3.4,8080", ""),
+			).
+			Return(nil).Times(1)
+	}
 	dp.EXPECT().ApplyDataPlane().Return(nil).Times(2)
 	// Delete pod section
 	dp.EXPECT().RemoveFromSets(mockIPSets[:1], podMetadata1).Return(nil).Times(1)
 	dp.EXPECT().RemoveFromSets(mockIPSets[1:], podMetadata1).Return(nil).Times(1)
-	dp.EXPECT().
-		RemoveFromSets(
-			[]*ipsets.IPSetMetadata{ipsets.NewIPSetMetadata("app:test-pod", ipsets.NamedPorts)},
-			dataplane.NewPodMetadata("test-namespace/test-pod", "1.2.3.4,8080", ""),
-		).
-		Return(nil).Times(1)
-	// New IP Pod add fails
+	if !util.IsWindowsDP() {
+		dp.EXPECT().
+			RemoveFromSets(
+				[]*ipsets.IPSetMetadata{ipsets.NewIPSetMetadata("app:test-pod", ipsets.NamedPorts)},
+				dataplane.NewPodMetadata("test-namespace/test-pod", "1.2.3.4,8080", ""),
+			).
+			Return(nil).Times(1)
+	}
+	// since the new IP is invalid, adding the new Pod object is ignored
 
 	updatePod(t, f, oldPodObj, newPodObj)
 
