@@ -114,24 +114,8 @@ func (dp *DataPlane) shouldUpdatePod() bool {
 // 1. Will call into dataplane and updates endpoint references of this pod.
 // 2. Will check for existing applicable network policies and applies it on endpoint.
 /*
-	FIXME: there is a rare edge case for memory-starved WS22 nodes:
-	- pod A previously had an IP k and EP x
-	- around same time:
-		- pod A restarts
-		- NPM restarts
-		- pod B comes up with IP k and EP y
-
-	Controller events can be jumbled. The possible sequences are:
-	1. Pod A create --> Pod A cleanup --> Pod B create
-	2. Pod A create --> Pod B create --> Pod A cleanup
-	3. Pod B create --> Pod A create --> Pod A cleanup
-
-	1 and 2 are accounted for, but 3 is a weird edge case that can happen under the above scenario.
-	The fix can be to reset all ACLs on the Endpoint, then add back Pod B's ACLs.
-
-	If a Pod encountered this issue, correct connectivity could be restored by bumping the Pod.
-
-	TODO: one other note. It would be good to replace stalePodKey behavior since it is complex.
+	FIXME: see https://github.com/Azure/azure-container-networking/issues/1729
+	TODO: it would be good to replace stalePodKey behavior since it is complex.
 */
 func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 	klog.Infof("[DataPlane] updatePod called for Pod Key %s", pod.PodKey)
