@@ -27,7 +27,8 @@ var (
 	// ErrUnsupportedExceptCIDR is returned when Except CIDR block translation feature is used in windows.
 	ErrUnsupportedExceptCIDR = errors.New("unsupported Except CIDR block translation features used on windows")
 	// ErrUnsupportedSCTP is returned when SCTP protocol is used in windows.
-	ErrUnsupportedSCTP = errors.New("unsupported SCTP protocol used on windows")
+	ErrUnsupportedSCTP    = errors.New("unsupported SCTP protocol used on windows")
+	ErrInvalidIPV6Address = errors.New("invalid IPV6 address")
 )
 
 type podSelectorResult struct {
@@ -562,7 +563,7 @@ func TranslatePolicy(npObj *networkingv1.NetworkPolicy) (*policies.NPMNetworkPol
 		for _, value := range egress.To {
 			if value.IPBlock != nil {
 				if !util.IsIPV4(value.IPBlock.CIDR) {
-					return nil, fmt.Errorf("IP %s is not a valid IPV4 address", value.IPBlock.CIDR)
+					return nil, ErrInvalidIPV6Address
 				}
 			}
 		}
@@ -571,7 +572,7 @@ func TranslatePolicy(npObj *networkingv1.NetworkPolicy) (*policies.NPMNetworkPol
 		for _, value := range ingress.From {
 			if value.IPBlock != nil {
 				if !util.IsIPV4(value.IPBlock.CIDR) {
-					return nil, fmt.Errorf("IP %s is not a valid IPV4 address", value.IPBlock.CIDR)
+					return nil, ErrInvalidIPV6Address
 				}
 			}
 		}
