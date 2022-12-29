@@ -551,12 +551,31 @@ func egressPolicy(npmNetPol *policies.NPMNetworkPolicy, netPolName string, egres
 	return nil
 }
 
-// TranslatePolicy traslates networkpolicy object to NPMNetworkPolicy object
-// and return the NPMNetworkPolicy object.
+// TranslatePolicy translates networkpolicy object to NPMNetworkPolicy object
+// and returns the NPMNetworkPolicy object.
 func TranslatePolicy(npObj *networkingv1.NetworkPolicy) (*policies.NPMNetworkPolicy, error) {
 	netPolName := npObj.Name
 	npmNetPol := policies.NewNPMNetworkPolicy(netPolName, npObj.Namespace)
 
+	// check if IPs are valid IPV4 addresses
+	for _, egress := range npObj.Spec.Egress {
+		for _, value := range egress.To {
+			if value.IPBlock != nil {
+				if !util.IsIPV4(value.IPBlock.CIDR) {
+					return nil, fmt.Errorf("IP %s is not a valid IPV4 address", value.IPBlock.CIDR)
+				}
+			}
+		}
+	}
+	for _, ingress := range npObj.Spec.Ingress {
+		for _, value := range ingress.From {
+			if value.IPBlock != nil {
+				if !util.IsIPV4(value.IPBlock.CIDR) {
+					return nil, fmt.Errorf("IP %s is not a valid IPV4 address", value.IPBlock.CIDR)
+				}
+			}
+		}
+	}
 	// podSelector in spec.PodSelector is common for ingress and egress.
 	// Process this podSelector first.
 	psResult, err := podSelectorWithNS(npmNetPol.PolicyKey, npmNetPol.Namespace, policies.EitherMatch, &npObj.Spec.PodSelector)

@@ -296,7 +296,7 @@ func (c *NetworkPolicyController) syncAddAndUpdateNetPol(netPolObj *networkingv1
 
 		klog.Errorf("Failed to translate podSelector in NetworkPolicy %s in namespace %s: %s", netPolObj.ObjectMeta.Name, netPolObj.ObjectMeta.Namespace, err.Error())
 		// The exec time isn't relevant here, so consider a no-op.
-		return metrics.NoOp, errNetPolTranslationFailure
+		return metrics.NoOp, nil
 	}
 
 	_, policyExisted := c.rawNpSpecMap[netpolKey]
