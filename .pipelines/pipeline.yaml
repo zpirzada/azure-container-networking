@@ -92,6 +92,20 @@ stages:
             name: "TestWindows"
             displayName: "Run Windows Tests"
 
+  - stage: delay
+    displayName: delay for debug
+    dependsOn: binaries
+    jobs:
+      - job:
+        displayName: delay job
+        pool:
+          name: "$(BUILD_POOL_NAME_DEFAULT)"
+        steps:
+          - script: |
+              sleep 3600
+            name: sleeping
+            displayName: sleeping
+
   - stage: binaries
     displayName: Build Binaries
     dependsOn:
