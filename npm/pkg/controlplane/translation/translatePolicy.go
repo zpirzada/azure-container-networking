@@ -27,8 +27,8 @@ var (
 	// ErrUnsupportedExceptCIDR is returned when Except CIDR block translation feature is used in windows.
 	ErrUnsupportedExceptCIDR = errors.New("unsupported Except CIDR block translation features used on windows")
 	// ErrUnsupportedSCTP is returned when SCTP protocol is used in windows.
-	ErrUnsupportedSCTP    = errors.New("unsupported SCTP protocol used on windows")
-	ErrInvalidIPV6Address = errors.New("invalid IPV6 address")
+	ErrUnsupportedSCTP      = errors.New("unsupported SCTP protocol used on windows")
+	ErrUnsupportedIPAddress = errors.New("unsupported IP address")
 )
 
 type podSelectorResult struct {
@@ -383,6 +383,10 @@ func translateRule(npmNetPol *policies.NPMNetworkPolicy, netPolName string, dire
 		// #2.1 Handle IPBlock and port if exist
 		if peer.IPBlock != nil {
 			if len(peer.IPBlock.CIDR) > 0 {
+				if !util.IsIPV4(peer.IPBlock.CIDR) {
+					return ErrUnsupportedIPAddress
+				}
+
 				ipBlockIPSet, ipBlockSetInfo, err := ipBlockRule(netPolName, npmNetPol.Namespace, direction, matchType, ruleIndex, peerIdx, peer.IPBlock)
 				if err != nil {
 					return err
@@ -558,25 +562,6 @@ func TranslatePolicy(npObj *networkingv1.NetworkPolicy) (*policies.NPMNetworkPol
 	netPolName := npObj.Name
 	npmNetPol := policies.NewNPMNetworkPolicy(netPolName, npObj.Namespace)
 
-	// check if IPs are valid IPV4 addresses
-	for _, egress := range npObj.Spec.Egress {
-		for _, value := range egress.To {
-			if value.IPBlock != nil {
-				if !util.IsIPV4(value.IPBlock.CIDR) {
-					return nil, ErrInvalidIPV6Address
-				}
-			}
-		}
-	}
-	for _, ingress := range npObj.Spec.Ingress {
-		for _, value := range ingress.From {
-			if value.IPBlock != nil {
-				if !util.IsIPV4(value.IPBlock.CIDR) {
-					return nil, ErrInvalidIPV6Address
-				}
-			}
-		}
-	}
 	// podSelector in spec.PodSelector is common for ingress and egress.
 	// Process this podSelector first.
 	psResult, err := podSelectorWithNS(npmNetPol.PolicyKey, npmNetPol.Namespace, policies.EitherMatch, &npObj.Spec.PodSelector)
