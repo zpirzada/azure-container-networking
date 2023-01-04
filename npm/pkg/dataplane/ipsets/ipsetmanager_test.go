@@ -1551,6 +1551,11 @@ func TestValidateIPSetMemberIP(t *testing.T) {
 			ipblock: "1.1.1.1/0",
 			want:    false,
 		},
+		{
+			name:    "valid/0",
+			ipblock: "0.0.0.0/0",
+			want:    true,
+		},
 	}
 
 	for _, tt := range tests {
