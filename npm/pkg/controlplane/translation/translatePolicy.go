@@ -222,6 +222,10 @@ func ipBlockRule(policyName, ns string, direction policies.Direction, matchType 
 		return nil, policies.SetInfo{}, nil
 	}
 
+	if !util.IsIPV4(ipBlockRule.CIDR) {
+		return nil, policies.SetInfo{}, ErrUnsupportedIPAddress
+	}
+
 	ipBlockIPSet, err := ipBlockIPSet(policyName, ns, direction, ipBlockSetIndex, ipBlockPeerIndex, ipBlockRule)
 	if err != nil {
 		return nil, policies.SetInfo{}, err
@@ -383,10 +387,6 @@ func translateRule(npmNetPol *policies.NPMNetworkPolicy, netPolName string, dire
 		// #2.1 Handle IPBlock and port if exist
 		if peer.IPBlock != nil {
 			if len(peer.IPBlock.CIDR) > 0 {
-				if !util.IsIPV4(peer.IPBlock.CIDR) {
-					return ErrUnsupportedIPAddress
-				}
-
 				ipBlockIPSet, ipBlockSetInfo, err := ipBlockRule(netPolName, npmNetPol.Namespace, direction, matchType, ruleIndex, peerIdx, peer.IPBlock)
 				if err != nil {
 					return err
