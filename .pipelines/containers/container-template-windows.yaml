@@ -41,7 +41,7 @@ steps:
     repository: 'azure-${{ parameters.name }}'
     tags: 'windows-${{ parameters.arch }}-${{ parameters.tag }}'
 
--task: PowerShell@2
+- task: PowerShell@2
   name: Delay
   displayName: sleeping
   inputs:
