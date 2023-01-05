@@ -14,7 +14,6 @@ import (
 	"github.com/Azure/azure-container-networking/cns/restserver"
 	"github.com/Azure/azure-container-networking/cns/types"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 )
 
 const (
@@ -53,11 +52,10 @@ type do interface {
 type Client struct {
 	client do
 	routes map[string]url.URL
-	logger *zap.Logger
 }
 
 // New returns a new CNS client configured with the passed URL and timeout.
-func New(lgr *zap.Logger, baseURL string, requestTimeout time.Duration) (*Client, error) {
+func New(baseURL string, requestTimeout time.Duration) (*Client, error) {
 	if baseURL == "" {
 		baseURL = defaultBaseURL
 	}
@@ -72,7 +70,6 @@ func New(lgr *zap.Logger, baseURL string, requestTimeout time.Duration) (*Client
 			Timeout: requestTimeout,
 		},
 		routes: routes,
-		logger: lgr,
 	}, nil
 }
 
@@ -218,6 +215,7 @@ func (c *Client) DeleteHostNCApipaEndpoint(ctx context.Context, networkContainer
 	}
 
 	var resp cns.DeleteHostNCApipaEndpointResponse
+
 	err = json.NewDecoder(res.Body).Decode(&resp)
 	if err != nil {
 		return errors.Wrap(err, "failed to decode DeleteHostNCApipaEndpointResponse")
@@ -269,7 +267,6 @@ func (c *Client) RequestIPAddress(ctx context.Context, ipconfig cns.IPConfigRequ
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode IPConfigResponse")
 	}
-	c.logger.Debug("request IP client", zap.Any("response", response))
 
 	if response.Response.ReturnCode != 0 {
 		return nil, errors.New(response.Response.Message)
