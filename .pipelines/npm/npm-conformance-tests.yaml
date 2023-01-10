@@ -288,9 +288,8 @@ jobs:
           }
 
           runConformanceWindows () {
-            git clone https://github.com/huntergregory/kubernetes.git
+            git clone https://github.com/huntergregory/kubernetes.git --depth=1 --branch=quit-on-failure
             cd kubernetes
-            git checkout sleep-before-probing
             export PATH=$PATH:/usr/local/go/bin/
             make WHAT=test/e2e/e2e.test
             cd ..
@@ -347,6 +346,14 @@ jobs:
             then
               runConformanceWindows | tee $npmLogsFolder/conformance-results
               exitCode=$?
+              if [[ $exitCode != 0 ]]; then
+                # capture HNS state
+                curl -LO https://raw.githubusercontent.com/Azure/azure-container-networking/master/debug/windows/npm/win-debug.sh
+                chmod +x win-debug.sh
+                ./win-debug.sh ./kubeconfig > $npmLogsFolder/win-debug.out
+                # move HNS logs from win-debug.sh to the artifact folder
+                mv logs_* $npmLogsFolder/
+              fi
             else
               runConformance | tee $npmLogsFolder/conformance-results
               exitCode=$?
