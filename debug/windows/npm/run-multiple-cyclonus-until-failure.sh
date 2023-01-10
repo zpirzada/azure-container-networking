@@ -1,3 +1,27 @@
+############################################################################################################
+# This script will run multiple rounds of cyclonus until failure. On failure, it will:
+# - Capture HNS/VFP state, cluster info, and NPM logs.
+# - Stop VMs on the windows nodepool (to stop an HNS trace).
+
+# Requirements:
+# - AKS cluster with Windows NPM and Windows Server '22 nodepool named like $WINDOWS_NODEPOOL.
+# - Cyclonus binary in the same folder as this script, named "cyclonus-stop-on-failure" (installation below).
+
+# Steps:
+# - Create cluster as described above.
+# - Create Bastion with defaults on a Windows VMSS instance.
+# - Login to Bastion on every node (should have minimum nodes necessary for repro).
+# - On each node, run C:\k\starthnstrace.ps1 -MaxFileSize 2000.
+# - Start this script with its arguments (see directly below).
+############################################################################################################
+
+## Cyclonus Installation
+# git checkout https://github.com/huntergregory/cyclonus.git --depth=1 --branch=stop-after-failure
+# cd cyclonus
+# CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ./cmd/cyclonus/cyclonus ./cmd/cyclonus
+# cd ..
+# mv cyclonus/cmd/cyclonus/cyclonus cyclonus-stop-on-failure
+
 # constants
 START=1
 END=10
@@ -30,6 +54,7 @@ echo "using kubecontext: $kubecontext"
 
 dateString=`date -I` # like 2022-09-24
 
+# NOTE: number of folders here impacts cdBack
 base=results-$kubecontext/$dateString
 mkdir -p results-$kubecontext
 test -d $base && echo "folder $base/ already exists" && exit 1
@@ -40,8 +65,9 @@ for i in $(seq $START $END); do
         i=0$i
     fi
     roundBase=$base/round-$i
-    mkdir $roundBase
+    mkdir $roundBase || echo "folder $roundBase already exists" && exit 1
     cd $roundBase
+    cdBack=../../..
 
     ## run cyc
     kubectl delete ns x y z --kubeconfig $absolutePathKubeConfig
@@ -53,7 +79,7 @@ for i in $(seq $START $END); do
 
     set -x
     LOG_FILE=run.out
-    ../../../cyclonus-stop-on-failure generate \
+    $cdBack/cyclonus-stop-on-failure generate \
         --context=$kubecontext \
         --noisy=true \
         --retries=3 \
@@ -95,5 +121,5 @@ for i in $(seq $START $END); do
     fi
 
     echo "FINISHED SUCCESSFULLY FOR ROUND $i"
-    cd ../../../
+    cd $cdBack
 done

@@ -1,10 +1,35 @@
+############################################################################################################
+# This script will run multiple rounds of cyclonus until failure. On failure, it will:
+# - Capture HNS/VFP state, cluster info, and NPM logs.
+# - Stop VMs on the windows nodepool (to stop an HNS trace).
+
+# Requirements:
+# - AKS cluster with Windows NPM and Windows Server '22 nodepool named like $WINDOWS_NODEPOOL.
+# - Conformance binary with path specified in $E2E_FILE (installation instructions directly below).
+
+# Steps:
+# - Identify test cases to run (modifying $toRun and $toSkip).
+# - To get the same order every time, set random $SEED (see top of the failed conformance run).
+#     For random order, comment out the line referencing $SEED.
+# - Create cluster as described above.
+# - Create Bastion with defaults on a Windows VMSS instance.
+# - Login to Bastion on every node (should have minimum nodes necessary for repro).
+# - On each node, run C:\k\starthnstrace.ps1 -MaxFileSize 2000.
+# - Start this script with its arguments (see directly below).
+############################################################################################################
+
+## Conformance Installation
+# git clone https://github.com/huntergregory/kubernetes.git --depth=1 --branch=quit-on-failure
+# cd kubernetes
+# make WHAT=test/e2e/e2e.test
+# cd ../
+# mv kubernetes/_output/local/bin/linux/amd64/e2e.test $E2E_FILE
+
 # constants
 START=1
 END=10
 WINDOWS_NODEPOOL=akswin22
 E2E_FILE=./e2e-quit-on-failure.test
-# to install the correct e2e run:
-# git clone https://github.com/huntergregory/kubernetes.git --depth=1 --branch=quit-on-failure && cd kubernetes && make WHAT=test/e2e/e2e.test && cd ../ && mv kubernetes/_output/local/bin/linux/amd64/e2e.test $E2E_FILE
 
 # IMPORTANT for reproducibility. Find from top of conformance run
 # or comment out if randomness is desired
