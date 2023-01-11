@@ -42,7 +42,7 @@ aksRGPrefix=MC_$resourceGroup_$clusterName
 aksRG=`az group list -otable | grep $aksRGPrefix | awk '{print $1}'`
 if [[ -z $aksRG ]]; then
     echo "AKS resource group not found. Should start with $aksRGPrefix..."
-    # exit 1
+    exit 1
 fi
 echo "found AKS resource group: $aksRG"
 echo "this AKS RG MUST have one WS22 nodepool named $WINDOWS_NODEPOOL..."
@@ -112,7 +112,7 @@ for i in $(seq $START $END); do
         for pod in `kubectl --kubeconfig $absoluteKubeConfig get pod -n kube-system | grep azure-npm-win | awk '{print $1}'`; do
             # using -l k8s-app=azure-npm weirdly only gets ~20 lines of log
             kubectl --kubeconfig $absoluteKubeConfig logs -n kube-system $pod > $fname.$pod.log
-        fi
+        done
 
         echo "stopping vmss instance to stop hns log capture"
         az vmss stop --instance-ids="*" -n $WINDOWS_NODEPOOL -g $aksRG
