@@ -304,6 +304,15 @@ func (iMgr *IPSetManager) calculateNewSetPolicies(networkPolicies []hcn.NetworkP
 }
 
 func (iMgr *IPSetManager) getHCnNetwork() (*hcn.HostComputeNetwork, error) {
+	net, err := hcn.ListNetworks()
+	if err != nil {
+		klog.Infof("error in listing networks %v", err)
+	} else {
+		for _, n := range net {
+			klog.Infof("network %v", n)
+		}
+	}
+
 	if iMgr.iMgrCfg.NetworkName == "" {
 		iMgr.iMgrCfg.NetworkName = util.AzureNetworkName
 	}

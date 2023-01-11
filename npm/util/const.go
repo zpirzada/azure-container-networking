@@ -231,7 +231,7 @@ const (
 )
 
 // AzureNetworkName is the default network Azure CNI creates
-const AzureNetworkName = "azure"
+const AzureNetworkName = "Calico"
 
 // These ID represents where did the error log generate from.
 // It's for better query purpose. In Kusto these value are used in

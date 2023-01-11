@@ -32,7 +32,7 @@ import (
 
 var npmV2DataplaneCfg = &dataplane.Config{
 	IPSetManagerCfg: &ipsets.IPSetManagerCfg{
-		NetworkName: "azure", // FIXME  should be specified in DP config instead
+		NetworkName: "Calico", // FIXME  should be specified in DP config instead
 		// NOTE: IPSetMode must be set later by the npm ConfigMap or default config
 	},
 	PolicyManagerCfg: &policies.PolicyManagerCfg{
