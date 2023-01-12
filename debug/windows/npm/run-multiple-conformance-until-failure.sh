@@ -60,7 +60,7 @@ wrongK8sVersion="Netpol API"
 toSkip="\[LinuxOnly\]|$nomatch1|$nomatch2|$nomatch3|$nomatch4|$cidrExcept1|$cidrExcept2|$namedPorts|$wrongK8sVersion|SCTP"
 
 # parameters
-absoluteKubeConfig=$1
+absolutePathKubeConfig=$1
 clusterName=$2
 resourceGroup=$3
 
@@ -80,7 +80,7 @@ echo "this AKS RG MUST have one WS22 nodepool named $WINDOWS_NODEPOOL..."
 echo "START the HNS trace BEFORE running this:  .\starthnstrace.ps1 -maxFileSize 2000 ..."
 sleep 15s
 
-echo "beginning conf with kubeconfig: $absoluteKubeConfig, clusterName: $clusterName, resourceGroup: $resourceGroup"
+echo "beginning conf with kubeconfig: $absolutePathKubeConfig, clusterName: $clusterName, resourceGroup: $resourceGroup"
 
 # script
 # NOTE: number of folders here impacts cdBack
@@ -94,11 +94,11 @@ set +e
 
 for i in $(seq $START $END); do
     # delete any old conf-namespaces
-    kubectl --kubeconfig $absoluteKubeConfig delete ns -l pod-security.kubernetes.io/enforce | grep "No resources found" || echo "sleeping 3m while HNS state resets" && sleep 3m
+    kubectl --kubeconfig $absolutePathKubeConfig delete ns -l pod-security.kubernetes.io/enforce | grep "No resources found" || (echo "sleeping 3m while HNS state resets" && sleep 3m)
 
     # clear NPM logs and reset HNS state
     echo "restarting npm windows then sleeping 3m"
-    kubectl --kubeconfig $absoluteKubeConfig rollout restart -n kube-system ds azure-npm-win
+    kubectl --kubeconfig $absolutePathKubeConfig rollout restart -n kube-system ds azure-npm-win
     sleep 3m
 
     if [[ $i -lt 10 ]]; then
@@ -114,7 +114,7 @@ for i in $(seq $START $END); do
         --allowed-not-ready-nodes=1 \
         --ginkgo.focus="$toRun" \
         --ginkgo.skip="$toSkip" \
-        --kubeconfig=$absoluteKubeConfig \
+        --kubeconfig=$absolutePathKubeConfig \
         --ginkgo.seed=$SEED \
         --delete-namespace=true \
         --delete-namespace-on-failure=true | tee $fname
@@ -126,13 +126,13 @@ for i in $(seq $START $END); do
         cdBack=../../..
         mkdir -p $hnsBase
         cd $hnsBase
-        ./win-debug.sh $absoluteKubeConfig
+        ./win-debug.sh $absolutePathKubeConfig
         cd $cdBack
 
         # NPM logs
-        for pod in `kubectl --kubeconfig $absoluteKubeConfig get pod -n kube-system | grep azure-npm-win | awk '{print $1}'`; do
+        for pod in `kubectl --kubeconfig $absolutePathKubeConfig get pod -n kube-system | grep azure-npm-win | awk '{print $1}'`; do
             # using -l k8s-app=azure-npm weirdly only gets ~20 lines of log
-            kubectl --kubeconfig $absoluteKubeConfig logs -n kube-system $pod > $fname.$pod.log
+            kubectl --kubeconfig $absolutePathKubeConfig logs -n kube-system $pod > $fname.$pod.log
         done
 
         echo "stopping vmss instance to stop hns log capture"

@@ -34,7 +34,7 @@ clusterName=$3
 resourceGroup=$4
 
 if [[ -z $1 || -z $2 || -z $3 || -z $4 ]]; then
-    echo "need absolute path of kubeconfig, and kubecontext string"
+    echo "need absolute path of kubeconfig, and kubecontext string, and cluster name, and resource group"
     exit 1
 fi
 
@@ -65,16 +65,16 @@ for i in $(seq $START $END); do
         i=0$i
     fi
     roundBase=$base/round-$i
-    mkdir $roundBase || echo "folder $roundBase already exists" && exit 1
+    mkdir $roundBase || (echo "folder $roundBase already exists" ; exit 1)
     cd $roundBase
     cdBack=../../..
 
     ## run cyc
-    kubectl delete ns x y z --kubeconfig $absolutePathKubeConfig
+    kubectl --kubeconfig $absolutePathKubeConfig delete ns x y z
 
     # clear NPM logs and reset HNS state
     echo "restarting npm windows then sleeping 3m"
-    kubectl --kubeconfig $absoluteKubeConfig rollout restart -n kube-system ds azure-npm-win
+    kubectl --kubeconfig $absolutePathKubeConfig rollout restart -n kube-system ds azure-npm-win
     sleep 3m
 
     set -x
