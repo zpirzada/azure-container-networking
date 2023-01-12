@@ -56,6 +56,46 @@ func (pMgr *PolicyManager) reconcile() {
 	// not implemented
 }
 
+func (pMgr *PolicyManager) AddBaseACLs(endpointID string) error {
+	rulesToAdd := []*NPMACLPolSettings{
+		{
+			Id:              "host-allow-in",
+			Action:          "Allow",
+			Direction:       "In",
+			LocalAddresses:  "",
+			LocalPorts:      "",
+			Priority:        0,
+			Protocols:       "256",
+			RemoteAddresses: "",
+			RemotePorts:     "",
+			RuleType:        "Host",
+		},
+		{
+			Id:              "host-allow-out",
+			Action:          "Allow",
+			Direction:       "Out",
+			LocalAddresses:  "",
+			LocalPorts:      "",
+			Priority:        0,
+			Protocols:       "256",
+			RemoteAddresses: "",
+			RemotePorts:     "",
+			RuleType:        "Host",
+		},
+	}
+
+	epPolicyRequest, err := getEPPolicyReqFromACLSettings(rulesToAdd)
+	if err != nil {
+		klog.Errorf("failed to get ep Policy request: %+v", err)
+		return nil
+	}
+
+	if err := pMgr.applyPoliciesToEndpointID(endpointID, epPolicyRequest); err != nil {
+		klog.Errorf("error applying base policies: %+v", err)
+	}
+	return nil
+}
+
 // addPolicy will add the policy for each specified endpoint if the policy doesn't exist on the endpoint yet,
 // and will add the endpoint to the PodEndpoints of the policy if successful.
 // addPolicy may modify the endpointList input.

@@ -22,6 +22,10 @@ const (
 	chainSectionPrefix = "chain"
 )
 
+func (pMgr *PolicyManager) AddBaseACLs(endpointID string) error {
+	return nil
+}
+
 /*
 Error handling for iptables-restore:
 Currently we retry on any error and will make two tries max.

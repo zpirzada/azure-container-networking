@@ -366,6 +366,8 @@ func (dp *DataPlane) refreshPodEndpoints() error {
 			dp.endpointCache.cache[ip] = npmEP
 			// NOTE: TSGs rely on this log line
 			klog.Infof("updating endpoint cache to include %s: %+v", npmEP.ip, npmEP)
+
+			_ = dp.policyMgr.AddBaseACLs(npmEP.id)
 		} else if oldNPMEP.id != endpoint.Id {
 			// multiple endpoints can have the same IP address, but there should be one endpoint ID per pod
 			// throw away old endpoints that have the same IP as a current endpoint (the old endpoint is getting deleted)
