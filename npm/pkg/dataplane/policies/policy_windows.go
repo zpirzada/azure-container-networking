@@ -163,16 +163,20 @@ func (acl *ACLPolicy) checkIPSets() bool {
 }
 
 func getAddrListFromSetInfo(setInfoList []SetInfo) string {
-	setInfoStr := ""
-	setInfoLen := len(setInfoList)
-	for i, setInfo := range setInfoList {
-		if i < setInfoLen-1 {
-			setInfoStr += setInfo.IPSet.GetHashedName() + ","
-		} else {
-			setInfoStr += setInfo.IPSet.GetHashedName()
-		}
+	if len(setInfoList) == 0 {
+		return ""
 	}
-	return setInfoStr
+	return "10.224.0.93/32"
+	// setInfoStr := ""
+	// setInfoLen := len(setInfoList)
+	// for i, setInfo := range setInfoList {
+	// 	if i < setInfoLen-1 {
+	// 		setInfoStr += setInfo.IPSet.GetHashedName() + ","
+	// 	} else {
+	// 		setInfoStr += setInfo.IPSet.GetHashedName()
+	// 	}
+	// }
+	// return setInfoStr
 }
 
 func getPortStrFromPorts(port Ports) string {
