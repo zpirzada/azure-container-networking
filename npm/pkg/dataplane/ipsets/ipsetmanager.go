@@ -15,18 +15,18 @@ import (
 type IPSetMode string
 
 /*
-	IPSet Modes
+IPSet Modes
 
-	- ApplyAllIPSets:
-		- all ipsets are added to the kernel
-		- ipsets are removed from the kernel when they are deleted from the cache
-		- creates empty ipsets
-		- adds empty/unreferenced ipsets to the toDelete cache periodically
+- ApplyAllIPSets:
+  - all ipsets are added to the kernel
+  - ipsets are removed from the kernel when they are deleted from the cache
+  - creates empty ipsets
+  - adds empty/unreferenced ipsets to the toDelete cache periodically
 
-	- ApplyOnNeed:
-		- ipsets are added to the kernel when they are referenced by network policies or lists in the kernel
-		- ipsets are removed from the kernel when they no longer have a reference
-		- removes empty/unreferenced ipsets from the cache periodically
+- ApplyOnNeed:
+  - ipsets are added to the kernel when they are referenced by network policies or lists in the kernel
+  - ipsets are removed from the kernel when they no longer have a reference
+  - removes empty/unreferenced ipsets from the cache periodically
 */
 const (
 	ApplyAllIPSets IPSetMode = "all"
@@ -75,9 +75,9 @@ func NewIPSetManager(iMgrCfg *IPSetManagerCfg, ioShim *common.IOShim) *IPSetMana
 }
 
 /*
-	Reconcile removes empty/unreferenced sets from the cache.
-	For ApplyAllIPSets mode, those sets are added to the toDeleteCache.
-	We can't delete from kernel immediately unless we lock iMgr during policy CRUD.
+Reconcile removes empty/unreferenced sets from the cache.
+For ApplyAllIPSets mode, those sets are added to the toDeleteCache.
+We can't delete from kernel immediately unless we lock iMgr during policy CRUD.
 */
 func (iMgr *IPSetManager) Reconcile() {
 	iMgr.Lock()
@@ -444,32 +444,34 @@ func (iMgr *IPSetManager) RemoveFromList(listMetadata *IPSetMetadata, setMetadat
 }
 
 func (iMgr *IPSetManager) ApplyIPSets() error {
-	iMgr.Lock()
-	defer iMgr.Unlock()
-
-	if iMgr.dirtyCache.numSetsToAddOrUpdate() == 0 && iMgr.dirtyCache.numSetsToDelete() == 0 {
-		klog.Info("[IPSetManager] No IPSets to apply")
-		return nil
-	}
-
-	klog.Infof(
-		"[IPSetManager] dirty caches. toAddUpdateCache: %s, toDeleteCache: %s",
-		iMgr.dirtyCache.printAddOrUpdateCache(), iMgr.dirtyCache.printDeleteCache(),
-	)
-	iMgr.sanitizeDirtyCache()
-
-	// Call the appropriate apply ipsets
-	prometheusTimer := metrics.StartNewTimer()
-	defer metrics.RecordIPSetExecTime(prometheusTimer) // record execution time regardless of failure
-	err := iMgr.applyIPSets()
-	if err != nil {
-		metrics.SendErrorLogAndMetric(util.IpsmID, "error: failed to apply ipsets: %s", err.Error())
-		return err
-	}
-
-	iMgr.clearDirtyCache()
-	// TODO could also set the number of ipsets in NPM (not necessarily in kernel) here using len(iMgr.setMap)
 	return nil
+
+	// iMgr.Lock()
+	// defer iMgr.Unlock()
+
+	// if iMgr.dirtyCache.numSetsToAddOrUpdate() == 0 && iMgr.dirtyCache.numSetsToDelete() == 0 {
+	// 	klog.Info("[IPSetManager] No IPSets to apply")
+	// 	return nil
+	// }
+
+	// klog.Infof(
+	// 	"[IPSetManager] dirty caches. toAddUpdateCache: %s, toDeleteCache: %s",
+	// 	iMgr.dirtyCache.printAddOrUpdateCache(), iMgr.dirtyCache.printDeleteCache(),
+	// )
+	// iMgr.sanitizeDirtyCache()
+
+	// // Call the appropriate apply ipsets
+	// prometheusTimer := metrics.StartNewTimer()
+	// defer metrics.RecordIPSetExecTime(prometheusTimer) // record execution time regardless of failure
+	// err := iMgr.applyIPSets()
+	// if err != nil {
+	// 	metrics.SendErrorLogAndMetric(util.IpsmID, "error: failed to apply ipsets: %s", err.Error())
+	// 	return err
+	// }
+
+	// iMgr.clearDirtyCache()
+	// // TODO could also set the number of ipsets in NPM (not necessarily in kernel) here using len(iMgr.setMap)
+	// return nil
 }
 
 func (iMgr *IPSetManager) GetAllIPSets() map[string]string {
