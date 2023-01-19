@@ -18,8 +18,6 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 )
 
-const networkName = "azure"
-
 var errorFakeHNS = errors.New("errorFakeHNS Error")
 
 func newErrorFakeHNS(errStr string) error {
@@ -185,7 +183,9 @@ func (f Hnsv2wrapperFake) GetNetworkByName(networkName string) (*hcn.HostCompute
 	if network, ok := f.Cache.networks[networkName]; ok {
 		return network.GetHCNObj(), nil
 	}
-	return nil, hcn.NetworkNotFoundError{}
+	return nil, hcn.NetworkNotFoundError{
+		NetworkName: networkName,
+	}
 }
 
 func (f Hnsv2wrapperFake) GetNetworkByID(networkID string) (*hcn.HostComputeNetwork, error) {

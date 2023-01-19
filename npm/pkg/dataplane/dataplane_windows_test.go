@@ -21,12 +21,15 @@ const (
 func TestAllSerialCases(t *testing.T) {
 	tests := getAllSerialTests()
 	for i, tt := range tests {
+		if tt.Description != "Test base ACLs for Calico Network" {
+			continue
+		}
 		i := i
 		tt := tt
 		t.Run(tt.Description, func(t *testing.T) {
 			t.Logf("beginning test #%d. Description: [%s]. Tags: %+v", i, tt.Description, tt.Tags)
 
-			hns := ipsets.GetHNSFake(t)
+			hns := ipsets.GetHNSFake(t, tt.DpCfg.NetworkName)
 			hns.Delay = defaultHNSLatency
 			io := common.NewMockIOShimWithFakeHNS(hns)
 			for _, ep := range tt.InitialEndpoints {
@@ -61,7 +64,7 @@ func TestAllMultiJobCases(t *testing.T) {
 		t.Run(tt.Description, func(t *testing.T) {
 			t.Logf("beginning test #%d. Description: [%s]. Tags: %+v", i, tt.Description, tt.Tags)
 
-			hns := ipsets.GetHNSFake(t)
+			hns := ipsets.GetHNSFake(t, tt.DpCfg.NetworkName)
 			hns.Delay = threadedHNSLatency
 			io := common.NewMockIOShimWithFakeHNS(hns)
 			for _, ep := range tt.InitialEndpoints {

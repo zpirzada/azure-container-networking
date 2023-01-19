@@ -12,15 +12,17 @@ const (
 	blockRulePriotity = 3000
 	allowRulePriotity = 222
 	policyIDPrefix    = "azure-acl"
+
+	// anyProtocol is the number HNS corresponds to any protocol
+	anyProtocol = "256"
 )
 
 var (
 	protocolNumMap = map[Protocol]string{
-		TCP:  "6",
-		UDP:  "17",
-		SCTP: "132",
-		// HNS thinks 256 as ANY protocol
-		UnspecifiedProtocol: "256",
+		TCP:                 "6",
+		UDP:                 "17",
+		SCTP:                "132",
+		UnspecifiedProtocol: anyProtocol,
 	}
 
 	ErrNamedPortsNotSupported     = errors.New("Named Port translation is not supported in windows dataplane")

@@ -15,6 +15,7 @@ const (
 	podCrudTag    Tag = "pod-crud"
 	nsCrudTag     Tag = "namespace-crud"
 	netpolCrudTag Tag = "netpol-crud"
+	calicoTag     Tag = "calico"
 )
 
 const (
@@ -52,6 +53,18 @@ var (
 var (
 	defaultWindowsDPCfg = &Config{
 		IPSetManagerCfg: &ipsets.IPSetManagerCfg{
+			NetworkName:        "azure",
+			IPSetMode:          ipsets.ApplyAllIPSets,
+			AddEmptySetToLists: true,
+		},
+		PolicyManagerCfg: &policies.PolicyManagerCfg{
+			PolicyMode: policies.IPSetPolicyMode,
+		},
+	}
+
+	windowsCalicoDPCfg = &Config{
+		IPSetManagerCfg: &ipsets.IPSetManagerCfg{
+			NetworkName:        "calico",
 			IPSetMode:          ipsets.ApplyAllIPSets,
 			AddEmptySetToLists: true,
 		},
@@ -479,6 +492,56 @@ func getAllSerialTests() []*SerialTestCase {
 				},
 				ExpectedEnpdointACLs: map[string][]*hnswrapper.FakeEndpointPolicy{
 					endpoint2: {},
+				},
+			},
+		},
+		{
+			Description: "Test base ACLs for Calico Network",
+			Actions: []*Action{
+				CreateEndpoint(endpoint1, ip1),
+				CreatePod("x", "a", ip1, thisNode, map[string]string{"k1": "v1"}),
+				ApplyDP(),
+			},
+			TestCaseMetadata: &TestCaseMetadata{
+				Tags: []Tag{
+					calicoTag,
+					podCrudTag,
+				},
+				DpCfg:            windowsCalicoDPCfg,
+				InitialEndpoints: nil,
+				ExpectedSetPolicies: []*hcn.SetPolicySetting{
+					dptestutils.SetPolicy(emptySet),
+					dptestutils.SetPolicy(allNamespaces, emptySet.GetHashedName(), nsXSet.GetHashedName()),
+					dptestutils.SetPolicy(nsXSet, ip1),
+					dptestutils.SetPolicy(podK1Set, ip1),
+					dptestutils.SetPolicy(podK1V1Set, ip1),
+				},
+				ExpectedEnpdointACLs: map[string][]*hnswrapper.FakeEndpointPolicy{
+					endpoint1: {
+						{
+							ID:              "azure-acl-baseblockhealthprobeout",
+							Action:          "Block",
+							Direction:       "Out",
+							Priority:        200,
+							RemoteAddresses: "168.63.129.16/32",
+							RemotePorts:     "80",
+							Protocols:       "6",
+						},
+						{
+							ID:        "azure-acl-baseallowin",
+							Action:    "Allow",
+							Direction: "In",
+							Priority:  65499,
+							Protocols: "256",
+						},
+						{
+							ID:        "azure-acl-baseallowout",
+							Action:    "Allow",
+							Direction: "Out",
+							Priority:  65499,
+							Protocols: "256",
+						},
+					},
 				},
 			},
 		},

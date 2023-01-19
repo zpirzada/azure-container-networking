@@ -19,6 +19,37 @@ var (
 	removeOnlyGivenPolicy         shouldResetAllACLs = false
 )
 
+// baseACLsForCalicoCNI is a list of base ACLs that are required for connectivity on Calico CNI.
+// Note: these ACLs have an ID with only one dash after the prefix so that they can't conflict with ACLs of a policy (see aclPolicyID()).
+var baseACLsForCalicoCNI = []*NPMACLPolSettings{
+	{
+		Id:              fmt.Sprintf("%s-baseblockhealthprobeout", policyIDPrefix),
+		Action:          "Block",
+		Direction:       "Out",
+		Priority:        200,
+		RemoteAddresses: "168.63.129.16/32",
+		RemotePorts:     "80",
+		Protocols:       "6",
+		RuleType:        "Switch",
+	},
+	{
+		Id:        fmt.Sprintf("%s-baseallowin", policyIDPrefix),
+		Action:    "Allow",
+		Direction: "In",
+		Priority:  65499,
+		Protocols: anyProtocol,
+		RuleType:  "Switch",
+	},
+	{
+		Id:        fmt.Sprintf("%s-baseallowout", policyIDPrefix),
+		Action:    "Allow",
+		Direction: "Out",
+		Priority:  65499,
+		Protocols: anyProtocol,
+		RuleType:  "Switch",
+	},
+}
+
 type staleChains struct{} // unused in Windows
 
 type shouldResetAllACLs bool
@@ -58,34 +89,7 @@ func (pMgr *PolicyManager) reconcile() {
 
 // AddBaseACLsForCalicoCNI attempts to add base ACLs for Calico CNI.
 func (pMgr *PolicyManager) AddBaseACLsForCalicoCNI(epID string) {
-	rulesToAdd := []*NPMACLPolSettings{
-		{
-			Id:              "host-allow-in",
-			Action:          "Allow",
-			Direction:       "In",
-			LocalAddresses:  "",
-			LocalPorts:      "",
-			Priority:        0,
-			Protocols:       "256",
-			RemoteAddresses: "",
-			RemotePorts:     "",
-			RuleType:        "Host",
-		},
-		{
-			Id:              "host-allow-out",
-			Action:          "Allow",
-			Direction:       "Out",
-			LocalAddresses:  "",
-			LocalPorts:      "",
-			Priority:        0,
-			Protocols:       "256",
-			RemoteAddresses: "",
-			RemotePorts:     "",
-			RuleType:        "Host",
-		},
-	}
-
-	epPolicyRequest, err := getEPPolicyReqFromACLSettings(rulesToAdd)
+	epPolicyRequest, err := getEPPolicyReqFromACLSettings(baseACLsForCalicoCNI)
 	if err != nil {
 		klog.Errorf("failed to get policy request for base ACLs for Calico CNI. endpoint: %s. err: %v", epID, err)
 		return
