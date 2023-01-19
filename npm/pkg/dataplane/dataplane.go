@@ -219,7 +219,8 @@ func (dp *DataPlane) ApplyDataPlane() error {
 		err := dp.refreshPodEndpoints()
 		if err != nil {
 			metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "[DataPlane] failed to refresh endpoints while updating pods. err: [%s]", err.Error())
-			return fmt.Errorf("[DataPlane] failed to refresh endpoints while updating pods. err: [%w]", err)
+			// return as success since this can be retried irrespective of other operations
+			return nil
 		}
 
 		// lock updatePodCache while driving goal state to kernel
@@ -227,22 +228,15 @@ func (dp *DataPlane) ApplyDataPlane() error {
 		dp.updatePodCache.Lock()
 		defer dp.updatePodCache.Unlock()
 
-		var aggregateErr error
 		for podKey, pod := range dp.updatePodCache.cache {
 			err := dp.updatePod(pod)
 			if err != nil {
-				if aggregateErr == nil {
-					aggregateErr = fmt.Errorf("failed to update pod while applying the dataplane. key: [%s], err: [%w]", podKey, err)
-				} else {
-					aggregateErr = fmt.Errorf("failed to update pod while applying the dataplane. key: [%s], err: [%s]. previous err: [%w]", podKey, err.Error(), aggregateErr)
-				}
+				// move on to the next and later return as success since this can be retried irrespective of other operations
 				metrics.SendErrorLogAndMetric(util.DaemonDataplaneID, "failed to update pod while applying the dataplane. key: [%s], err: [%s]", podKey, err.Error())
 				continue
 			}
+
 			delete(dp.updatePodCache.cache, podKey)
-		}
-		if aggregateErr != nil {
-			return fmt.Errorf("[DataPlane] error while updating pods: %w", aggregateErr)
 		}
 	}
 	return nil
@@ -395,16 +389,17 @@ func (dp *DataPlane) createIPSetsAndReferences(sets []*ipsets.TranslatedIPSet, n
 }
 
 func (dp *DataPlane) deleteIPSetsAndReferences(sets []*ipsets.TranslatedIPSet, netpolName string, referenceType ipsets.ReferenceType) error {
+	for _, set := range sets {
+		prefixName := set.Metadata.GetPrefixName()
+		if err := dp.ipsetMgr.DeleteReference(prefixName, netpolName, referenceType); err != nil {
+			// with current implementation of DeleteReference(), err will be ipsets.ErrSetDoesNotExist
+			klog.Infof("[DataPlane] ignoring delete reference on non-existent set. ipset: %s. netpol: %s. referenceType: %s", prefixName, netpolName, referenceType)
+		}
+	}
+
 	npmErrorString := npmerrors.DeleteSelectorReference
 	if referenceType == ipsets.NetPolType {
 		npmErrorString = npmerrors.DeleteNetPolReference
-	}
-	for _, set := range sets {
-		// TODO ignore set does not exist error
-		err := dp.ipsetMgr.DeleteReference(set.Metadata.GetPrefixName(), netpolName, referenceType)
-		if err != nil {
-			return npmerrors.Errorf(npmErrorString, false, fmt.Sprintf("[DataPlane] failed to deleteIPSetReferences with err: %s", err.Error()))
-		}
 	}
 
 	// Check if any list sets are provided with members to delete
