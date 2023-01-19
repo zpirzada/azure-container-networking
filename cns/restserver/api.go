@@ -1159,14 +1159,16 @@ func (service *HTTPRestService) publishNetworkContainer(w http.ResponseWriter, r
 	ctx := r.Context()
 
 	var (
-		req                 cns.PublishNetworkContainerRequest
-		returnCode          types.ResponseCode
-		returnMessage       string
-		publishStatusCode   int
-		publishResponseBody []byte
-		publishErrorStr     string
-		isNetworkJoined     bool
+		req             cns.PublishNetworkContainerRequest
+		returnCode      types.ResponseCode
+		returnMessage   string
+		publishErrorStr string
+		isNetworkJoined bool
 	)
+
+	// publishing is assumed to succeed unless some other error handling sets it
+	// otherwise
+	publishStatusCode := http.StatusOK
 
 	err := service.Listener.Decode(w, r, &req)
 
@@ -1245,6 +1247,10 @@ func (service *HTTPRestService) publishNetworkContainer(w http.ResponseWriter, r
 		returnCode = types.UnsupportedVerb
 	}
 
+	// create a synthetic response from NMAgent so that clients that previously
+	// relied on its presence can continue to do so.
+	publishResponseBody := fmt.Sprintf(`{"httpStatusCode":"%d"}`, publishStatusCode)
+
 	response := cns.PublishNetworkContainerResponse{
 		Response: cns.Response{
 			ReturnCode: returnCode,
@@ -1252,7 +1258,7 @@ func (service *HTTPRestService) publishNetworkContainer(w http.ResponseWriter, r
 		},
 		PublishErrorStr:     publishErrorStr,
 		PublishStatusCode:   publishStatusCode,
-		PublishResponseBody: publishResponseBody,
+		PublishResponseBody: []byte(publishResponseBody),
 	}
 
 	err = service.Listener.Encode(w, &response)
@@ -1265,14 +1271,14 @@ func (service *HTTPRestService) unpublishNetworkContainer(w http.ResponseWriter,
 	ctx := r.Context()
 
 	var (
-		req                   cns.UnpublishNetworkContainerRequest
-		returnCode            types.ResponseCode
-		returnMessage         string
-		unpublishStatusCode   int
-		unpublishResponseBody []byte
-		unpublishErrorStr     string
-		isNetworkJoined       bool
+		req               cns.UnpublishNetworkContainerRequest
+		returnCode        types.ResponseCode
+		returnMessage     string
+		unpublishErrorStr string
+		isNetworkJoined   bool
 	)
+
+	unpublishStatusCode := http.StatusOK
 
 	err := service.Listener.Decode(w, r, &req)
 
@@ -1355,6 +1361,10 @@ func (service *HTTPRestService) unpublishNetworkContainer(w http.ResponseWriter,
 		returnCode = types.UnsupportedVerb
 	}
 
+	// create a synthetic response from NMAgent so that clients that previously
+	// relied on its presence can continue to do so.
+	unpublishResponseBody := fmt.Sprintf(`{"httpStatusCode":"%d"}`, unpublishStatusCode)
+
 	response := cns.UnpublishNetworkContainerResponse{
 		Response: cns.Response{
 			ReturnCode: returnCode,
@@ -1362,7 +1372,7 @@ func (service *HTTPRestService) unpublishNetworkContainer(w http.ResponseWriter,
 		},
 		UnpublishErrorStr:     unpublishErrorStr,
 		UnpublishStatusCode:   unpublishStatusCode,
-		UnpublishResponseBody: unpublishResponseBody,
+		UnpublishResponseBody: []byte(unpublishResponseBody),
 	}
 
 	err = service.Listener.Encode(w, &response)
