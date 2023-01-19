@@ -234,7 +234,7 @@ const (
 	// AzureNetworkName is the default network Azure CNI creates
 	AzureNetworkName = "azure"
 	// CalicoNetworkName is the default network Calico CNI creates
-	CalicoNetworkName = "calico"
+	CalicoNetworkName = "Calico"
 )
 
 // These ID represents where did the error log generate from.

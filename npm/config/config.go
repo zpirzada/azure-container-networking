@@ -48,6 +48,8 @@ type GrpcServerConfig struct {
 }
 
 type Config struct {
+	// WindowsNetworkName can be either 'azure' or 'Calico' (case sensitive).
+	// It can also be the empty string, which results in the default value of 'azure'.
 	WindowsNetworkName    string           `json:"WindowsNetworkName,omitempty"`
 	ResyncPeriodInMinutes int              `json:"ResyncPeriodInMinutes,omitempty"`
 	ListeningPort         int              `json:"ListeningPort,omitempty"`
