@@ -23,7 +23,7 @@ var (
 // Note: these ACLs have an ID with only one dash after the prefix so that they can't conflict with ACLs of a policy (see aclPolicyID()).
 var baseACLsForCalicoCNI = []*NPMACLPolSettings{
 	{
-		Id:              fmt.Sprintf("%s-baseblockhealthprobeout", policyIDPrefix),
+		Id:              fmt.Sprintf("%s-baseazurewireserver", policyIDPrefix),
 		Action:          "Block",
 		Direction:       "Out",
 		Priority:        200,
@@ -33,20 +33,50 @@ var baseACLsForCalicoCNI = []*NPMACLPolSettings{
 		RuleType:        "Switch",
 	},
 	{
-		Id:        fmt.Sprintf("%s-baseallowin", policyIDPrefix),
+		Id:        fmt.Sprintf("%s-baseallowinswitch", policyIDPrefix),
 		Action:    "Allow",
 		Direction: "In",
 		Priority:  65499,
-		Protocols: anyProtocol,
-		RuleType:  "Switch",
 	},
 	{
-		Id:        fmt.Sprintf("%s-baseallowout", policyIDPrefix),
+		Id:        fmt.Sprintf("%s-baseallowoutswitch", policyIDPrefix),
 		Action:    "Allow",
 		Direction: "Out",
 		Priority:  65499,
-		Protocols: anyProtocol,
-		RuleType:  "Switch",
+	},
+	{
+		Id:        fmt.Sprintf("%s-baseallowinhost", policyIDPrefix),
+		Action:    "Allow",
+		Direction: "In",
+		// unsupported for NPMACLPolSettings
+		// InternalPort:  0,
+		LocalAddresses: "",
+		// unsupported for NPMACLPolSettings (note no 's')
+		// LocalPort: "0",
+		Priority: 0,
+		// unsupported for NPMACLPolSettings (note no 's')
+		// Protocol:       "256",
+		RemoteAddresses: "",
+		// unsupported for NPMACLPolSettings (note no 's')
+		// RemotePort: "0",
+		RuleType: "Host",
+	},
+	{
+		Id:        fmt.Sprintf("%s-baseallowouthost", policyIDPrefix),
+		Action:    "Allow",
+		Direction: "Out",
+		// unsupported for NPMACLPolSettings
+		// InternalPort:  0,
+		LocalAddresses: "",
+		// unsupported for NPMACLPolSettings (note no 's')
+		// LocalPort: "0",
+		Priority: 0,
+		// unsupported for NPMACLPolSettings (note no 's')
+		// Protocol:       "256",
+		RemoteAddresses: "",
+		// unsupported for NPMACLPolSettings (note no 's')
+		// RemotePort: "0",
+		RuleType: "Host",
 	},
 }
 

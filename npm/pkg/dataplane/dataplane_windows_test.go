@@ -21,9 +21,6 @@ const (
 func TestAllSerialCases(t *testing.T) {
 	tests := getAllSerialTests()
 	for i, tt := range tests {
-		if tt.Description != "Test base ACLs for Calico Network" {
-			continue
-		}
 		i := i
 		tt := tt
 		t.Run(tt.Description, func(t *testing.T) {

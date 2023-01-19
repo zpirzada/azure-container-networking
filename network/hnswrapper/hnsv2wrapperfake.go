@@ -528,4 +528,5 @@ type FakeEndpointPolicy struct {
 	LocalPorts      string            `json:",omitempty"`
 	RemotePorts     string            `json:",omitempty"`
 	Priority        int               `json:",omitempty"`
+	// FIXME should include RuleType too, but that will require updating every instance of this struct in UTs
 }

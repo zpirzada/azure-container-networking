@@ -20,7 +20,7 @@ const (
 	donotResetIPSets                           = false
 )
 
-var errUnsupportedNetwork = errors.New("only 'azure' and 'calico' networks are supported")
+var errUnsupportedNetwork = errors.New("only 'azure' and 'Calico' networks are supported")
 
 type networkPolicyBuilder struct {
 	toAddSets    map[string]*hcn.SetPolicySetting

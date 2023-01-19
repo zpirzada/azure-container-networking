@@ -64,7 +64,7 @@ var (
 
 	windowsCalicoDPCfg = &Config{
 		IPSetManagerCfg: &ipsets.IPSetManagerCfg{
-			NetworkName:        "calico",
+			NetworkName:        "Calico",
 			IPSetMode:          ipsets.ApplyAllIPSets,
 			AddEmptySetToLists: true,
 		},
@@ -519,7 +519,7 @@ func getAllSerialTests() []*SerialTestCase {
 				ExpectedEnpdointACLs: map[string][]*hnswrapper.FakeEndpointPolicy{
 					endpoint1: {
 						{
-							ID:              "azure-acl-baseblockhealthprobeout",
+							ID:              "azure-acl-baseazurewireserver",
 							Action:          "Block",
 							Direction:       "Out",
 							Priority:        200,
@@ -528,18 +528,36 @@ func getAllSerialTests() []*SerialTestCase {
 							Protocols:       "6",
 						},
 						{
-							ID:        "azure-acl-baseallowin",
+							ID:        "azure-acl-baseallowinswitch",
 							Action:    "Allow",
 							Direction: "In",
 							Priority:  65499,
-							Protocols: "256",
 						},
 						{
-							ID:        "azure-acl-baseallowout",
+							ID:        "azure-acl-baseallowoutswitch",
 							Action:    "Allow",
 							Direction: "Out",
 							Priority:  65499,
-							Protocols: "256",
+						},
+						{
+							ID:              "azure-acl-baseallowinhost",
+							Action:          "Allow",
+							Direction:       "In",
+							LocalAddresses:  "",
+							Priority:        0,
+							RemoteAddresses: "",
+							// RuleType is unsupported in FakeEndpointPolicy
+							// RuleType: "Host",
+						},
+						{
+							ID:              "azure-acl-baseallowouthost",
+							Action:          "Allow",
+							Direction:       "Out",
+							LocalAddresses:  "",
+							Priority:        0,
+							RemoteAddresses: "",
+							// RuleType is unsupported in FakeEndpointPolicy
+							// RuleType: "Host",
 						},
 					},
 				},
