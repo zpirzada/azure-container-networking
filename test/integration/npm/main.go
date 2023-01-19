@@ -23,7 +23,7 @@ var (
 	dpCfg = &dataplane.Config{
 		IPSetManagerCfg: &ipsets.IPSetManagerCfg{
 			IPSetMode:   ipsets.ApplyAllIPSets,
-			NetworkName: "Calico",
+			NetworkName: "azure",
 		},
 		PolicyManagerCfg: &policies.PolicyManagerCfg{
 			PolicyMode:           policies.IPSetPolicyMode,

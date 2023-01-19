@@ -56,7 +56,8 @@ func (pMgr *PolicyManager) reconcile() {
 	// not implemented
 }
 
-func (pMgr *PolicyManager) AddBaseACLs(endpointID string) error {
+// AddBaseACLsForCalicoCNI attempts to add base ACLs for Calico CNI.
+func (pMgr *PolicyManager) AddBaseACLsForCalicoCNI(epID string) {
 	rulesToAdd := []*NPMACLPolSettings{
 		{
 			Id:              "host-allow-in",
@@ -86,14 +87,13 @@ func (pMgr *PolicyManager) AddBaseACLs(endpointID string) error {
 
 	epPolicyRequest, err := getEPPolicyReqFromACLSettings(rulesToAdd)
 	if err != nil {
-		klog.Errorf("failed to get ep Policy request: %+v", err)
-		return nil
+		klog.Errorf("failed to get policy request for base ACLs for Calico CNI. endpoint: %s. err: %v", epID, err)
+		return
 	}
 
-	if err := pMgr.applyPoliciesToEndpointID(endpointID, epPolicyRequest); err != nil {
-		klog.Errorf("error applying base policies: %+v", err)
+	if err := pMgr.applyPoliciesToEndpointID(epID, epPolicyRequest); err != nil {
+		klog.Errorf("failed to apply base ACLs for Calico CNI. endpoint: %s. err: %v", epID, err)
 	}
-	return nil
 }
 
 // addPolicy will add the policy for each specified endpoint if the policy doesn't exist on the endpoint yet,

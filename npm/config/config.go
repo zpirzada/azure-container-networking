@@ -16,6 +16,7 @@ const (
 
 // DefaultConfig is the guaranteed configuration NPM can run in out of the box
 var DefaultConfig = Config{
+	WindowsNetworkName:    util.AzureNetworkName,
 	ResyncPeriodInMinutes: defaultResyncPeriod,
 
 	ListeningPort:    defaultListeningPort,
@@ -47,14 +48,12 @@ type GrpcServerConfig struct {
 }
 
 type Config struct {
-	ResyncPeriodInMinutes int `json:"ResyncPeriodInMinutes,omitempty"`
-
-	ListeningPort    int    `json:"ListeningPort,omitempty"`
-	ListeningAddress string `json:"ListeningAddress,omitempty"`
-
-	Transport GrpcServerConfig `json:"Transport,omitempty"`
-
-	Toggles Toggles `json:"Toggles,omitempty"`
+	WindowsNetworkName    string           `json:"WindowsNetworkName,omitempty"`
+	ResyncPeriodInMinutes int              `json:"ResyncPeriodInMinutes,omitempty"`
+	ListeningPort         int              `json:"ListeningPort,omitempty"`
+	ListeningAddress      string           `json:"ListeningAddress,omitempty"`
+	Transport             GrpcServerConfig `json:"Transport,omitempty"`
+	Toggles               Toggles          `json:"Toggles,omitempty"`
 }
 
 type Toggles struct {
