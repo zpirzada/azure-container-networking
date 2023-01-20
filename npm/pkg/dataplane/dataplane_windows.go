@@ -390,6 +390,13 @@ func (dp *DataPlane) refreshPodEndpoints() error {
 				// NOTE: TSGs rely on this log line
 				klog.Infof("updating endpoint cache for previously cached IP %s: %+v with stalePodKey %+v", npmEP.ip, npmEP, npmEP.stalePodKey)
 			}
+
+			if dp.NetworkName == util.CalicoNetworkName {
+				// NOTE 1: connectivity may be broken for an endpoint until this method is called
+				// NOTE 2: if NPM restarted, technically we could call into HNS to add the base ACLs even if they already exist on the Endpoint.
+				// It doesn't seem worthwhile to account for these edge-cases since using calico network is currently intended just for testing
+				dp.policyMgr.AddBaseACLsForCalicoCNI(npmEP.id)
+			}
 		}
 	}
 
