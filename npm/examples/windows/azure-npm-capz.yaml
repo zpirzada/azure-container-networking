@@ -83,7 +83,8 @@ spec:
       hostNetwork: true
       containers:
         - name: azure-npm
-          image: mcr.microsoft.com/containernetworking/azure-npm:v1.4.41 # setting to future version since it will use the updated Dockerfile
+          # setting to future version since it will use the updated Dockerfile
+          image: mcr.microsoft.com/containernetworking/azure-npm:v1.4.42
           command: ["powershell.exe"]
           args:
             [
