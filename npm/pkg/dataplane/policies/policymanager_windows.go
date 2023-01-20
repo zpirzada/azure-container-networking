@@ -56,6 +56,38 @@ func (pMgr *PolicyManager) reconcile() {
 	// not implemented
 }
 
+// AddHostACL attempts to add base ACLs for Calico CNI.
+func (pMgr *PolicyManager) AddHostACL(epID string) {
+	toAdd := []*NPMACLPolSettings{
+		{
+			Id:        fmt.Sprintf("%s-baseallowouthost", policyIDPrefix),
+			Action:    "Allow",
+			Direction: "Out",
+			// unsupported for NPMACLPolSettings
+			// InternalPort:  0,
+			LocalAddresses: "",
+			// unsupported for NPMACLPolSettings (note no 's')
+			// LocalPort: "0",
+			Priority: 0,
+			// unsupported for NPMACLPolSettings (note no 's')
+			// Protocol:       "256",
+			RemoteAddresses: "",
+			// unsupported for NPMACLPolSettings (note no 's')
+			// RemotePort: "0",
+			RuleType: "Host",
+		},
+	}
+	epPolicyRequest, err := getEPPolicyReqFromACLSettings(toAdd)
+	if err != nil {
+		klog.Errorf("failed to get policy request for base ACLs for Calico CNI. endpoint: %s. err: %v", epID, err)
+		return
+	}
+
+	if err := pMgr.applyPoliciesToEndpointID(epID, epPolicyRequest); err != nil {
+		klog.Errorf("failed to apply base ACLs for Calico CNI. endpoint: %s. err: %v", epID, err)
+	}
+}
+
 // addPolicy will add the policy for each specified endpoint if the policy doesn't exist on the endpoint yet,
 // and will add the endpoint to the PodEndpoints of the policy if successful.
 // addPolicy may modify the endpointList input.
