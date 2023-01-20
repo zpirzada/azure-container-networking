@@ -21,9 +21,6 @@ const (
 func TestAllSerialCases(t *testing.T) {
 	tests := getAllSerialTests()
 	for i, tt := range tests {
-		if tt.Tags[0] != calicoTag {
-			continue
-		}
 		i := i
 		tt := tt
 		t.Run(tt.Description, func(t *testing.T) {
