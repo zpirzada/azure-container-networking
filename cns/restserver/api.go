@@ -20,7 +20,6 @@ import (
 	"github.com/Azure/azure-container-networking/cns/types"
 	"github.com/Azure/azure-container-networking/cns/wireserver"
 	"github.com/Azure/azure-container-networking/nmagent"
-	"github.com/Azure/azure-container-networking/platform"
 	"github.com/pkg/errors"
 )
 
@@ -885,14 +884,6 @@ func (service *HTTPRestService) getNetworkContainerByOrchestratorContext(w http.
 		return
 	}
 
-	// getNetworkContainerByOrchestratorContext gets called for multitenancy and
-	// setting the SDNRemoteArpMacAddress regKey is essential for the multitenancy
-	// to work correctly in case of windows platform. Return if there is an error
-	if err = platform.SetSdnRemoteArpMacAddress(); err != nil {
-		logger.Printf("[Azure CNS] SetSdnRemoteArpMacAddress failed with error: %s", err.Error())
-		return
-	}
-
 	getNetworkContainerResponse := service.getNetworkContainerResponse(req)
 	returnCode := getNetworkContainerResponse.Response.ReturnCode
 	err = service.Listener.Encode(w, &getNetworkContainerResponse)
@@ -1139,7 +1130,7 @@ func (h *HTTPRestService) doPublish(ctx context.Context, req cns.PublishNetworkC
 	var innerReq nmagent.PutNetworkContainerRequest
 	err := json.Unmarshal(innerReqBytes, &innerReq)
 	if err != nil {
-		returnMessage := fmt.Sprintf("Failed to publish Network Container: %s", req.NetworkContainerID)
+		returnMessage := fmt.Sprintf("Failed to unmarshal embedded NC publish request for NC %s, with err: %v", req.NetworkContainerID, err)
 		returnCode := types.NetworkContainerPublishFailed
 		logger.Errorf("[Azure-CNS] %s", returnMessage)
 		return returnMessage, returnCode
@@ -1147,11 +1138,12 @@ func (h *HTTPRestService) doPublish(ctx context.Context, req cns.PublishNetworkC
 
 	innerReq.AuthenticationToken = ncParameters.AuthToken
 	innerReq.PrimaryAddress = ncParameters.AssociatedInterfaceID
+	innerReq.ID = req.NetworkContainerID
 
 	err = h.nma.PutNetworkContainer(ctx, &innerReq)
 	// nolint:bodyclose // existing code needs refactoring
 	if err != nil {
-		returnMessage := fmt.Sprintf("Failed to publish Network Container: %s", req.NetworkContainerID)
+		returnMessage := fmt.Sprintf("Failed to publish Network Container %s in put Network Container call, with err: %v", req.NetworkContainerID, err)
 		returnCode := types.NetworkContainerPublishFailed
 		logger.Errorf("[Azure-CNS] %s", returnMessage)
 		return returnMessage, returnCode
@@ -1167,14 +1159,16 @@ func (service *HTTPRestService) publishNetworkContainer(w http.ResponseWriter, r
 	ctx := r.Context()
 
 	var (
-		req                 cns.PublishNetworkContainerRequest
-		returnCode          types.ResponseCode
-		returnMessage       string
-		publishStatusCode   int
-		publishResponseBody []byte
-		publishErrorStr     string
-		isNetworkJoined     bool
+		req             cns.PublishNetworkContainerRequest
+		returnCode      types.ResponseCode
+		returnMessage   string
+		publishErrorStr string
+		isNetworkJoined bool
 	)
+
+	// publishing is assumed to succeed unless some other error handling sets it
+	// otherwise
+	publishStatusCode := http.StatusOK
 
 	err := service.Listener.Decode(w, r, &req)
 
@@ -1240,18 +1234,14 @@ func (service *HTTPRestService) publishNetworkContainer(w http.ResponseWriter, r
 			returnMessage, returnCode = service.doPublish(ctx, req, ncParameters)
 		}
 
-		req := nmagent.NCVersionRequest{
-			AuthToken:          ncParameters.AuthToken,
-			NetworkContainerID: req.NetworkContainerID,
-			PrimaryAddress:     ncParameters.AssociatedInterfaceID,
-		}
-
-		ncVersionURLs.Store(cns.SwiftPrefix+req.NetworkContainerID, req)
-
 	default:
 		returnMessage = "PublishNetworkContainer API expects a POST"
 		returnCode = types.UnsupportedVerb
 	}
+
+	// create a synthetic response from NMAgent so that clients that previously
+	// relied on its presence can continue to do so.
+	publishResponseBody := fmt.Sprintf(`{"httpStatusCode":"%d"}`, publishStatusCode)
 
 	response := cns.PublishNetworkContainerResponse{
 		Response: cns.Response{
@@ -1260,7 +1250,7 @@ func (service *HTTPRestService) publishNetworkContainer(w http.ResponseWriter, r
 		},
 		PublishErrorStr:     publishErrorStr,
 		PublishStatusCode:   publishStatusCode,
-		PublishResponseBody: publishResponseBody,
+		PublishResponseBody: []byte(publishResponseBody),
 	}
 
 	err = service.Listener.Encode(w, &response)
@@ -1273,14 +1263,14 @@ func (service *HTTPRestService) unpublishNetworkContainer(w http.ResponseWriter,
 	ctx := r.Context()
 
 	var (
-		req                   cns.UnpublishNetworkContainerRequest
-		returnCode            types.ResponseCode
-		returnMessage         string
-		unpublishStatusCode   int
-		unpublishResponseBody []byte
-		unpublishErrorStr     string
-		isNetworkJoined       bool
+		req               cns.UnpublishNetworkContainerRequest
+		returnCode        types.ResponseCode
+		returnMessage     string
+		unpublishErrorStr string
+		isNetworkJoined   bool
 	)
+
+	unpublishStatusCode := http.StatusOK
 
 	err := service.Listener.Decode(w, r, &req)
 
@@ -1355,13 +1345,14 @@ func (service *HTTPRestService) unpublishNetworkContainer(w http.ResponseWriter,
 				logger.Errorf("[Azure-CNS] %s", returnMessage)
 			}
 		}
-
-		// Remove the NC version URL entry added during publish
-		ncVersionURLs.Delete(cns.SwiftPrefix + req.NetworkContainerID)
 	default:
 		returnMessage = "UnpublishNetworkContainer API expects a POST"
 		returnCode = types.UnsupportedVerb
 	}
+
+	// create a synthetic response from NMAgent so that clients that previously
+	// relied on its presence can continue to do so.
+	unpublishResponseBody := fmt.Sprintf(`{"httpStatusCode":"%d"}`, unpublishStatusCode)
 
 	response := cns.UnpublishNetworkContainerResponse{
 		Response: cns.Response{
@@ -1370,7 +1361,7 @@ func (service *HTTPRestService) unpublishNetworkContainer(w http.ResponseWriter,
 		},
 		UnpublishErrorStr:     unpublishErrorStr,
 		UnpublishStatusCode:   unpublishStatusCode,
-		UnpublishResponseBody: unpublishResponseBody,
+		UnpublishResponseBody: []byte(unpublishResponseBody),
 	}
 
 	err = service.Listener.Encode(w, &response)

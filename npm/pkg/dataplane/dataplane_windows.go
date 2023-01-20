@@ -171,7 +171,9 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 		*/
 		selectorReference, err := dp.ipsetMgr.GetSelectorReferencesBySet(setName)
 		if err != nil {
-			return err
+			// ignore this set since it may have been deleted in the background reconcile thread
+			klog.Infof("[DataPlane] ignoring pod update for ipset to remove since the set does not exist. pod: %+v. set: %s", pod, setName)
+			continue
 		}
 
 		for policyKey := range selectorReference {
@@ -208,7 +210,9 @@ func (dp *DataPlane) updatePod(pod *updateNPMPod) error {
 		*/
 		selectorReference, err := dp.ipsetMgr.GetSelectorReferencesBySet(setName)
 		if err != nil {
-			return err
+			// ignore this set since it may have been deleted in the background reconcile thread
+			klog.Infof("[DataPlane] ignoring pod update for ipset to remove since the set does not exist. pod: %+v. set: %s", pod, setName)
+			continue
 		}
 
 		for policyKey := range selectorReference {
