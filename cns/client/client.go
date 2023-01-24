@@ -29,6 +29,7 @@ var clientPaths = []string{
 	cns.CreateHostNCApipaEndpointPath,
 	cns.DeleteHostNCApipaEndpointPath,
 	cns.RequestIPConfig,
+	cns.RequestIPConfigs,
 	cns.ReleaseIPConfig,
 	cns.PathDebugIPAddresses,
 	cns.PathDebugPodContext,
@@ -331,7 +332,7 @@ func (c *Client) RequestIPs(ctx context.Context, ipconfig cns.IPConfigRequest) (
 		return nil, errors.Wrap(err, "failed to encode IPConfigRequest")
 	}
 
-	u := c.routes[cns.RequestIPConfig]
+	u := c.routes[cns.RequestIPConfigs]
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), &body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build request")
