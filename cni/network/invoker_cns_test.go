@@ -175,7 +175,7 @@ func TestCNSIPAMInvoker_Delete(t *testing.T) {
 				podNamespace: testPodInfo.PodNamespace,
 				cnsClient: &MockCNSClient{
 					require: require,
-					release: releaseIPsHandler{
+					release: releaseIPAddressHandler{
 						ipconfigArgument: getTestIPConfigRequest(),
 					},
 				},
@@ -196,7 +196,7 @@ func TestCNSIPAMInvoker_Delete(t *testing.T) {
 				podName:      testPodInfo.PodName,
 				podNamespace: testPodInfo.PodNamespace,
 				cnsClient: &MockCNSClient{
-					release: releaseIPsHandler{
+					release: releaseIPAddressHandler{
 						ipconfigArgument: getTestIPConfigRequest(),
 						err:              errors.New("handle CNS delete error"), //nolint ut error
 					},
