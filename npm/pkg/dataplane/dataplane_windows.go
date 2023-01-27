@@ -371,6 +371,7 @@ func (dp *DataPlane) refreshPodEndpoints() error {
 				// NOTE 1: connectivity may be broken for an endpoint until this method is called
 				// NOTE 2: if NPM restarted, technically we could call into HNS to add the base ACLs even if they already exist on the Endpoint.
 				// It doesn't seem worthwhile to account for these edge-cases since using calico network is currently intended just for testing
+				klog.Infof("adding base ACLs for calico CNI endpoint. IP: %s. ID: %s", ip, npmEP.id)
 				dp.policyMgr.AddBaseACLsForCalicoCNI(npmEP.id)
 			}
 		} else if oldNPMEP.id != endpoint.Id {
@@ -395,6 +396,7 @@ func (dp *DataPlane) refreshPodEndpoints() error {
 				// NOTE 1: connectivity may be broken for an endpoint until this method is called
 				// NOTE 2: if NPM restarted, technically we could call into HNS to add the base ACLs even if they already exist on the Endpoint.
 				// It doesn't seem worthwhile to account for these edge-cases since using calico network is currently intended just for testing
+				klog.Infof("adding base ACLs for calico CNI endpoint. IP: %s. ID: %s", ip, npmEP.id)
 				dp.policyMgr.AddBaseACLsForCalicoCNI(npmEP.id)
 			}
 		}
