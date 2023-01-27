@@ -25,6 +25,9 @@
 # constants
 START=1
 END=10
+
+STOP_NODES_ON_FAILURE_FOR_TRACES=false
+# must be accurate if STOP_NODES_ON_FAILURE_FOR_TRACES=true
 WINDOWS_NODEPOOL=akswin22
 
 # parameters
@@ -38,16 +41,18 @@ if [[ -z $1 || -z $2 || -z $3 || -z $4 ]]; then
     exit 1
 fi
 
-aksRGPrefix=MC_$resourceGroup_$clusterName
-aksRG=`az group list -otable | grep $aksRGPrefix | awk '{print $1}'`
-if [[ -z $aksRG ]]; then
-    echo "AKS resource group not found. Should start with $aksRGPrefix..."
-    exit 1
+if [[ $STOP_NODES_ON_FAILURE_FOR_TRACES == true ]]; then
+    aksRGPrefix=MC_$resourceGroup_$clusterName
+    aksRG=`az group list -otable | grep $aksRGPrefix | awk '{print $1}'`
+    if [[ -z $aksRG ]]; then
+        echo "AKS resource group not found. Should start with $aksRGPrefix..."
+        exit 1
+    fi
+    echo "found AKS resource group: $aksRG"
+    echo "this AKS RG MUST have one WS22 nodepool named $WINDOWS_NODEPOOL..."
+    echo "START the HNS trace BEFORE running this:  .\starthnstrace.ps1 -maxFileSize 2000 ..."
+    sleep 15s
 fi
-echo "found AKS resource group: $aksRG"
-echo "this AKS RG MUST have one WS22 nodepool named $WINDOWS_NODEPOOL..."
-echo "START the HNS trace BEFORE running this:  .\starthnstrace.ps1 -maxFileSize 2000 ..."
-sleep 15s
 
 echo "using kubeconfig: $absolutePathKubeConfig"
 echo "using kubecontext: $kubecontext"
@@ -114,8 +119,10 @@ for i in $(seq $START $END); do
             kubectl --kubeconfig $absoluteKubeConfig logs -n kube-system $pod > $fname.$pod.log
         done
 
-        echo "stopping vmss instance to stop hns log capture"
-        az vmss stop --instance-ids="*" -n $WINDOWS_NODEPOOL -g $aksRG
+        if [[ $STOP_NODES_ON_FAILURE_FOR_TRACES == "true" ]]; then
+            echo "stopping vmss instance to stop hns log capture"
+            az vmss stop --instance-ids="*" -n $WINDOWS_NODEPOOL -g $aksRG
+        fi
 
         exit 3
     fi
