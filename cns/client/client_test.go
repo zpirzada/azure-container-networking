@@ -1464,7 +1464,9 @@ func TestRequestIPAddress(t *testing.T) {
 			name: "happy case",
 			ctx:  context.TODO(),
 			ipconfig: cns.IPConfigRequest{
-				DesiredIPAddress: "testipaddress",
+				DesiredIPAddresses: []string{
+					"testipaddress",
+				},
 				PodInterfaceID:   "testpodinterfaceid",
 				InfraContainerID: "testcontainerid",
 			},
@@ -1481,7 +1483,9 @@ func TestRequestIPAddress(t *testing.T) {
 			name: "bad request",
 			ctx:  context.TODO(),
 			ipconfig: cns.IPConfigRequest{
-				DesiredIPAddress: "testipaddress",
+				DesiredIPAddresses: []string{
+					"testipaddress",
+				},
 				PodInterfaceID:   "testpodinterfaceid",
 				InfraContainerID: "testcontainerid",
 			},
@@ -1498,7 +1502,9 @@ func TestRequestIPAddress(t *testing.T) {
 			name: "bad decoding",
 			ctx:  context.TODO(),
 			ipconfig: cns.IPConfigRequest{
-				DesiredIPAddress: "testipaddress",
+				DesiredIPAddresses: []string{
+					"testipaddress",
+				},
 				PodInterfaceID:   "testpodinterfaceid",
 				InfraContainerID: "testcontainerid",
 			},
@@ -1528,7 +1534,9 @@ func TestRequestIPAddress(t *testing.T) {
 			name: "cns return code not zero",
 			ctx:  context.TODO(),
 			ipconfig: cns.IPConfigRequest{
-				DesiredIPAddress: "testipaddress",
+				DesiredIPAddresses: []string{
+					"testipaddress",
+				},
 				PodInterfaceID:   "testpodinterfaceid",
 				InfraContainerID: "testcontainerid",
 			},
@@ -1549,7 +1557,9 @@ func TestRequestIPAddress(t *testing.T) {
 			name: "nil context",
 			ctx:  nil,
 			ipconfig: cns.IPConfigRequest{
-				DesiredIPAddress: "testipaddress",
+				DesiredIPAddresses: []string{
+					"testipaddress",
+				},
 				PodInterfaceID:   "testpodinterfaceid",
 				InfraContainerID: "testcontainerid",
 			},
@@ -1591,7 +1601,9 @@ func TestReleaseIPAddress(t *testing.T) {
 			name: "happy case",
 			ctx:  context.TODO(),
 			ipconfig: cns.IPConfigRequest{
-				DesiredIPAddress: "testipaddress",
+				DesiredIPAddresses: []string{
+					"testipaddress",
+				},
 				PodInterfaceID:   "testpodinterfaceid",
 				InfraContainerID: "testcontainerid",
 			},
@@ -1607,7 +1619,9 @@ func TestReleaseIPAddress(t *testing.T) {
 			name: "bad request",
 			ctx:  context.TODO(),
 			ipconfig: cns.IPConfigRequest{
-				DesiredIPAddress: "testipaddress",
+				DesiredIPAddresses: []string{
+					"testipaddress",
+				},
 				PodInterfaceID:   "testpodinterfaceid",
 				InfraContainerID: "testcontainerid",
 			},
@@ -1623,7 +1637,9 @@ func TestReleaseIPAddress(t *testing.T) {
 			name: "bad decoding",
 			ctx:  context.TODO(),
 			ipconfig: cns.IPConfigRequest{
-				DesiredIPAddress: "testipaddress",
+				DesiredIPAddresses: []string{
+					"testipaddress",
+				},
 				PodInterfaceID:   "testpodinterfaceid",
 				InfraContainerID: "testcontainerid",
 			},
@@ -1651,7 +1667,9 @@ func TestReleaseIPAddress(t *testing.T) {
 			name: "cns return code not zero",
 			ctx:  context.TODO(),
 			ipconfig: cns.IPConfigRequest{
-				DesiredIPAddress: "testipaddress",
+				DesiredIPAddresses: []string{
+					"testipaddress",
+				},
 				PodInterfaceID:   "testpodinterfaceid",
 				InfraContainerID: "testcontainerid",
 			},
@@ -1669,7 +1687,9 @@ func TestReleaseIPAddress(t *testing.T) {
 			name: "nil context",
 			ctx:  nil,
 			ipconfig: cns.IPConfigRequest{
-				DesiredIPAddress: "testipaddress",
+				DesiredIPAddresses: []string{
+					"testipaddress",
+				},
 				PodInterfaceID:   "testpodinterfaceid",
 				InfraContainerID: "testcontainerid",
 			},
