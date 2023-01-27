@@ -37,12 +37,14 @@ var baseACLsForCalicoCNI = []*NPMACLPolSettings{
 		Action:    "Allow",
 		Direction: "In",
 		Priority:  65499,
+		RuleType:  "Switch",
 	},
 	{
 		Id:        fmt.Sprintf("%s-baseallowoutswitch", policyIDPrefix),
 		Action:    "Allow",
 		Direction: "Out",
 		Priority:  65499,
+		RuleType:  "Switch",
 	},
 	{
 		Id:        fmt.Sprintf("%s-baseallowinhost", policyIDPrefix),
