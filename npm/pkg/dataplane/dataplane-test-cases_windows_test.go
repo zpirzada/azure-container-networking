@@ -16,6 +16,7 @@ const (
 	nsCrudTag     Tag = "namespace-crud"
 	netpolCrudTag Tag = "netpol-crud"
 	calicoTag     Tag = "calico"
+	reconcileTag  Tag = "reconcile"
 )
 
 const (
@@ -168,6 +169,7 @@ func getAllSerialTests() []*SerialTestCase {
 			TestCaseMetadata: &TestCaseMetadata{
 				Tags: []Tag{
 					podCrudTag,
+					reconcileTag,
 				},
 				DpCfg:            defaultWindowsDPCfg,
 				InitialEndpoints: nil,
@@ -496,6 +498,33 @@ func getAllSerialTests() []*SerialTestCase {
 			},
 		},
 		{
+			Description: "issue 1613: remove last instance of label, then reconcile IPSets, then apply DP",
+			Actions: []*Action{
+				CreateEndpoint(endpoint1, ip1),
+				CreatePod("x", "a", ip1, thisNode, map[string]string{"k1": "v1"}),
+				ApplyDP(),
+				UpdatePodLabels("x", "a", ip1, thisNode, map[string]string{"k1": "v1"}, nil),
+				ReconcileDP(),
+				ApplyDP(),
+			},
+			TestCaseMetadata: &TestCaseMetadata{
+				Tags: []Tag{
+					podCrudTag,
+					reconcileTag,
+				},
+				DpCfg:            defaultWindowsDPCfg,
+				InitialEndpoints: nil,
+				ExpectedSetPolicies: []*hcn.SetPolicySetting{
+					dptestutils.SetPolicy(emptySet),
+					dptestutils.SetPolicy(allNamespaces, emptySet.GetHashedName(), nsXSet.GetHashedName()),
+					dptestutils.SetPolicy(nsXSet, ip1),
+				},
+				ExpectedEnpdointACLs: map[string][]*hnswrapper.FakeEndpointPolicy{
+					endpoint1: {},
+				},
+			},
+		},
+		{
 			Description: "Calico Network: base ACLs",
 			Actions: []*Action{
 				CreateEndpoint(endpoint1, ip1),
@@ -670,7 +699,8 @@ func getAllSerialTests() []*SerialTestCase {
 					podCrudTag,
 					netpolCrudTag,
 				},
-				DpCfg:            windowsCalicoDPCfg,
+				DpCfg: windowsCalicoDPCfg,
+
 				InitialEndpoints: nil,
 				ExpectedSetPolicies: []*hcn.SetPolicySetting{
 					dptestutils.SetPolicy(emptySet),
