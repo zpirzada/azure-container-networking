@@ -295,8 +295,8 @@ func TestCNSClientRequestAndRelease(t *testing.T) {
 	t.Log(ipaddresses)
 
 	addresses := []string{}
-	for _, address := range addresses {
-		addresses = append(addresses, address)
+	for _, address := range ipaddresses {
+		addresses = append(addresses, address.IPAddress)
 	}
 
 	// release requested IP address, expect success
@@ -1840,7 +1840,7 @@ func TestGetPodOrchestratorContext(t *testing.T) {
 		ctx     context.Context
 		mockdo  *mockdo
 		routes  map[string]url.URL
-		want    map[string]string
+		want    map[string][]string
 		wantErr bool
 	}{
 		{
@@ -1854,7 +1854,7 @@ func TestGetPodOrchestratorContext(t *testing.T) {
 				httpStatusCodeToReturn: http.StatusOK,
 			},
 			routes:  emptyRoutes,
-			want:    map[string]string{},
+			want:    map[string][]string{},
 			wantErr: false,
 		},
 		{

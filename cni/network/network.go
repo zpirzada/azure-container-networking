@@ -1005,8 +1005,8 @@ func (plugin *NetPlugin) Delete(args *cniSkel.CmdArgs) error {
 	if !nwCfg.MultiTenancy {
 		// Call into IPAM plugin to release the endpoint's addresses.
 		addresses := []*net.IPNet{}
-		for _, address := range epInfo.IPAddresses {
-			addresses = append(addresses, &address)
+		for i := range epInfo.IPAddresses {
+			addresses = append(addresses, &epInfo.IPAddresses[i])
 			logAndSendEvent(plugin, fmt.Sprintf("Release ip:%s", address.IP.String()))
 		}
 		err = plugin.ipamInvoker.Delete(addresses, nwCfg, args, nwInfo.Options)
