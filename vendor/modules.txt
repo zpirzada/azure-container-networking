@@ -463,7 +463,7 @@ golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert
 golang.org/x/crypto/pkcs12
 golang.org/x/crypto/pkcs12/internal/rc2
-# golang.org/x/net v0.4.0
+# golang.org/x/net v0.7.0
 ## explicit; go 1.17
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -483,17 +483,17 @@ golang.org/x/net/trace
 ## explicit; go 1.17
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sys v0.3.0
+# golang.org/x/sys v0.5.0
 ## explicit; go 1.17
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.3.0
+# golang.org/x/term v0.5.0
 ## explicit; go 1.17
 golang.org/x/term
-# golang.org/x/text v0.5.0
+# golang.org/x/text v0.7.0
 ## explicit; go 1.17
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -641,7 +641,7 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/api v0.26.0
+# k8s.io/api v0.26.3
 ## explicit; go 1.19
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -705,7 +705,7 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
-# k8s.io/apimachinery v0.26.0
+# k8s.io/apimachinery v0.26.3
 ## explicit; go 1.19
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
